@@ -1,0 +1,42 @@
+{
+  "name": "twinmap",
+  "version": "0.0.0",
+  "description": "Live map of World of Warcraft: Forever for your second screen",
+  "private": true,
+  "license": "GPL-3.0-only",
+  "author": "Twinmap contributors",
+  "homepage": "https://twinmap.app",
+  "main": "out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "check": "svelte-check --tsconfig ./tsconfig.json",
+    "test": "vitest run",
+    "dist": "electron-vite build && electron-builder --win portable"
+  },
+  "build": {
+    "appId": "app.twinmap",
+    "productName": "Twinmap",
+    "files": [
+      "out/**"
+    ],
+    "win": {
+      "target": "portable"
+    },
+    "portable": {
+      "artifactName": "Twinmap-${version}-portable.exe"
+    }
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^7.3.1",
+    "@types/node": "^26.6.6",
+    "electron": "^45.2.3",
+    "electron-builder": "^26.18.0",
+    "electron-vite": "^6.0.0",
+    "svelte": "^5.57.3",
+    "svelte-check": "^4.7.8",
+    "typescript": "~5.9",
+    "vite": "^8.3.7",
+    "vitest": "^5.1.0"
+  }
+}
