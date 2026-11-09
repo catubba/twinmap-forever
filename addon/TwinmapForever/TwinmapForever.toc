@@ -1,0 +1,9 @@
+## Interface: 16001
+## Title: Twinmap Forever
+## Notes: Live map on your second screen. Reads and draws, never plays for you.
+## Author: Twinmap contributors
+## Version: 0.0.0
+## X-Website: https://twinmap.app
+## X-License: GPL-3.0-only
+
+TwinmapForever.lua
