@@ -7,3 +7,4 @@
 ## X-License: GPL-3.0-only
 
 TwinmapForever.lua
+Strip.lua

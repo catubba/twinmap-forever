@@ -1,0 +1,227 @@
+-- The strip: the game-to-app channel. One row of pixels along the top of the window, each cell one
+-- of 8 colors (R, G, B fully on or off). The app reads it off the screen.
+-- Codec and strip drawing adapted from wow-ai, Copyright (c) 2026 chelinho139, MIT License:
+-- full text in THIRD-PARTY-LICENSES.
+--
+-- Block: [0xC7 0x1B] [protocol] [id hi, lo] [len hi, lo] [payload] [fletcher s1, s2],
+-- packed MSB-first into 3-bit cells. The first three bytes never change meaning, so every app
+-- version can tell which protocol a strip speaks. The checksum covers protocol to payload.
+-- Payload: section US version US part US total US chunk of JSON.
+local _, ns = ...
+
+-- Tuning knobs.
+local CELL = 1        -- physical pixels per cell
+local RESERVED = 40   -- bytes of a block that are not section data: header, checksum, record
+local HOLD = 0.05     -- seconds a block stays up: must span a few captures
+local REFRESH = 600   -- resend an unchanged section this often: nothing acks, a block can be missed
+local START_DELAY = 5 -- seconds after entering the world
+
+local MAGIC1, MAGIC2 = 0xC7, 0x1B
+local US = "\31"
+
+---------------------------------------------------------------------------
+-- Helpers
+---------------------------------------------------------------------------
+
+local function Ok(ok, ...) if ok then return ... end end
+local function Try(f, ...) if f then return Ok(pcall(f, ...)) end end
+
+-- Some values are hidden from addons in combat: they must never be compared or sent.
+local function IsSecret(v) return issecretvalue and issecretvalue(v) end
+local function Num(v) if type(v) == "number" and not IsSecret(v) then return v end end
+local function Str(v) if type(v) == "string" and not IsSecret(v) then return v end end
+local function Round(v, step) return math.floor(v / step + 0.5) * step end
+
+local function Json(v)
+  if IsSecret(v) then return "null" end
+  local t = type(v)
+  if t == "string" then
+    return '"' .. (v:gsub('[%c"\\]', function(c) return string.format("\\u%04x", c:byte()) end)) .. '"'
+  elseif t == "number" then
+    if v ~= v or v == math.huge or v == -math.huge then return "null" end
+    if v == math.floor(v) then return string.format("%.0f", v) end
+    return string.format("%.1f", v)
+  elseif t == "boolean" then
+    return tostring(v)
+  elseif t == "table" then
+    local parts = {}
+    if next(v) == nil or v[1] ~= nil then
+      for i, x in ipairs(v) do parts[i] = Json(x) end
+      return "[" .. table.concat(parts, ",") .. "]"
+    end
+    -- Sorted keys: change detection compares the text.
+    local keys = {}
+    for k in pairs(v) do keys[#keys + 1] = k end
+    table.sort(keys)
+    for i, k in ipairs(keys) do parts[i] = Json(k) .. ":" .. Json(v[k]) end
+    return "{" .. table.concat(parts, ",") .. "}"
+  end
+  return "null"
+end
+
+---------------------------------------------------------------------------
+-- Sections: what gets sent. Each builder runs in a pcall.
+---------------------------------------------------------------------------
+
+local function BuildPos()
+  local out = { zone = Str(Try(GetZoneText)), sub = Str(Try(GetSubZoneText)) }
+  local mapId = Num(Try(C_Map.GetBestMapForUnit, "player"))
+  if mapId then
+    out.map = mapId
+    local p = Try(C_Map.GetPlayerMapPosition, mapId, "player")
+    if type(p) == "table" and Num(p.x) and Num(p.y) then
+      -- Percent of the zone map, to one decimal.
+      out.x, out.y = Round(p.x * 100, 0.1), Round(p.y * 100, 0.1)
+    end
+  end
+  -- Degrees, anticlockwise from north, in steps of 10: turning on the spot should not send every second.
+  local facing = Num(Try(GetPlayerFacing))
+  if facing then out.facing = Round(math.deg(facing), 10) % 360 end
+  return out
+end
+
+-- name, seconds between checks, builder
+local SECTIONS = {
+  { name = "pos", period = 1, build = BuildPos },
+}
+
+---------------------------------------------------------------------------
+-- Strip
+---------------------------------------------------------------------------
+
+local function Encode(id, payload)
+  local len = #payload
+  local bytes = { MAGIC1, MAGIC2, ns.PROTOCOL, math.floor(id / 256) % 256, id % 256, math.floor(len / 256) % 256, len % 256 }
+  for i = 1, len do bytes[#bytes + 1] = payload:byte(i) end
+  local s1, s2 = 0, 0
+  for i = 3, #bytes do
+    s1 = (s1 + bytes[i]) % 255
+    s2 = (s2 + s1) % 255
+  end
+  bytes[#bytes + 1] = s1
+  bytes[#bytes + 1] = s2
+
+  local cells, acc, nbits = {}, 0, 0
+  for i = 1, #bytes do
+    acc = acc * 256 + bytes[i]
+    nbits = nbits + 8
+    while nbits >= 3 do
+      nbits = nbits - 3
+      cells[#cells + 1] = math.floor(acc / 2 ^ nbits) % 8
+      acc = acc % 2 ^ nbits
+    end
+  end
+  if nbits > 0 then cells[#cells + 1] = (acc * 2 ^ (3 - nbits)) % 8 end
+  return cells
+end
+
+local strip
+local cellPool = {}
+
+local function RowCells()
+  return math.floor(GetPhysicalScreenSize() / CELL)
+end
+
+local function ShowStrip(id, payload)
+  if not strip then
+    strip = CreateFrame("Frame", "TwinmapForeverStrip", UIParent)
+    strip:SetFrameStrata("TOOLTIP")
+    strip:SetFrameLevel(10000)
+    -- One UI unit = one physical pixel.
+    local _, physH = GetPhysicalScreenSize()
+    strip:SetIgnoreParentScale(true)
+    strip:SetScale(768 / physH)
+    strip:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 0, 0)
+    strip:SetSize(RowCells() * CELL, CELL)
+  end
+  local cells = Encode(id, payload)
+  local row = RowCells()
+  for i = 1, row do
+    local v = cells[(i - 1) % #cells + 1] -- past the end the block repeats: always full width, ignored by the reader
+    local t = cellPool[i]
+    if not t then
+      t = strip:CreateTexture(nil, "OVERLAY")
+      t:SetSize(CELL, CELL)
+      t:SetPoint("TOPLEFT", strip, "TOPLEFT", (i - 1) * CELL, 0)
+      cellPool[i] = t
+    end
+    t:SetColorTexture(math.floor(v / 4) % 2, math.floor(v / 2) % 2, v % 2, 1)
+    t:Show()
+  end
+  for i = row + 1, #cellPool do cellPool[i]:Hide() end
+  strip:Show()
+end
+
+---------------------------------------------------------------------------
+-- Scheduler: each section is rebuilt on its period and queued when its JSON
+-- changed or REFRESH passed.
+---------------------------------------------------------------------------
+
+local queue = {}
+local version, blockId = 0, 0
+local startAt
+local showing, timer, tickAcc = false, 0, 0
+
+local function Enqueue(name, json)
+  for i = #queue, 1, -1 do
+    if queue[i].name == name then table.remove(queue, i) end
+  end
+  version = version % 9999 + 1
+  local parts, pos = {}, 1
+  local chunk = math.floor(RowCells() * 3 / 8) - RESERVED
+  while pos <= #json do
+    local stop = math.min(pos + chunk - 1, #json)
+    -- Never cut a UTF-8 character: each chunk is decoded on its own.
+    while stop < #json and stop > pos do
+      local b = json:byte(stop + 1)
+      if b >= 0x80 and b < 0xC0 then stop = stop - 1 else break end
+    end
+    parts[#parts + 1] = json:sub(pos, stop)
+    pos = stop + 1
+  end
+  for i, part in ipairs(parts) do
+    queue[#queue + 1] = { name = name, text = table.concat({ name, version, i, #parts, part }, US) }
+  end
+end
+
+local function Tick(now)
+  for _, s in ipairs(SECTIONS) do
+    if now >= (s.nextAt or 0) then
+      s.nextAt = now + s.period
+      local ok, value = pcall(s.build)
+      if ok and type(value) == "table" then
+        local json = Json(value)
+        if json ~= s.json or now >= (s.sentAt or 0) + REFRESH then
+          s.json, s.sentAt = json, now
+          Enqueue(s.name, json)
+        end
+      end
+    end
+  end
+end
+
+local driver = CreateFrame("Frame")
+driver:RegisterEvent("PLAYER_ENTERING_WORLD")
+driver:SetScript("OnEvent", function()
+  startAt = startAt or GetTime() + START_DELAY
+end)
+driver:SetScript("OnUpdate", function(_, elapsed)
+  if not startAt then return end
+  local now = GetTime()
+  if now < startAt then return end
+  tickAcc = tickAcc + elapsed
+  if tickAcc >= 1 then
+    tickAcc = 0
+    Tick(now)
+  end
+  timer = timer - elapsed
+  if timer > 0 then return end
+  if #queue > 0 then -- straight to the next one: an empty frame between blocks is a visible blink
+    blockId = (blockId + 1) % 65536
+    ShowStrip(blockId, table.remove(queue, 1).text)
+    showing, timer = true, HOLD
+  elseif showing then
+    strip:Hide()
+    showing = false
+  end
+end)
