@@ -1,0 +1,9 @@
+import { defineConfig } from 'electron-vite'
+import { svelte } from '@sveltejs/vite-plugin-svelte'
+
+export default defineConfig({
+  main: {},
+  renderer: {
+    plugins: [svelte()],
+  },
+})
