@@ -90,3 +90,51 @@ SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
 CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+================================================================================
+One for All
+by Smoergi (an addon for World of Warcraft: Forever, "OneForAll" in the game)
+Used in: the app, where the bosses and the entrance are on the map of each
+dungeon, the names of the dungeons and their split in wings
+(app/src/shared/dungeon-pins.ts, generated from Data\DungeonMaps.lua of
+One for All 6.2.2)
+================================================================================
+
+One for All is licensed under the GNU General Public License, version 3 or
+(at your option) any later version: https://www.gnu.org/licenses/gpl-3.0.html
+
+One for All has the places of bosses and entrances from Forever Simple World Map
+(below), and for four dungeons (Hall of Thanes, Ruins of Lordaeron, Excavation
+Site, City of Dalaran) from the boss pins of the dungeon maps of
+foreverchanges.pro, converted by One for All. Each dungeon in dungeon-pins.ts
+says which.
+
+================================================================================
+Forever Simple World Map
+by Tarolg (CurseForge project 1728535)
+Used in: the app, through One for All: where the bosses and the entrance are on
+the map of a dungeon (app/src/shared/dungeon-pins.ts), from version 0.30.2.
+Nothing comes from the later versions published under "All Rights Reserved".
+================================================================================
+
+MIT License
+
+Copyright (c) 2026 Tarolg
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

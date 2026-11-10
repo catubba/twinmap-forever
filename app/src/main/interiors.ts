@@ -16,7 +16,8 @@
 // What is kept, in the folder of the build:
 //   rooms/<file>.dxt   a picture's DXT1 blocks as the game has them, deflated
 //   i<map>/...         the ground of a dungeon or raid that has one, as tiles.ts keeps a continent
-//   interiors.json     for each map its pieces: which picture, where, how large, how turned, how high
+//   interiors.json     for each map its pieces (which picture, where, how large, how turned, how
+//                      high) and the names of its bosses, as the game's table of encounters has them
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { deflateSync } from 'node:zlib'
@@ -26,15 +27,17 @@ import { BLOCK_YARDS, BLOCKS, minimapTiles, WORLDS } from '../shared/world'
 import { EncryptedFileError } from './client-files'
 import { convertWorld, keep } from './tiles'
 
-/** The file numbers of the two tables in the game's archive. Both have parts the game keeps encrypted: read around them. */
+/** The file numbers of the three tables in the game's archive. They have parts the game keeps encrypted: read around them. */
 export const MAP_FILE = 1349477
 export const ROOM_PICTURES_FILE = 1323241
+export const ENCOUNTERS_FILE = 1347279
 export const INTERIORS_FILE = 'interiors.json'
-const FORMAT = 1
+const FORMAT = 2 // 1 had no bosses
 
 // Which column is what, found by reading the real tables.
 const NAME = 1, KIND = 8, WORLD_FILE = 21
 const ROOM = 0, ACROSS = 1, UP = 2, PICTURE = 3
+const BOSS = 0, BOSS_MAP = 2, DIFFICULTY = 3, ORDER = 4
 const KINDS: Record<number, 'dungeon' | 'raid'> = { 1: 'dungeon', 2: 'raid' }
 
 const PIXELS_PER_YARD = 2
@@ -47,7 +50,7 @@ const RENUMBERED: Record<number, (room: number) => number | undefined> = {
   21107: (room) => (room >= 39 ? room - 7 : room >= 32 ? undefined : room), // Stratholme: seven rooms gone
 }
 
-export interface MapEntry { id: number; name: string; kind: 'world' | 'dungeon' | 'raid'; worldFile: number }
+export interface MapEntry { id: number; name: string; kind: 'world' | 'dungeon' | 'raid'; worldFile: number; bosses: string[] }
 export interface RoomPicture { room: number; across: number; up: number; file: number }
 /** A building standing in a map. u, v: yards from the top left of the square of 64 x 64 blocks (u east, v south). */
 export interface Placed { file: number; u: number; v: number; height: number; turn: number; scale: number }
@@ -76,6 +79,8 @@ export interface InteriorMap {
   kind: 'world' | 'dungeon' | 'raid'
   /** The folder of the tiles of its ground, or null for a map that is all rooms. */
   ground: string | null
+  /** The names of its bosses, in the game's order. */
+  bosses: string[]
   pieces: Piece[]
 }
 
@@ -86,12 +91,22 @@ export interface Interiors {
   dropped: number
 }
 
-/** The continents, dungeons and raids of the game's table of maps. */
-export function mapEntries(maps: Table): MapEntry[] {
+/** The continents, dungeons and raids of the game's table of maps, each with the bosses the table of encounters gives it. */
+export function mapEntries(maps: Table, encounters: Table): MapEntry[] {
+  // A map may list its bosses again for other ways of playing it (leftovers of other versions of
+  // the game among them): where the plain way has any, only those count.
+  const fights = new Map<number, { name: string; plain: boolean }[]>()
+  for (const row of [...encounters.rows].sort((a, b) => a.int(ORDER) - b.int(ORDER) || a.id - b.id)) {
+    const list = fights.get(row.int(BOSS_MAP)) ?? []
+    list.push({ name: row.text(BOSS), plain: row.int(DIFFICULTY) <= 1 })
+    fights.set(row.int(BOSS_MAP), list)
+  }
   const out: MapEntry[] = []
   for (const row of maps.rows) {
-    const kind = WORLDS.some((w) => w.continent === row.id) ? 'world' : KINDS[row.int(KIND)]
-    if (kind) out.push({ id: row.id, name: row.text(NAME), kind, worldFile: row.int(WORLD_FILE) })
+    const world = WORLDS.some((w) => w.continent === row.id), kind = world ? 'world' : KINDS[row.int(KIND)]
+    if (!kind) continue
+    const all = world ? [] : (fights.get(row.id) ?? []), plain = all.filter((f) => f.plain)
+    out.push({ id: row.id, name: row.text(NAME), kind, worldFile: row.int(WORLD_FILE), bosses: [...new Set((plain.length ? plain : all).map((f) => f.name))] })
   }
   return out
 }
@@ -267,7 +282,7 @@ export function convertInteriors(
       pieces.push(...laid.pieces)
       out.dropped += laid.dropped
     }
-    if (pieces.length || ground) out.maps.push({ id: map.id, name: map.name, kind: map.kind, ground, pieces: pieces.sort((a, b) => a.bottom - b.bottom) })
+    if (pieces.length || ground) out.maps.push({ id: map.id, name: map.name, kind: map.kind, ground, bosses: map.bosses, pieces: pieces.sort((a, b) => a.bottom - b.bottom) })
   })
   onProgress?.(maps.length, maps.length)
   // Under another name first: the list is either whole or not there.
