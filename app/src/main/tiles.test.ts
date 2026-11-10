@@ -156,7 +156,12 @@ test('the window is given only the files the converter writes', () => {
   expect(servedFile(base, '/azeroth/blocks/31/49.dxt')).toBe(join(base, 'azeroth', 'blocks', '31', '49.dxt'))
   expect(servedFile(base, '/kalimdor/5/12/7.png')).toBe(join(base, 'kalimdor', '5', '12', '7.png'))
   expect(servedFile(base, '/maps.json')).toBe(join(base, 'maps.json'))
-  for (const path of ['/azeroth/done.json', '/../secret.png', '/azeroth/../../5/1/1.png', '/azeroth/blocks/1/1.dxt/..', '/azeroth/5/1/1.PNG', '/AZEROTH/5/1/1.png', '']) {
+  // The insides: the list, a room's picture, the ground of a dungeon.
+  expect(servedFile(base, '/interiors.json')).toBe(join(base, 'interiors.json'))
+  expect(servedFile(base, '/rooms/211409.dxt')).toBe(join(base, 'rooms', '211409.dxt'))
+  expect(servedFile(base, '/i36/blocks/33/31.dxt')).toBe(join(base, 'i36', 'blocks', '33', '31.dxt'))
+  expect(servedFile(base, '/i2959/3/4/4.png')).toBe(join(base, 'i2959', '3', '4', '4.png'))
+  for (const path of ['/azeroth/done.json', '/../secret.png', '/azeroth/../../5/1/1.png', '/azeroth/blocks/1/1.dxt/..', '/azeroth/5/1/1.PNG', '/AZEROTH/5/1/1.png', '', '/rooms/../maps.json', '/rooms/x.dxt', '/rooms/1.png', '/i36/done.json', '/36/5/1/1.png', '/other.json']) {
     expect(servedFile(base, path), path).toBeNull()
   }
 })

@@ -13,6 +13,8 @@ export interface Position {
   y?: number
   /** Degrees, anticlockwise from north. */
   facing?: number
+  /** True under a roof: in a cave, a mine, a house. Missing in the open. */
+  indoors?: boolean
   /** The dungeon, raid or battleground the character is inside; missing in the open world. */
   inst?: Instance
 }

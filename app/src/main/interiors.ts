@@ -22,6 +22,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from '
 import { join } from 'node:path'
 import { deflateSync } from 'node:zlib'
 import { dxt1Picture } from '../shared/blp'
+import type { Interiors, Piece } from '../shared/inside'
 import type { Table } from '../shared/wdc5'
 import { BLOCK_YARDS, BLOCKS, minimapTiles, WORLDS } from '../shared/world'
 import { EncryptedFileError } from './client-files'
@@ -32,7 +33,7 @@ export const MAP_FILE = 1349477
 export const ROOM_PICTURES_FILE = 1323241
 export const ENCOUNTERS_FILE = 1347279
 export const INTERIORS_FILE = 'interiors.json'
-const FORMAT = 2 // 1 had no bosses
+const FORMAT = 3 // 1 had no bosses, 2 no levels and no buildings
 
 // Which column is what, found by reading the real tables.
 const NAME = 1, KIND = 8, WORLD_FILE = 21
@@ -55,41 +56,6 @@ export interface RoomPicture { room: number; across: number; up: number; file: n
 /** A building standing in a map. u, v: yards from the top left of the square of 64 x 64 blocks (u east, v south). */
 export interface Placed { file: number; u: number; v: number; height: number; turn: number; scale: number }
 export interface Building { number: number; rooms: { min: number[]; max: number[] }[] }
-
-/** A picture of a room, laid on the map. */
-export interface Piece {
-  /** The picture: rooms/<file>.dxt. */
-  file: number
-  /** Its middle, in yards from the top left of the map's square (u east, v south). */
-  u: number
-  v: number
-  /** Its size in yards; the picture has twice as many pixels. */
-  width: number
-  height: number
-  /** Its turn in radians, anticlockwise. */
-  angle: number
-  /** How high the room's floor and ceiling are, in yards: lower rooms are drawn first. */
-  bottom: number
-  top: number
-}
-
-export interface InteriorMap {
-  id: number
-  name: string
-  kind: 'world' | 'dungeon' | 'raid'
-  /** The folder of the tiles of its ground, or null for a map that is all rooms. */
-  ground: string | null
-  /** The names of its bosses, in the game's order. */
-  bosses: string[]
-  pieces: Piece[]
-}
-
-export interface Interiors {
-  format: number
-  maps: InteriorMap[]
-  /** Pieces the table lists that could not be laid: no such room, outside the room, no picture. */
-  dropped: number
-}
 
 /** The continents, dungeons and raids of the game's table of maps, each with the bosses the table of encounters gives it. */
 export function mapEntries(maps: Table, encounters: Table): MapEntry[] {
@@ -211,9 +177,78 @@ export function layOut(p: Placed, b: Building, pictures: RoomPicture[], sizeOf: 
       angle: round(angle, 4),
       bottom: round(room.min[2]! * p.scale + p.height, 1),
       top: round(room.max[2]! * p.scale + p.height, 1),
+      building: 0,
+      level: 0,
     })
   }
   return { pieces, dropped }
+}
+
+const CELL = 2 // yards: the side of a DXT block of a picture, and of the squares rooms are compared on
+const STEP_UP = 4 // yards between two floors, at least
+const SHARED = 0.15 // of the smaller room, for the two to count as one over the other
+
+/** Which blocks of 4 x 4 pixels of a picture are mostly solid: one byte each, rows from the top. */
+export function solidBlocks(dxt: Uint8Array): Uint8Array {
+  const view = new DataView(dxt.buffer, dxt.byteOffset, dxt.byteLength), solid = new Uint8Array(dxt.length >> 3)
+  for (let i = 0; i < solid.length; i++) {
+    // A block whose first color is not the greater has a see-through choice, the fourth.
+    let seeThrough = 0
+    if (view.getUint16(i * 8, true) <= view.getUint16(i * 8 + 2, true)) {
+      const choices = view.getUint32(i * 8 + 4, true)
+      for (let k = 0; k < 16; k++) if (((choices >>> (k * 2)) & 3) === 3) seeThrough++
+    }
+    solid[i] = seeThrough <= 8 ? 1 : 0
+  }
+  return solid
+}
+
+/**
+ * How many rooms lie under each piece. Two rooms are one over the other when their pictures cover
+ * a good part of the same ground (not just a doorway) and one's floor is well above the other's.
+ * solidOf: the solid blocks of a picture, or null.
+ */
+export function levelsOf(pieces: Piece[], solidOf: (file: number) => Uint8Array | null): number[] {
+  // The ground in squares of two yards: which pieces cover each.
+  const ground = new Map<number, number[]>(), covered = pieces.map(() => 0)
+  pieces.forEach((p, i) => {
+    const solid = solidOf(p.file)
+    if (!solid) return
+    const across = Math.round((p.width * PIXELS_PER_YARD) / 4), cos = Math.cos(p.angle), sin = Math.sin(p.angle), mine = new Set<number>()
+    for (let b = 0; b < solid.length; b++) {
+      if (!solid[b]) continue
+      // The middle of the block, from the middle of the picture, turned as the picture is.
+      const x = ((b % across) + 0.5) * CELL - p.width / 2, y = (Math.floor(b / across) + 0.5) * CELL - p.height / 2
+      mine.add(Math.floor((p.u + x * cos + y * sin) / CELL) * 32768 + Math.floor((p.v - x * sin + y * cos) / CELL))
+    }
+    covered[i] = mine.size
+    for (const square of mine) {
+      const list = ground.get(square)
+      if (list) list.push(i)
+      else ground.set(square, [i])
+    }
+  })
+  const shared = new Map<number, number>() // pair of pieces -> squares they both cover
+  for (const list of ground.values()) {
+    for (let a = 0; a < list.length; a++) for (let b = a + 1; b < list.length; b++) {
+      const pair = list[a]! * pieces.length + list[b]!
+      shared.set(pair, (shared.get(pair) ?? 0) + 1)
+    }
+  }
+  const under = pieces.map((): number[] => [])
+  for (const [pair, squares] of shared) {
+    const a = Math.floor(pair / pieces.length), b = pair % pieces.length
+    if (squares < SHARED * Math.min(covered[a]!, covered[b]!)) continue
+    const rise = pieces[a]!.bottom - pieces[b]!.bottom
+    if (rise >= STEP_UP) under[a]!.push(b)
+    else if (rise <= -STEP_UP) under[b]!.push(a)
+  }
+  // From the lowest floor up: a room is one level over the highest room under it.
+  const levels = pieces.map(() => 0)
+  for (const i of pieces.map((_, k) => k).sort((a, b) => pieces[a]!.bottom - pieces[b]!.bottom)) {
+    for (const lower of under[i]!) levels[i] = Math.max(levels[i]!, levels[lower]! + 1)
+  }
+  return levels
 }
 
 /** What a finished folder holds, or null when the interiors are not converted, or in an older layout. */
@@ -253,11 +288,14 @@ export function convertInteriors(
     return buildings.get(file)!
   }
   const sizes = new Map<number, [number, number] | null>()
+  let solid = new Map<number, Uint8Array>() // of the pictures of the map being converted
+  let wantSolid = false
   const stored = (file: number): [number, number] | null => {
-    if (!sizes.has(file)) {
+    if (!sizes.has(file) || (wantSolid && sizes.get(file) && !solid.has(file))) {
       const b = get(file), dxt = b && dxt1Picture(b)
       // ponytail: a picture stored some other way is left out (none is, of 5,512). Keep it as a PNG if one ever is.
       if (dxt) keep(join(folder, 'rooms', `${file}.dxt`), () => deflateSync(dxt.data, { level: 9 }))
+      if (dxt && wantSolid) solid.set(file, solidBlocks(dxt.data))
       sizes.set(file, dxt ? [dxt.width, dxt.height] : null)
     }
     return sizes.get(file)!
@@ -275,13 +313,17 @@ export function convertInteriors(
       convertWorld(wdt, get, join(folder, ground))
     }
     const pieces: Piece[] = []
-    for (const p of placedIn(wdt, get)) {
+    // The shapes of the rooms are looked at only where floors matter: inside a dungeon or a raid.
+    wantSolid = map.kind !== 'world'
+    solid = new Map()
+    placedIn(wdt, get).forEach((p, n) => {
       const b = building(p.file), list = b && pictures.get(b.number)
-      if (!b || !list) continue
+      if (!b || !list) return
       const laid = layOut(p, b, list, stored)
-      pieces.push(...laid.pieces)
+      for (const piece of laid.pieces) pieces.push({ ...piece, building: n })
       out.dropped += laid.dropped
-    }
+    })
+    if (wantSolid) levelsOf(pieces, (file) => solid.get(file) ?? null).forEach((level, k) => (pieces[k]!.level = level))
     if (pieces.length || ground) out.maps.push({ id: map.id, name: map.name, kind: map.kind, ground, bosses: map.bosses, pieces: pieces.sort((a, b) => a.bottom - b.bottom) })
   })
   onProgress?.(maps.length, maps.length)

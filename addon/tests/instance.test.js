@@ -57,6 +57,14 @@ test('leaving the dungeon the next position has no instance', () => {
   assert.equal(all[1].zone, 'Westfall');
 });
 
+test('under a roof the position says so, and stops saying it outside', () => {
+  const addon = enterWorld('GAME.indoors = true');
+  addon.run(10);
+  addon.lua('GAME.indoors = false');
+  addon.run(2);
+  assert.deepEqual(positions(addon).map((p) => p.indoors), [true, undefined]);
+});
+
 test('the instance goes out during a fight too', () => {
   const addon = enterWorld();
   addon.run(10);
