@@ -22,9 +22,12 @@
   const TOP_ZOOM = 7 // the game's own detail: a block's picture is four tiles
   const BLANK = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=='
   const NAMES: Record<Continent, string> = { 0: 'Eastern Kingdoms', 1: 'Kalimdor' }
-  // Cities that lie wholly under a roof, though the game calls them outdoors (one can ride there):
-  // Ironforge and Undercity, by the id of their map. Their rooms show as those of a cave do.
-  const ROOFED = new Set([1455, 1458])
+  // Two cities lie wholly under a roof, though the game calls them outdoors (one can ride there).
+  // Ironforge is always on the map from the inside: what is above it is bare mountain, and the
+  // player looks for the city there. Undercity shows only from within, as a cave does: above it
+  // are the ruins of Lordaeron, which are a place of their own. Both by the id of their map.
+  const ALWAYS_INSIDE = [1455]
+  const ROOFED = new Set([1458])
   const GROUND_INSIDE = 0.45 // how bright the ground of a dungeon is: its rooms are what matters
 
   let holder: HTMLDivElement
@@ -177,6 +180,26 @@
     rooms = map && box ? new RoomsLayer({ pieces, bounds: boundsOfBox(box), keepBuffer: 2, zIndex: 3 }).addTo(map) : undefined
   }
 
+  // The cities that are always shown from the inside, on the continent on show: the rooms of
+  // whatever building stands at the middle of their map. Needs the list of the rooms.
+  let cities: L.Layer | undefined
+  function showCities(): void {
+    cities?.remove()
+    cities = undefined
+    const world = inside ? undefined : interiors?.maps.find((m) => m.kind === 'world' && m.id === continent)
+    if (!map || !world) return
+    const buildings = new Set<number>()
+    for (const id of ALWAYS_INSIDE) {
+      const zone = maps.find((m) => m.id === id)
+      if (!zone?.rect || zone.continent !== continent) continue
+      const middle = unitsOfPlace(zone.rect, 50, 50)
+      for (const b of buildingsAt(world.pieces, middle.x * YARDS_PER_UNIT, middle.y * YARDS_PER_UNIT)) buildings.add(b)
+    }
+    const pieces = world.pieces.filter((p) => buildings.has(p.building)), box = boxOf(pieces)
+    // Not from far away: there a city is a few pixels, and its hundred pictures would be read for nothing.
+    if (box) cities = new RoomsLayer({ pieces, bounds: boundsOfBox(box), minZoom: 3, keepBuffer: 2, zIndex: 3 }).addTo(map)
+  }
+
   // Puts a continent on the map: its tiles and the names of its zones.
   function show(which: Continent, fit: boolean): void {
     if (!map) return
@@ -191,6 +214,7 @@
       L.marker(boundsOf(m).getCenter(), { interactive: false, icon: L.divIcon({ className: 'zone-name', html: `<span>${m.name}</span>`, iconSize: [0, 0] }) }).addTo(labels)
     }
     continent = which
+    showCities()
     const whole = maps.find((m) => m.level === 'continent' && m.continent === which && m.parent !== 0)
     // At once: a zoom still running would end by putting this view back over whatever came after it.
     if (fit && whole?.rect) map.fitBounds(boundsOf(whole), { animate: false })
@@ -207,6 +231,7 @@
     labels.clearLayers()
     pins.clearLayers()
     inside = m
+    showCities()
     levels = Math.max(0, ...m.pieces.map((p) => p.level))
     upTo = levels
     showRooms(m.pieces)
@@ -338,6 +363,7 @@
       .then((answer) => (answer.ok ? (answer.json() as Promise<Interiors>) : undefined))
       .then((list) => {
         interiors = list
+        showCities()
         place()
       })
       .catch(() => {})
