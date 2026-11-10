@@ -41,6 +41,10 @@
   const mapReady = $derived(tiles?.state === 'ready')
   const insideReady = $derived(tiles?.state === 'ready' && !!tiles.interiors && !tiles.interiors.problem)
   const count = (n: number): string => n.toLocaleString('en-US')
+  let wrong = $state('') // what was wrong with the folder the player picked
+  async function choose(): Promise<void> {
+    wrong = (await window.twinmap.chooseGameFolder()) ?? ''
+  }
 </script>
 
 <!-- The top row is the window's title bar too: it drags the window, a double click maximizes it. -->
@@ -74,7 +78,10 @@
     {:else if tiles}
       <div class="making" class:failed={tiles.state === 'failed' || tiles.state === 'no-game'}>
         <p>{tilesLine(tiles)}</p>
-        {#if tiles.state === 'no-game'}<button class="btn" onclick={() => window.twinmap.chooseGameFolder()}>Choose the game folder</button>{/if}
+        {#if tiles.state === 'no-game'}
+          {#if wrong}<p>{wrong}</p>{/if}
+          <button class="btn" onclick={choose}>Choose the game folder</button>
+        {/if}
       </div>
     {/if}
     {#if pos}

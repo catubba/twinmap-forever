@@ -46,6 +46,11 @@ test('in a corner the label slides to stay whole inside the frame', () => {
   expect(labelPlace({ x: 915, y: 740 }, map, label)).toEqual({ side: 'left', left: 621, top: 592 })
 })
 
+test('on a narrow map the label goes where it fits, never under the frame', () => {
+  const map = { width: 380, height: 434 }, label = { width: 300, height: 125 }
+  expect(labelPlace({ x: 330, y: 250 }, map, label)).toEqual({ side: 'above', left: 62, top: 111 })
+})
+
 test('saved layer choices: off stays off, everything else is on, rubbish is ignored', () => {
   expect(layersFrom(null).zones).toBe(true)
   expect(layersFrom('not json').arrow).toBe(true)
