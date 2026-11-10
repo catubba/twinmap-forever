@@ -1,7 +1,38 @@
 <script lang="ts">
   // Trial page: every basic control in every state, side by side. Opened with TWINMAP_KIT=1, never from the app's own screens.
+  import { onMount } from 'svelte'
+  import { unitsOfRect } from '../../shared/geo'
+  import type { GameMap } from '../../shared/maps'
+  import { WORLDS } from '../../shared/world'
+  import Glyph from './Glyph.svelte'
   import Logo from './Logo.svelte'
+  import { GLYPHS, pin, PIN_NAMES, pinSize, type GlyphName } from './marks'
 
+  // Three grounds to read the pins on: grass, sand, snow. In the app each is a tile of the game's
+  // own map, at its true size; in a browser, where there are no tiles, a flat colour stands in.
+  let grounds = $state([
+    { zone: 'Elwynn Forest', color: '#4f6b2c', tile: '' },
+    { zone: 'Tanaris', color: '#b59a5b', tile: '' },
+    { zone: 'Dun Morogh', color: '#dfe6ea', tile: '' },
+  ])
+  onMount(() => {
+    let tries = 0
+    const look = (): void => {
+      fetch('twinmap://tiles/maps.json')
+        .then((answer) => answer.json() as Promise<GameMap[]>)
+        .then((maps) => {
+          grounds = grounds.map((g) => {
+            const m = maps.find((z) => z.name === g.zone && z.rect && z.continent !== null)
+            if (!m) return g
+            const [a, b] = unitsOfRect(m.rect!), world = WORLDS.find((w) => w.continent === m.continent)!.name
+            // Zoom 5: a tile is 8 units of the map wide.
+            return { ...g, tile: `twinmap://tiles/${world}/5/${Math.floor((a.x + b.x) / 16)}/${Math.floor((a.y + b.y) / 16)}.png` }
+          })
+        })
+        .catch(() => void (++tries < 8 && setTimeout(look, 1000))) // the tiles are not ready in the first moments
+    }
+    look()
+  })
   const STONE = ['stone-950', 'stone-900', 'stone-800', 'stone-700', 'stone-600', 'stone-500']
   const BRONZE = ['bronze-900', 'bronze-700', 'bronze-600', 'bronze-500', 'bronze-400', 'bronze-300']
   const GOLD = ['gold', 'gold-pale', 'plate-top', 'plate-mid', 'plate-low', 'plate-ink']
@@ -20,7 +51,7 @@
 </script>
 
 {#snippet arrow(turn: number)}
-  <svg class="dir" viewBox="0 0 16 16" style:rotate="{turn}deg" aria-hidden="true"><path d="M8 1 14 15 8 11 2 15Z" /></svg>
+  <Glyph name="direction" size={12} {turn} />
 {/snippet}
 
 {#snippet swatches(names: string[])}
@@ -33,6 +64,30 @@
 
 <main class="surface">
   <h1>Twinmap: basic controls</h1>
+
+  <h2 class="band">Map pins</h2>
+  <div class="lands">
+    {#each grounds as ground (ground.zone)}
+      <figure style:background-color={ground.color} style:background-image={ground.tile ? `url(${ground.tile})` : 'none'}>
+        {#each PIN_NAMES as name (name)}<span style:color="#c79c6e">{@html pin(name)}</span>{/each}
+        <figcaption>{ground.zone}</figcaption>
+      </figure>
+    {/each}
+  </div>
+  <ul class="legend">
+    {#each PIN_NAMES as name (name)}
+      <li><span style:color="#c79c6e">{@html pin(name)}</span>{name}, {pinSize(name)} px</li>
+    {/each}
+  </ul>
+
+  <h2 class="band">Glyphs</h2>
+  <section class="states">
+    {#each Object.keys(GLYPHS) as GlyphName[] as name (name)}
+      <span><Glyph {name} />{name}</span>
+    {/each}
+    <span><button class="btn" aria-label="Zoom in"><Glyph name="plus" /></button>in a button</span>
+    <span class="dim"><Glyph name="search" />dim</span>
+  </section>
 
   <h2 class="band">Logo and wordmark</h2>
   <div class="grounds">
@@ -223,6 +278,59 @@
     align-items: center;
     gap: 6px;
     font: var(--t-small);
+  }
+
+  .lands {
+    display: flex;
+    gap: 12px;
+    padding: 12px 16px;
+  }
+  .lands figure {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    align-content: center;
+    justify-content: center;
+    align-items: center;
+    gap: 22px 26px;
+    width: 256px;
+    height: 256px;
+    margin: 0;
+    padding: 34px;
+  }
+  .lands span,
+  .legend span {
+    display: grid;
+    place-content: center;
+  }
+  .lands figcaption {
+    position: absolute;
+    left: 8px;
+    bottom: 6px;
+    font: var(--t-small);
+    color: #fff;
+    text-shadow:
+      0 1px 3px #000,
+      0 0 2px #000;
+  }
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 20px;
+    margin: 0;
+    padding: 0 16px 24px;
+    list-style: none;
+    font: var(--t-small);
+    color: var(--text-dim);
+  }
+  .legend li {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .legend span {
+    width: 28px;
+    height: 28px;
   }
 
   .swatches {
