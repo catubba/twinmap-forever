@@ -13,6 +13,20 @@ export interface Position {
   y?: number
   /** Degrees, anticlockwise from north. */
   facing?: number
+  /** The dungeon, raid or battleground the character is inside; missing in the open world. */
+  inst?: Instance
+}
+
+export interface Instance {
+  /** The game's number of the instance: the same as of its map in the game's files. */
+  id: number
+  /** As the game names it, in the player's language. */
+  name?: string
+  /** "party", "raid", "pvp". */
+  kind?: string
+  /** Where the character is, in yards of the world: x to the north, y to the west. Missing when the game does not tell addons. */
+  x?: number
+  y?: number
 }
 
 export interface ProtocolMismatch {

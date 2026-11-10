@@ -35,7 +35,19 @@ function record() {
   const protocol2 = enterWorld(null, 'local ns = ...; ns.PROTOCOL = 2');
   protocol2.run(10);
 
-  return { session: session.strips(), narrow: narrow.strips(), protocol2: protocol2.strips() };
+  // Into a dungeon, around in it, to where the game stops telling the place, and out again.
+  const instance = enterWorld(null, 'local ns = ...; ns.db.mode = "fast"');
+  instance.run(10);
+  instance.lua('GAME.instance = { name = "Deadmines", kind = "party", id = 36 }; GAME.zone, GAME.sub, GAME.map, GAME.x, GAME.north, GAME.west = "The Deadmines", "", nil, nil, -16.4, -383.1');
+  instance.run(3);
+  instance.lua('GAME.north, GAME.west = -64.2, -820.7');
+  instance.run(3);
+  instance.lua('GAME.north, GAME.west = nil, nil');
+  instance.run(3);
+  instance.lua('GAME.instance = nil; GAME.zone, GAME.sub, GAME.map, GAME.x = "Westfall", "Moonbrook", 1436, 0.423');
+  instance.run(3);
+
+  return { session: session.strips(), narrow: narrow.strips(), protocol2: protocol2.strips(), instance: instance.strips() };
 }
 
 module.exports = { record, FILE };

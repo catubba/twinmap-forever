@@ -83,6 +83,16 @@ local function BuildPos()
   -- Degrees, anticlockwise from north, in steps of 10: turning on the spot should not send every second.
   local facing = Num(Try(GetPlayerFacing))
   if facing then out.facing = Round(math.deg(facing), 10) % 360 end
+  -- Inside a dungeon, a raid or a battleground: which one. It travels with the position, so the
+  -- app never holds the place of one moment with the instance of another.
+  local name, kind, _, _, _, _, _, id = Try(GetInstanceInfo)
+  if Str(kind) and kind ~= "none" and Num(id) then
+    local inst = { id = id, name = Str(name), kind = kind }
+    -- Where in it, if the game tells addons: yards of the world, north then west, to the yard.
+    local north, west = Try(UnitPosition, "player")
+    if Num(north) and Num(west) then inst.x, inst.y = Round(north, 1), Round(west, 1) end
+    out.inst = inst
+  end
   return out
 end
 
