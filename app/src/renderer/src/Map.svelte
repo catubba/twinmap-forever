@@ -425,6 +425,10 @@
     made.on('dragstart', () => (following = false))
     made.on('zoomend moveend', layout)
     made.on('zoomend', () => (zoom = made.getZoom()))
+    // A window made wider or narrower: the map that follows puts the character back in its middle.
+    made.on('resize', () => {
+      if (following) place(true)
+    })
     // Names are measured as they are drawn: once the typefaces are in, they are measured again.
     void document.fonts.ready.then(() => {
       for (const n of named) n.sizes = {}
@@ -433,6 +437,7 @@
     // A click on the world map puts the label on that point. Inside a dungeon there is nothing to say of a point yet.
     made.on('click', (e) => {
       if (inside) return
+      if (holder.clientWidth < 640) layersOpen = false // on a narrow map the menu would lie over the label
       const units = { x: e.latlng.lng, y: -e.latlng.lat }, found = zoneAt(maps, continent, units)
       labelled = {
         units,
@@ -588,6 +593,11 @@
     display: flex;
     flex-direction: column;
     align-items: flex-end;
+    /* The box is as wide as its widest row: only what is in it takes the mouse, the map shows through the rest. */
+    pointer-events: none;
+  }
+  .corner > :global(*) {
+    pointer-events: auto;
   }
   .corner.top {
     top: 22px;
@@ -702,7 +712,9 @@
     border: 1px solid var(--float-edge);
     border-radius: 0;
     background: var(--float);
-    box-shadow: 0 0 0 1px #000;
+    box-shadow:
+      0 0 0 1px #000,
+      0 6px 16px #000000b3;
     font: var(--t-small);
     color: var(--text);
   }

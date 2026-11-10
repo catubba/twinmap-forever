@@ -56,6 +56,7 @@
       <section in:fly={pageIn(dir)} out:fly={pageOut(dir)} aria-labelledby="page-title">
         <h1 id="page-title">{page.title}</h1>
         <p class="intro">{page.intro}</p>
+        {#if page.warning}<p class="warning">{page.warning}</p>{/if}
 
         <div class="now {page.state}" role="status">
           <p class="first">
@@ -76,7 +77,6 @@
             <button class="btn" onclick={() => window.twinmap.openCurseForge()}>Get Twinmap Forever on CurseForge</button>
           {/if}
         </div>
-        {#if page.warning}<p class="warning">{page.warning}</p>{/if}
       </section>
     {/key}
   </div>
@@ -199,10 +199,10 @@
     justify-content: space-between;
   }
 
+  /* Read before the thing it warns of is on: above what there is to do, in the size of the text. */
   .warning {
     max-width: 60ch;
-    margin: 20px 0 0;
-    font: var(--t-small);
+    margin: 12px 0 0;
   }
 
   footer {

@@ -40,14 +40,17 @@ export function wayTo(from: Point, to: Point): { far: string; time: string } {
 export interface Size { width: number; height: number }
 
 /**
- * Where the label goes: on the side of the point with the most room, a gap away from it, and
- * slid along that side so it stays whole inside the map's frame. All in pixels of the map's box.
+ * Where the label goes: on the side of the point with the most room among those it fits on, a gap
+ * away from it, and slid so it stays whole inside the map's frame. All in pixels of the map's box.
  */
 export function labelPlace(point: Point, map: Size, label: Size, gap = 14, margin = 18): { left: number; top: number; side: 'right' | 'left' | 'below' | 'above' } {
   const room = { right: map.width - point.x, left: point.x, below: map.height - point.y, above: point.y }
-  const side = (Object.keys(room) as (keyof typeof room)[]).reduce((best, s) => (room[s] > room[best] ? s : best))
+  const sides = Object.keys(room) as (keyof typeof room)[]
+  // On a narrow map the widest side may still be too narrow for the label: then it goes above or below.
+  const fits = sides.filter((s) => room[s] >= (s === 'right' || s === 'left' ? label.width : label.height) + gap + margin)
+  const side = (fits.length ? fits : sides).reduce((best, s) => (room[s] > room[best] ? s : best))
   const within = (v: number, most: number): number => Math.max(margin, Math.min(v, most - margin))
-  if (side === 'right' || side === 'left')
-    return { side, left: side === 'right' ? point.x + gap : point.x - gap - label.width, top: within(point.y - label.height / 2, map.height - label.height) }
-  return { side, top: side === 'below' ? point.y + gap : point.y - gap - label.height, left: within(point.x - label.width / 2, map.width - label.width) }
+  const left = side === 'right' ? point.x + gap : side === 'left' ? point.x - gap - label.width : point.x - label.width / 2
+  const top = side === 'below' ? point.y + gap : side === 'above' ? point.y - gap - label.height : point.y - label.height / 2
+  return { side, left: within(left, map.width - label.width), top: within(top, map.height - label.height) }
 }
