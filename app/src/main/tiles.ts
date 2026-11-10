@@ -54,14 +54,17 @@ export function tileFile(folder: string, zoom: number, column: number, row: numb
 export const MAPS_FILE = 'maps.json'
 
 /**
- * The file the window may have for a path it asks, or null: only what the converter writes, nothing
- * else on the disk. base: the folder of the build. path: as in "/azeroth/blocks/31/49.dxt".
+ * The file the window may have for a path it asks, or null: only what the converters write, nothing
+ * else on the disk. base: the folder of the build. path: as in "/azeroth/blocks/31/49.dxt". A
+ * ground is a continent by its name or a dungeon by "i" and its number; the rest is the two lists
+ * and the pictures of the rooms (interiors.ts).
  */
 export function servedFile(base: string, path: string): string | null {
-  const m = /^\/(?:(maps\.json)|([a-z]+)\/(?:blocks\/(\d{1,2})\/(\d{1,2})\.dxt|(\d)\/(\d{1,3})\/(\d{1,3})\.png))$/.exec(path)
+  const m = /^\/(?:(maps|interiors)\.json|rooms\/(\d{1,9})\.dxt|([a-z]+|i\d{1,5})\/(?:blocks\/(\d{1,2})\/(\d{1,2})\.dxt|(\d)\/(\d{1,3})\/(\d{1,3})\.png))$/.exec(path)
   if (!m) return null
-  if (m[1]) return joinPath(base, MAPS_FILE)
-  return m[3] !== undefined ? blockFile(joinPath(base, m[2]!), Number(m[3]), Number(m[4])) : tileFile(joinPath(base, m[2]!), Number(m[5]), Number(m[6]), Number(m[7]))
+  if (m[1]) return joinPath(base, `${m[1]}.json`)
+  if (m[2]) return joinPath(base, 'rooms', `${m[2]}.dxt`)
+  return m[4] !== undefined ? blockFile(joinPath(base, m[3]!), Number(m[4]), Number(m[5])) : tileFile(joinPath(base, m[3]!), Number(m[6]), Number(m[7]), Number(m[8]))
 }
 
 /** What a finished folder holds, or null when the continent is not converted, or only in part, or in an older layout. */

@@ -5,7 +5,8 @@ import { inflateSync } from 'node:zlib'
 import { expect, test } from 'vitest'
 import type { Row, Table } from '../shared/wdc5'
 import { EncryptedFileError } from './client-files'
-import { buildingOf, convertInteriors, finishedInteriors, INTERIORS_FILE, layOut, mapEntries, placedIn, roomPictures, type Building, type Placed } from './interiors'
+import type { Piece } from '../shared/inside'
+import { buildingOf, convertInteriors, finishedInteriors, INTERIORS_FILE, layOut, levelsOf, mapEntries, placedIn, roomPictures, solidBlocks, type Building, type Placed } from './interiors'
 
 const MIDDLE = (32 * 1600) / 3
 
@@ -74,7 +75,7 @@ test('a picture starts at the lowest corner of its room, and the building is tur
   // The middle of the picture is at x 10 + 16, y 20 + 8 of the building.
   const { pieces, dropped } = layOut(at(180), ONE_ROOM, [{ room: 0, across: 0, up: 0, file: 77 }], size)
   expect(dropped).toBe(0)
-  expect(pieces).toEqual([{ file: 77, u: 17000 - 28, v: 17100 - 26, width: 32, height: 16, angle: 1.5708, bottom: 55, top: 65 }])
+  expect(pieces).toEqual([{ file: 77, u: 17000 - 28, v: 17100 - 26, width: 32, height: 16, angle: 1.5708, bottom: 55, top: 65, building: 0, level: 0 }])
   // Turned 0: the other way round.
   const other = layOut(at(0), ONE_ROOM, [{ room: 0, across: 0, up: 0, file: 77 }], size).pieces[0]!
   expect([other.u, other.v, other.angle]).toEqual([17000 + 28, 17100 + 26, -1.5708])
@@ -192,6 +193,8 @@ test('a dungeon is converted once: its pictures as the game has them, its ground
     expect(made.maps.map((m) => [m.id, m.kind, m.ground, m.pieces.length])).toEqual([[36, 'dungeon', 'i36', 2], [43, 'dungeon', null, 2]])
     expect(made.maps[0]!.pieces.map((p) => p.bottom)).toEqual([30, 55])
     expect(made.maps[0]!.bosses).toEqual(['Edwin VanCleef'])
+    // The two rooms are far apart on the ground: neither is over the other. Both are of the map's one building.
+    expect(made.maps[0]!.pieces.map((p) => [p.level, p.building])).toEqual([[0, 0], [0, 0]])
     expect(made.dropped).toBe(4)
     // The picture is kept as the game has it: the same DXT1 blocks.
     expect(inflateSync(readFileSync(join(folder, 'rooms', '77.dxt')))).toEqual(room.subarray(148 + 1024))
@@ -201,10 +204,44 @@ test('a dungeon is converted once: its pictures as the game has them, its ground
     reads = 0
     expect(finishedInteriors(folder)).toEqual(made)
     expect(reads).toBe(0)
-    expect(JSON.parse(readFileSync(join(folder, INTERIORS_FILE), 'utf8')).format).toBe(2)
+    expect(JSON.parse(readFileSync(join(folder, INTERIORS_FILE), 'utf8')).format).toBe(3)
   } finally {
     rmSync(folder, { recursive: true, force: true })
   }
+})
+
+// The DXT1 blocks of a picture: solid where the plan says "#", see-through elsewhere. One letter is a block of 4 x 4 pixels.
+function shape(rows: string[]): Uint8Array {
+  const dxt = new Uint8Array(rows.length * rows[0]!.length * 8)
+  rows.join('').split('').forEach((c, i) => {
+    // First color not the greater, and every pixel the fourth choice: see-through. Else every pixel the first color.
+    if (c !== '#') dxt.set([0, 0, 0, 0, 255, 255, 255, 255], i * 8)
+    else dxt.set([255, 255, 0, 0, 0, 0, 0, 0], i * 8)
+  })
+  return dxt
+}
+
+test('the solid blocks of a picture are told from its see-through ones', () => {
+  expect([...solidBlocks(shape(['#.', '.#']))]).toEqual([1, 0, 0, 1])
+})
+
+test('a room is a level up when it covers the ground of a lower one, not when they only meet at a door', () => {
+  // Pictures of 8 x 4 blocks: 16 x 8 yards.
+  const full = shape(['########', '########', '########', '########'])
+  const piece = (file: number, u: number, v: number, bottom: number): Piece => ({ file, u, v, width: 16, height: 8, angle: 0, bottom, top: bottom + 5, building: 0, level: 0 })
+  const pieces = [
+    piece(1, 100, 100, 0), // the ground floor
+    piece(1, 102, 100, 10), // right over it
+    piece(1, 104, 100, 20), // and one more over both
+    piece(1, 114, 100, 10), // higher than the first, but touching it only along an edge
+    piece(1, 100, 100, 2), // on the same ground as the first and almost as low: the same floor
+    piece(1, 500, 500, 30), // high up, alone
+  ]
+  expect(levelsOf(pieces, () => full)).toEqual([0, 1, 2, 0, 0, 0])
+  // A picture turned a quarter covers other ground.
+  const turned = [piece(1, 100, 100, 0), { ...piece(1, 100, 112, 10), angle: Math.PI / 2 }]
+  expect(levelsOf(turned, () => full)).toEqual([0, 0])
+  expect(levelsOf(pieces, () => null)).toEqual([0, 0, 0, 0, 0, 0])
 })
 
 test('a folder with no list of interiors is not finished', () => {

@@ -1,21 +1,26 @@
 <script lang="ts">
   // The map: the game's own pictures of the two continents, the names of the zones, and the
   // character as an arrow. It follows the character until the player drags the map away.
+  // Inside a dungeon or a raid it shows that instead: its rooms, its bosses, its entrance.
   import L from 'leaflet'
   import 'leaflet/dist/leaflet.css'
   import { onMount } from 'svelte'
+  import { DUNGEON_PINS } from '../../shared/dungeon-pins'
   import type { Position } from '../../shared/game'
   import { unitsOfPlace, unitsOfRect, type Point } from '../../shared/geo'
+  import { boxOf, buildingsAt, piecesIn, roomPixels, yardsInside, YARDS_PER_UNIT, type Box, type InteriorMap, type Interiors, type Piece, type Yards } from '../../shared/inside'
   import type { Continent, GameMap } from '../../shared/maps'
   import { pictureOfBlock, tileOfPicture } from '../../shared/pixels'
   import { WORLDS } from '../../shared/world'
 
-  let { pos }: { pos: Position | undefined } = $props()
+  // insideReady: the rooms of the buildings are converted, and their list can be asked for.
+  let { pos, insideReady }: { pos: Position | undefined; insideReady: boolean } = $props()
 
   const TILES = 'twinmap://tiles'
   const TOP_ZOOM = 7 // the game's own detail: a block's picture is four tiles
   const BLANK = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=='
   const NAMES: Record<Continent, string> = { 0: 'Eastern Kingdoms', 1: 'Kalimdor' }
+  const GROUND_INSIDE = 0.45 // how bright the ground of a dungeon is: its rooms are what matters
 
   let holder: HTMLDivElement
   let map: L.Map | undefined
@@ -23,29 +28,43 @@
   let continent = $state<Continent>(0)
   let following = $state(true)
   let offMap = $state(false)
+  let interiors: Interiors | undefined
+  // The dungeon or raid on show, and how many of its levels: a room is a level up when it lies over another.
+  let inside = $state<InteriorMap | null>(null)
+  let levels = $state(0)
+  let upTo = $state(0)
+  let pinned = $state(false)
 
   // Leaflet's plain coordinates: a map unit is a pixel of zoom 0, north is up.
   const at = (p: Point): L.LatLng => L.latLng(-p.y, p.x)
+  const atYards = (y: Yards): L.LatLng => at({ x: y.u / YARDS_PER_UNIT, y: y.v / YARDS_PER_UNIT })
   const boundsOf = (m: GameMap): L.LatLngBounds => {
     const [a, b] = unitsOfRect(m.rect!)
     return L.latLngBounds(at(a), at(b))
   }
+  const boundsOfBox = ([u1, v1, u2, v2]: Box): L.LatLngBounds => L.latLngBounds(atYards({ u: u1, v: v1 }), atYards({ u: u2, v: v2 }))
   const WORLD_BOUNDS = L.latLngBounds([-256, 0], [0, 256])
 
-  // The pictures of the blocks, decoded, for the tiles of the two top levels. The last few are
-  // kept (0.8 MB each): the four tiles of a block ask for the same one, and so does coming back to it.
-  const blocks = new Map<string, Promise<Uint8Array | null>>()
-  function block(url: string): Promise<Uint8Array | null> {
-    let wanted = blocks.get(url)
-    if (!wanted) {
-      wanted = fetch(url)
-        .then(async (answer) => (answer.ok && answer.body ? pictureOfBlock(new Uint8Array(await new Response(answer.body.pipeThrough(new DecompressionStream('deflate'))).arrayBuffer())) : null))
-        .catch(() => null)
-      blocks.set(url, wanted)
-      if (blocks.size > 40) blocks.delete(blocks.keys().next().value!)
+  // A file of the map as the converter keeps it, deflated; null where there is none.
+  const inflated = (url: string): Promise<Uint8Array<ArrayBuffer> | null> =>
+    fetch(url)
+      .then(async (answer) => (answer.ok && answer.body ? new Uint8Array(await new Response(answer.body.pipeThrough(new DecompressionStream('deflate'))).arrayBuffer()) : null))
+      .catch(() => null)
+  // Keeps the last few of what is slow to make: the same one is asked for again and again.
+  function kept<K, V>(most: number, make: (key: K) => V): (key: K) => V {
+    const made = new Map<K, V>()
+    return (key) => {
+      if (!made.has(key)) {
+        made.set(key, make(key))
+        if (made.size > most) made.delete(made.keys().next().value!)
+      }
+      return made.get(key)!
     }
-    return wanted
   }
+
+  // The pictures of the blocks, decoded, for the tiles of the two top levels (0.8 MB each): the four
+  // tiles of a block ask for the same one, and so does coming back to it.
+  const block = kept(40, (url: string) => inflated(url).then((dxt) => dxt && pictureOfBlock(dxt)))
 
   // Zoom 6 and 7 are drawn from the game's own blocks; past 7 Leaflet stretches them.
   const BlockLayer = L.GridLayer.extend({
@@ -72,8 +91,51 @@
     },
   }) as unknown as new (options: L.GridLayerOptions & { world: string }) => L.GridLayer
 
+  // The picture of a room, decoded with its shape cut out, by its file and its proportions (width
+  // over height). Its pixels: the file holds half a byte each.
+  const room = kept(600, (wanted: string) => {
+    const [file, proportions] = wanted.split(':')
+    return inflated(`${TILES}/rooms/${file}.dxt`).then((dxt) => {
+      if (!dxt) return null
+      const width = Math.round(Math.sqrt(dxt.length * 2 * Number(proportions))), height = (dxt.length * 2) / width
+      const canvas = document.createElement('canvas')
+      canvas.width = width
+      canvas.height = height
+      canvas.getContext('2d')!.putImageData(new ImageData(roomPixels(dxt, width, height), width, height), 0, 0)
+      return canvas
+    })
+  })
+  const roomOf = (p: Piece): Promise<HTMLCanvasElement | null> => room(`${p.file}:${p.width / p.height}`)
+
+  // The rooms of a map: each tile is drawn from the pictures that reach into it, each turned as its
+  // building stands, the lower ones first.
+  const RoomsLayer = L.GridLayer.extend({
+    createTile(this: L.GridLayer & { options: { pieces: Piece[] } }, coords: L.Coords, done: L.DoneCallback) {
+      const canvas = document.createElement('canvas')
+      canvas.width = canvas.height = 256
+      const yardsPerPixel = YARDS_PER_UNIT / 2 ** coords.z, side = 256 * yardsPerPixel
+      const u0 = coords.x * side, v0 = coords.y * side
+      const here = piecesIn(this.options.pieces, [u0, v0, u0 + side, v0 + side])
+      void Promise.all(here.map(roomOf)).then((pictures) => {
+        const g = canvas.getContext('2d')!
+        here.forEach((p, i) => {
+          const picture = pictures[i]
+          if (!picture) return
+          g.setTransform(1, 0, 0, 1, 0, 0)
+          g.translate((p.u - u0) / yardsPerPixel, (p.v - v0) / yardsPerPixel)
+          g.rotate(-p.angle) // the canvas turns clockwise
+          g.drawImage(picture, -p.width / 2 / yardsPerPixel, -p.height / 2 / yardsPerPixel, p.width / yardsPerPixel, p.height / yardsPerPixel)
+        })
+        done(undefined, canvas)
+      })
+      return canvas
+    },
+  }) as unknown as new (options: L.GridLayerOptions & { pieces: Piece[] }) => L.GridLayer
+
   let shown: L.Layer[] = []
+  let rooms: L.Layer | undefined
   const labels = L.layerGroup()
+  const pins = L.layerGroup()
   const arrow = L.marker([0, 0], {
     zIndexOffset: 2000,
     interactive: false,
@@ -90,18 +152,34 @@
     if (svg) svg.style.transform = `rotate(${turned}deg)`
   }
 
+  // The ground of a continent or of a dungeon, from its folder. The halved tiles stay under
+  // everything at every zoom, stretched past their own detail: while the sharp tiles of a place are
+  // still being read, the map shows it blurred, never black. The game's own blocks go on top, from
+  // halfway between the two kinds of tile up.
+  function ground(folder: string, opacity = 1): void {
+    if (!map) return
+    for (const layer of shown) layer.remove()
+    shown = [
+      L.tileLayer(`${TILES}/${folder}/{z}/{x}/{y}.png`, { minZoom: 0, maxZoom: 9, maxNativeZoom: TOP_ZOOM - 2, bounds: WORLD_BOUNDS, errorTileUrl: BLANK, keepBuffer: 4, zIndex: 1, opacity }).addTo(map),
+      new BlockLayer({ world: folder, minZoom: TOP_ZOOM - 1.5, minNativeZoom: TOP_ZOOM - 1, maxNativeZoom: TOP_ZOOM, bounds: WORLD_BOUNDS, keepBuffer: 3, zIndex: 2, opacity }).addTo(map),
+    ]
+  }
+
+  // Puts these rooms on the map, in place of the ones before.
+  function showRooms(pieces: Piece[]): void {
+    rooms?.remove()
+    const box = boxOf(pieces)
+    rooms = map && box ? new RoomsLayer({ pieces, bounds: boundsOfBox(box), keepBuffer: 2, zIndex: 3 }).addTo(map) : undefined
+  }
+
   // Puts a continent on the map: its tiles and the names of its zones.
   function show(which: Continent, fit: boolean): void {
     if (!map) return
-    const world = WORLDS.find((w) => w.continent === which)!.name
-    for (const layer of shown) layer.remove()
-    // The halved tiles stay under everything at every zoom, stretched past their own detail: while
-    // the sharp tiles of a place are still being read, the map shows it blurred, never black. The
-    // game's own blocks go on top, from halfway between the two kinds of tile up.
-    shown = [
-      L.tileLayer(`${TILES}/${world}/{z}/{x}/{y}.png`, { minZoom: 0, maxZoom: 9, maxNativeZoom: TOP_ZOOM - 2, bounds: WORLD_BOUNDS, errorTileUrl: BLANK, keepBuffer: 4, zIndex: 1 }).addTo(map),
-      new BlockLayer({ world, minZoom: TOP_ZOOM - 1.5, minNativeZoom: TOP_ZOOM - 1, maxNativeZoom: TOP_ZOOM, bounds: WORLD_BOUNDS, keepBuffer: 3, zIndex: 2 }).addTo(map),
-    ]
+    ground(WORLDS.find((w) => w.continent === which)!.name)
+    inside = null
+    showRooms([])
+    under = ''
+    pins.clearLayers()
     labels.clearLayers()
     for (const m of maps) {
       if (m.level !== 'zone' || m.continent !== which || !m.rect) continue
@@ -112,6 +190,43 @@
     if (fit && whole?.rect) map.fitBounds(boundsOf(whole))
   }
 
+  // Puts a dungeon or a raid on the map: its ground dimmed, its rooms, its bosses and its entrance.
+  function showInside(m: InteriorMap): void {
+    if (!map) return
+    if (m.ground) ground(m.ground, GROUND_INSIDE)
+    else {
+      for (const layer of shown) layer.remove()
+      shown = []
+    }
+    labels.clearLayers()
+    pins.clearLayers()
+    inside = m
+    levels = Math.max(0, ...m.pieces.map((p) => p.level))
+    upTo = levels
+    showRooms(m.pieces)
+    // The dungeons of this map: one, or its wings.
+    const dungeons = DUNGEON_PINS.filter((d) => d.map === m.id)
+    pinned = dungeons.length > 0
+    const dot = (u: number, v: number, color: string, name: string): void => {
+      L.circleMarker(atYards({ u, v }), { radius: 6, color: '#000', weight: 1.5, fillColor: color, fillOpacity: 1 }).bindTooltip(name, { direction: 'top', offset: [0, -6] }).addTo(pins)
+    }
+    for (const d of dungeons) {
+      for (const [name, u, v] of d.bosses) dot(u, v, '#e0483e', name)
+      if (d.entrance) dot(d.entrance[0], d.entrance[1], '#5fd17a', dungeons.length > 1 ? `Entrance: ${d.name}` : 'Entrance')
+    }
+    const box = dungeons.length
+      ? dungeons.reduce<Box>((all, d) => [Math.min(all[0], d.bounds[0]), Math.min(all[1], d.bounds[1]), Math.max(all[2], d.bounds[2]), Math.max(all[3], d.bounds[3])], [Infinity, Infinity, -Infinity, -Infinity])
+      : boxOf(m.pieces)
+    if (box) map.fitBounds(boundsOfBox(box), { animate: false }) // at once: the arrow is placed against this view
+  }
+
+  // Shows the rooms up to a level: the ones above are taken off, to see what they cover.
+  function showUpTo(level: number): void {
+    if (!inside) return
+    upTo = level
+    showRooms(inside.pieces.filter((p) => p.level <= level))
+  }
+
   function choose(which: Continent): void {
     following = false
     show(which, true)
@@ -119,32 +234,71 @@
 
   function follow(): void {
     following = !following
-    if (following && placed) place(true)
+    if (following) place(true)
+  }
+
+  // Puts the arrow on a place, turned as the character is.
+  function mark(here: L.LatLng): void {
+    if (!map) return
+    arrow.setLatLng(here).addTo(map)
+    if (pos?.facing !== undefined) turnTo(360 - pos.facing) // the game counts anticlockwise from north
+  }
+
+  // The arrow on a place, and the map with it when it follows. loose: the map moves only once the
+  // arrow is at its edge, so a dungeon that fits the window stays still.
+  function point(here: L.LatLng, jump: boolean, loose = false): void {
+    if (!map) return
+    mark(here)
+    const there = loose ? map.getBounds().pad(-0.05).contains(here) : map.getCenter().equals(here)
+    if (following && (jump || !there)) map.panTo(here, { animate: !jump, duration: 0.9, easeLinearity: 1 })
   }
 
   // Where the character is on the map, or nothing: a place with no map, or one outside the two continents.
   let placed = false
+  let under = '' // the buildings whose rooms are on show on a continent: the character is under their roof
   function place(jump = false): void {
     if (!map || !maps.length) return
+    // Inside a dungeon or a raid the app has the rooms of: that is the map, whatever was on show.
+    const inst = pos?.inst, dungeon = inst && interiors?.maps.find((m) => m.id === inst.id && m.kind !== 'world')
+    if (inst && dungeon) {
+      const entering = inside?.id !== dungeon.id
+      if (entering) showInside(dungeon)
+      offMap = false
+      placed = false // back in the world, the map goes to where the character comes out
+      const where = yardsInside(inst)
+      if (!where) return void arrow.remove() // the game does not tell the place in here
+      // On the way in the whole dungeon is in view, and stays so while the arrow is well inside it.
+      if (entering) mark(atYards(where))
+      else point(atYards(where), jump, true)
+      return
+    }
+    const leaving = inside !== null
     const zone = pos?.map === undefined ? undefined : maps.find((m) => m.id === pos!.map)
     if (!zone?.rect || zone.continent === null || pos?.x === undefined || pos.y === undefined) {
+      if (leaving) show(continent, true)
       offMap = pos !== undefined
       arrow.remove()
       return
     }
     offMap = false
-    const here = at(unitsOfPlace(zone.rect, pos.x, pos.y))
-    if (zone.continent !== continent) {
-      if (!following && placed) return void arrow.remove() // the player is looking at the other continent
+    const units = unitsOfPlace(zone.rect, pos.x, pos.y), here = at(units)
+    if (zone.continent !== continent || leaving) {
+      if (!following && placed && !leaving) return void arrow.remove() // the player is looking at the other continent
       show(zone.continent, false)
     }
-    arrow.setLatLng(here).addTo(map)
-    if (pos.facing !== undefined) turnTo(360 - pos.facing) // the game counts anticlockwise from north
     if (!placed) {
       placed = true
+      mark(here)
       map.fitBounds(boundsOf(zone))
-    } else if (following && (jump || !map.getCenter().equals(here))) {
-      map.panTo(here, { animate: !jump, duration: 0.9, easeLinearity: 1 })
+    } else point(here, jump)
+
+    // Under a roof (a cave, a mine, a house): the rooms of that building go over the ground.
+    const world = pos.indoors ? interiors?.maps.find((m) => m.kind === 'world' && m.id === zone.continent) : undefined
+    const buildings = world ? buildingsAt(world.pieces, units.x * YARDS_PER_UNIT, units.y * YARDS_PER_UNIT) : new Set<number>()
+    const now = [...buildings].join()
+    if (now !== under) {
+      under = now
+      showRooms(world ? world.pieces.filter((p) => buildings.has(p.building)) : [])
     }
   }
 
@@ -152,6 +306,7 @@
     const made = L.map(holder, { crs: L.CRS.Simple, minZoom: 1, maxZoom: 9, zoomSnap: 0.5, zoomDelta: 0.5, wheelPxPerZoomLevel: 90, attributionControl: false, maxBounds: WORLD_BOUNDS.pad(0.2) })
     map = made
     made.setView([-128, 128], 2)
+    pins.addTo(made)
     made.on('dragstart', () => (following = false))
     // The names of the zones are for looking at a continent, not at a street.
     made.on('zoomend', () => (made.getZoom() >= 2 && made.getZoom() <= 5.5 ? labels.addTo(made) : labels.remove()))
@@ -169,15 +324,45 @@
     void pos // each new position moves the arrow
     place()
   })
+
+  // The list of the rooms, once: it is ready a little after the continents the first time.
+  $effect(() => {
+    if (!insideReady || interiors) return
+    void fetch(`${TILES}/interiors.json`)
+      .then((answer) => (answer.ok ? (answer.json() as Promise<Interiors>) : undefined))
+      .then((list) => {
+        interiors = list
+        place()
+      })
+      .catch(() => {})
+  })
 </script>
 
 <div class="map" bind:this={holder}></div>
 <div class="buttons">
+  {#if inside}
+    <span class="where">{inside.name}</span>
+  {/if}
   {#each [0, 1] as const as which (which)}
-    <button aria-pressed={continent === which} onclick={() => choose(which)}>{NAMES[which]}</button>
+    <button aria-pressed={!inside && continent === which} onclick={() => choose(which)}>{NAMES[which]}</button>
   {/each}
   <button aria-pressed={following} onclick={follow}>Follow</button>
 </div>
+{#if inside && levels > 0}
+  <div class="levels" role="group" aria-label="Levels shown">
+    <span>Levels</span>
+    {#each Array.from({ length: levels + 1 }, (_, i) => i) as level (level)}
+      <button aria-pressed={upTo === level} title={level === levels ? 'Every room' : `Rooms up to level ${level + 1}`} onclick={() => showUpTo(level)}>{level + 1}</button>
+    {/each}
+  </div>
+{/if}
+{#if inside && inside.bosses.length && !pinned}
+  <ol class="bosses">
+    {#each inside.bosses as boss (boss)}
+      <li>{boss}</li>
+    {/each}
+  </ol>
+{/if}
 {#if offMap}
   <p class="off">This place is not on the map.</p>
 {/if}
@@ -189,13 +374,32 @@
     background: #000; /* the sea of the game's own pictures ends in black */
   }
 
-  .buttons {
+  .buttons,
+  .levels {
     position: absolute;
-    top: 12px;
     right: 12px;
     z-index: 1000;
     display: flex;
+    align-items: center;
     gap: 6px;
+  }
+
+  .buttons {
+    top: 12px;
+  }
+
+  .levels {
+    top: 54px;
+    color: #b9a88c;
+    font-size: 13px;
+  }
+
+  .where {
+    padding: 6px 12px;
+    border-radius: 4px;
+    background: rgb(23 17 12 / 0.9);
+    color: #f3ead9;
+    font-size: 13px;
   }
 
   button {
@@ -212,6 +416,19 @@
   button[aria-pressed='true'] {
     border-color: #ffd100;
     color: #ffd100;
+  }
+
+  .bosses {
+    position: absolute;
+    top: 96px;
+    right: 12px;
+    z-index: 1000;
+    margin: 0;
+    padding: 8px 12px 8px 30px;
+    border-radius: 4px;
+    background: rgb(23 17 12 / 0.9);
+    color: #f3ead9;
+    font-size: 13px;
   }
 
   .off {

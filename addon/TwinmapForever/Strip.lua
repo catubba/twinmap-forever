@@ -83,6 +83,8 @@ local function BuildPos()
   -- Degrees, anticlockwise from north, in steps of 10: turning on the spot should not send every second.
   local facing = Num(Try(GetPlayerFacing))
   if facing then out.facing = Round(math.deg(facing), 10) % 360 end
+  -- Under a roof (a cave, a mine, a house): the app then shows the rooms of the place.
+  if Try(IsIndoors) == true then out.indoors = true end
   -- Inside a dungeon, a raid or a battleground: which one. It travels with the position, so the
   -- app never holds the place of one moment with the instance of another.
   local name, kind, _, _, _, _, _, id = Try(GetInstanceInfo)

@@ -16,13 +16,14 @@
   const GAME = { closed: 'Game not found', minimized: 'Game minimized', open: 'Game open' }
   const pos = $derived(link?.state.sections.pos)
   const mapReady = $derived(tiles?.state === 'ready')
+  const insideReady = $derived(tiles?.state === 'ready' && !!tiles.interiors && !tiles.interiors.problem)
   const age = $derived(
     link && link.state.updatedAt.pos ? Math.max(0, Math.round((Date.now() - link.state.updatedAt.pos) / 1000)) : null,
   )
 </script>
 
 {#if mapReady}
-  <Map {pos} />
+  <Map {pos} {insideReady} />
 {/if}
 <main class:over={mapReady}>
   <h1>Twinmap</h1>
