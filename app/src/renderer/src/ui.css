@@ -44,6 +44,15 @@
   --text: #f3ead9;
   --text-dim: #b9a88c;
   --text-off: #7d705c;
+  --nav-rest: #c9b48a; /* an entry of the top row that is not the one on show */
+
+  /* The red of the buttons, from the top; and one step lighter under the mouse */
+  --red-top: #b3261a;
+  --red-mid: #701008;
+  --red-low: #520b06;
+  --red-top-over: #c9301f;
+  --red-mid-over: #82140a;
+  --red-low-over: #5e0e09;
 
   /* Meanings */
   --quest: #ffd100;
@@ -71,14 +80,6 @@
   --t-name: 400 25px/28px var(--display);
   --t-zone: 400 28px/31px var(--display);
   --t-sign: 600 38px/36px var(--font);
-
-  /* Space, in steps of 4 */
-  --s1: 4px;
-  --s2: 8px;
-  --s3: 12px;
-  --s4: 16px;
-  --s6: 24px;
-  --s8: 32px;
 
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
   --quick: 120ms var(--ease);
@@ -198,7 +199,7 @@ body {
   text-shadow: 0 1px 0 #000;
   white-space: nowrap;
   cursor: pointer;
-  background: linear-gradient(#b3261a, #701008 55%, #520b06);
+  background: linear-gradient(var(--red-top), var(--red-mid) 55%, var(--red-low));
   box-shadow:
     inset 0 1px 0 #ffb09a66,
     inset 0 0 0 1px var(--bronze-400),
@@ -213,7 +214,7 @@ body {
 }
 .btn:hover,
 .btn.is-hover {
-  background: linear-gradient(#c9301f, #82140a 55%, #5e0e09);
+  background: linear-gradient(var(--red-top-over), var(--red-mid-over) 55%, var(--red-low-over));
   box-shadow:
     inset 0 1px 0 #ffb09a66,
     inset 0 0 0 1px var(--bronze-300),
@@ -243,7 +244,7 @@ body {
 .btn:active,
 .btn.is-pressed {
   padding: 5px 12px 3px;
-  background: linear-gradient(#520b06, #701008);
+  background: linear-gradient(var(--red-low), var(--red-mid));
   box-shadow:
     inset 0 0 0 1px var(--bronze-400),
     var(--halo);
@@ -272,7 +273,8 @@ body {
     content: '...';
   }
 }
-.btn:disabled {
+.btn:disabled,
+.btn[aria-disabled='true'] {
   color: var(--text-off);
   text-shadow: none;
   cursor: default;

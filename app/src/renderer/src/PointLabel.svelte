@@ -27,7 +27,7 @@
   <line x1={spot.x} y1={spot.y} x2={end.x} y2={end.y} />
   <circle cx={spot.x} cy={spot.y} r="3.5" />
 </svg>
-<div class="label" data-side={at.side} role="dialog" in:scale={pop} out:fade={gone} aria-label={title} style:left="{at.left}px" style:top="{at.top}px" style:visibility={width ? 'visible' : 'hidden'} bind:offsetWidth={width} bind:offsetHeight={height}>
+<div class="label" data-side={at.side} role="dialog" in:scale={pop()} out:fade={gone} aria-label={title} style:left="{at.left}px" style:top="{at.top}px" style:visibility={width ? 'visible' : 'hidden'} bind:offsetWidth={width} bind:offsetHeight={height}>
   <button class="close" aria-label="Close" onclick={onclose}><Glyph name="close" size={14} /></button>
   <h3>{title}</h3>
   {#if where}<p class="dim">{where}</p>{/if}
