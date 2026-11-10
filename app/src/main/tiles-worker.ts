@@ -8,6 +8,7 @@ import type { TilesStatus } from '../shared/tiles-status'
 import { readTable } from '../shared/wdc5'
 import { WORLDS } from '../shared/world'
 import { installedBuild, openClientFiles, type ClientFiles } from './client-files'
+import { convertInteriors, finishedInteriors, MAP_FILE, mapEntries, ROOM_PICTURES_FILE, roomPictures } from './interiors'
 import { convertWorld, finished, MAPS_FILE, tilesFolder } from './tiles'
 
 const { gameFolder, base } = workerData as { gameFolder: string; base: string }
@@ -45,7 +46,28 @@ try {
     if (!uiMap || !assignments) throw new Error('the game has no table of its maps')
     writeFileSync(join(folder, MAPS_FILE), JSON.stringify(gameMaps(readTable(uiMap), readTable(assignments))))
   }
-  tell({ state: 'ready', folder, version: build.version, tiles, missing, seconds: (Date.now() - started) / 1000, converted })
+  const ready = { state: 'ready', folder, version: build.version, tiles, missing, seconds: (Date.now() - started) / 1000, converted } as const
+  tell(ready)
+
+  // The insides of buildings come after: the map of the continents is already usable.
+  const insideStarted = Date.now()
+  const interiors = (told: { maps: number; pieces: number; dropped: number; converted: boolean; problem?: string }): void =>
+    tell({ ...ready, interiors: { ...told, seconds: (Date.now() - insideStarted) / 1000 } })
+  try {
+    let inside = finishedInteriors(folder)
+    const insideConverted = !inside
+    if (!inside) {
+      const files = (client ??= openClientFiles(gameFolder))
+      // Both tables have parts the game keeps encrypted: read around them, never decrypted.
+      const maps = files.read(MAP_FILE, true), rooms = files.read(ROOM_PICTURES_FILE, true)
+      if (!maps || !rooms) throw new Error('the game has no table of its maps or of its room pictures')
+      inside = convertInteriors(mapEntries(readTable(maps)), roomPictures(readTable(rooms)), (id) => files.read(id), folder)
+    }
+    interiors({ maps: inside.maps.length, pieces: inside.maps.reduce((n, m) => n + m.pieces.length, 0), dropped: inside.dropped, converted: insideConverted })
+  } catch (e) {
+    // The map of the continents is there all the same.
+    interiors({ maps: 0, pieces: 0, dropped: 0, converted: false, problem: e instanceof Error ? e.message : String(e) })
+  }
 } catch (e) {
   tell({ state: 'failed', message: e instanceof Error ? e.message : String(e) })
 }

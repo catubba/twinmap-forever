@@ -72,6 +72,15 @@ export function finished(folder: string): ConvertResult | null {
   return format === FORMAT ? { converted: false, tiles, missing } : null
 }
 
+/** Writes a file unless it is there already: what lets an interrupted conversion resume. */
+export function keep(file: string, bytes: () => Buffer): void {
+  if (existsSync(file)) return
+  mkdirSync(dirname(file), { recursive: true })
+  // Under another name first: a file is either whole or not there.
+  writeFileSync(file + '.part', bytes())
+  renameSync(file + '.part', file)
+}
+
 /**
  * Converts one continent. wdt: its world file. read: a game file by number. folder: where it goes.
  * A folder left half done is finished: files already there are kept, so an interrupted run resumes.
@@ -88,17 +97,6 @@ export function convertWorld(
   if (existsSync(joinPath(folder, MARKER))) rmSync(folder, { recursive: true, force: true })
 
   let tiles = 0, missing = 0, done = 0
-  const madeFolders = new Set<string>()
-  const keep = (file: string, bytes: () => Buffer): void => {
-    if (existsSync(file)) return
-    if (!madeFolders.has(dirname(file))) {
-      mkdirSync(dirname(file), { recursive: true })
-      madeFolders.add(dirname(file))
-    }
-    // Under another name first: a file is either whole or not there.
-    writeFileSync(file + '.part', bytes())
-    renameSync(file + '.part', file)
-  }
   const png = (zoom: number, column: number, row: number, rgb: Uint8Array): void => {
     tiles++
     keep(tileFile(folder, zoom, column, row), () => encodePng(rgb, TILE, TILE))
