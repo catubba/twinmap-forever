@@ -4,7 +4,8 @@
   "description": "Runs the addon in a Lua VM against a stand-in game client",
   "license": "GPL-3.0-only",
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "record": "node tests/record.js"
   },
   "devDependencies": {
     "fengari": "^0.1.5"
