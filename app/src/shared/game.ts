@@ -73,7 +73,7 @@ export function protocolMismatch(addon: number): ProtocolMismatch {
   const message =
     update === 'app'
       ? `The Twinmap Forever addon is newer than this app (protocol ${addon}, this app speaks ${PROTOCOL}). Update Twinmap.`
-      : `The Twinmap Forever addon is older than this app (protocol ${addon}, this app speaks ${PROTOCOL}). Update the addon.`
+      : `The Twinmap Forever addon is older than this app (protocol ${addon}, this app speaks ${PROTOCOL}). Update the addon from CurseForge.`
   return { addon, app: PROTOCOL, update, message }
 }
 
