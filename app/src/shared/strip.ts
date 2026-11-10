@@ -1,6 +1,7 @@
 // Reads a row of pixels back into the block the addon drew on it. The format is in the addon's
 // Strip.lua: [0xC7 0x1B] [protocol] [id hi, lo] [len hi, lo] [payload] [fletcher s1, s2], packed
-// MSB-first into 3-bit cells, one cell per pixel (red, green, blue each on or off).
+// MSB-first into 3-bit cells, one cell per pixel (red, green, blue each on or off). On and off
+// are the two levels found on the row itself: the addon may draw them close together.
 // Payload: section US version US part US total US chunk of JSON.
 
 /** The strip protocol this app speaks. The same number as PROTOCOL in the addon. */
@@ -42,13 +43,25 @@ export function decodeRow(row: Uint8Array): Reading {
   const capacity = Math.floor((cells * 3) / 8)
   if (capacity < HEADER + 2) return { kind: 'none' }
 
+  // A strip fills its row with two levels only, so a channel is on above the middle of the darkest
+  // and the brightest value there. On a row with no strip this is noise, and the magic bytes say so.
+  let lo = 255, hi = 0
+  for (let p = 0; p < row.length; p += 4) {
+    for (let c = 0; c < 3; c++) {
+      const value = row[p + c]!
+      if (value < lo) lo = value
+      if (value > hi) hi = value
+    }
+  }
+  const middle = (lo + hi) / 2
+
   // The bytes of the row, from the first up to (not including) end, read as drawn or in negative.
   const read = (end: number, negative: boolean): number[] => {
     const bytes: number[] = []
     let acc = 0, nbits = 0
     for (let i = 0; bytes.length < end; i++) {
       const p = i * 4
-      let v = (row[p + 2]! >= 128 ? 4 : 0) | (row[p + 1]! >= 128 ? 2 : 0) | (row[p]! >= 128 ? 1 : 0)
+      let v = (row[p + 2]! > middle ? 4 : 0) | (row[p + 1]! > middle ? 2 : 0) | (row[p]! > middle ? 1 : 0)
       if (negative) v = 7 - v
       acc = (acc << 3) | v
       nbits += 3

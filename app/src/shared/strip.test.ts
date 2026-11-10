@@ -41,8 +41,18 @@ test('a block read many times while it is up counts once', () => {
   expect(game.state.blocks).toBe(3)
 })
 
-test('colors that are not pure still read: a cell is on from half brightness', () => {
-  expect(decodeRow(pixels(strips.session[0]!, 140, 110))).toEqual(decodeRow(pixels(strips.session[0]!)))
+test('colors that are not pure still read: a cell is on above the middle of the two levels on the row', () => {
+  const usual = decodeRow(pixels(strips.session[0]!))
+  expect(usual.kind).toBe('block')
+  expect(decodeRow(pixels(strips.session[0]!, 140, 110))).toEqual(usual)
+  // A strip drawn dark and at low contrast, as in the camouflage trials.
+  expect(decodeRow(pixels(strips.session[0]!, 30, 10))).toEqual(usual)
+  expect(decodeRow(pixels(strips.session[1]!, 11, 10))).toEqual(decodeRow(pixels(strips.session[1]!)))
+})
+
+test('an even row, or one with no strip, is no strip', () => {
+  expect(decodeRow(new Uint8Array(1920 * 4).fill(20))).toEqual({ kind: 'none' })
+  expect(decodeRow(Uint8Array.from({ length: 1920 * 4 }, (_, i) => (i * 37) % 256))).toEqual({ kind: 'none' })
 })
 
 test('a section split into several blocks joins back, in whatever order the parts come', () => {
