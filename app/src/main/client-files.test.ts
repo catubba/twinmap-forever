@@ -125,6 +125,12 @@ test('a file with an encrypted part is refused, and the error names the key', ()
   expect(() => client.read(70000)).toThrow(KEY_NAME)
 })
 
+test('asked to skip what is hidden, the encrypted part comes as zeros of its size and the rest is read', () => {
+  const client = openClientFiles(fakeClient(FILES, 2))
+  const start = Buffer.from('readable start')
+  expect(client.read(70000, true)).toEqual(Buffer.concat([start, Buffer.alloc(locked.data.length)]))
+})
+
 test('the game folder is found from a path inside it, and only if it holds Forever', () => {
   const folder = fakeClient(FILES, 2)
   expect(gameFolderFrom([null, 'Z:\\nowhere\\Wow.exe', join(folder, '_forever_', 'Wow.exe')])).toBe(folder)

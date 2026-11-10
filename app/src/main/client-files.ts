@@ -37,8 +37,12 @@ export interface ClientFiles {
   buildKey: string
   /** How many files the build lists. */
   count: number
-  /** The bytes of a file by its number, or null when the build has no such file. Throws EncryptedFileError. */
-  read(id: number): Buffer | null
+  /**
+   * The bytes of a file by its number, or null when the build has no such file. Throws
+   * EncryptedFileError, unless skipHidden: then the parts the game keeps encrypted come as zeros,
+   * unread (a table says which of its sections those are, and wdc5.ts leaves them out).
+   */
+  read(id: number, skipHidden?: boolean): Buffer | null
 }
 
 /** The build of the product installed in a game folder, or null when the folder has none. */
@@ -84,13 +88,17 @@ export function registryInstallPath(): string | null {
   }
 }
 
-/** Decodes a BLTE container: chunks stored plain or deflated, one after the other. */
-export function decodeBlte(b: Buffer): Buffer {
+/**
+ * Decodes a BLTE container: chunks stored plain or deflated, one after the other. An encrypted
+ * chunk is never decrypted: it throws, or with skipHidden it comes as zeros of its plain size.
+ */
+export function decodeBlte(b: Buffer, skipHidden = false): Buffer {
   if (b.toString('latin1', 0, 4) !== 'BLTE') throw new Error('not a BLTE container')
-  const chunk = (c: Buffer): Buffer => {
+  const chunk = (c: Buffer, plainSize?: number): Buffer => {
     const mode = String.fromCharCode(c[0] ?? 0)
     if (mode === 'N') return c.subarray(1)
     if (mode === 'Z') return inflateSync(c.subarray(1))
+    if (mode === 'E' && skipHidden && plainSize !== undefined) return Buffer.alloc(plainSize)
     if (mode === 'E') throw new EncryptedFileError(Buffer.from(c.subarray(2, 10)).reverse().toString('hex'))
     throw new Error(`BLTE chunk of unknown kind "${mode}"`)
   }
@@ -99,7 +107,7 @@ export function decodeBlte(b: Buffer): Buffer {
   const parts: Buffer[] = []
   for (let i = 0, count = b.readUIntBE(9, 3), at = headerSize; i < count; i++) {
     const size = b.readUInt32BE(12 + i * 24)
-    parts.push(chunk(b.subarray(at, at + size)))
+    parts.push(chunk(b.subarray(at, at + size), b.readUInt32BE(16 + i * 24)))
     at += size
   }
   return Buffer.concat(parts)
@@ -141,7 +149,7 @@ export function openClientFiles(folder: string): ClientFiles {
     return entries
   }
 
-  const readEncoded = (ekey: Buffer): Buffer | null => {
+  const readEncoded = (ekey: Buffer, skipHidden = false): Buffer | null => {
     const short = ekey.subarray(0, 9)
     let x = 0
     for (const byte of short) x ^= byte
@@ -162,7 +170,7 @@ export function openClientFiles(folder: string): ClientFiles {
         } finally {
           closeSync(fd)
         }
-        return decodeBlte(record.subarray(RECORD_HEADER))
+        return decodeBlte(record.subarray(RECORD_HEADER), skipHidden)
       }
     }
     return null
@@ -173,7 +181,7 @@ export function openClientFiles(folder: string): ClientFiles {
   if (!encoding || encoding.toString('latin1', 0, 2) !== 'EN') throw new Error('the encoding file is missing or not one')
   const pageSize = encoding.readUInt16BE(5) * 1024, pages = encoding.readUInt32BE(9)
   const pageIndex = 22 + encoding.readUInt32BE(18), pageData = pageIndex + pages * 32
-  const readContent = (ckey: Buffer): Buffer | null => {
+  const readContent = (ckey: Buffer, skipHidden = false): Buffer | null => {
     let page = 0
     for (let lo = 0, hi = pages - 1; lo <= hi; ) {
       const mid = (lo + hi) >> 1
@@ -185,7 +193,7 @@ export function openClientFiles(folder: string): ClientFiles {
     for (let at = pageData + page * pageSize, end = at + pageSize; at < end; ) {
       const keys = encoding[at]!
       if (!keys) break
-      if (encoding.compare(ckey, 0, 16, at + 6, at + 22) === 0) return readEncoded(encoding.subarray(at + 22, at + 38))
+      if (encoding.compare(ckey, 0, 16, at + 6, at + 22) === 0) return readEncoded(encoding.subarray(at + 22, at + 38), skipHidden)
       at += 22 + keys * 16
     }
     return null
@@ -231,9 +239,9 @@ export function openClientFiles(folder: string): ClientFiles {
     version: build.version,
     buildKey: key,
     count: keyAt.size,
-    read(id) {
+    read(id, skipHidden) {
       const where = keyAt.get(id)
-      return where === undefined ? null : readContent(root.subarray(where, where + 16))
+      return where === undefined ? null : readContent(root.subarray(where, where + 16), skipHidden)
     },
   }
 }
