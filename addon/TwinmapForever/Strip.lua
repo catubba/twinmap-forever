@@ -111,8 +111,8 @@ end
 -- name, seconds between checks, builder. combat: also sent during a fight; the rest waits for its end.
 -- refresh: seconds after which it is sent again unchanged, when not REFRESH. The position is the
 -- heartbeat: the app takes the strip for stopped when none comes for a while. It is also read four
--- times a second: the app's arrow glides from one reading to the next (GLIDE in Map.svelte, a little
--- longer than this period).
+-- times a second: the app's arrow glides from one reading to the next, and counts on this period
+-- (PERIOD in the app's glide.ts).
 local SECTIONS = {
   { name = "pos", period = 0.25, build = BuildPos, combat = true, refresh = 10 },
   { name = "char", period = 2, build = BuildChar },
