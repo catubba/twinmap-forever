@@ -32,6 +32,11 @@ const STUB = `
     if GAME.north then return GAME.north, GAME.west, 0, GAME.instance and GAME.instance.id or 0 end
   end
   function InCombatLockdown() return GAME.combat == true end
+  -- GAME.level, GAME.xp, GAME.xpMax, GAME.rested: unset, the game tells nothing of the character.
+  function UnitLevel() return GAME.level end
+  function UnitXP() return GAME.xp end
+  function UnitXPMax() return GAME.xpMax end
+  function GetXPExhaustion() return GAME.rested end
   Settings = {
     RegisterCanvasLayoutCategory = function(panel, name) return { panel = panel, name = name } end,
     RegisterAddOnCategory = function(category) SETTINGS_CATEGORY = category end,

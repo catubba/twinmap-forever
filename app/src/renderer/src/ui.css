@@ -150,6 +150,22 @@ body {
     linear-gradient(var(--stone-800), var(--stone-900));
 }
 
+/* A line on the map, at its foot: what is going on and what to do about it. Never over the middle. */
+.map-note {
+  position: absolute;
+  left: 110px;
+  right: 110px;
+  bottom: 24px;
+  z-index: 1200;
+  width: fit-content;
+  margin: 0 auto;
+  padding: 6px 12px;
+  background: var(--float);
+  border: 1px solid var(--float-edge);
+  box-shadow: 0 0 0 1px #000;
+  text-align: center;
+}
+
 /* Wordmark: TWINMAP in spaced capitals, FOREVER under it for the addon. Never in another typeface. */
 .wordmark {
   font: 400 var(--w, 40px) / 1 var(--display);

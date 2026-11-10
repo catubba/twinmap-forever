@@ -303,7 +303,7 @@
   }
 
   onMount(() => {
-    const made = L.map(holder, { crs: L.CRS.Simple, minZoom: 1, maxZoom: 9, zoomSnap: 0.5, zoomDelta: 0.5, wheelPxPerZoomLevel: 90, attributionControl: false, maxBounds: WORLD_BOUNDS.pad(0.2) })
+    const made = L.map(holder, { zoomControl: false, crs: L.CRS.Simple, minZoom: 1, maxZoom: 9, zoomSnap: 0.5, zoomDelta: 0.5, wheelPxPerZoomLevel: 90, attributionControl: false, maxBounds: WORLD_BOUNDS.pad(0.2) })
     map = made
     made.setView([-128, 128], 2)
     pins.addTo(made)
@@ -339,32 +339,38 @@
 </script>
 
 <div class="map" bind:this={holder}></div>
-<div class="buttons">
-  {#if inside}
-    <span class="where">{inside.name}</span>
-  {/if}
-  {#each [0, 1] as const as which (which)}
-    <button aria-pressed={!inside && continent === which} onclick={() => choose(which)}>{NAMES[which]}</button>
-  {/each}
-  <button aria-pressed={following} onclick={follow}>Follow</button>
-</div>
-{#if inside && levels > 0}
-  <div class="levels" role="group" aria-label="Levels shown">
-    <span>Levels</span>
-    {#each Array.from({ length: levels + 1 }, (_, i) => i) as level (level)}
-      <button aria-pressed={upTo === level} title={level === levels ? 'Every room' : `Rooms up to level ${level + 1}`} onclick={() => showUpTo(level)}>{level + 1}</button>
+<div class="corner top">
+  <div class="line">
+    {#if inside}
+      <span class="tag">{inside.name}</span>
+    {/if}
+    {#each [0, 1] as const as which (which)}
+      <button class="btn" aria-pressed={!inside && continent === which} onclick={() => choose(which)}>{NAMES[which]}</button>
     {/each}
   </div>
-{/if}
-{#if inside && inside.bosses.length && !pinned}
-  <ol class="bosses">
-    {#each inside.bosses as boss (boss)}
-      <li>{boss}</li>
-    {/each}
-  </ol>
-{/if}
+  {#if inside && levels > 0}
+    <div class="line" role="group" aria-label="Levels shown">
+      <span class="tag">Levels</span>
+      {#each Array.from({ length: levels + 1 }, (_, i) => i) as level (level)}
+        <button class="btn" aria-pressed={upTo === level} title={level === levels ? 'Every room' : `Rooms up to level ${level + 1}`} onclick={() => showUpTo(level)}>{level + 1}</button>
+      {/each}
+    </div>
+  {/if}
+  {#if inside && inside.bosses.length && !pinned}
+    <ol class="menu bosses">
+      {#each inside.bosses as boss (boss)}
+        <li>{boss}</li>
+      {/each}
+    </ol>
+  {/if}
+</div>
+<div class="corner bottom">
+  <button class="btn" aria-label="Zoom in" onclick={() => map?.zoomIn()}>+</button>
+  <button class="btn" aria-label="Zoom out" onclick={() => map?.zoomOut()}>&minus;</button>
+  <button class="btn" aria-pressed={following} onclick={follow}>Follow</button>
+</div>
 {#if offMap}
-  <p class="off">This place is not on the map.</p>
+  <p class="map-note">This place is not on the map.</p>
 {/if}
 
 <style>
@@ -374,74 +380,46 @@
     background: #000; /* the sea of the game's own pictures ends in black */
   }
 
-  .buttons,
-  .levels {
+  /* The controls sit inside the frame, over its vignette. */
+  .corner {
     position: absolute;
-    right: 12px;
-    z-index: 1000;
+    right: 22px;
+    z-index: 1200;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+  }
+  .corner.top {
+    top: 22px;
+    gap: 8px;
+  }
+  .corner.bottom {
+    bottom: 22px;
+    gap: 4px;
+  }
+  .corner .btn {
+    min-width: 32px;
+    height: 32px;
+  }
+  .line {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 4px;
+  }
+  .tag {
+    margin-right: 4px;
+    color: #fff;
+    text-shadow:
+      0 1px 3px #000,
+      0 0 2px #000;
   }
 
-  .buttons {
-    top: 12px;
-  }
-
-  .levels {
-    top: 54px;
-    color: #b9a88c;
-    font-size: 13px;
-  }
-
-  .where {
-    padding: 6px 12px;
-    border-radius: 4px;
-    background: rgb(23 17 12 / 0.9);
-    color: #f3ead9;
-    font-size: 13px;
-  }
-
-  button {
-    padding: 6px 12px;
-    border: 1px solid #5a4a2f;
-    border-radius: 4px;
-    background: rgb(23 17 12 / 0.9);
-    color: #b9a88c;
-    font: inherit;
-    font-size: 13px;
-    cursor: pointer;
-  }
-
-  button[aria-pressed='true'] {
-    border-color: #ffd100;
-    color: #ffd100;
-  }
-
+  /* The bosses of a raid: the game names them but not where they stand. */
   .bosses {
-    position: absolute;
-    top: 96px;
-    right: 12px;
-    z-index: 1000;
-    margin: 0;
-    padding: 8px 12px 8px 30px;
-    border-radius: 4px;
-    background: rgb(23 17 12 / 0.9);
-    color: #f3ead9;
-    font-size: 13px;
-  }
-
-  .off {
-    position: absolute;
-    bottom: 12px;
-    left: 50%;
-    z-index: 1000;
-    margin: 0;
-    padding: 6px 12px;
-    transform: translateX(-50%);
-    border-radius: 4px;
-    background: rgb(23 17 12 / 0.9);
-    color: #ff8a5c;
+    min-width: 0;
+    padding: 8px 12px 8px 32px;
+    list-style: decimal;
+    font: var(--t-small);
   }
 
   .map :global(.me),
@@ -451,17 +429,18 @@
   }
 
   .map :global(.me svg) {
-    transition: transform 0.3s;
+    transition: transform 0.4s linear;
   }
 
   .map :global(.zone-name span) {
     position: absolute;
     transform: translate(-50%, -50%);
     white-space: nowrap;
-    color: #f3ead9;
-    font-size: 13px;
-    letter-spacing: 0.04em;
-    text-shadow: 0 0 3px #000, 0 0 3px #000, 0 1px 2px #000;
+    color: #fff;
+    font: 600 13px/17px var(--font);
+    text-shadow:
+      0 1px 3px #000,
+      0 0 2px #000;
   }
 
   .map :global(.leaflet-container) {

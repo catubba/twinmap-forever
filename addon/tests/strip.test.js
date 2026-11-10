@@ -64,7 +64,7 @@ test('nothing is drawn before the world is entered', () => {
   assert.equal(addon.strips().length, 0);
 });
 
-test('a move sends a new block, and an unchanged position is sent again after ten minutes', () => {
+test('a move sends a new block, and an unchanged position is sent again after ten seconds, as a heartbeat', () => {
   const addon = enterWorld();
   addon.run(10);
   addon.lua('GAME.x, GAME.sub, GAME.facing = 0.5, "", 6.27');
@@ -74,9 +74,9 @@ test('a move sends a new block, and an unchanged position is sent again after te
   assert.deepEqual([all[1].id, all[1].version], [2, 2]);
   assert.deepEqual(data(all[1]), { zone: 'Elwynn Forest', sub: '', map: 1429, x: 50, y: 65.7, facing: 0 });
 
-  addon.run(590);
+  addon.run(7);
   assert.equal(blocks(addon).length, 2, 'not yet');
-  addon.run(20);
+  addon.run(5);
   all = blocks(addon);
   assert.equal(all.length, 3);
   assert.equal(all[2].text, all[1].text);
