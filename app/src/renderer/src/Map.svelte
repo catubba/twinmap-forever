@@ -275,7 +275,7 @@
     const shown = fitNames(boxes, clear)
     named.forEach((n, id) => n.marker.getElement()?.classList.toggle('on', shown.has(id)))
   }
-  // The arrow moves every second: the names make room for it a moment later, once.
+  // The arrow moves four times a second: the names make room for it a moment later, once.
   let laying = 0
   const layoutSoon = (): void => {
     clearTimeout(laying)
@@ -352,10 +352,33 @@
     if (following) place(true)
   }
 
-  // Puts the arrow on a place, turned as the character is.
-  function mark(here: L.LatLng): void {
+  // The arrow goes to a new place, it does not jump there. A position comes every 250 ms (the
+  // addon's period for it): the way takes a little longer, so the arrow is still moving when the
+  // next one comes and never stops to wait. It is always one reading behind, and never guesses.
+  const GLIDE = 350 // ms from one position to the next; the map that follows takes as long
+  const TOO_FAR = 100 // yards: beyond this it is a portal or a hearthstone, and the arrow jumps
+  let gliding = 0, goal: L.LatLng | undefined
+  function glide(here: L.LatLng, jump: boolean): void {
+    // The same place told again (the window is updated more often than the position changes): the way goes on.
+    if (!jump && goal?.equals(here) && map?.hasLayer(arrow)) return
+    goal = here
+    cancelAnimationFrame(gliding)
+    gliding = 0
+    const from = arrow.getLatLng(), started = performance.now()
+    const yards = Math.hypot(here.lat - from.lat, here.lng - from.lng) * YARDS_PER_UNIT
+    if (jump || still() || !map?.hasLayer(arrow) || yards > TOO_FAR) return void arrow.setLatLng(here)
+    const step = (now: number): void => {
+      const t = Math.min(1, (now - started) / GLIDE)
+      arrow.setLatLng([from.lat + (here.lat - from.lat) * t, from.lng + (here.lng - from.lng) * t])
+      gliding = t < 1 ? requestAnimationFrame(step) : 0
+    }
+    gliding = requestAnimationFrame(step)
+  }
+
+  // Puts the arrow on a place, turned as the character is. jump: at once, without the way there.
+  function mark(here: L.LatLng, jump = false): void {
     if (!map) return
-    arrow.setLatLng(here)
+    glide(here, jump)
     if (layers.arrow) arrow.addTo(map)
     else arrow.remove()
     layoutSoon()
@@ -366,9 +389,12 @@
   // arrow is at its edge, so a dungeon that fits the window stays still.
   function point(here: L.LatLng, jump: boolean, loose = false): void {
     if (!map) return
-    mark(here)
+    const fresh = !goal?.equals(here)
+    mark(here, jump)
     const there = loose ? map.getBounds().pad(-0.05).contains(here) : map.getCenter().equals(here)
-    if (following && (jump || !there)) map.panTo(here, { animate: !jump && !still(), duration: 0.9, easeLinearity: 1 })
+    // The map sets off with the arrow and takes as long, so the two stay together; a place told
+    // again does not start it over. Once the arrow is still, a map left off it goes back to it.
+    if (following && (jump || (!there && (fresh || !gliding)))) map.panTo(here, { animate: !jump && !still(), duration: GLIDE / 1000, easeLinearity: 1 })
   }
 
   // Where the character is on the map, or nothing: a place with no map, or one outside the two continents.
@@ -387,7 +413,7 @@
       const where = yardsInside(inst)
       if (!where) return void arrow.remove() // the game does not tell the place in here
       // On the way in the whole dungeon is in view, and stays so while the arrow is well inside it.
-      if (entering) mark(atYards(where))
+      if (entering) mark(atYards(where), true)
       else point(atYards(where), jump, true)
       return
     }
@@ -475,6 +501,7 @@
     // Gone with the screen: whatever was still waiting (a layout, a list being read) finds no map and does nothing.
     return () => {
       clearTimeout(laying)
+      cancelAnimationFrame(gliding)
       map = undefined
       made.remove()
     }

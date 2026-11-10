@@ -21,7 +21,7 @@ const DEADMINES = 'GAME.instance = { name = "Deadmines", kind = "party", id = 36
 test('in the open world the position names no instance', () => {
   const addon = enterWorld('GAME.north, GAME.west = -9465, 74');
   addon.run(10);
-  assert.deepEqual(positions(addon), [{ zone: 'Elwynn Forest', sub: 'Goldshire', map: 1429, x: 42.3, y: 65.7, facing: 90 }]);
+  assert.deepEqual(positions(addon), [{ zone: 'Elwynn Forest', sub: 'Goldshire', map: 1429, x: 42.34, y: 65.71, facing: 90 }]);
 });
 
 test('entering a dungeon the position says which one and where in it, to the yard', () => {

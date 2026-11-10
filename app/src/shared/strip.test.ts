@@ -29,7 +29,7 @@ test('a recorded session decodes to the positions the game reported', () => {
   expect(readings.map((r) => (r as Block).negative)).toEqual([false, true, false, true, false, true])
 
   game.feed(readings[0]!, 1000)
-  expect(game.state.sections.pos).toEqual({ zone: 'Elwynn Forest', sub: 'Goldshire', map: 1429, x: 42.3, y: 65.7, facing: 90 })
+  expect(game.state.sections.pos).toEqual({ zone: 'Elwynn Forest', sub: 'Goldshire', map: 1429, x: 42.34, y: 65.71, facing: 90 })
   readings.slice(1).forEach((r) => game.feed(r, 2000))
   expect(game.state.sections.pos).toEqual({ zone: 'Stormwind City', sub: 'Trade District', map: 1453, x: 61.2, y: 70.8, facing: 180 })
   expect(game.state).toMatchObject({ blocks: 3, lost: 0, corrupt: 0, protocol: null, updatedAt: { pos: 2000 } })
@@ -42,11 +42,11 @@ test('into a dungeon and out: the position says which instance, and where in it 
     return game.state.sections.pos
   })
   expect(seen).toEqual([
-    { zone: 'Elwynn Forest', sub: 'Goldshire', map: 1429, x: 42.3, y: 65.7, facing: 90 },
+    { zone: 'Elwynn Forest', sub: 'Goldshire', map: 1429, x: 42.34, y: 65.71, facing: 90 },
     { zone: 'The Deadmines', sub: '', facing: 90, inst: { id: 36, name: 'Deadmines', kind: 'party', x: -16, y: -383 } },
     { zone: 'The Deadmines', sub: '', facing: 90, inst: { id: 36, name: 'Deadmines', kind: 'party', x: -64, y: -821 } },
     { zone: 'The Deadmines', sub: '', facing: 90, inst: { id: 36, name: 'Deadmines', kind: 'party' } },
-    { zone: 'Westfall', sub: 'Moonbrook', map: 1436, x: 42.3, y: 65.7, facing: 90 },
+    { zone: 'Westfall', sub: 'Moonbrook', map: 1436, x: 42.3, y: 65.71, facing: 90 },
   ])
 })
 
