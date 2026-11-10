@@ -57,6 +57,7 @@ const STUB = `
     function f:RegisterEvent(e) self.events[e] = true end
     function f:SetScript(kind, fn) self[kind] = fn end
     function f:SetPoint(point) self.point = point end
+    function f:SetScale(scale) self.scale = scale end
     function f:SetText(text) self.text = text end
     function f:CreateFontString() return setmetatable({}, Widget) end
     function f:CreateTexture()

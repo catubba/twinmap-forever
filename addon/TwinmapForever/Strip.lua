@@ -146,7 +146,7 @@ local function Encode(id, payload)
   return cells
 end
 
-local strip, anchored
+local strip, anchored, sized
 -- A block's two looks, "plain" and "negative", are painted once and then only shown and hidden:
 -- showing one costs nothing, so they can swap every frame. "flat" is one even cell.
 local layers = {}
@@ -160,11 +160,14 @@ local function Place()
     strip = CreateFrame("Frame", "TwinmapForeverStrip", UIParent)
     strip:SetFrameStrata("TOOLTIP")
     strip:SetFrameLevel(10000)
+    strip:SetIgnoreParentScale(true)
+  end
+  if not sized then -- again whenever the window changes size
     -- One UI unit = one physical pixel.
     local _, physH = GetPhysicalScreenSize()
-    strip:SetIgnoreParentScale(true)
     strip:SetScale(768 / physH)
     strip:SetSize(RowCells() * CELL, CELL)
+    sized = true
   end
   local point = ns.db.position == "BOTTOM" and "BOTTOMLEFT" or "TOPLEFT"
   if point ~= anchored then
@@ -322,8 +325,17 @@ end
 
 local driver = CreateFrame("Frame")
 driver:RegisterEvent("PLAYER_ENTERING_WORLD")
-driver:SetScript("OnEvent", function()
-  startAt = startAt or GetTime() + START_DELAY
+driver:RegisterEvent("DISPLAY_SIZE_CHANGED")
+driver:SetScript("OnEvent", function(_, event)
+  if event == "PLAYER_ENTERING_WORLD" then
+    startAt = startAt or GetTime() + START_DELAY
+    return
+  end
+  -- The window changed size: the row has another length and another pixel scale. Blocks cut for
+  -- the old row are dropped and everything is sent again, cut for the new one.
+  sized, paintedCells = nil, nil
+  queue, steps, last, timer = {}, {}, nil, 0
+  for _, s in ipairs(SECTIONS) do s.nextAt, s.json = 0, nil end
 end)
 driver:SetScript("OnUpdate", function(_, elapsed)
   if not startAt then return end
