@@ -21,7 +21,13 @@ beforeAll(async () => {
     await sleep(100)
     hwnd = findWindow(TITLE)
   }
-  await sleep(300) // found is not painted yet
+  // Found is not painted yet, and over a game that fills the screen the first frames read are still
+  // the game's: wait until the window's own first pixel shows, a few seconds at most.
+  const first = expected((x) => (x * 7 + 3) % 8).slice(0, 3)
+  for (let i = 0; i < 50 && hwnd; i++) {
+    await sleep(100)
+    if (colors(readRow(hwnd, 'top')).slice(0, 3).join() === first.join()) break
+  }
 }, 70_000)
 afterAll(() => void child.kill())
 
