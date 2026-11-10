@@ -2,6 +2,8 @@
   // The main screen: the top row with the state of the link, the map in its frame, and the Now panel.
   import { experience, linkStatus, type LinkSnapshot } from '../../shared/link'
   import { tilesLine, type TilesStatus } from '../../shared/tiles-status'
+  import type { SetupStatus } from '../../shared/setup'
+  import FirstRun from './FirstRun.svelte'
   import Map from './Map.svelte'
 
   let link = $state<LinkSnapshot | null>(null)
@@ -14,6 +16,14 @@
   let tiles = $state<TilesStatus | null>(null)
   window.twinmap.onTiles((status) => {
     tiles = status
+  })
+
+  // The first run shows by itself until its steps were all done once; then the app opens on the map.
+  let setup = $state<SetupStatus | null>(null)
+  let onSetup = $state<boolean | null>(null)
+  window.twinmap.onSetup((told) => {
+    setup = told
+    onSetup ??= !told.done
   })
 
   const status = $derived(link ? linkStatus(link, now) : null)
@@ -30,14 +40,20 @@
 
 <!-- The top row is the window's title bar too: it drags the window, a double click maximizes it. -->
 <header class="top">
-  <nav aria-label="Sections">
-    <span class="tab" aria-current="page">Now</span>
-  </nav>
+  {#if !onSetup}
+    <nav aria-label="Sections">
+      <span class="tab" aria-current="page">Now</span>
+    </nav>
+  {/if}
   {#if status}
     <p class="status"><i class={status.tone}></i>{status.word}</p>
   {/if}
 </header>
 
+{#if onSetup && setup}
+  <FirstRun {setup} link={status} onclose={() => (onSetup = false)} />
+{/if}
+{#if onSetup === false}
 <div class="work">
   <div class="mapbox">
     {#if mapReady}
@@ -71,6 +87,7 @@
     {/if}
   </aside>
 </div>
+{/if}
 
 <style>
   .top {

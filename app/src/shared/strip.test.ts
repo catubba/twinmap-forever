@@ -148,5 +148,5 @@ test('an addon with an older protocol: the app says to update the addon', () => 
   const game = createGame()
   for (let i = 0; i < 3; i++) game.feed({ kind: 'protocol', protocol: 0 })
   expect(game.state.protocol).toMatchObject({ addon: 0, update: 'addon' })
-  expect(game.state.protocol?.message).toMatch(/Update the addon\.$/)
+  expect(game.state.protocol?.message).toMatch(/Update the addon from CurseForge\.$/)
 })

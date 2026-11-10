@@ -1,13 +1,15 @@
-import { app, BrowserWindow, Menu, protocol, screen } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu, protocol, screen, shell } from 'electron'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { lostPercent } from '../shared/link'
+import { linkStatus, lostPercent } from '../shared/link'
+import { CURSEFORGE, setupComplete, setupSteps } from '../shared/setup'
 import type { TilesStatus } from '../shared/tiles-status'
 import { placeWindow, WINDOW } from '../shared/window'
 import { findGameWindow, programOf } from './capture'
 import { gameFolderFrom, registryInstallPath } from './client-files'
 import { startLink } from './link'
+import { readSettings, setupStatus, writeSettings } from './setup'
 import { servedFile } from './tiles'
 import startTilesWorker from './tiles-worker?nodeWorker'
 
@@ -19,12 +21,18 @@ const BLANK = Buffer.from('R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=='
 // The window gets the map's files through an address of its own, twinmap://tiles/..., and only those.
 protocol.registerSchemesAsPrivileged([{ scheme: 'twinmap', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }])
 
+// The game folder: the one the player picked, else the one of the game that is running, else the
+// one the game's installer wrote down. TWINMAP_GAME, for trials, is looked at alone (a folder with no game in it: none found).
+function findGameFolder(picked: string | undefined): string | null {
+  if (process.env.TWINMAP_GAME !== undefined) return gameFolderFrom([process.env.TWINMAP_GAME])
+  const running = findGameWindow()
+  return gameFolderFrom([picked ?? null, running === null ? null : programOf(running), registryInstallPath()])
+}
+
 // Makes the map tiles from the game's files, once per build of the game, and keeps the latest word on it.
 // The folder: TWINMAP_DATA when set (for trials), or Twinmap under the local application data.
-function startTiles(): { status: () => TilesStatus; stop: () => void } {
+function startTiles(gameFolder: string | null): { status: () => TilesStatus; stop: () => void } {
   let status: TilesStatus = { state: 'looking' }
-  const running = findGameWindow()
-  const gameFolder = gameFolderFrom([running === null ? null : programOf(running), registryInstallPath()])
   if (!gameFolder) return { status: () => ({ state: 'no-game' }), stop: () => {} }
   const base = process.env.TWINMAP_DATA ?? join(process.env.LOCALAPPDATA ?? app.getPath('userData'), 'Twinmap')
   const worker = startTilesWorker({ workerData: { gameFolder, base } })
@@ -77,7 +85,40 @@ function createWindow(): void {
   else void win.loadFile(join(__dirname, '../renderer/index.html'), { hash })
 
   const link = startLink()
-  const tiles = startTiles()
+  const settingsFile = join(app.getPath('userData'), 'settings.json')
+  const settings = readSettings(settingsFile)
+  let gameFolder = findGameFolder(settings.gameFolder)
+  let tiles = startTiles(gameFolder)
+
+  // The first run. The window may ask for two things, and only these: to let the player pick the
+  // game folder, and to open the addon's page on CurseForge in the browser.
+  ipcMain.handle('choose-game-folder', async (): Promise<string | null> => {
+    const picked = await dialog.showOpenDialog(win, { title: 'Where World of Warcraft: Forever is installed', properties: ['openDirectory'] })
+    const chosen = picked.filePaths[0]
+    if (picked.canceled || !chosen) return null
+    const found = gameFolderFrom([chosen])
+    if (!found) return 'World of Warcraft: Forever is not in that folder. Choose the one that holds _forever_.'
+    settings.gameFolder = found
+    writeSettings(settingsFile, settings)
+    if (found !== gameFolder) {
+      gameFolder = found
+      tiles.stop()
+      tiles = startTiles(found)
+    }
+    return null
+  })
+  ipcMain.handle('open-curseforge', () => shell.openExternal(CURSEFORGE))
+  // Where the first run stands, looked at every couple of seconds: an addon installed meanwhile shows by itself.
+  let setup = setupStatus(gameFolder, settings.setupDone === true)
+  const look = setInterval(() => {
+    if (!gameFolder) gameFolder = findGameFolder(settings.gameFolder) // the game may be started after the app
+    if (gameFolder && tiles.status().state === 'no-game') tiles = startTiles(gameFolder)
+    setup = setupStatus(gameFolder, settings.setupDone === true)
+    if (!settings.setupDone && setupComplete(setupSteps(setup, linkStatus(link.snapshot(), Date.now())))) {
+      settings.setupDone = true
+      writeSettings(settingsFile, settings)
+    }
+  }, 2000)
   protocol.handle('twinmap', async (request) => {
     const status = tiles.status(), url = new URL(request.url)
     const file = status.state === 'ready' && url.host === 'tiles' ? servedFile(status.folder, url.pathname) : null
@@ -94,6 +135,7 @@ function createWindow(): void {
   const show = setInterval(() => {
     win.webContents.send('link', link.snapshot())
     win.webContents.send('tiles', tiles.status())
+    win.webContents.send('setup', setup)
   }, SHOW_EVERY)
 
   // The measures of a live session, for whoever tunes the link: read, lost, processor.
@@ -120,6 +162,9 @@ function createWindow(): void {
   win.on('closed', () => {
     clearInterval(show)
     clearInterval(log)
+    clearInterval(look)
+    ipcMain.removeHandler('choose-game-folder')
+    ipcMain.removeHandler('open-curseforge')
     link.stop()
     tiles.stop()
     protocol.unhandle('twinmap')
