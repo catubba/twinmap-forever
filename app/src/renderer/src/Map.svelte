@@ -22,6 +22,9 @@
   const TOP_ZOOM = 7 // the game's own detail: a block's picture is four tiles
   const BLANK = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=='
   const NAMES: Record<Continent, string> = { 0: 'Eastern Kingdoms', 1: 'Kalimdor' }
+  // Cities that lie wholly under a roof, though the game calls them outdoors (one can ride there):
+  // Ironforge and Undercity, by the id of their map. Their rooms show as those of a cave do.
+  const ROOFED = new Set([1455, 1458])
   const GROUND_INSIDE = 0.45 // how bright the ground of a dungeon is: its rooms are what matters
 
   let holder: HTMLDivElement
@@ -189,7 +192,8 @@
     }
     continent = which
     const whole = maps.find((m) => m.level === 'continent' && m.continent === which && m.parent !== 0)
-    if (fit && whole?.rect) map.fitBounds(boundsOf(whole))
+    // At once: a zoom still running would end by putting this view back over whatever came after it.
+    if (fit && whole?.rect) map.fitBounds(boundsOf(whole), { animate: false })
   }
 
   // Puts a dungeon or a raid on the map: its ground dimmed, its rooms, its bosses and its entrance.
@@ -291,11 +295,11 @@
     if (!placed) {
       placed = true
       mark(here)
-      map.fitBounds(boundsOf(zone))
+      map.fitBounds(boundsOf(zone), { animate: false })
     } else point(here, jump)
 
     // Under a roof (a cave, a mine, a house): the rooms of that building go over the ground.
-    const world = pos.indoors ? interiors?.maps.find((m) => m.kind === 'world' && m.id === zone.continent) : undefined
+    const world = pos.indoors || ROOFED.has(zone.id) ? interiors?.maps.find((m) => m.kind === 'world' && m.id === zone.continent) : undefined
     const buildings = world ? buildingsAt(world.pieces, units.x * YARDS_PER_UNIT, units.y * YARDS_PER_UNIT) : new Set<number>()
     const now = [...buildings].join()
     if (now !== under) {
