@@ -14,7 +14,9 @@
   import { WORLDS } from '../../shared/world'
   import { LAYER_GROUPS, layersFrom } from '../../shared/layers'
   import { wayTo, zoneAt, type Size } from '../../shared/point-label'
+  import { fade, fly } from 'svelte/transition'
   import Glyph from './Glyph.svelte'
+  import { drop, gone } from './motion'
   import PointLabel from './PointLabel.svelte'
   import { pin } from './marks'
 
@@ -450,7 +452,7 @@
     {/each}
   </div>
   {#if layersOpen}
-    <div class="menu layers" id="layers" role="group" aria-label="Layers">
+    <div class="menu layers" id="layers" role="group" aria-label="Layers" in:fly={drop()} out:fade={gone}>
       {#each LAYER_GROUPS as group (group.name)}
         <div class="group">{group.name}</div>
         {#each group.layers as layer (layer.id)}
@@ -468,7 +470,7 @@
     </div>
   {/if}
   {#if inside && inside.bosses.length && !pinned}
-    <ol class="menu bosses">
+    <ol class="menu bosses" in:fly={drop()} out:fade={gone}>
       {#each inside.bosses as boss (boss)}
         <li>{boss}</li>
       {/each}
@@ -481,7 +483,7 @@
   <button class="btn" aria-pressed={following} onclick={follow}>Follow</button>
 </div>
 {#if offMap}
-  <p class="map-note">This place is not on the map.</p>
+  <p class="map-note" in:fly={drop(8)} out:fade={gone}>This place is not on the map.</p>
 {/if}
 
 <style>
