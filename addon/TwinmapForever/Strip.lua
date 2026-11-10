@@ -10,12 +10,15 @@
 --
 -- In "steady" mode a block is drawn twice: as it is, then in negative (every cell 7 - v), so the
 -- eye sees a still grey line. The reader tells a negative by its inverted magic bytes.
+--
+-- Temporary, for the camouflage trials: how long each showing lasts, how many times, what is on
+-- screen between blocks and how far apart the two levels of a channel are come from the settings
+-- (ns.db.on, neg, gap, cycles, idle, base, amp). The reader takes the levels from the row itself.
 local _, ns = ...
 
 -- Tuning knobs.
 local CELL = 1        -- physical pixels per cell
 local RESERVED = 40   -- bytes of a block that are not section data: header, checksum, record
-local HOLD = 0.05     -- seconds a block stays up, and again its negative: must span a few captures
 local REFRESH = 600   -- resend an unchanged section this often: nothing acks, a block can be missed
 local START_DELAY = 5 -- seconds after entering the world
 
@@ -120,13 +123,15 @@ local function Encode(id, payload)
 end
 
 local strip, anchored
-local cellPool = {}
+-- A block's two looks, "plain" and "negative", are painted once and then only shown and hidden:
+-- showing one costs nothing, so they can swap every frame. "flat" is one even cell.
+local layers = {}
 
 local function RowCells()
   return math.floor(GetPhysicalScreenSize() / CELL)
 end
 
-local function Draw(cells, negative)
+local function Place()
   if not strip then
     strip = CreateFrame("Frame", "TwinmapForeverStrip", UIParent)
     strip:SetFrameStrata("TOOLTIP")
@@ -143,22 +148,69 @@ local function Draw(cells, negative)
     strip:SetPoint(point, UIParent, point, 0, 0)
     anchored = point
   end
-  local row = RowCells()
+end
+
+local function Layer(key)
+  local f = layers[key]
+  if not f then
+    Place()
+    f = CreateFrame("Frame", nil, strip)
+    f:SetAllPoints(strip)
+    f.cells = {}
+    layers[key] = f
+  end
+  return f
+end
+
+-- A color channel, off or on, as the game wants it: 0 to 1.
+local function Level(on)
+  return math.min(255, ns.db.base + (on and ns.db.amp or 0)) / 255
+end
+
+local function Paint(key, cells)
+  local f, row, off, on = Layer(key), RowCells(), Level(false), Level(true)
   for i = 1, row do
     local v = cells[(i - 1) % #cells + 1] -- past the end the block repeats: always full width, ignored by the reader
-    if negative then v = 7 - v end
-    local t = cellPool[i]
+    if key == "negative" then v = 7 - v end
+    local t = f.cells[i]
     if not t then
-      t = strip:CreateTexture(nil, "OVERLAY")
+      t = f:CreateTexture(nil, "OVERLAY")
       t:SetSize(CELL, CELL)
-      t:SetPoint("TOPLEFT", strip, "TOPLEFT", (i - 1) * CELL, 0)
-      cellPool[i] = t
+      t:SetPoint("TOPLEFT", f, "TOPLEFT", (i - 1) * CELL, 0)
+      f.cells[i] = t
     end
-    t:SetColorTexture(math.floor(v / 4) % 2, math.floor(v / 2) % 2, v % 2, 1)
+    t:SetColorTexture(v >= 4 and on or off, v % 4 >= 2 and on or off, v % 2 == 1 and on or off, 1)
     t:Show()
   end
-  for i = row + 1, #cellPool do cellPool[i]:Hide() end
-  strip:Show()
+  for i = row + 1, #f.cells do f.cells[i]:Hide() end
+end
+
+-- Halfway between off and on: what a block and its negative average to.
+local function PaintFlat()
+  local f = Layer("flat")
+  local t = f.cells[1]
+  if not t then
+    t = f:CreateTexture(nil, "OVERLAY")
+    t:SetAllPoints(f)
+    f.cells[1] = t
+  end
+  local mid = (Level(false) + Level(true)) / 2
+  t:SetColorTexture(mid, mid, mid, 1)
+  t:Show()
+end
+
+-- Puts one layer on screen, or none.
+local function Show(key)
+  Place()
+  for k, f in pairs(layers) do
+    if k ~= key then f:Hide() end
+  end
+  if key then
+    strip:Show()
+    layers[key]:Show()
+  else
+    strip:Hide()
+  end
 end
 
 ---------------------------------------------------------------------------
@@ -170,8 +222,33 @@ local queue = {}
 local version, blockId = 0, 0
 local startAt
 local showing, timer, tickAcc = false, 0, 0
-local negative -- the cells on screen, when their negative is still to be drawn
+local steps = {} -- what is left to show of the block on screen: { layer or "rest", seconds }
+local last, paintedCells, paintedStamp -- the last block's cells; what the layers hold now
 local paused = false
+
+-- What is on screen while no block is: nothing, or the even line.
+local function Rest()
+  if ns.db.idle == "hide" then return Show(nil) end
+  PaintFlat()
+  Show("flat")
+end
+
+-- Lines up the showings of a block: as it is, its negative, a rest, as many times as asked.
+local function Begin(cells)
+  local db = ns.db
+  local steady = db.mode ~= "fast"
+  if cells ~= paintedCells or ns.tuneStamp ~= paintedStamp then
+    Paint("plain", cells)
+    Paint("negative", cells)
+    paintedCells, paintedStamp = cells, ns.tuneStamp
+  end
+  for _ = 1, math.max(1, db.cycles) do
+    steps[#steps + 1] = { "plain", db.on / 1000 }
+    if steady then steps[#steps + 1] = { "negative", db.neg / 1000 } end
+    if db.gap > 0 then steps[#steps + 1] = { "rest", db.gap / 1000 } end
+  end
+  last = cells
+end
 
 local function Enqueue(s, json)
   local name = s.name
@@ -228,8 +305,8 @@ driver:SetScript("OnUpdate", function(_, elapsed)
   if not startAt then return end
   if ns.db.paused then
     if not paused then
-      paused, queue, negative, timer = true, {}, nil, 0
-      if strip then strip:Hide() end
+      paused, queue, steps, last, timer = true, {}, {}, nil, 0
+      Show(nil)
       showing = false
     end
     return
@@ -248,20 +325,21 @@ driver:SetScript("OnUpdate", function(_, elapsed)
   end
   timer = timer - elapsed
   if timer > 0 then return end
-  if negative then
-    Draw(negative, true)
-    negative, timer = nil, HOLD
-    return
+  if #steps == 0 then
+    local item = Next(combat)
+    if item then -- straight to the next one: an empty frame between blocks is a visible blink
+      blockId = (blockId + 1) % 65536
+      Begin(Encode(blockId, item.text))
+    elseif last and ns.db.idle == "repeat" then
+      Begin(last)
+    end
   end
-  local item = Next(combat)
-  if item then -- straight to the next one: an empty frame between blocks is a visible blink
-    blockId = (blockId + 1) % 65536
-    local cells = Encode(blockId, item.text)
-    Draw(cells, false)
-    if ns.db.mode ~= "fast" then negative = cells end
-    showing, timer = true, HOLD
+  local step = table.remove(steps, 1)
+  if step then
+    if step[1] == "rest" then Rest() else Show(step[1]) end
+    showing, timer = true, step[2]
   elseif showing then
-    strip:Hide()
+    Rest()
     showing = false
   end
 end)

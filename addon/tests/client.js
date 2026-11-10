@@ -31,6 +31,7 @@ const STUB = `
     GetPlayerMapPosition = function() return GAME.x and { x = GAME.x, y = GAME.y } end,
   }
   UIParent = {}
+  LEVELS = {} -- every channel value a texture was given, as a key
 
   -- Frames and textures answer every method; only what a test looks at does something.
   local function noop() end
@@ -45,7 +46,12 @@ const STUB = `
     function f:CreateFontString() return setmetatable({}, Widget) end
     function f:CreateTexture()
       local t = setmetatable({}, Widget)
-      function t:SetColorTexture(r, g, b) self.v = math.floor(r * 4 + g * 2 + b) end
+      -- A channel is on above GAME.threshold: half, unless a test draws the strip with other levels.
+      function t:SetColorTexture(r, g, b)
+        local th = GAME.threshold or 0.5
+        self.v = (r > th and 4 or 0) + (g > th and 2 or 0) + (b > th and 1 or 0)
+        LEVELS[r], LEVELS[g], LEVELS[b] = true, true, true
+      end
       function t:Show() self.shown = true end
       function t:Hide() self.shown = false end
       cells[#cells + 1] = t
@@ -96,6 +102,7 @@ const STUB = `
     error("no such slash command: " .. text)
   end
   function T_click(name) return rawget(_G[name], "OnClick")(_G[name]) end
+  function T_slide(name, value) return rawget(_G[name], "OnValueChanged")(_G[name], tonumber(value)) end
   function T_printed() return table.concat(printed, "\\n") end
   function T_ns(key) return tostring(ns[key]) end
 `;
@@ -137,6 +144,8 @@ function loadAddon(dir) {
     ns: (key) => call('T_ns', key),
     lua: (code) => call('T_lua', code),
     click: (name) => call('T_click', name),
+    // Drags a slider to a value.
+    slide: (name, value) => call('T_slide', name, String(value)),
     run: (seconds) => call('T_run', String(seconds)),
     // Every strip drawn so far, oldest first, each a string of cells 0 to 7.
     strips: () => (call('T_strips') || '').split('\n').filter(Boolean),
