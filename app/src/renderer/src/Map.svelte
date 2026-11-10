@@ -7,7 +7,7 @@
   import type { Position } from '../../shared/game'
   import { unitsOfPlace, unitsOfRect, type Point } from '../../shared/geo'
   import type { Continent, GameMap } from '../../shared/maps'
-  import { tileOfBlock } from '../../shared/pixels'
+  import { pictureOfBlock, tileOfPicture } from '../../shared/pixels'
   import { WORLDS } from '../../shared/world'
 
   let { pos }: { pos: Position | undefined } = $props()
@@ -32,17 +32,17 @@
   }
   const WORLD_BOUNDS = L.latLngBounds([-256, 0], [0, 256])
 
-  // The pictures of the blocks, inflated, for the tiles of the two top levels. The last few are
-  // kept: the four tiles of a block ask for the same file.
+  // The pictures of the blocks, decoded, for the tiles of the two top levels. The last few are
+  // kept (0.8 MB each): the four tiles of a block ask for the same one, and so does coming back to it.
   const blocks = new Map<string, Promise<Uint8Array | null>>()
   function block(url: string): Promise<Uint8Array | null> {
     let wanted = blocks.get(url)
     if (!wanted) {
       wanted = fetch(url)
-        .then(async (answer) => (answer.ok && answer.body ? new Uint8Array(await new Response(answer.body.pipeThrough(new DecompressionStream('deflate'))).arrayBuffer()) : null))
+        .then(async (answer) => (answer.ok && answer.body ? pictureOfBlock(new Uint8Array(await new Response(answer.body.pipeThrough(new DecompressionStream('deflate'))).arrayBuffer())) : null))
         .catch(() => null)
       blocks.set(url, wanted)
-      if (blocks.size > 48) blocks.delete(blocks.keys().next().value!)
+      if (blocks.size > 40) blocks.delete(blocks.keys().next().value!)
     }
     return wanted
   }
@@ -54,9 +54,9 @@
       canvas.width = canvas.height = 256
       const top = coords.z === TOP_ZOOM
       const column = top ? coords.x >> 1 : coords.x, row = top ? coords.y >> 1 : coords.y
-      void block(`${TILES}/${this.options.world}/blocks/${column}/${row}.dxt`).then((dxt) => {
-        if (dxt) {
-          const rgb = tileOfBlock(dxt, top ? (coords.x & 1) + (coords.y & 1) * 2 : undefined)
+      void block(`${TILES}/${this.options.world}/blocks/${column}/${row}.dxt`).then((picture) => {
+        if (picture) {
+          const rgb = tileOfPicture(picture, top ? (coords.x & 1) + (coords.y & 1) * 2 : undefined)
           const image = new ImageData(256, 256)
           for (let i = 0, o = 0; i < rgb.length; i += 3, o += 4) {
             image.data[o] = rgb[i]!
@@ -95,9 +95,12 @@
     if (!map) return
     const world = WORLDS.find((w) => w.continent === which)!.name
     for (const layer of shown) layer.remove()
+    // The halved tiles stay under everything at every zoom, stretched past their own detail: while
+    // the sharp tiles of a place are still being read, the map shows it blurred, never black. The
+    // game's own blocks go on top, from halfway between the two kinds of tile up.
     shown = [
-      L.tileLayer(`${TILES}/${world}/{z}/{x}/{y}.png`, { minZoom: 0, maxZoom: TOP_ZOOM - 2, bounds: WORLD_BOUNDS, errorTileUrl: BLANK }).addTo(map),
-      new BlockLayer({ world, minZoom: TOP_ZOOM - 1, maxNativeZoom: TOP_ZOOM, bounds: WORLD_BOUNDS }).addTo(map),
+      L.tileLayer(`${TILES}/${world}/{z}/{x}/{y}.png`, { minZoom: 0, maxZoom: 9, maxNativeZoom: TOP_ZOOM - 2, bounds: WORLD_BOUNDS, errorTileUrl: BLANK, keepBuffer: 4, zIndex: 1 }).addTo(map),
+      new BlockLayer({ world, minZoom: TOP_ZOOM - 1.5, minNativeZoom: TOP_ZOOM - 1, maxNativeZoom: TOP_ZOOM, bounds: WORLD_BOUNDS, keepBuffer: 3, zIndex: 2 }).addTo(map),
     ]
     labels.clearLayers()
     for (const m of maps) {
