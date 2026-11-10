@@ -8,6 +8,7 @@
   import { DUNGEON_PINS } from '../../shared/dungeon-pins'
   import type { Position } from '../../shared/game'
   import { unitsOfPlace, unitsOfRect, type Point } from '../../shared/geo'
+  import { addFix, BEHIND, PERIOD, whereAt, type Fix } from '../../shared/glide'
   import { boxOf, buildingsAt, piecesIn, roomPixels, yardsInside, YARDS_PER_UNIT, type Box, type InteriorMap, type Interiors, type Piece, type Yards } from '../../shared/inside'
   import type { Continent, GameMap } from '../../shared/maps'
   import { pictureOfBlock, tileOfPicture } from '../../shared/pixels'
@@ -21,8 +22,9 @@
   import PointLabel from './PointLabel.svelte'
   import { pin } from './marks'
 
+  // at: when the position was read off the game, in milliseconds.
   // insideReady: the rooms of the buildings are converted, and their list can be asked for.
-  let { pos, insideReady }: { pos: Position | undefined; insideReady: boolean } = $props()
+  let { pos, at: readAt, insideReady }: { pos: Position | undefined; at: number | undefined; insideReady: boolean } = $props()
 
   const TILES = 'twinmap://tiles'
   const TOP_ZOOM = 7 // the game's own detail: a block's picture is four tiles
@@ -275,11 +277,14 @@
     const shown = fitNames(boxes, clear)
     named.forEach((n, id) => n.marker.getElement()?.classList.toggle('on', shown.has(id)))
   }
-  // The arrow moves four times a second: the names make room for it a moment later, once.
+  // The arrow and the map that follows it move at every frame: the names are laid out a moment
+  // later, once for all the moves of that moment.
   let laying = 0
   const layoutSoon = (): void => {
-    clearTimeout(laying)
-    laying = window.setTimeout(layout, 150)
+    laying ||= window.setTimeout(() => {
+      laying = 0
+      layout()
+    }, 150)
   }
 
   // Puts a continent on the map: its tiles and the names written over it.
@@ -352,27 +357,33 @@
     if (following) place(true)
   }
 
-  // The arrow goes to a new place, it does not jump there. A position comes every 250 ms (the
-  // addon's period for it): the way takes a little longer, so the arrow is still moving when the
-  // next one comes and never stops to wait. It is always one reading behind, and never guesses.
-  const GLIDE = 350 // ms from one position to the next; the map that follows takes as long
+  // The arrow goes to a new place, it does not jump there: at every frame it is put where the
+  // character was a moment ago (glide.ts), and the map that follows is put under it.
   const TOO_FAR = 100 // yards: beyond this it is a portal or a hearthstone, and the arrow jumps
-  let gliding = 0, goal: L.LatLng | undefined
+  let trail: Fix[] = [], gliding = 0
+  let tied = false // the map moves with the arrow, frame by frame
+  let zooming = false // a zoom is running: the map is left alone until its end
+  function frame(): void {
+    const now = whereAt(trail, Date.now() - BEHIND), here = L.latLng(now.y, now.x)
+    arrow.setLatLng(here)
+    if (map && following && tied && !zooming) map.panTo(here, { animate: false, noMoveStart: true })
+    layoutSoon()
+    gliding = now.arrived ? 0 : requestAnimationFrame(frame)
+  }
   function glide(here: L.LatLng, jump: boolean): void {
-    // The same place told again (the window is updated more often than the position changes): the way goes on.
-    if (!jump && goal?.equals(here) && map?.hasLayer(arrow)) return
-    goal = here
-    cancelAnimationFrame(gliding)
-    gliding = 0
-    const from = arrow.getLatLng(), started = performance.now()
-    const yards = Math.hypot(here.lat - from.lat, here.lng - from.lng) * YARDS_PER_UNIT
-    if (jump || still() || !map?.hasLayer(arrow) || yards > TOO_FAR) return void arrow.setLatLng(here)
-    const step = (now: number): void => {
-      const t = Math.min(1, (now - started) / GLIDE)
-      arrow.setLatLng([from.lat + (here.lat - from.lat) * t, from.lng + (here.lng - from.lng) * t])
-      gliding = t < 1 ? requestAnimationFrame(step) : 0
+    const fix = { at: readAt ?? Date.now(), x: here.lng, y: here.lat }, last = trail.at(-1)
+    const yards = last ? Math.hypot(fix.x - last.x, fix.y - last.y) * YARDS_PER_UNIT : Infinity
+    if (jump || still() || !map?.hasLayer(arrow) || yards > TOO_FAR) {
+      cancelAnimationFrame(gliding)
+      gliding = 0
+      trail = [fix]
+      layoutSoon()
+      return void arrow.setLatLng(here)
     }
-    gliding = requestAnimationFrame(step)
+    const longer = addFix(trail, fix)
+    if (longer === trail) return // the same place told again
+    trail = longer
+    gliding ||= requestAnimationFrame(frame)
   }
 
   // Puts the arrow on a place, turned as the character is. jump: at once, without the way there.
@@ -381,20 +392,25 @@
     glide(here, jump)
     if (layers.arrow) arrow.addTo(map)
     else arrow.remove()
-    layoutSoon()
-    if (pos?.facing !== undefined) turnTo(360 - pos.facing) // the game counts anticlockwise from north
+    if (pos?.facing === undefined) return
+    const turn = 360 - pos.facing // the game counts anticlockwise from north
+    // It turns as it sets off on the stretch that ends where the game told this facing.
+    if (gliding) setTimeout(() => turnTo(turn), BEHIND - PERIOD)
+    else turnTo(turn)
   }
 
   // The arrow on a place, and the map with it when it follows. loose: the map moves only once the
   // arrow is at its edge, so a dungeon that fits the window stays still.
   function point(here: L.LatLng, jump: boolean, loose = false): void {
     if (!map) return
-    const fresh = !goal?.equals(here)
     mark(here, jump)
-    const there = loose ? map.getBounds().pad(-0.05).contains(here) : map.getCenter().equals(here)
-    // The map sets off with the arrow and takes as long, so the two stay together; a place told
-    // again does not start it over. Once the arrow is still, a map left off it goes back to it.
-    if (following && (jump || (!there && (fresh || !gliding)))) map.panTo(here, { animate: !jump && !still(), duration: GLIDE / 1000, easeLinearity: 1 })
+    tied = !loose
+    if (!following) return
+    if (jump) map.panTo(here, { animate: false })
+    // In a dungeon the map goes after an arrow that reached its edge.
+    else if (loose && !map.getBounds().pad(-0.05).contains(here)) map.panTo(here, { animate: !still(), duration: 0.9, easeLinearity: 1 })
+    // A map left off a still arrow (a zoom on another point) goes back to it.
+    else if (!loose && !gliding && !map.getCenter().equals(here)) map.panTo(here, { animate: !still(), duration: 0.35 })
   }
 
   // Where the character is on the map, or nothing: a place with no map, or one outside the two continents.
@@ -455,7 +471,10 @@
     made.setView([-128, 128], 2)
     pins.addTo(made)
     made.on('dragstart', () => (following = false))
-    made.on('zoomend moveend', layout)
+    made.on('zoomend', layout)
+    made.on('moveend', layoutSoon)
+    made.on('zoomstart', () => (zooming = true))
+    made.on('zoomend', () => (zooming = false))
     made.on('zoomend', () => (zoom = made.getZoom()))
     // A window made wider or narrower: the map that follows puts the character back in its middle.
     made.on('resize', () => {
@@ -696,7 +715,7 @@
   }
 
   .map :global(.me svg) {
-    transition: transform 0.4s linear;
+    transition: transform 0.25s linear;
   }
 
   /* The names lie over the map as if hung above it: light letters, a close dark edge to read on

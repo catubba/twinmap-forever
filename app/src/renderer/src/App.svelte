@@ -74,7 +74,7 @@
 <div class="work" in:fade={screen} inert={onSettings}>
   <div class="mapbox">
     {#if mapReady}
-      <Map {pos} {insideReady} />
+      <Map {pos} at={link?.state.updatedAt.pos} {insideReady} />
     {:else if tiles}
       <div class="making" class:failed={tiles.state === 'failed' || tiles.state === 'no-game'}>
         <p>{tilesLine(tiles)}</p>
