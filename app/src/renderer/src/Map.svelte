@@ -17,7 +17,7 @@
   import { wayTo, zoneAt, type Size } from '../../shared/point-label'
   import { fade, fly } from 'svelte/transition'
   import Glyph from './Glyph.svelte'
-  import { drop, gone } from './motion'
+  import { drop, gone, still } from './motion'
   import PointLabel from './PointLabel.svelte'
   import { pin } from './marks'
 
@@ -36,6 +36,7 @@
   const ROOFED = new Set([1458])
   const CITY_UNDER = 3e6 // square yards: a zone map smaller than this is a city
   const FAR = 3 // under this zoom the names of the regions are written small
+  const EDGE = 14 // px from the edge of the map's box that a name keeps clear: the frame and a little air
   const GROUND_INSIDE = 0.45 // how bright the ground of a dungeon is: its rooms are what matters
 
   let holder: HTMLDivElement
@@ -258,8 +259,10 @@
       // A little past the edges too, so a name is there already when the map is dragged to it.
       if (p.x < -300 || p.y < -200 || p.x > size.x + 300 || p.y > size.y + 200) return
       const [width, height] = (n.sizes[scale] ??= [span.offsetWidth, span.offsetHeight])
-      if (width) boxes.push({ id, x: p.x, y: p.y, width, height })
-      else delete n.sizes[scale] // not drawn yet: measured the next time
+      if (!width) return void delete n.sizes[scale] // not drawn yet: measured the next time
+      // Whole inside the frame, or not at all: half a name under the moulding reads as a mistake.
+      const whole = p.x - width / 2 >= EDGE && p.x + width / 2 <= size.x - EDGE && p.y - height / 2 >= EDGE && p.y + height / 2 <= size.y - EDGE
+      if (whole) boxes.push({ id, x: p.x, y: p.y, width, height })
     })
     // Kept clear: the arrow, and what is written or pressed over the map (the zone and its coordinates, the buttons).
     const frame = holder.getBoundingClientRect()
@@ -321,7 +324,10 @@
     }
     for (const d of dungeons) {
       for (const [name, u, v] of d.bosses) dot(u, v, '#ff5a4d', name)
-      if (d.entrance) dot(d.entrance[0], d.entrance[1], '#5fe35a', dungeons.length > 1 ? `Entrance: ${d.name}` : 'Entrance')
+      if (d.entrance)
+        L.marker(atYards({ u: d.entrance[0], v: d.entrance[1] }), { keyboard: false, icon: L.divIcon({ className: 'door', iconSize: [16, 16], html: pin('dungeon') }) })
+          .bindTooltip(dungeons.length > 1 ? `Entrance: ${d.name}` : 'Entrance', { direction: 'top', offset: [0, -8], className: 'tip' })
+          .addTo(pins)
     }
     const box = dungeons.length
       ? dungeons.reduce<Box>((all, d) => [Math.min(all[0], d.bounds[0]), Math.min(all[1], d.bounds[1]), Math.max(all[2], d.bounds[2]), Math.max(all[3], d.bounds[3])], [Infinity, Infinity, -Infinity, -Infinity])
@@ -362,7 +368,7 @@
     if (!map) return
     mark(here)
     const there = loose ? map.getBounds().pad(-0.05).contains(here) : map.getCenter().equals(here)
-    if (following && (jump || !there)) map.panTo(here, { animate: !jump, duration: 0.9, easeLinearity: 1 })
+    if (following && (jump || !there)) map.panTo(here, { animate: !jump && !still(), duration: 0.9, easeLinearity: 1 })
   }
 
   // Where the character is on the map, or nothing: a place with no map, or one outside the two continents.
@@ -418,7 +424,7 @@
   }
 
   onMount(() => {
-    const made = L.map(holder, { zoomControl: false, crs: L.CRS.Simple, minZoom: 1, maxZoom: 9, zoomSnap: 0.5, zoomDelta: 0.5, wheelPxPerZoomLevel: 90, attributionControl: false, maxBounds: WORLD_BOUNDS.pad(0.2) })
+    const made = L.map(holder, { zoomControl: false, crs: L.CRS.Simple, minZoom: 1, maxZoom: 9, zoomSnap: 0.5, zoomDelta: 0.5, wheelPxPerZoomLevel: 90, attributionControl: false, zoomAnimation: !still(), fadeAnimation: !still(), maxBounds: WORLD_BOUNDS.pad(0.2) })
     map = made
     made.setView([-128, 128], 2)
     pins.addTo(made)
@@ -570,8 +576,8 @@
   {/if}
 </div>
 <div class="corner bottom">
-  <button class="btn" aria-label="Zoom in" title="Zoom in (+)" disabled={zoom >= 9} onclick={() => map?.zoomIn()}><Glyph name="plus" /></button>
-  <button class="btn" aria-label="Zoom out" title="Zoom out (-)" disabled={zoom <= 1} onclick={() => map?.zoomOut()}><Glyph name="minus" /></button>
+  <button class="btn" aria-label="Zoom in" title="Zoom in (+)" aria-disabled={zoom >= 9} onclick={() => map?.zoomIn()}><Glyph name="plus" /></button>
+  <button class="btn" aria-label="Zoom out" title="Zoom out (-)" aria-disabled={zoom <= 1} onclick={() => map?.zoomOut()}><Glyph name="minus" /></button>
   <button class="btn" aria-pressed={following} title="Follow your character (F)" onclick={follow}>Follow</button>
 </div>
 {#if offMap}
@@ -613,8 +619,11 @@
   }
   .line {
     display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
     align-items: center;
     gap: 4px;
+    max-width: calc(100cqw - 44px); /* the map's width less the two margins */
   }
   .tag {
     margin-right: 4px;
@@ -653,6 +662,7 @@
   }
 
   .map :global(.me),
+  .map :global(.door),
   .map :global(.place) {
     background: none;
     border: 0;

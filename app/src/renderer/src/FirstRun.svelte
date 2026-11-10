@@ -46,7 +46,7 @@
     <Logo size={40} />
     <ol aria-label="Steps">
       {#each pages as p, i (p.id)}
-        <li class:here={i === at} class:done={p.state === 'done' && i !== at} aria-current={i === at ? 'step' : undefined}>{p.title}</li>
+        <li class:here={i === at} class:done={p.state === 'done' && i !== at} aria-current={i === at ? 'step' : undefined}>{#if p.state === 'done' && i !== at}<Glyph name="check" size={12} />{/if}{p.title}</li>
       {/each}
     </ol>
   </header>
@@ -111,12 +111,13 @@
     width: min(640px, 100% - 48px);
   }
 
+  /* The mark, and under it the steps: with their ticks they are too long to stand beside it. */
   header {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 24px;
-    padding: 28px 0 0;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 24px 0 0;
     color: var(--gold);
   }
   /* Where the player is among the pages: the names in a row, the one on show in gold. */
@@ -129,6 +130,11 @@
     font: var(--t-small);
     color: var(--text-dim);
     white-space: nowrap;
+  }
+  ol li {
+    display: flex;
+    align-items: center;
+    gap: 3px;
   }
   ol .done {
     color: var(--text);

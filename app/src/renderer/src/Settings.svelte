@@ -97,9 +97,11 @@
       <p>Not affiliated with or endorsed by Blizzard Entertainment. World of Warcraft is a trademark of Blizzard Entertainment, Inc.</p>
       <h3>Built with</h3>
       {#each parties as party (party.name)}
+        {@const [, address = '', rest = ''] = /^(https?:\/\/\S+)?\s*(.*)$/.exec(party.about) ?? []}
         <details>
           <summary><Glyph name="menu" />{party.name}<span>{KIND.exec(party.licence)?.[0] ?? 'See the text'}</span></summary>
-          {#if party.about}<p class="dim">{party.about}</p>{/if}
+          {#if address}<p class="dim">{address}</p>{/if}
+          {#if rest}<p class="dim">{rest}</p>{/if}
           <pre>{party.licence}</pre>
         </details>
       {/each}

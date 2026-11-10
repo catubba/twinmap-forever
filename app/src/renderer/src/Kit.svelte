@@ -181,7 +181,7 @@
       <label class="item"><input type="checkbox" class="check" />Objectives</label>
       <div class="group">Services</div>
       <label class="item"><input type="checkbox" class="check" checked />Flight</label>
-      <label class="item"><input type="checkbox" class="check" disabled />Auction, not yet</label>
+      <label class="item"><input type="checkbox" class="check" disabled />Auction, disabled</label>
     </div>
     <ul class="menu">
       <li><button class="item">Mountaineer Kadrell<span class="num">NPC</span></button></li>

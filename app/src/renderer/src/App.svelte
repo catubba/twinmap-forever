@@ -138,7 +138,7 @@
     border-radius: 5px 5px 0 0;
     background: none;
     font: var(--t-nav);
-    color: #c9b48a;
+    color: var(--nav-rest);
     text-shadow: 0 1px 0 #000;
     cursor: pointer;
     -webkit-app-region: no-drag;
