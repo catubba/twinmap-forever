@@ -52,9 +52,18 @@ const BLOCK = 512, TILE = 256
  * zoom 7. No quarter: the tile of zoom 6, the whole block.
  */
 export function tileOfBlock(dxt: Uint8Array, quarter?: number): Uint8Array {
+  return tileOfPicture(pictureOfBlock(dxt), quarter)
+}
+
+/** The whole picture of a block from its DXT1 blocks: the slow half of tileOfBlock, worth keeping for the next tile. */
+export function pictureOfBlock(dxt: Uint8Array): Uint8Array {
   const size = Math.sqrt(dxt.length * 2)
-  // ponytail: the whole block is decoded for one quarter, 4 ms instead of 1. Keep the decoded block of the last few if panning feels slow.
-  const rgb = decodeDxt(dxt, size, size)
+  return decodeDxt(dxt, size, size)
+}
+
+/** A tile from the picture pictureOfBlock gives. quarter: as in tileOfBlock. */
+export function tileOfPicture(rgb: Uint8Array, quarter?: number): Uint8Array {
+  const size = Math.sqrt(rgb.length / 3)
   if (quarter === undefined) return size === BLOCK ? halve(rgb, BLOCK) : rgb
   return crop(size === BLOCK ? rgb : double(rgb, size), BLOCK, (quarter & 1) * TILE, (quarter >> 1) * TILE, TILE)
 }

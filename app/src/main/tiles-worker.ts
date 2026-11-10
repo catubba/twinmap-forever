@@ -1,11 +1,14 @@
 // Makes the map tiles on a thread of its own: a minute or two of work the first time, which would
 // stop the reading of the strip if it ran with it. Tells its progress in whole percents.
+import { existsSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parentPort, workerData } from 'node:worker_threads'
+import { gameMaps, UI_MAP_ASSIGNMENT_FILE, UI_MAP_FILE } from '../shared/maps'
 import type { TilesStatus } from '../shared/tiles-status'
+import { readTable } from '../shared/wdc5'
 import { WORLDS } from '../shared/world'
 import { installedBuild, openClientFiles, type ClientFiles } from './client-files'
-import { convertWorld, finished, tilesFolder } from './tiles'
+import { convertWorld, finished, MAPS_FILE, tilesFolder } from './tiles'
 
 const { gameFolder, base } = workerData as { gameFolder: string; base: string }
 const tell = (status: TilesStatus): void => parentPort?.postMessage(status)
@@ -35,6 +38,13 @@ try {
     missing += result.missing
     converted ||= result.converted
   })
+  // The maps of the game and where each lies: what places the character on the tiles.
+  if (!existsSync(join(folder, MAPS_FILE))) {
+    const files = (client ??= openClientFiles(gameFolder))
+    const uiMap = files.read(UI_MAP_FILE), assignments = files.read(UI_MAP_ASSIGNMENT_FILE)
+    if (!uiMap || !assignments) throw new Error('the game has no table of its maps')
+    writeFileSync(join(folder, MAPS_FILE), JSON.stringify(gameMaps(readTable(uiMap), readTable(assignments))))
+  }
   tell({ state: 'ready', folder, version: build.version, tiles, missing, seconds: (Date.now() - started) / 1000, converted })
 } catch (e) {
   tell({ state: 'failed', message: e instanceof Error ? e.message : String(e) })

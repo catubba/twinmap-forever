@@ -1,5 +1,5 @@
-import { app, BrowserWindow } from 'electron'
-import { writeFile } from 'node:fs/promises'
+import { app, BrowserWindow, protocol } from 'electron'
+import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { lostPercent } from '../shared/link'
 import type { TilesStatus } from '../shared/tiles-status'
@@ -7,10 +7,16 @@ import { WINDOW } from '../shared/window'
 import { findGameWindow, programOf } from './capture'
 import { gameFolderFrom, registryInstallPath } from './client-files'
 import { startLink } from './link'
+import { servedFile } from './tiles'
 import startTilesWorker from './tiles-worker?nodeWorker'
 
 const SHOW_EVERY = 250 // ms between updates of the window
 const LOG_EVERY = 5000 // ms between writes of the measures
+
+const BLANK = Buffer.from('R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==', 'base64') // a see-through picture of one pixel
+
+// The window gets the map's files through an address of its own, twinmap://tiles/..., and only those.
+protocol.registerSchemesAsPrivileged([{ scheme: 'twinmap', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }])
 
 // Makes the map tiles from the game's files, once per build of the game, and keeps the latest word on it.
 // The folder: TWINMAP_DATA when set (for trials), or Twinmap under the local application data.
@@ -45,6 +51,19 @@ function createWindow(): void {
 
   const link = startLink()
   const tiles = startTiles()
+  protocol.handle('twinmap', async (request) => {
+    const status = tiles.status(), url = new URL(request.url)
+    const file = status.state === 'ready' && url.host === 'tiles' ? servedFile(status.folder, url.pathname) : null
+    const bytes = file ? await readFile(file).catch(() => null) : null
+    // Where the game has no picture there is no file. That is the sea, not a fault: an empty picture for
+    // a tile and an empty answer for a block, so the window logs no error for it.
+    if (!bytes) {
+      if (file?.endsWith('.png')) return new Response(new Uint8Array(BLANK), { headers: { 'content-type': 'image/gif', 'access-control-allow-origin': '*' } })
+      return new Response(null, { status: file ? 204 : 404, headers: { 'access-control-allow-origin': '*' } })
+    }
+    const type = file!.endsWith('.png') ? 'image/png' : file!.endsWith('.json') ? 'application/json' : 'application/octet-stream'
+    return new Response(new Uint8Array(bytes), { headers: { 'content-type': type, 'access-control-allow-origin': '*', 'cache-control': 'max-age=3600' } })
+  })
   const show = setInterval(() => {
     win.webContents.send('link', link.snapshot())
     win.webContents.send('tiles', tiles.status())
@@ -76,6 +95,7 @@ function createWindow(): void {
     clearInterval(log)
     link.stop()
     tiles.stop()
+    protocol.unhandle('twinmap')
   })
 }
 

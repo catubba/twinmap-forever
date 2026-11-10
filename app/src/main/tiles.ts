@@ -50,6 +50,20 @@ export function tileFile(folder: string, zoom: number, column: number, row: numb
   return joinPath(folder, String(zoom), String(column), `${row}.png`)
 }
 
+/** The list of the game's maps, kept beside the continents so the game's archive need not be opened for it. */
+export const MAPS_FILE = 'maps.json'
+
+/**
+ * The file the window may have for a path it asks, or null: only what the converter writes, nothing
+ * else on the disk. base: the folder of the build. path: as in "/azeroth/blocks/31/49.dxt".
+ */
+export function servedFile(base: string, path: string): string | null {
+  const m = /^\/(?:(maps\.json)|([a-z]+)\/(?:blocks\/(\d{1,2})\/(\d{1,2})\.dxt|(\d)\/(\d{1,3})\/(\d{1,3})\.png))$/.exec(path)
+  if (!m) return null
+  if (m[1]) return joinPath(base, MAPS_FILE)
+  return m[3] !== undefined ? blockFile(joinPath(base, m[2]!), Number(m[3]), Number(m[4])) : tileFile(joinPath(base, m[2]!), Number(m[5]), Number(m[6]), Number(m[7]))
+}
+
 /** What a finished folder holds, or null when the continent is not converted, or only in part, or in an older layout. */
 export function finished(folder: string): ConvertResult | null {
   const marker = joinPath(folder, MARKER)

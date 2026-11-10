@@ -6,7 +6,7 @@ import { expect, test } from 'vitest'
 import { decodeBlp } from '../shared/blp'
 import { tileOfBlock } from '../shared/pixels'
 import { minimapTiles } from '../shared/world'
-import { blockFile, convertWorld, tileFile } from './tiles'
+import { blockFile, convertWorld, servedFile, tileFile } from './tiles'
 
 type Color = [number, number, number]
 
@@ -149,4 +149,14 @@ test('a folder finished in the older layout is made again', () => {
   writeFileSync(join(folder, 'leftover.png'), 'old')
   expect(convertWorld(WORLD, (id) => FILES[id] ?? null, folder).converted).toBe(true)
   expect(existsSync(join(folder, 'leftover.png'))).toBe(false)
+})
+
+test('the window is given only the files the converter writes', () => {
+  const base = join('C:', 'data', 'tiles', 'abc')
+  expect(servedFile(base, '/azeroth/blocks/31/49.dxt')).toBe(join(base, 'azeroth', 'blocks', '31', '49.dxt'))
+  expect(servedFile(base, '/kalimdor/5/12/7.png')).toBe(join(base, 'kalimdor', '5', '12', '7.png'))
+  expect(servedFile(base, '/maps.json')).toBe(join(base, 'maps.json'))
+  for (const path of ['/azeroth/done.json', '/../secret.png', '/azeroth/../../5/1/1.png', '/azeroth/blocks/1/1.dxt/..', '/azeroth/5/1/1.PNG', '/AZEROTH/5/1/1.png', '']) {
+    expect(servedFile(base, path), path).toBeNull()
+  }
 })

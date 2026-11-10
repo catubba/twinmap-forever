@@ -1,20 +1,30 @@
 <script lang="ts">
   import { lostPercent, type LinkSnapshot } from '../../shared/link'
   import { tilesLine, type TilesStatus } from '../../shared/tiles-status'
+  import Map from './Map.svelte'
 
   let link = $state<LinkSnapshot | null>(null)
-  window.twinmap.onLink((snapshot) => (link = snapshot))
+  // A listener must give nothing back: what it returns is copied across to the preload script, and a state object cannot be.
+  window.twinmap.onLink((snapshot) => {
+    link = snapshot
+  })
   let tiles = $state<TilesStatus | null>(null)
-  window.twinmap.onTiles((status) => (tiles = status))
+  window.twinmap.onTiles((status) => {
+    tiles = status
+  })
 
   const GAME = { closed: 'Game not found', minimized: 'Game minimized', open: 'Game open' }
   const pos = $derived(link?.state.sections.pos)
+  const mapReady = $derived(tiles?.state === 'ready')
   const age = $derived(
     link && link.state.updatedAt.pos ? Math.max(0, Math.round((Date.now() - link.state.updatedAt.pos) / 1000)) : null,
   )
 </script>
 
-<main>
+{#if mapReady}
+  <Map {pos} />
+{/if}
+<main class:over={mapReady}>
   <h1>Twinmap</h1>
   {#if !link}
     <p>Starting.</p>
@@ -60,6 +70,45 @@
     display: grid;
     place-content: center;
     text-align: center;
+  }
+
+  /* With the map on, the words move to a corner of it. */
+  main.over {
+    position: absolute;
+    top: 12px;
+    left: 56px;
+    z-index: 1000;
+    height: auto;
+    display: block;
+    padding: 10px 14px;
+    border: 1px solid #5a4a2f;
+    border-radius: 4px;
+    background: rgb(23 17 12 / 0.9);
+    text-align: left;
+    pointer-events: none;
+  }
+
+  main.over h1 {
+    font-size: 15px;
+  }
+
+  main.over p {
+    margin-top: 4px;
+    font-size: 13px;
+  }
+
+  main.over .zone {
+    margin-top: 8px;
+    font-size: 16px;
+  }
+
+  main.over .coords {
+    font-size: 22px;
+  }
+
+  main.over .measures {
+    margin-top: 8px;
+    font-size: 12px;
   }
 
   h1 {
