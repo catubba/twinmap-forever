@@ -28,6 +28,12 @@ export function tilesFolder(base: string, buildKey: string): string {
   return joinPath(base, 'tiles', buildKey)
 }
 
+/** What a finished folder holds, or null when the continent is not converted, or only in part. */
+export function finished(folder: string): ConvertResult | null {
+  const marker = joinPath(folder, MARKER)
+  return existsSync(marker) ? { converted: false, ...(JSON.parse(readFileSync(marker, 'utf8')) as { tiles: number; missing: number }) } : null
+}
+
 /**
  * Converts one continent. wdt: its world file. read: a game file by number. folder: where its tiles go.
  * A folder left half done is finished: tiles already there are kept, so an interrupted run resumes.
@@ -38,10 +44,10 @@ export function convertWorld(
   folder: string,
   onProgress?: (done: number, total: number) => void,
 ): ConvertResult {
-  const marker = joinPath(folder, MARKER)
-  if (existsSync(marker)) return { converted: false, ...(JSON.parse(readFileSync(marker, 'utf8')) as { tiles: number; missing: number }) }
+  const before = finished(folder)
+  if (before) return before
 
-  let tiles = 0, missing = 0
+  let tiles = 0, missing = 0, done = 0
   const madeFolders = new Set<string>()
   const write = (zoom: number, column: number, row: number, rgb: Buffer): void => {
     tiles++
@@ -56,13 +62,12 @@ export function convertWorld(
     renameSync(file + '.part', file)
   }
 
-  // ponytail: a whole level below the top stays in memory, up to 200 MB for Kalimdor. Go through a folder of raw halves if that is too much.
-  let level = new Map<number, Buffer>() // block of the level (row * 64 + column) -> its 256 pixel picture
   const source = minimapTiles(wdt)
-  let done = 0
-  for (const [block, file] of source) {
-    const column = block % BLOCKS, row = Math.floor(block / BLOCKS)
-    let rgb: Buffer | null = null
+  // One block: its picture makes four tiles at the top zoom and, halved, the one below.
+  const block = (column: number, row: number): Buffer | undefined => {
+    const file = source.get(row * BLOCKS + column)
+    if (file === undefined) return undefined
+    let rgb: Buffer | undefined
     try {
       const raw = read(file)
       if (raw) {
@@ -72,32 +77,31 @@ export function convertWorld(
         else if (picture.width === BLOCK_PIXELS / 2) rgb = double(picture.rgb, picture.width)
       }
     } catch {
-      rgb = null
+      rgb = undefined
     }
-    if (rgb) {
-      for (let i = 0; i < 4; i++) write(MAX_ZOOM, column * 2 + (i & 1), row * 2 + (i >> 1), crop(rgb, BLOCK_PIXELS, (i & 1) * TILE, (i >> 1) * TILE, TILE))
-      const half = halve(rgb, BLOCK_PIXELS)
-      write(MAX_ZOOM - 1, column, row, half)
-      level.set(block, half)
-    } else missing++
     onProgress?.(++done, source.size)
-  }
-
-  // Each level below: a tile from the four under it, halved.
-  for (let zoom = MAX_ZOOM - 2; zoom >= 0; zoom--) {
-    const below = level
-    level = new Map()
-    const parents = new Set([...below.keys()].map((b) => (Math.floor(b / BLOCKS) >> 1) * BLOCKS + ((b % BLOCKS) >> 1)))
-    for (const parent of parents) {
-      const column = parent % BLOCKS, row = Math.floor(parent / BLOCKS)
-      const four = [0, 1, 2, 3].map((i) => below.get((row * 2 + (i >> 1)) * BLOCKS + column * 2 + (i & 1)))
-      const rgb = halve(join(four, TILE), TILE * 2)
-      write(zoom, column, row, rgb)
-      level.set(parent, rgb)
+    if (!rgb) {
+      missing++
+      return undefined
     }
+    for (let i = 0; i < 4; i++) write(MAX_ZOOM, column * 2 + (i & 1), row * 2 + (i >> 1), crop(rgb, BLOCK_PIXELS, (i & 1) * TILE, (i >> 1) * TILE, TILE))
+    const half = halve(rgb, BLOCK_PIXELS)
+    write(MAX_ZOOM - 1, column, row, half)
+    return half
   }
+  // A tile is the four under it, halved: made from the bottom up, one branch at a time, so only a
+  // handful of pictures are in memory at once. Where nothing is under it there is no tile.
+  const tile = (zoom: number, column: number, row: number): Buffer | undefined => {
+    if (zoom === MAX_ZOOM - 1) return block(column, row)
+    const four = [0, 1, 2, 3].map((i) => tile(zoom + 1, column * 2 + (i & 1), row * 2 + (i >> 1)))
+    if (four.every((part) => !part)) return undefined
+    const rgb = halve(join(four, TILE), TILE * 2)
+    write(zoom, column, row, rgb)
+    return rgb
+  }
+  tile(0, 0, 0)
 
   mkdirSync(folder, { recursive: true })
-  writeFileSync(marker, JSON.stringify({ tiles, missing }))
+  writeFileSync(joinPath(folder, MARKER), JSON.stringify({ tiles, missing }))
   return { converted: true, tiles, missing }
 }
