@@ -6,17 +6,50 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const STUB = `
-  local printed, frames = {}, {}
+  local printed, frames, strips, now = {}, {}, {}, 100
   function print(...)
     local parts = {}
     for i = 1, select("#", ...) do parts[i] = tostring((select(i, ...))) end
     printed[#printed + 1] = table.concat(parts, " ")
   end
   SlashCmdList = {}
+
+  -- The world the addon reads. A test changes it with lua().
+  GAME = { width = 1920, height = 1080, zone = "Elwynn Forest", sub = "Goldshire", map = 1429, x = 0.4234, y = 0.6571, facing = 1.5708 }
+  function GetTime() return now end
+  function GetPhysicalScreenSize() return GAME.width, GAME.height end
+  function GetZoneText() return GAME.zone end
+  function GetSubZoneText() return GAME.sub end
+  function GetPlayerFacing() return GAME.facing end
+  C_Map = {
+    GetBestMapForUnit = function() return GAME.map end,
+    GetPlayerMapPosition = function() return GAME.x and { x = GAME.x, y = GAME.y } end,
+  }
+  UIParent = {}
+
+  -- Frames and textures answer every method; only what a test looks at does something.
+  local function noop() end
+  local Widget = { __index = function() return noop end }
   function CreateFrame()
-    local f = { events = {} }
+    local f, cells = setmetatable({ events = {} }, Widget), {}
     function f:RegisterEvent(e) self.events[e] = true end
     function f:SetScript(kind, fn) self[kind] = fn end
+    function f:CreateTexture()
+      local t = setmetatable({}, Widget)
+      function t:SetColorTexture(r, g, b) self.v = math.floor(r * 4 + g * 2 + b) end
+      function t:Show() self.shown = true end
+      function t:Hide() self.shown = false end
+      cells[#cells + 1] = t
+      return t
+    end
+    -- A frame with textures is a strip: showing it records the row of cells on screen.
+    function f:Show()
+      local row = {}
+      for _, t in ipairs(cells) do
+        if t.shown then row[#row + 1] = t.v end
+      end
+      if #row > 0 then strips[#strips + 1] = table.concat(row) end
+    end
     frames[#frames + 1] = f
     return f
   end
@@ -26,9 +59,22 @@ const STUB = `
   function T_load(name, source, chunk) return assert(load(source, "@" .. chunk))(name, ns) end
   function T_fire(event)
     for _, f in ipairs(frames) do
-      if f.events[event] and f.OnEvent then f.OnEvent(f, event) end
+      local fn = rawget(f, "OnEvent")
+      if f.events[event] and fn then fn(f, event) end
     end
   end
+  function T_run(seconds)
+    local step = 1 / 60
+    for _ = 1, math.floor(tonumber(seconds) / step + 0.5) do
+      now = now + step
+      for _, f in ipairs(frames) do
+        local fn = rawget(f, "OnUpdate")
+        if fn then fn(f, step) end
+      end
+    end
+  end
+  function T_strips() return table.concat(strips, "\\n") end
+  function T_lua(code) return assert(load(code))() end
   function T_slash(text)
     for key, fn in pairs(SlashCmdList) do
       local i = 1
@@ -78,6 +124,10 @@ function loadAddon(dir) {
     slash: (text) => call('T_slash', text),
     printed: () => call('T_printed'),
     ns: (key) => call('T_ns', key),
+    lua: (code) => call('T_lua', code),
+    run: (seconds) => call('T_run', String(seconds)),
+    // Every strip drawn so far, oldest first, each a string of cells 0 to 7.
+    strips: () => (call('T_strips') || '').split('\n').filter(Boolean),
   };
 }
 
