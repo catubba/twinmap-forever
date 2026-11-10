@@ -58,6 +58,8 @@ test('what went wrong is said on its page: a map not built, an addon to tick, on
   const lost = setupPages(installed, READY, { kind: 'lost', word: 'Link lost', tone: 'objective' })[4]!
   expect(lost.state).toBe('todo')
   expect(lost.lines.join(' ')).toContain('make sure Twinmap Forever is ticked')
+  // The warning about the flickering strip is on its two pages whatever their state.
+  expect(setupPages(installed, READY, CLOSED).filter((p) => p.warning?.startsWith('Photosensitivity warning')).map((p) => p.id)).toEqual(['addon', 'play'])
   const old = setupPages(installed, READY, { kind: 'update-addon', word: 'Update the addon', tone: 'objective', line: 'Update the addon from CurseForge.' })[4]!
   expect(old).toMatchObject({ state: 'problem', lines: ['Update the addon from CurseForge.'] })
 })

@@ -33,8 +33,8 @@
   {#if where}<p class="dim">{where}</p>{/if}
   {#if way}<p>{way.far}, {way.time}</p>{/if}
   <div class="go">
-    <button class="btn" disabled title="Not yet">Send to game</button>
-    <button class="btn" disabled title="Not yet">Add to route</button>
+    <button class="btn" disabled title="Sending to the game comes in a later version.">Send to game</button>
+    <button class="btn" disabled title="Routes come in a later version.">Add to route</button>
   </div>
 </div>
 
@@ -67,7 +67,9 @@
     border: 2px solid var(--float-edge);
     border-radius: 7px;
     background: var(--grain), var(--float);
-    box-shadow: 0 0 0 1px #000;
+    box-shadow:
+      0 0 0 1px #000,
+      0 6px 16px #000000b3;
   }
   h3 {
     margin: 0 20px 0 0;

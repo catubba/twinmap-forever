@@ -6,6 +6,7 @@
   import type { LinkStatus } from '../../shared/link'
   import type { SetupStatus } from '../../shared/setup'
   import type { TilesStatus } from '../../shared/tiles-status'
+  import Glyph from './Glyph.svelte'
   import Logo from './Logo.svelte'
 
   let { setup, tiles, link, onback, onfirstrun }: { setup: SetupStatus; tiles: TilesStatus | null; link: LinkStatus | null; onback: () => void; onfirstrun: () => void } = $props()
@@ -21,6 +22,8 @@
     !tiles || tiles.state === 'looking' ? 'Looking' : tiles.state === 'no-game' ? 'Waiting for the game folder' : tiles.state === 'converting' ? `Being built, ${tiles.percent}%` : tiles.state === 'failed' ? `Not built: ${tiles.message}` : `${tiles.tiles.toLocaleString('en-US')} tiles, from game version ${tiles.version}`,
   )
 </script>
+
+<svelte:window onkeydown={(e) => e.key === 'Escape' && onback()} />
 
 <main class="surface">
   <div class="column">
@@ -62,6 +65,22 @@
       <dd>F11 turns it on and off.</dd>
     </dl>
 
+    <h2 class="band">Shortcuts</h2>
+    <dl>
+      <dt>L</dt>
+      <dd>Opens and closes Layers.</dd>
+      <dt>F</dt>
+      <dd>Turns Follow on and off.</dd>
+      <dt>Esc</dt>
+      <dd>Closes the label on a point, then Layers, and these settings.</dd>
+      <dt>Arrows, + and -</dt>
+      <dd>Move and zoom the map, with the keyboard on it.</dd>
+      <dt>Space</dt>
+      <dd>Puts the label on the middle of the map, with the keyboard on it.</dd>
+      <dt>F11</dt>
+      <dd>Full screen.</dd>
+    </dl>
+
     <h2 class="band">Updates</h2>
     <dl>
       <dt>Twinmap</dt>
@@ -79,7 +98,7 @@
       <h3>Built with</h3>
       {#each parties as party (party.name)}
         <details>
-          <summary>{party.name}<span>{KIND.exec(party.licence)?.[0] ?? 'See the text'}</span></summary>
+          <summary><Glyph name="menu" />{party.name}<span>{KIND.exec(party.licence)?.[0] ?? 'See the text'}</span></summary>
           {#if party.about}<p class="dim">{party.about}</p>{/if}
           <pre>{party.licence}</pre>
         </details>
@@ -129,10 +148,15 @@
     margin: 0;
     overflow-wrap: anywhere;
   }
+  /* As tall as a button, so a row with one and a row without line up; a value on two lines keeps the text's own leading. */
   dt,
   dd {
     min-height: 28px;
-    line-height: 28px;
+    padding: 3.5px 0;
+  }
+  /* A button in a row does not make the row taller than its neighbours. */
+  dd .btn {
+    margin: -3.5px 0;
   }
   .wrong {
     flex-basis: 100%;
@@ -150,6 +174,7 @@
   }
   .about p {
     max-width: 65ch;
+    text-wrap: pretty;
     margin: 0 0 8px;
   }
   h3 {
@@ -163,8 +188,8 @@
   }
   summary {
     display: flex;
-    justify-content: space-between;
-    gap: 16px;
+    align-items: center;
+    gap: 8px;
     padding: 0 4px;
     line-height: 30px;
     cursor: pointer;
@@ -175,6 +200,18 @@
   summary span,
   .dim {
     color: var(--text-dim);
+  }
+  summary span {
+    margin-left: auto;
+  }
+  /* The arrow points right on a closed entry and down on an open one. */
+  summary :global(svg) {
+    transform: rotate(-90deg); /* the glyph sets its own rotate; this one adds to it */
+    color: var(--text-dim);
+    transition: transform var(--quick);
+  }
+  details[open] summary :global(svg) {
+    transform: none;
   }
   details .dim {
     padding: 4px 4px 0;

@@ -54,7 +54,6 @@
   <div class="stage">
     {#key at}
       <section in:fly={pageIn(dir)} out:fly={pageOut(dir)} aria-labelledby="page-title">
-        <p class="step">Step {at + 1} of {pages.length}</p>
         <h1 id="page-title">{page.title}</h1>
         <p class="intro">{page.intro}</p>
 
@@ -77,6 +76,7 @@
             <button class="btn" onclick={() => window.twinmap.openCurseForge()}>Get Twinmap Forever on CurseForge</button>
           {/if}
         </div>
+        {#if page.warning}<p class="warning">{page.warning}</p>{/if}
       </section>
     {/key}
   </div>
@@ -99,7 +99,9 @@
     position: absolute;
     inset: 46px 0 0;
     display: grid;
-    grid-template-rows: auto 1fr auto;
+    /* The page and its buttons stay together in the middle of a tall window: Next is never far under what it follows. */
+    grid-template-rows: auto minmax(0, 440px) auto;
+    align-content: center;
     justify-items: center;
     overflow: hidden;
   }
@@ -125,11 +127,11 @@
     padding: 0;
     list-style: none;
     font: var(--t-small);
-    color: var(--text-off);
+    color: var(--text-dim);
     white-space: nowrap;
   }
   ol .done {
-    color: var(--text-dim);
+    color: var(--text);
   }
   ol .here {
     color: var(--gold);
@@ -145,12 +147,8 @@
     position: absolute;
     inset: 0;
     margin: 0 auto;
-    padding-top: 9vh;
-  }
-  .step {
-    margin: 0 0 4px;
-    font: var(--t-small);
-    color: var(--text-dim);
+    padding-top: clamp(8px, 9vh - 30px, 80px); /* less air above the title in a low window */
+    overflow-y: auto; /* a long page in a low window scrolls, it is not cut */
   }
   h1 {
     margin: 0;
@@ -199,6 +197,12 @@
     max-width: none;
     display: flex;
     justify-content: space-between;
+  }
+
+  .warning {
+    max-width: 60ch;
+    margin: 20px 0 0;
+    font: var(--t-small);
   }
 
   footer {
