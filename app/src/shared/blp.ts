@@ -41,12 +41,18 @@ export function decodeDxt(data: Uint8Array, width: number, height: number, alpha
   return rgb
 }
 
-/** The DXT1 blocks of a square picture stored that way, as the game has them; null for any other picture. */
-export function dxt1Of(f: Buffer): { size: number; data: Buffer } | null {
+/** The DXT1 blocks of a picture stored that way, as the game has them; null for any other picture. */
+export function dxt1Picture(f: Buffer): { width: number; height: number; data: Buffer } | null {
   if (f.toString('latin1', 0, 4) !== 'BLP2' || f[8] !== 2 || f[10] !== 0) return null
-  const size = f.readUInt32LE(12), at = f.readUInt32LE(20)
-  if (f.readUInt32LE(16) !== size || size % 4 || at + (size * size) / 2 > f.length) return null
-  return { size, data: f.subarray(at, at + (size * size) / 2) }
+  const width = f.readUInt32LE(12), height = f.readUInt32LE(16), at = f.readUInt32LE(20)
+  if (width % 4 || height % 4 || at + (width * height) / 2 > f.length) return null
+  return { width, height, data: f.subarray(at, at + (width * height) / 2) }
+}
+
+/** The same for a square picture, as the minimap of the ground is; null for any other. */
+export function dxt1Of(f: Buffer): { size: number; data: Buffer } | null {
+  const picture = dxt1Picture(f)
+  return picture && picture.width === picture.height ? { size: picture.width, data: picture.data } : null
 }
 
 export function decodeBlp(f: Buffer): Image {
