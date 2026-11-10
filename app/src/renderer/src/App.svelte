@@ -22,6 +22,9 @@
   )
 </script>
 
+<!-- The top row is the window's title bar: it drags the window, a double click maximizes it. Its entries come later. -->
+<header class="top"></header>
+<div class="work">
 {#if mapReady}
   <Map {pos} {insideReady} />
 {/if}
@@ -56,10 +59,26 @@
     {/if}
   {/if}
 </main>
+</div>
 
 <style>
+  .top {
+    height: 46px;
+    /* From the top: the bronze moulding along the bottom, 6 px; the grain; the ground. */
+    background:
+      linear-gradient(#000, var(--bronze-700) 18%, var(--bronze-300) 42%, var(--bronze-600) 62%, var(--bronze-900) 86%, #000) bottom / 100% 6px no-repeat,
+      var(--grain),
+      linear-gradient(var(--stone-600), #1b140e 55%, var(--stone-950));
+    -webkit-app-region: drag;
+  }
+
+  .work {
+    position: absolute;
+    inset: 46px 0 0;
+  }
+
   main {
-    height: 100vh;
+    height: 100%;
     display: grid;
     place-content: center;
     text-align: center;
