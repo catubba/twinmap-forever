@@ -5,12 +5,22 @@ import koffi from 'koffi'
 
 const user32 = koffi.load('user32.dll')
 const gdi32 = koffi.load('gdi32.dll')
+const kernel32 = koffi.load('kernel32.dll')
 
 koffi.struct('POINT', { x: 'long', y: 'long' })
 koffi.struct('RECT', { left: 'long', top: 'long', right: 'long', bottom: 'long' })
 
 const SetProcessDPIAware = user32.func('int __stdcall SetProcessDPIAware()')
 const FindWindowW = user32.func('void * __stdcall FindWindowW(str16 cls, str16 title)')
+const FindWindowExW = user32.func('void * __stdcall FindWindowExW(void *parent, void *after, str16 cls, str16 title)')
+const IsWindow = user32.func('int __stdcall IsWindow(void *hwnd)')
+const IsWindowVisible = user32.func('int __stdcall IsWindowVisible(void *hwnd)')
+const GetWindowThreadProcessId = user32.func('uint32_t __stdcall GetWindowThreadProcessId(void *hwnd, _Out_ uint32_t *pid)')
+const OpenProcess = kernel32.func('void * __stdcall OpenProcess(uint32_t access, int inherit, uint32_t pid)')
+const QueryFullProcessImageNameW = kernel32.func(
+  'int __stdcall QueryFullProcessImageNameW(void *process, uint32_t flags, void *name, _Inout_ uint32_t *size)',
+)
+const CloseHandle = kernel32.func('int __stdcall CloseHandle(void *handle)')
 const IsIconic = user32.func('int __stdcall IsIconic(void *hwnd)')
 const GetClientRect = user32.func('int __stdcall GetClientRect(void *hwnd, _Out_ RECT *rect)')
 const ClientToScreen = user32.func('int __stdcall ClientToScreen(void *hwnd, _Inout_ POINT *point)')
@@ -37,6 +47,36 @@ export type WindowHandle = bigint
 /** The first top-level window with exactly this title, or null. */
 export function findWindow(title: string): WindowHandle | null {
   return (FindWindowW(null, title) as WindowHandle | null) || null
+}
+
+/** The full path of the program that owns a window, or null when Windows will not say. */
+export function programOf(hwnd: WindowHandle): string | null {
+  const pid = [0]
+  GetWindowThreadProcessId(hwnd, pid)
+  const process = OpenProcess(0x1000, 0, pid[0]!) as bigint | null // PROCESS_QUERY_LIMITED_INFORMATION
+  if (!process) return null
+  const name = Buffer.alloc(2 * 1024), size = [1024]
+  const ok = QueryFullProcessImageNameW(process, 0, name, size)
+  CloseHandle(process)
+  return ok ? name.toString('utf16le', 0, size[0]! * 2) : null
+}
+
+/**
+ * The window of World of Warcraft: Forever, or null when the game is not open. Other clients of
+ * the game have the same window title: Forever is the one that runs from the _forever_ folder.
+ */
+export function findGameWindow(): WindowHandle | null {
+  let hwnd: WindowHandle | null = null
+  while ((hwnd = (FindWindowExW(null, hwnd, null, 'World of Warcraft') as WindowHandle | null) || null)) {
+    if (IsWindowVisible(hwnd) && /\\_forever_\\Wow\.exe$/i.test(programOf(hwnd) ?? '')) return hwnd
+  }
+  return null
+}
+
+/** Whether a window is still there, and whether there is anything of it on screen. */
+export function windowState(hwnd: WindowHandle): 'gone' | 'minimized' | 'open' {
+  if (!IsWindow(hwnd)) return 'gone'
+  return IsIconic(hwnd) ? 'minimized' : 'open'
 }
 
 // Kept between calls: the row is read many times a second.

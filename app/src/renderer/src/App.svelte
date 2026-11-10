@@ -1,10 +1,43 @@
 <script lang="ts">
-  // A Svelte file without a TypeScript script block counts as JavaScript for the type checker.
+  import { lostPercent, type LinkSnapshot } from '../../shared/link'
+
+  let link = $state<LinkSnapshot | null>(null)
+  window.twinmap.onLink((snapshot) => (link = snapshot))
+
+  const GAME = { closed: 'Game not found', minimized: 'Game minimized', open: 'Game open' }
+  const pos = $derived(link?.state.sections.pos)
+  const age = $derived(
+    link && link.state.updatedAt.pos ? Math.max(0, Math.round((Date.now() - link.state.updatedAt.pos) / 1000)) : null,
+  )
 </script>
 
 <main>
   <h1>Twinmap</h1>
-  <p>Nothing to show yet.</p>
+  {#if !link}
+    <p>Starting.</p>
+  {:else}
+    <p class="status">{GAME[link.game]}</p>
+    {#if link.state.protocol}
+      <p class="warning">{link.state.protocol.message}</p>
+    {/if}
+
+    {#if pos}
+      <p class="zone">{pos.zone ?? 'Unknown zone'}{pos.sub ? `, ${pos.sub}` : ''}</p>
+      <p class="coords">
+        {pos.x !== undefined && pos.y !== undefined ? `${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}` : 'No coordinates here'}
+      </p>
+      <p>
+        Facing {pos.facing ?? '?'}° · map {pos.map ?? '?'} · {age === null ? '' : `${age} s ago`}
+      </p>
+    {:else}
+      <p>No position yet. Is the Twinmap Forever addon on?</p>
+    {/if}
+
+    <p class="measures">
+      {link.state.blocks} blocks · {link.state.lost} lost ({lostPercent(link.state).toFixed(2)}%) ·
+      {link.state.corrupt} unreadable · {link.reads} reads in {Math.round(link.seconds)} s · {link.cpu.toFixed(1)}% of a core
+    </p>
+  {/if}
 </main>
 
 <style>
@@ -35,5 +68,27 @@
   p {
     margin: 8px 0 0;
     color: #b9a88c;
+  }
+
+  .zone {
+    margin-top: 24px;
+    font-size: 22px;
+    color: #f3ead9;
+  }
+
+  .coords {
+    font-size: 40px;
+    font-variant-numeric: tabular-nums;
+    color: #f3ead9;
+  }
+
+  .warning {
+    color: #ff8a5c;
+  }
+
+  .measures {
+    margin-top: 32px;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
   }
 </style>
