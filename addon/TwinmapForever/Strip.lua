@@ -95,12 +95,24 @@ local function BuildPos()
     if Num(north) and Num(west) then inst.x, inst.y = Round(north, 1), Round(west, 1) end
     out.inst = inst
   end
+  -- In a fight only this section goes out: the app says so, instead of showing the rest as fresh.
+  if Try(InCombatLockdown) then out.combat = true end
   return out
 end
 
+-- Level and experience, for the bar at the foot of the app's panel. Nothing at the level cap but the level.
+local function BuildChar()
+  local level = Num(Try(UnitLevel, "player"))
+  if not level then return end
+  return { level = level, xp = Num(Try(UnitXP, "player")), max = Num(Try(UnitXPMax, "player")), rested = Num(Try(GetXPExhaustion)) }
+end
+
 -- name, seconds between checks, builder. combat: also sent during a fight; the rest waits for its end.
+-- refresh: seconds after which it is sent again unchanged, when not REFRESH. The position is the
+-- heartbeat: the app takes the strip for stopped when none comes for a while.
 local SECTIONS = {
-  { name = "pos", period = 1, build = BuildPos, combat = true },
+  { name = "pos", period = 1, build = BuildPos, combat = true, refresh = 10 },
+  { name = "char", period = 2, build = BuildChar },
 }
 ns.sections = SECTIONS -- other files add their own
 
@@ -292,7 +304,7 @@ local function Tick(now, combat)
       local ok, value = pcall(s.build)
       if ok and type(value) == "table" then
         local json = Json(value)
-        if json ~= s.json or now >= (s.sentAt or 0) + REFRESH then
+        if json ~= s.json or now >= (s.sentAt or 0) + (s.refresh or REFRESH) then
           s.json, s.sentAt = json, now
           Enqueue(s, json)
         end

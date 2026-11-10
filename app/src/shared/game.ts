@@ -17,6 +17,18 @@ export interface Position {
   indoors?: boolean
   /** The dungeon, raid or battleground the character is inside; missing in the open world. */
   inst?: Instance
+  /** True in a fight: only the position comes through, the rest waits for its end. */
+  combat?: boolean
+}
+
+/** Level and experience. At the level cap the game tells no experience. */
+export interface Character {
+  level: number
+  xp?: number
+  /** Experience this level takes. */
+  max?: number
+  /** Rested experience still to spend. */
+  rested?: number
 }
 
 export interface Instance {
@@ -41,7 +53,7 @@ export interface ProtocolMismatch {
 
 export interface GameState {
   /** The latest data of each section the addon sent, by name. */
-  sections: { pos?: Position; [name: string]: unknown }
+  sections: { pos?: Position; char?: Character; [name: string]: unknown }
   /** When each section last arrived whole, in milliseconds. */
   updatedAt: Record<string, number>
   /** Set while the addon speaks a protocol this app does not. */
