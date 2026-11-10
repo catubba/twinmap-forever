@@ -12,6 +12,8 @@
   import type { Continent, GameMap } from '../../shared/maps'
   import { pictureOfBlock, tileOfPicture } from '../../shared/pixels'
   import { WORLDS } from '../../shared/world'
+  import Glyph from './Glyph.svelte'
+  import { pin } from './marks'
 
   // insideReady: the rooms of the buildings are converted, and their list can be asked for.
   let { pos, insideReady }: { pos: Position | undefined; insideReady: boolean } = $props()
@@ -142,7 +144,7 @@
     icon: L.divIcon({
       className: 'me',
       iconSize: [28, 28],
-      html: '<svg viewBox="-12 -12 24 24" width="28" height="28"><path d="M0-11 8 9 0 4-8 9Z" fill="#ffd100" stroke="#000" stroke-width="1.6" stroke-linejoin="round"/></svg>',
+      html: pin('player'),
     }),
   })
   let turned = 0
@@ -365,8 +367,8 @@
   {/if}
 </div>
 <div class="corner bottom">
-  <button class="btn" aria-label="Zoom in" onclick={() => map?.zoomIn()}>+</button>
-  <button class="btn" aria-label="Zoom out" onclick={() => map?.zoomOut()}>&minus;</button>
+  <button class="btn" aria-label="Zoom in" onclick={() => map?.zoomIn()}><Glyph name="plus" /></button>
+  <button class="btn" aria-label="Zoom out" onclick={() => map?.zoomOut()}><Glyph name="minus" /></button>
   <button class="btn" aria-pressed={following} onclick={follow}>Follow</button>
 </div>
 {#if offMap}
