@@ -16,12 +16,13 @@ const child = spawn(
 let hwnd: WindowHandle | null = null
 
 beforeAll(async () => {
-  for (let i = 0; i < 150 && !hwnd; i++) {
+  // Up to a minute: on a busy machine PowerShell alone can take more than 15 seconds to start.
+  for (let i = 0; i < 600 && !hwnd; i++) {
     await sleep(100)
     hwnd = findWindow(TITLE)
   }
   await sleep(300) // found is not painted yet
-}, 20_000)
+}, 70_000)
 afterAll(() => void child.kill())
 
 // Blue, green, red, unused: the bytes Windows gives for a cell of the strip (R*4 + G*2 + B).
