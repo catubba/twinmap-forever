@@ -3,7 +3,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, test } from 'vitest'
 import type { LinkStatus } from '../shared/link'
-import { setupComplete, setupSteps } from '../shared/setup'
+import { setupComplete, setupPages, timeLeft, type SetupStatus } from '../shared/setup'
+import type { TilesStatus } from '../shared/tiles-status'
 import { addonVersion, readSettings, setupStatus, writeSettings } from './setup'
 
 const folder = (): string => mkdtempSync(join(tmpdir(), 'twinmap-setup-'))
@@ -12,6 +13,7 @@ const addons = (game: string, ...names: string[]): void => {
 }
 const CONNECTED: LinkStatus = { kind: 'connected', word: 'Connected', tone: 'done' }
 const CLOSED: LinkStatus = { kind: 'closed', word: 'Game not running', tone: 'objective' }
+const READY: TilesStatus = { state: 'ready', folder: 'x', version: '1.60.1', tiles: 9302, missing: 0, seconds: 16, converted: true }
 
 test('the addon is found by its .toc, with its version; Questie by its folder', () => {
   const game = folder()
@@ -34,25 +36,37 @@ test('settings come back as they were written, and a file that is not ours gives
   expect(readSettings(file)).toEqual({})
 })
 
-test('the steps of the first run, from nothing to the arrow', () => {
-  const states = (setup: Parameters<typeof setupSteps>[0], link: LinkStatus | null) => setupSteps(setup, link).map((s) => s.state)
+const states = (setup: SetupStatus, tiles: TilesStatus | null, link: LinkStatus | null) => Object.fromEntries(setupPages(setup, tiles, link).map((p) => [p.id, p.state]))
+
+test('the pages of the first run, from nothing to the arrow', () => {
   const none = { gameFolder: null, addon: null, questie: false, done: false }
-  expect(states(none, CLOSED)).toEqual(['todo', 'waiting', 'waiting', 'waiting'])
+  expect(states(none, { state: 'no-game' }, CLOSED)).toEqual({ game: 'todo', map: 'todo', addon: 'todo', extras: 'done', play: 'todo' })
   const found = { ...none, gameFolder: 'D:\\WoW' }
-  expect(states(found, CLOSED)).toEqual(['done', 'todo', 'waiting', 'todo'])
-  expect(setupSteps(found, CLOSED)[1]!.action).toBe('curseforge')
+  expect(states(found, { state: 'converting', percent: 40 }, CLOSED)).toMatchObject({ game: 'done', map: 'working' })
+  expect(setupPages(found, { state: 'converting', percent: 40 }, CLOSED)[1]!.progress).toBe(40)
+  expect(setupPages(found, READY, CLOSED)[1]!.lines).toEqual(['The map is ready.', '9,302 tiles from game version 1.60.1.'])
+  expect(setupPages(found, READY, CLOSED)[2]!.action).toBe('curseforge')
   const installed = { ...found, addon: '0.1.0' }
-  expect(states(installed, CLOSED)).toEqual(['done', 'done', 'todo', 'todo'])
-  expect(setupComplete(setupSteps(installed, CLOSED))).toBe(false)
-  expect(states(installed, CONNECTED)).toEqual(['done', 'done', 'done', 'todo'])
-  expect(setupComplete(setupSteps(installed, CONNECTED)), 'Questie is optional').toBe(true)
+  expect(setupComplete(setupPages(installed, READY, CLOSED))).toBe(false)
+  expect(setupComplete(setupPages(installed, { state: 'converting', percent: 99 }, CONNECTED)), 'not before the map is built').toBe(false)
+  expect(setupComplete(setupPages(installed, READY, CONNECTED)), 'Questie is optional').toBe(true)
 })
 
-test('the third step says what is wrong: an addon to tick, or one of the two to update', () => {
+test('what went wrong is said on its page: a map not built, an addon to tick, one of the two to update', () => {
   const installed = { gameFolder: 'D:\\WoW', addon: '0.1.0', questie: true, done: false }
-  const lost = setupSteps(installed, { kind: 'lost', word: 'Link lost', tone: 'objective' })[2]!
+  expect(setupPages(installed, { state: 'failed', message: 'disk full' }, CLOSED)[1]).toMatchObject({ state: 'problem', lines: ['The map could not be built.', 'disk full'] })
+  const lost = setupPages(installed, READY, { kind: 'lost', word: 'Link lost', tone: 'objective' })[4]!
   expect(lost.state).toBe('todo')
   expect(lost.lines.join(' ')).toContain('make sure Twinmap Forever is ticked')
-  const old = setupSteps(installed, { kind: 'update-addon', word: 'Update the addon', tone: 'objective', line: 'Update the addon from CurseForge.' })[2]!
+  const old = setupPages(installed, READY, { kind: 'update-addon', word: 'Update the addon', tone: 'objective', line: 'Update the addon from CurseForge.' })[4]!
   expect(old).toMatchObject({ state: 'problem', lines: ['Update the addon from CurseForge.'] })
+})
+
+test('the time left is said once there is something to tell it from, in round numbers', () => {
+  expect(timeLeft(0, 0, 2000, 20), 'too early').toBe('')
+  expect(timeLeft(0, 10, 5000, 10), 'nothing moved').toBe('')
+  expect(timeLeft(0, 0, 10_000, 50)).toBe('about 10 seconds left')
+  expect(timeLeft(0, 20, 8000, 40)).toBe('about 25 seconds left')
+  expect(timeLeft(0, 0, 30_000, 10)).toBe('about 5 min left')
+  expect(timeLeft(0, 0, 30_000, 100)).toBe('')
 })

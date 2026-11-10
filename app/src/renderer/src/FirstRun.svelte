@@ -1,135 +1,228 @@
 <script lang="ts">
-  // The first run: four steps on one page, each ticking itself as it becomes true. The app looks
-  // and tells; the addon comes from CurseForge, never from here.
+  // The first run: one page for each thing, sliding in from the right. The app looks and tells;
+  // the addon comes from CurseForge, never from here.
+  import { fly } from 'svelte/transition'
   import type { LinkStatus } from '../../shared/link'
-  import { setupComplete, setupSteps, type SetupStatus, type StepState } from '../../shared/setup'
+  import { setupPages, timeLeft, type SetupStatus } from '../../shared/setup'
+  import type { TilesStatus } from '../../shared/tiles-status'
   import Glyph from './Glyph.svelte'
   import Logo from './Logo.svelte'
+  import { pageIn, pageOut } from './motion'
 
-  let { setup, link, onclose }: { setup: SetupStatus; link: LinkStatus | null; onclose: () => void } = $props()
+  let { setup, tiles, link, onclose }: { setup: SetupStatus; tiles: TilesStatus | null; link: LinkStatus | null; onclose: () => void } = $props()
 
-  const steps = $derived(setupSteps(setup, link))
-  const complete = $derived(setupComplete(steps))
-  const WORD: Record<StepState, string> = { done: 'Done', todo: 'To do', waiting: 'After the steps above', problem: 'Needs attention' }
+  const pages = $derived(setupPages(setup, tiles, link))
+  let at = $state(0)
+  let dir = $state(1)
+  const page = $derived(pages[at]!)
+  const last = $derived(at === pages.length - 1)
+  function go(step: number): void {
+    dir = step
+    at += step
+  }
+
   let wrong = $state('') // what was wrong with the folder the player picked
-
   async function choose(): Promise<void> {
     wrong = (await window.twinmap.chooseGameFolder()) ?? ''
   }
+
+  // How long the map still takes: from when its building was first seen.
+  let started: { at: number; percent: number } | null = null
+  let left = $state('')
+  $effect(() => {
+    const building = pages[1]!
+    if (building.state !== 'working' || building.progress === undefined) {
+      started = null
+      left = ''
+      return
+    }
+    started ??= { at: Date.now(), percent: building.progress }
+    left = timeLeft(started.at, started.percent, Date.now(), building.progress)
+  })
 </script>
 
 <main class="surface">
-  <div class="column">
-    <header>
-      <Logo size={56} />
-      <p>A live map of World of Warcraft: Forever for your second screen. Four steps and your character is on it.</p>
-    </header>
-
-    <ol>
-      {#each steps as step, i (step.title)}
-        <li class={step.state}>
-          <h2 class="band">
-            {i + 1}. {step.title}
-            <span class="count">{#if step.state === 'done'}<Glyph name="check" />{/if}{WORD[step.state]}</span>
-          </h2>
-          <div class="body">
-            {#each step.lines as line (line)}
-              <p>{line}</p>
-            {/each}
-            {#if step.action === 'choose-folder'}
-              {#if wrong}<p class="wrong">{wrong}</p>{/if}
-              <button class="btn" onclick={choose}>{step.state === 'done' ? 'Change folder' : 'Choose the game folder'}</button>
-            {:else if step.action === 'curseforge'}
-              <button class="btn" disabled={!setup.gameFolder} onclick={() => window.twinmap.openCurseForge()}>Get Twinmap Forever on CurseForge</button>
-            {/if}
-          </div>
-        </li>
+  <header>
+    <Logo size={40} />
+    <ol aria-label="Steps">
+      {#each pages as p, i (p.id)}
+        <li class:here={i === at} class:done={p.state === 'done' && i !== at} aria-current={i === at ? 'step' : undefined}>{p.title}</li>
       {/each}
     </ol>
+  </header>
 
-    <footer>
-      {#if complete}
-        <p class="ready">All set.</p>
-        <button class="btn" onclick={onclose}>Go to the map</button>
-      {:else}
-        <p>The map works without the game too; your character appears on it once the steps are done.</p>
-        <button class="btn" onclick={onclose}>Look at the map</button>
-      {/if}
-    </footer>
+  <div class="stage">
+    {#key at}
+      <section in:fly={pageIn(dir)} out:fly={pageOut(dir)} aria-labelledby="page-title">
+        <p class="step">Step {at + 1} of {pages.length}</p>
+        <h1 id="page-title">{page.title}</h1>
+        <p class="intro">{page.intro}</p>
+
+        <div class="now {page.state}" role="status">
+          <p class="first">
+            {#if page.state === 'done'}<Glyph name="check" />{/if}
+            {page.lines[0]}
+          </p>
+          {#if page.progress !== undefined}
+            <progress class="bar" value={page.progress} max="100" aria-label="Building the map"></progress>
+            <p class="count"><span>{Math.floor(page.progress)}%</span><span>{left}</span></p>
+          {/if}
+          {#each page.lines.slice(1) as line (line)}
+            <p>{line}</p>
+          {/each}
+          {#if page.action === 'choose-folder'}
+            {#if wrong}<p class="wrong">{wrong}</p>{/if}
+            <button class="btn" onclick={choose}>{page.state === 'done' ? 'Choose another folder' : 'Choose the game folder'}</button>
+          {:else if page.action === 'curseforge'}
+            <button class="btn" onclick={() => window.twinmap.openCurseForge()}>Get Twinmap Forever on CurseForge</button>
+          {/if}
+        </div>
+      </section>
+    {/key}
   </div>
+
+  <footer>
+    <button class="plain" onclick={onclose}>Skip, look at the map</button>
+    <span class="nav">
+      {#if at > 0}<button class="btn" onclick={() => go(-1)}>Back</button>{/if}
+      {#if last}
+        <button class="btn" disabled={page.state !== 'done'} onclick={onclose}>Go to the map</button>
+      {:else}
+        <button class="btn" disabled={page.state !== 'done'} onclick={() => go(1)}>Next</button>
+      {/if}
+    </span>
+  </footer>
 </main>
 
 <style>
   main {
     position: absolute;
     inset: 46px 0 0;
-    overflow-y: auto;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    justify-items: center;
+    overflow: hidden;
   }
-  .column {
-    max-width: 640px;
-    margin: 0 auto;
-    padding: 32px 0 48px;
+  header,
+  footer,
+  section {
+    width: min(640px, 100% - 48px);
   }
+
   header {
-    padding: 0 16px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    padding: 28px 0 0;
     color: var(--gold);
   }
-  header p {
-    margin: 16px 0 0;
-    color: var(--text);
-  }
+  /* Where the player is among the pages: the names in a row, the one on show in gold. */
   ol {
+    display: flex;
+    gap: 14px;
     margin: 0;
     padding: 0;
     list-style: none;
+    font: var(--t-small);
+    color: var(--text-off);
+    white-space: nowrap;
   }
-  .band .count {
+  ol .done {
+    color: var(--text-dim);
+  }
+  ol .here {
+    color: var(--gold);
+  }
+
+  /* The pages lie one over the other while one leaves and the next comes. */
+  .stage {
+    position: relative;
+    width: 100%;
+    overflow: hidden;
+  }
+  section {
+    position: absolute;
+    inset: 0;
+    margin: 0 auto;
+    padding-top: 9vh;
+  }
+  .step {
+    margin: 0 0 4px;
+    font: var(--t-small);
+    color: var(--text-dim);
+  }
+  h1 {
+    margin: 0;
+    font: 400 34px/40px var(--display);
+    color: var(--gold);
+    text-shadow: 0 1px 0 #000;
+  }
+  .intro {
+    max-width: 60ch;
+    margin: 12px 0 0;
+  }
+
+  /* What is true now, under a bronze line. */
+  .now {
+    margin-top: 28px;
+    padding-top: 18px;
+    box-shadow: inset 0 1px 0 var(--bronze-600);
+  }
+  .now p {
+    max-width: 60ch;
+    margin: 0 0 8px;
+    color: var(--text-dim);
+  }
+  .now .first {
     display: flex;
     align-items: center;
-    gap: 6px;
-    color: var(--text-dim);
+    gap: 8px;
+    font: var(--t-title);
+    color: var(--text);
   }
-  .done .count {
+  .now.done .first {
     color: var(--done);
   }
-  .problem .count {
+  .now.problem .first,
+  .now .wrong {
     color: var(--objective);
   }
-  .body {
-    padding: 12px 16px 24px;
+  .now .btn {
+    margin-top: 8px;
   }
-  .body p {
-    margin: 0 0 8px;
-    max-width: 70ch;
+  .now .bar {
+    height: 10px;
+    margin: 14px 0 6px;
   }
-  .body p + p {
-    color: var(--text-dim);
+  .now .count {
+    max-width: none;
+    display: flex;
+    justify-content: space-between;
   }
-  .waiting .body {
-    color: var(--text-dim);
-  }
-  .body .wrong,
-  .problem .body p {
-    color: var(--objective);
-  }
-  .body .btn {
-    margin-top: 4px;
-  }
+
   footer {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 16px;
-    padding: 16px;
-    box-shadow:
-      0 -1px 0 var(--bronze-600),
-      0 -2px 0 #000;
+    padding: 16px 0 28px;
+    box-shadow: inset 0 1px 0 var(--bronze-600);
   }
-  footer p {
-    margin: 0;
+  .nav {
+    display: flex;
+    gap: 8px;
+  }
+  .plain {
+    padding: 0;
+    border: 0;
+    background: none;
+    font: var(--t-body);
     color: var(--text-dim);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
   }
-  footer .ready {
-    color: var(--done);
+  .plain:hover {
+    color: var(--text);
   }
 </style>

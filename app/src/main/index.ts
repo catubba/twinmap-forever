@@ -3,7 +3,7 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { linkStatus, lostPercent } from '../shared/link'
-import { CURSEFORGE, setupComplete, setupSteps } from '../shared/setup'
+import { CURSEFORGE, setupComplete, setupPages } from '../shared/setup'
 import type { TilesStatus } from '../shared/tiles-status'
 import { placeWindow, WINDOW } from '../shared/window'
 import { findGameWindow, programOf } from './capture'
@@ -114,7 +114,7 @@ function createWindow(): void {
     if (!gameFolder) gameFolder = findGameFolder(settings.gameFolder) // the game may be started after the app
     if (gameFolder && tiles.status().state === 'no-game') tiles = startTiles(gameFolder)
     setup = setupStatus(gameFolder, settings.setupDone === true)
-    if (!settings.setupDone && setupComplete(setupSteps(setup, linkStatus(link.snapshot(), Date.now())))) {
+    if (!settings.setupDone && setupComplete(setupPages(setup, tiles.status(), linkStatus(link.snapshot(), Date.now())))) {
       settings.setupDone = true
       writeSettings(settingsFile, settings)
     }

@@ -2,9 +2,11 @@
   // The main screen: the top row with the state of the link, the map in its frame, and the Now panel.
   import { experience, linkStatus, type LinkSnapshot } from '../../shared/link'
   import { tilesLine, type TilesStatus } from '../../shared/tiles-status'
+  import { fade, fly } from 'svelte/transition'
   import type { SetupStatus } from '../../shared/setup'
   import FirstRun from './FirstRun.svelte'
   import Map from './Map.svelte'
+  import { drop, gone, screen } from './motion'
 
   let link = $state<LinkSnapshot | null>(null)
   let now = $state(Date.now())
@@ -51,10 +53,10 @@
 </header>
 
 {#if onSetup && setup}
-  <FirstRun {setup} link={status} onclose={() => (onSetup = false)} />
+  <div class="whole" out:fade={gone}><FirstRun {setup} {tiles} link={status} onclose={() => (onSetup = false)} /></div>
 {/if}
 {#if onSetup === false}
-<div class="work">
+<div class="work" in:fade={screen}>
   <div class="mapbox">
     {#if mapReady}
       <Map {pos} {insideReady} />
@@ -69,7 +71,7 @@
       </div>
     {/if}
     {#if status?.line}
-      <p class="map-note" role="status">{status.line}</p>
+      {#key status.line}<p class="map-note" role="status" in:fly={drop(8)} out:fade={gone}>{status.line}</p>{/key}
     {/if}
   </div>
 
