@@ -7,6 +7,7 @@
   import FirstRun from './FirstRun.svelte'
   import Map from './Map.svelte'
   import { drop, gone, screen } from './motion'
+  import Settings from './Settings.svelte'
 
   let link = $state<LinkSnapshot | null>(null)
   let now = $state(Date.now())
@@ -23,6 +24,8 @@
   // The first run shows by itself until its steps were all done once; then the app opens on the map.
   let setup = $state<SetupStatus | null>(null)
   let onSetup = $state<boolean | null>(null)
+  // Settings lie over the map, which stays as it was underneath.
+  let onSettings = $state(false)
   window.twinmap.onSetup((told) => {
     setup = told
     onSetup ??= !told.done
@@ -44,16 +47,24 @@
 <header class="top">
   {#if !onSetup}
     <nav aria-label="Sections">
-      <span class="tab" aria-current="page">Now</span>
+      <button class="tab" aria-current={onSettings ? undefined : 'page'} onclick={() => (onSettings = false)}>Now</button>
     </nav>
   {/if}
   {#if status}
     <p class="status"><i class={status.tone}></i>{status.word}</p>
   {/if}
+  {#if onSetup === false}
+    <button class="entry" aria-current={onSettings ? 'page' : undefined} onclick={() => (onSettings = !onSettings)}>Settings</button>
+  {/if}
 </header>
 
 {#if onSetup && setup}
   <div class="whole" out:fade={gone}><FirstRun {setup} {tiles} link={status} onclose={() => (onSetup = false)} /></div>
+{/if}
+{#if onSettings && setup && onSetup === false}
+  <div class="over" in:fade={screen} out:fade={gone}>
+    <Settings {setup} {tiles} link={status} onback={() => (onSettings = false)} onfirstrun={() => ((onSettings = false), (onSetup = true))} />
+  </div>
 {/if}
 {#if onSetup === false}
 <div class="work" in:fade={screen}>
@@ -108,19 +119,45 @@
     -webkit-app-region: drag;
   }
 
-  /* The section on show: a tab that touches the moulding. */
-  .tab {
+  /* An entry of the top row. The section on show is a tab that touches the moulding. */
+  .tab,
+  .entry {
     padding: 0 14px;
-    border: 1px solid #a8843a;
+    border: 1px solid transparent;
     border-bottom: 0;
     border-radius: 5px 5px 0 0;
+    background: none;
+    font: var(--t-nav);
+    color: #c9b48a;
+    text-shadow: 0 1px 0 #000;
+    cursor: pointer;
+    -webkit-app-region: no-drag;
+  }
+  .tab:hover,
+  .entry:hover {
+    color: var(--text);
+  }
+  .tab[aria-current],
+  .entry[aria-current] {
+    border-color: #a8843a;
     background: linear-gradient(#6a5238, var(--stone-700));
     box-shadow:
       inset 0 1px 0 #fff4,
       0 0 0 1px #000;
-    font: var(--t-nav);
     color: var(--gold);
-    text-shadow: 0 1px 0 #000;
+  }
+  /* Settings sit at the far end, after the state of the link. */
+  .entry {
+    margin-left: 12px;
+  }
+  .over {
+    position: absolute;
+    inset: 0;
+    z-index: 2000;
+    pointer-events: none;
+  }
+  .over :global(main) {
+    pointer-events: auto;
   }
   nav {
     display: flex;

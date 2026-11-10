@@ -17,19 +17,19 @@ const READY: TilesStatus = { state: 'ready', folder: 'x', version: '1.60.1', til
 
 test('the addon is found by its .toc, with its version; Questie by its folder', () => {
   const game = folder()
-  expect(setupStatus(game, false)).toEqual({ gameFolder: game, addon: null, questie: false, done: false })
+  expect(setupStatus(game, {}, '0.1.0')).toEqual({ gameFolder: game, addon: null, questie: false, done: false, version: '0.1.0', onTop: false })
   addons(game, 'TwinmapForever', 'Questie')
   expect(addonVersion(game), 'a folder with no .toc is not the addon').toBeNull()
   writeFileSync(join(game, '_forever_', 'Interface', 'AddOns', 'TwinmapForever', 'TwinmapForever.toc'), '## Interface: 11508\r\n## Title: Twinmap Forever\r\n## Version: 0.1.0\r\nTwinmapForever.lua\r\n')
-  expect(setupStatus(game, true)).toEqual({ gameFolder: game, addon: '0.1.0', questie: true, done: true })
-  expect(setupStatus(null, false)).toEqual({ gameFolder: null, addon: null, questie: false, done: false })
+  expect(setupStatus(game, { setupDone: true, onTop: true }, '0.1.0')).toEqual({ gameFolder: game, addon: '0.1.0', questie: true, done: true, version: '0.1.0', onTop: true })
+  expect(setupStatus(null, {}, '0.1.0')).toMatchObject({ gameFolder: null, addon: null, questie: false })
 })
 
 test('settings come back as they were written, and a file that is not ours gives none', () => {
   const file = join(folder(), 'settings.json')
   expect(readSettings(file)).toEqual({})
-  writeSettings(file, { gameFolder: 'D:\\Games\\WoW', setupDone: true })
-  expect(readSettings(file)).toEqual({ gameFolder: 'D:\\Games\\WoW', setupDone: true })
+  writeSettings(file, { gameFolder: 'D:\\Games\\WoW', setupDone: true, onTop: true })
+  expect(readSettings(file)).toEqual({ gameFolder: 'D:\\Games\\WoW', setupDone: true, onTop: true })
   writeFileSync(file, '{"gameFolder": 7, "setupDone": "yes", "other": 1}')
   expect(readSettings(file)).toEqual({})
   writeFileSync(file, 'not json')
@@ -39,7 +39,7 @@ test('settings come back as they were written, and a file that is not ours gives
 const states = (setup: SetupStatus, tiles: TilesStatus | null, link: LinkStatus | null) => Object.fromEntries(setupPages(setup, tiles, link).map((p) => [p.id, p.state]))
 
 test('the pages of the first run, from nothing to the arrow', () => {
-  const none = { gameFolder: null, addon: null, questie: false, done: false }
+  const none = { gameFolder: null, addon: null, questie: false, done: false, version: '0.1.0', onTop: false }
   expect(states(none, { state: 'no-game' }, CLOSED)).toEqual({ game: 'todo', map: 'todo', addon: 'todo', extras: 'done', play: 'todo' })
   const found = { ...none, gameFolder: 'D:\\WoW' }
   expect(states(found, { state: 'converting', percent: 40 }, CLOSED)).toMatchObject({ game: 'done', map: 'working' })
@@ -53,7 +53,7 @@ test('the pages of the first run, from nothing to the arrow', () => {
 })
 
 test('what went wrong is said on its page: a map not built, an addon to tick, one of the two to update', () => {
-  const installed = { gameFolder: 'D:\\WoW', addon: '0.1.0', questie: true, done: false }
+  const installed = { gameFolder: 'D:\\WoW', addon: '0.1.0', questie: true, done: false, version: '0.1.0', onTop: false }
   expect(setupPages(installed, { state: 'failed', message: 'disk full' }, CLOSED)[1]).toMatchObject({ state: 'problem', lines: ['The map could not be built.', 'disk full'] })
   const lost = setupPages(installed, READY, { kind: 'lost', word: 'Link lost', tone: 'objective' })[4]!
   expect(lost.state).toBe('todo')

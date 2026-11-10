@@ -1,4 +1,4 @@
-﻿import type { LinkSnapshot } from '../../shared/link'
+import type { LinkSnapshot } from '../../shared/link'
 import type { SetupStatus } from '../../shared/setup'
 import type { TilesStatus } from '../../shared/tiles-status'
 
@@ -11,6 +11,7 @@ declare global {
       onSetup: (listener: (status: SetupStatus) => void) => void
       chooseGameFolder: () => Promise<string | null>
       openCurseForge: () => Promise<void>
+      setOnTop: (on: boolean) => Promise<void>
     }
   }
 }
