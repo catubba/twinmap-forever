@@ -33,7 +33,7 @@ test('the drawn strip decodes to the position the game reports, with the protoco
   assert.equal(block.protocol, Number(addon.ns('PROTOCOL')));
   assert.deepEqual({ ...block, text: data(block) }, {
     negative: false, protocol: 1, id: 1, section: 'pos', version: 1, part: 1, total: 1,
-    text: { zone: 'Elwynn Forest', sub: 'Goldshire', map: 1429, x: 42.3, y: 65.7, facing: 90 },
+    text: { zone: 'Elwynn Forest', sub: 'Goldshire', map: 1429, x: 42.34, y: 65.71, facing: 90 },
   });
 });
 
@@ -72,7 +72,7 @@ test('a move sends a new block, and an unchanged position is sent again after te
   let all = blocks(addon);
   assert.equal(all.length, 2);
   assert.deepEqual([all[1].id, all[1].version], [2, 2]);
-  assert.deepEqual(data(all[1]), { zone: 'Elwynn Forest', sub: '', map: 1429, x: 50, y: 65.7, facing: 0 });
+  assert.deepEqual(data(all[1]), { zone: 'Elwynn Forest', sub: '', map: 1429, x: 50, y: 65.71, facing: 0 });
 
   addon.run(7);
   assert.equal(blocks(addon).length, 2, 'not yet');
@@ -80,6 +80,16 @@ test('a move sends a new block, and an unchanged position is sent again after te
   all = blocks(addon);
   assert.equal(all.length, 3);
   assert.equal(all[2].text, all[1].text);
+});
+
+test('a character on the move is read four times a second, to a hundredth of the zone', () => {
+  const addon = enterWorld(null, FAST);
+  addon.run(10);
+  for (const x of [0.5001, 0.5002, 0.5003, 0.5004]) {
+    addon.lua(`GAME.x = ${x}`);
+    addon.run(0.3);
+  }
+  assert.deepEqual(blocks(addon).slice(1).map((b) => data(b).x), [50.01, 50.02, 50.03, 50.04]);
 });
 
 test('a place with no map sends zone and facing only', () => {
@@ -166,8 +176,8 @@ test('in combat only the position goes out; the rest follows when the fight ends
 
   addon.lua('GAME.combat = false');
   addon.run(3);
-  const last = blocks(addon).at(-1);
-  assert.deepEqual([last.section, data(last)], ['bags', { n: 2 }]);
+  const bags = blocks(addon).filter((b) => b.section === 'bags').at(-1);
+  assert.deepEqual(data(bags), { n: 2 });
 });
 
 test('a block queued before the fight waits for its end', () => {

@@ -13,7 +13,7 @@ import { readSettings, setupStatus, writeSettings } from './setup'
 import { servedFile } from './tiles'
 import startTilesWorker from './tiles-worker?nodeWorker'
 
-const SHOW_EVERY = 250 // ms between updates of the window
+const SHOW_EVERY = 100 // ms between updates of the window: well under the 250 ms between two positions
 const LOG_EVERY = 5000 // ms between writes of the measures
 
 const BLANK = Buffer.from('R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==', 'base64') // a see-through picture of one pixel

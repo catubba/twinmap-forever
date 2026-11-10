@@ -46,7 +46,7 @@ local function Json(v)
   elseif t == "number" then
     if v ~= v or v == math.huge or v == -math.huge then return "null" end
     if v == math.floor(v) then return string.format("%.0f", v) end
-    return string.format("%.1f", v)
+    return (string.format("%.2f", v):gsub("%.?0+$", "")) -- two decimals at most, no zeros at the end
   elseif t == "boolean" then
     return tostring(v)
   elseif t == "table" then
@@ -76,8 +76,9 @@ local function BuildPos()
     out.map = mapId
     local p = Try(C_Map.GetPlayerMapPosition, mapId, "player")
     if type(p) == "table" and Num(p.x) and Num(p.y) then
-      -- Percent of the zone map, to one decimal.
-      out.x, out.y = Round(p.x * 100, 0.1), Round(p.y * 100, 0.1)
+      -- Percent of the zone map, to two decimals: a step or two of the character, so the arrow
+      -- of the app moves with every reading instead of once in a few.
+      out.x, out.y = Round(p.x * 100, 0.01), Round(p.y * 100, 0.01)
     end
   end
   -- Degrees, anticlockwise from north, in steps of 10: turning on the spot should not send every second.
@@ -109,9 +110,11 @@ end
 
 -- name, seconds between checks, builder. combat: also sent during a fight; the rest waits for its end.
 -- refresh: seconds after which it is sent again unchanged, when not REFRESH. The position is the
--- heartbeat: the app takes the strip for stopped when none comes for a while.
+-- heartbeat: the app takes the strip for stopped when none comes for a while. It is also read four
+-- times a second: the app's arrow glides from one reading to the next (GLIDE in Map.svelte, a little
+-- longer than this period).
 local SECTIONS = {
-  { name = "pos", period = 1, build = BuildPos, combat = true, refresh = 10 },
+  { name = "pos", period = 0.25, build = BuildPos, combat = true, refresh = 10 },
   { name = "char", period = 2, build = BuildChar },
 }
 ns.sections = SECTIONS -- other files add their own
@@ -248,7 +251,7 @@ end
 local queue = {}
 local version, blockId = 0, 0
 local startAt
-local showing, timer, tickAcc = false, 0, 0
+local showing, timer = false, 0
 local steps = {} -- what is left to show of the block on screen: { layer or "rest", seconds }
 local last, paintedCells, paintedStamp -- the last block's cells; what the layers hold now
 local paused = false
@@ -354,11 +357,7 @@ driver:SetScript("OnUpdate", function(_, elapsed)
   local now = GetTime()
   if now < startAt then return end
   local combat = InCombatLockdown()
-  tickAcc = tickAcc + elapsed
-  if tickAcc >= 1 then
-    tickAcc = 0
-    Tick(now, combat)
-  end
+  Tick(now, combat) -- every frame: each section keeps its own period
   timer = timer - elapsed
   if timer > 0 then return end
   if #steps == 0 then
