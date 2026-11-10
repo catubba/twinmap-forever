@@ -1,8 +1,11 @@
 <script lang="ts">
   import { lostPercent, type LinkSnapshot } from '../../shared/link'
+  import { tilesLine, type TilesStatus } from '../../shared/tiles-status'
 
   let link = $state<LinkSnapshot | null>(null)
   window.twinmap.onLink((snapshot) => (link = snapshot))
+  let tiles = $state<TilesStatus | null>(null)
+  window.twinmap.onTiles((status) => (tiles = status))
 
   const GAME = { closed: 'Game not found', minimized: 'Game minimized', open: 'Game open' }
   const pos = $derived(link?.state.sections.pos)
@@ -37,6 +40,9 @@
       {link.state.blocks} blocks · {link.state.lost} lost ({lostPercent(link.state).toFixed(2)}%) ·
       {link.state.corrupt} unreadable · {link.reads} reads in {Math.round(link.seconds)} s · {link.cpu.toFixed(1)}% of a core
     </p>
+    {#if tiles}
+      <p class="measures tiles" class:warning={tiles.state === 'failed' || tiles.state === 'no-game'}>{tilesLine(tiles)}</p>
+    {/if}
   {/if}
 </main>
 
@@ -84,6 +90,10 @@
 
   .warning {
     color: #ff8a5c;
+  }
+
+  .tiles {
+    margin-top: 8px;
   }
 
   .measures {
