@@ -8,7 +8,7 @@ import type { TilesStatus } from '../shared/tiles-status'
 import { readTable } from '../shared/wdc5'
 import { WORLDS } from '../shared/world'
 import { installedBuild, openClientFiles, type ClientFiles } from './client-files'
-import { convertInteriors, finishedInteriors, MAP_FILE, mapEntries, ROOM_PICTURES_FILE, roomPictures } from './interiors'
+import { convertInteriors, ENCOUNTERS_FILE, finishedInteriors, MAP_FILE, mapEntries, ROOM_PICTURES_FILE, roomPictures } from './interiors'
 import { convertWorld, finished, MAPS_FILE, tilesFolder } from './tiles'
 
 const { gameFolder, base } = workerData as { gameFolder: string; base: string }
@@ -58,10 +58,10 @@ try {
     const insideConverted = !inside
     if (!inside) {
       const files = (client ??= openClientFiles(gameFolder))
-      // Both tables have parts the game keeps encrypted: read around them, never decrypted.
-      const maps = files.read(MAP_FILE, true), rooms = files.read(ROOM_PICTURES_FILE, true)
-      if (!maps || !rooms) throw new Error('the game has no table of its maps or of its room pictures')
-      inside = convertInteriors(mapEntries(readTable(maps)), roomPictures(readTable(rooms)), (id) => files.read(id), folder)
+      // These tables have parts the game keeps encrypted: read around them, never decrypted.
+      const maps = files.read(MAP_FILE, true), rooms = files.read(ROOM_PICTURES_FILE, true), fights = files.read(ENCOUNTERS_FILE, true)
+      if (!maps || !rooms || !fights) throw new Error('the game has no table of its maps, of its room pictures or of its bosses')
+      inside = convertInteriors(mapEntries(readTable(maps), readTable(fights)), roomPictures(readTable(rooms)), (id) => files.read(id), folder)
     }
     interiors({ maps: inside.maps.length, pieces: inside.maps.reduce((n, m) => n + m.pieces.length, 0), dropped: inside.dropped, converted: insideConverted })
   } catch (e) {

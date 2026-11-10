@@ -141,9 +141,21 @@ const mapRow = (id: number, name: string, kind: number, worldFile: number) => {
 }
 
 test('the tables give the continents, dungeons and raids, and the pictures of each building', () => {
-  const maps = mapEntries(table([mapRow(0, 'Eastern Kingdoms', 0, 775971), mapRow(36, 'Deadmines', 1, 780605), mapRow(249, "Onyxia's Lair", 2, 789922), mapRow(30, 'Alterac Valley', 3, 790112), mapRow(25, 'Scott Test', 0, 863335)]))
+  // Bosses: name, id, map, way of playing, order. The table is not in order, and a map may list a boss twice.
+  const fights = table([
+    { id: 3, cells: ['Edwin VanCleef', 3, 36, 0, 2000] },
+    { id: 1, cells: ["Rhahk'Zor", 1, 36, 0, 0] },
+    { id: 2, cells: ['Sneed', 2, 36, 1, 1000] },
+    { id: 9, cells: ['Sneed', 9, 36, 198, 1000] },
+    { id: 8, cells: ['Someone of another season', 8, 36, 198, 500] },
+    { id: 4, cells: ['Onyxia', 4, 249, 9, 0] },
+    { id: 5, cells: ['No Longer in Use', 5, 0, 0, 0] },
+  ])
+  const maps = mapEntries(table([mapRow(0, 'Eastern Kingdoms', 0, 775971), mapRow(36, 'Deadmines', 1, 780605), mapRow(249, "Onyxia's Lair", 2, 789922), mapRow(30, 'Alterac Valley', 3, 790112), mapRow(25, 'Scott Test', 0, 863335)]), fights)
   expect(maps.map((m) => [m.id, m.kind])).toEqual([[0, 'world'], [36, 'dungeon'], [249, 'raid']])
-  expect(maps[1]).toEqual({ id: 36, name: 'Deadmines', kind: 'dungeon', worldFile: 780605 })
+  // In the game's order, the plain way of playing only; a raid that has no plain way keeps what it has.
+  expect(maps[1]).toEqual({ id: 36, name: 'Deadmines', kind: 'dungeon', worldFile: 780605, bosses: ["Rhahk'Zor", 'Sneed', 'Edwin VanCleef'] })
+  expect([maps[0]!.bosses, maps[2]!.bosses]).toEqual([[], ['Onyxia']])
   // The third column carries a 1 in its high byte.
   const pictures = roomPictures(table([{ id: 1, parent: 500, cells: [0, 0, 256, 211409] }, { id: 2, parent: 500, cells: [21, 1, 257, 211430] }, { id: 3, parent: 814, cells: [2, 0, 256, 9] }]))
   expect(pictures.get(500)).toEqual([{ room: 0, across: 0, up: 0, file: 211409 }, { room: 21, across: 1, up: 1, file: 211430 }])
@@ -169,9 +181,9 @@ test('a dungeon is converted once: its pictures as the game has them, its ground
       return game[id] ?? null
     }
     const maps = [
-      { id: 36, name: 'Deadmines', kind: 'dungeon' as const, worldFile: 100 },
-      { id: 43, name: 'Wailing Caverns', kind: 'dungeon' as const, worldFile: 200 },
-      { id: 99, name: 'Gone', kind: 'raid' as const, worldFile: 999 },
+      { id: 36, name: 'Deadmines', kind: 'dungeon' as const, worldFile: 100, bosses: ['Edwin VanCleef'] },
+      { id: 43, name: 'Wailing Caverns', kind: 'dungeon' as const, worldFile: 200, bosses: [] },
+      { id: 99, name: 'Gone', kind: 'raid' as const, worldFile: 999, bosses: [] },
     ]
     // Room 1 is the lower: its picture is drawn first. File 78 is not in the game, 79 is encrypted.
     const pictures = new Map([[500, [{ room: 0, across: 0, up: 0, file: 77 }, { room: 1, across: 0, up: 0, file: 77 }, { room: 0, across: 0, up: 0, file: 78 }, { room: 0, across: 0, up: 0, file: 79 }]]])
@@ -179,6 +191,7 @@ test('a dungeon is converted once: its pictures as the game has them, its ground
 
     expect(made.maps.map((m) => [m.id, m.kind, m.ground, m.pieces.length])).toEqual([[36, 'dungeon', 'i36', 2], [43, 'dungeon', null, 2]])
     expect(made.maps[0]!.pieces.map((p) => p.bottom)).toEqual([30, 55])
+    expect(made.maps[0]!.bosses).toEqual(['Edwin VanCleef'])
     expect(made.dropped).toBe(4)
     // The picture is kept as the game has it: the same DXT1 blocks.
     expect(inflateSync(readFileSync(join(folder, 'rooms', '77.dxt')))).toEqual(room.subarray(148 + 1024))
@@ -188,7 +201,7 @@ test('a dungeon is converted once: its pictures as the game has them, its ground
     reads = 0
     expect(finishedInteriors(folder)).toEqual(made)
     expect(reads).toBe(0)
-    expect(JSON.parse(readFileSync(join(folder, INTERIORS_FILE), 'utf8')).format).toBe(1)
+    expect(JSON.parse(readFileSync(join(folder, INTERIORS_FILE), 'utf8')).format).toBe(2)
   } finally {
     rmSync(folder, { recursive: true, force: true })
   }
