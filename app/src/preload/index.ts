@@ -1,5 +1,5 @@
-﻿// The door between the window and the main process. The window listens; it can ask for two things
-// only, both of the first run: to pick the game folder, and to open the addon's page on CurseForge.
+// The door between the window and the main process. The window listens; it can ask for three things
+// only: to pick the game folder, to open the addon's page on CurseForge, and to stay over other windows.
 import { contextBridge, ipcRenderer } from 'electron'
 import type { LinkSnapshot } from '../shared/link'
 import type { SetupStatus } from '../shared/setup'
@@ -18,4 +18,5 @@ contextBridge.exposeInMainWorld('twinmap', {
   // Opens the folder picker. Gives back what is wrong with the folder picked, or null.
   chooseGameFolder: (): Promise<string | null> => ipcRenderer.invoke('choose-game-folder'),
   openCurseForge: (): Promise<void> => ipcRenderer.invoke('open-curseforge'),
+  setOnTop: (on: boolean): Promise<void> => ipcRenderer.invoke('set-on-top', on),
 })

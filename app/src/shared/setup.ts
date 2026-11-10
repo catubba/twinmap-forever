@@ -11,6 +11,10 @@ export interface SetupStatus {
   questie: boolean
   /** The first run was gone through once, in this run or an earlier one. */
   done: boolean
+  /** The version of this app. */
+  version: string
+  /** The player asked for the window to stay over the others. */
+  onTop: boolean
 }
 
 /** Where the addon is published. The app never installs it itself: every install is one CurseForge counts. */

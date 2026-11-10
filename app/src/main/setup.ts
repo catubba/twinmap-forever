@@ -12,6 +12,8 @@ export interface Settings {
   gameFolder?: string
   /** The first run was gone through once: the app opens on the map. */
   setupDone?: boolean
+  /** The window stays over the others. */
+  onTop?: boolean
 }
 
 /** The settings as they were saved; nothing where the file is missing or is not ours. */
@@ -19,8 +21,8 @@ export function readSettings(file: string): Settings {
   try {
     const read: unknown = JSON.parse(readFileSync(file, 'utf8'))
     if (typeof read !== 'object' || !read) return {}
-    const { gameFolder, setupDone } = read as Record<string, unknown>
-    return { ...(typeof gameFolder === 'string' ? { gameFolder } : {}), ...(setupDone === true ? { setupDone } : {}) }
+    const { gameFolder, setupDone, onTop } = read as Record<string, unknown>
+    return { ...(typeof gameFolder === 'string' ? { gameFolder } : {}), ...(setupDone === true ? { setupDone } : {}), ...(onTop === true ? { onTop } : {}) }
   } catch {
     return {}
   }
@@ -44,11 +46,13 @@ export function addonVersion(gameFolder: string): string | null {
   }
 }
 
-export function setupStatus(gameFolder: string | null, done: boolean): SetupStatus {
+export function setupStatus(gameFolder: string | null, settings: Settings, version: string): SetupStatus {
   return {
     gameFolder,
     addon: gameFolder ? addonVersion(gameFolder) : null,
     questie: gameFolder ? existsSync(join(gameFolder, ...ADDONS, 'Questie')) : false,
-    done,
+    done: settings.setupDone === true,
+    version,
+    onTop: settings.onTop === true,
   }
 }

@@ -90,8 +90,8 @@ function createWindow(): void {
   let gameFolder = findGameFolder(settings.gameFolder)
   let tiles = startTiles(gameFolder)
 
-  // The first run. The window may ask for two things, and only these: to let the player pick the
-  // game folder, and to open the addon's page on CurseForge in the browser.
+  // What the window may ask for, and only this: to let the player pick the game folder, to open the
+  // addon's page on CurseForge in the browser, and (further down) to keep the window over the others.
   ipcMain.handle('choose-game-folder', async (): Promise<string | null> => {
     const picked = await dialog.showOpenDialog(win, { title: 'Where World of Warcraft: Forever is installed', properties: ['openDirectory'] })
     const chosen = picked.filePaths[0]
@@ -109,11 +109,19 @@ function createWindow(): void {
   })
   ipcMain.handle('open-curseforge', () => shell.openExternal(CURSEFORGE))
   // Where the first run stands, looked at every couple of seconds: an addon installed meanwhile shows by itself.
-  let setup = setupStatus(gameFolder, settings.setupDone === true)
+  let setup = setupStatus(gameFolder, settings, app.getVersion())
+  win.setAlwaysOnTop(settings.onTop === true)
+  // From the settings: the window over the others or not. The choice is kept.
+  ipcMain.handle('set-on-top', (_event, on: unknown) => {
+    settings.onTop = on === true
+    writeSettings(settingsFile, settings)
+    win.setAlwaysOnTop(settings.onTop)
+    setup = setupStatus(gameFolder, settings, app.getVersion())
+  })
   const look = setInterval(() => {
     if (!gameFolder) gameFolder = findGameFolder(settings.gameFolder) // the game may be started after the app
     if (gameFolder && tiles.status().state === 'no-game') tiles = startTiles(gameFolder)
-    setup = setupStatus(gameFolder, settings.setupDone === true)
+    setup = setupStatus(gameFolder, settings, app.getVersion())
     if (!settings.setupDone && setupComplete(setupPages(setup, tiles.status(), linkStatus(link.snapshot(), Date.now())))) {
       settings.setupDone = true
       writeSettings(settingsFile, settings)
@@ -165,6 +173,7 @@ function createWindow(): void {
     clearInterval(look)
     ipcMain.removeHandler('choose-game-folder')
     ipcMain.removeHandler('open-curseforge')
+    ipcMain.removeHandler('set-on-top')
     link.stop()
     tiles.stop()
     protocol.unhandle('twinmap')
