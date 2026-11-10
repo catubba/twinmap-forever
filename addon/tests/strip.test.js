@@ -101,6 +101,21 @@ test('in a narrow window the data is split into blocks that join back, never cut
   assert.equal(JSON.parse(all.map((b) => b.text).join('')).zone, zone);
 });
 
+test('when the window changes size the strip follows at once: new width, new pixel scale, position sent again', () => {
+  const addon = enterWorld();
+  addon.run(10);
+  assert.equal(addon.lua('return 768 / TwinmapForeverStrip.scale'), '1080.0');
+
+  addon.lua('GAME.width, GAME.height = 1280, 720');
+  addon.fire('DISPLAY_SIZE_CHANGED');
+  addon.run(3);
+  const strips = addon.strips();
+  assert.equal(strips.length, 4, 'the unchanged position goes out again');
+  assert.ok(strips.slice(2).every((s) => s.length === 1280), 'as wide as the new window');
+  assert.equal(decodeStrip(strips[2]).text, decodeStrip(strips[0]).text);
+  assert.equal(addon.lua('return 768 / TwinmapForeverStrip.scale'), '720.0');
+});
+
 test('a strip with one wrong cell is refused', () => {
   const addon = enterWorld();
   addon.run(10);
