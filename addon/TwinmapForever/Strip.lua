@@ -7,12 +7,15 @@
 -- packed MSB-first into 3-bit cells. The first three bytes never change meaning, so every app
 -- version can tell which protocol a strip speaks. The checksum covers protocol to payload.
 -- Payload: section US version US part US total US chunk of JSON.
+--
+-- In "steady" mode a block is drawn twice: as it is, then in negative (every cell 7 - v), so the
+-- eye sees a still grey line. The reader tells a negative by its inverted magic bytes.
 local _, ns = ...
 
 -- Tuning knobs.
 local CELL = 1        -- physical pixels per cell
 local RESERVED = 40   -- bytes of a block that are not section data: header, checksum, record
-local HOLD = 0.05     -- seconds a block stays up: must span a few captures
+local HOLD = 0.05     -- seconds a block stays up, and again its negative: must span a few captures
 local REFRESH = 600   -- resend an unchanged section this often: nothing acks, a block can be missed
 local START_DELAY = 5 -- seconds after entering the world
 
@@ -80,10 +83,11 @@ local function BuildPos()
   return out
 end
 
--- name, seconds between checks, builder
+-- name, seconds between checks, builder. combat: also sent during a fight; the rest waits for its end.
 local SECTIONS = {
-  { name = "pos", period = 1, build = BuildPos },
+  { name = "pos", period = 1, build = BuildPos, combat = true },
 }
+ns.sections = SECTIONS -- other files add their own
 
 ---------------------------------------------------------------------------
 -- Strip
@@ -115,14 +119,14 @@ local function Encode(id, payload)
   return cells
 end
 
-local strip
+local strip, anchored
 local cellPool = {}
 
 local function RowCells()
   return math.floor(GetPhysicalScreenSize() / CELL)
 end
 
-local function ShowStrip(id, payload)
+local function Draw(cells, negative)
   if not strip then
     strip = CreateFrame("Frame", "TwinmapForeverStrip", UIParent)
     strip:SetFrameStrata("TOOLTIP")
@@ -131,13 +135,18 @@ local function ShowStrip(id, payload)
     local _, physH = GetPhysicalScreenSize()
     strip:SetIgnoreParentScale(true)
     strip:SetScale(768 / physH)
-    strip:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 0, 0)
     strip:SetSize(RowCells() * CELL, CELL)
   end
-  local cells = Encode(id, payload)
+  local point = ns.db.position == "BOTTOM" and "BOTTOMLEFT" or "TOPLEFT"
+  if point ~= anchored then
+    strip:ClearAllPoints()
+    strip:SetPoint(point, UIParent, point, 0, 0)
+    anchored = point
+  end
   local row = RowCells()
   for i = 1, row do
     local v = cells[(i - 1) % #cells + 1] -- past the end the block repeats: always full width, ignored by the reader
+    if negative then v = 7 - v end
     local t = cellPool[i]
     if not t then
       t = strip:CreateTexture(nil, "OVERLAY")
@@ -154,15 +163,18 @@ end
 
 ---------------------------------------------------------------------------
 -- Scheduler: each section is rebuilt on its period and queued when its JSON
--- changed or REFRESH passed.
+-- changed or REFRESH passed. In combat only the sections marked for it.
 ---------------------------------------------------------------------------
 
 local queue = {}
 local version, blockId = 0, 0
 local startAt
 local showing, timer, tickAcc = false, 0, 0
+local negative -- the cells on screen, when their negative is still to be drawn
+local paused = false
 
-local function Enqueue(name, json)
+local function Enqueue(s, json)
+  local name = s.name
   for i = #queue, 1, -1 do
     if queue[i].name == name then table.remove(queue, i) end
   end
@@ -180,23 +192,30 @@ local function Enqueue(name, json)
     pos = stop + 1
   end
   for i, part in ipairs(parts) do
-    queue[#queue + 1] = { name = name, text = table.concat({ name, version, i, #parts, part }, US) }
+    queue[#queue + 1] = { name = name, combat = s.combat, text = table.concat({ name, version, i, #parts, part }, US) }
   end
 end
 
-local function Tick(now)
+local function Tick(now, combat)
   for _, s in ipairs(SECTIONS) do
-    if now >= (s.nextAt or 0) then
+    if (s.combat or not combat) and now >= (s.nextAt or 0) then
       s.nextAt = now + s.period
       local ok, value = pcall(s.build)
       if ok and type(value) == "table" then
         local json = Json(value)
         if json ~= s.json or now >= (s.sentAt or 0) + REFRESH then
           s.json, s.sentAt = json, now
-          Enqueue(s.name, json)
+          Enqueue(s, json)
         end
       end
     end
+  end
+end
+
+-- The next block to draw: in combat, the first one allowed there.
+local function Next(combat)
+  for i, item in ipairs(queue) do
+    if item.combat or not combat then return table.remove(queue, i) end
   end
 end
 
@@ -207,18 +226,39 @@ driver:SetScript("OnEvent", function()
 end)
 driver:SetScript("OnUpdate", function(_, elapsed)
   if not startAt then return end
+  if ns.db.paused then
+    if not paused then
+      paused, queue, negative, timer = true, {}, nil, 0
+      if strip then strip:Hide() end
+      showing = false
+    end
+    return
+  end
+  if paused then -- back on: nothing went out meanwhile, so everything is sent again
+    paused = false
+    for _, s in ipairs(SECTIONS) do s.nextAt, s.json = 0, nil end
+  end
   local now = GetTime()
   if now < startAt then return end
+  local combat = InCombatLockdown()
   tickAcc = tickAcc + elapsed
   if tickAcc >= 1 then
     tickAcc = 0
-    Tick(now)
+    Tick(now, combat)
   end
   timer = timer - elapsed
   if timer > 0 then return end
-  if #queue > 0 then -- straight to the next one: an empty frame between blocks is a visible blink
+  if negative then
+    Draw(negative, true)
+    negative, timer = nil, HOLD
+    return
+  end
+  local item = Next(combat)
+  if item then -- straight to the next one: an empty frame between blocks is a visible blink
     blockId = (blockId + 1) % 65536
-    ShowStrip(blockId, table.remove(queue, 1).text)
+    local cells = Encode(blockId, item.text)
+    Draw(cells, false)
+    if ns.db.mode ~= "fast" then negative = cells end
     showing, timer = true, HOLD
   elseif showing then
     strip:Hide()
