@@ -7,7 +7,7 @@ import { decodeRow, PROTOCOL, type Block } from './strip'
 // Strips the addon really drew, recorded in the simulated game by addon/tests/record.js.
 // Each is a string of cells, one digit 0 to 7 (R*4 + G*2 + B) per pixel.
 const strips = JSON.parse(readFileSync(join(__dirname, 'strips.fixture.json'), 'utf8')) as Record<
-  'session' | 'narrow' | 'protocol2',
+  'session' | 'narrow' | 'protocol2' | 'instance',
   string[]
 >
 
@@ -33,6 +33,21 @@ test('a recorded session decodes to the positions the game reported', () => {
   readings.slice(1).forEach((r) => game.feed(r, 2000))
   expect(game.state.sections.pos).toEqual({ zone: 'Stormwind City', sub: 'Trade District', map: 1453, x: 61.2, y: 70.8, facing: 180 })
   expect(game.state).toMatchObject({ blocks: 3, lost: 0, corrupt: 0, protocol: null, updatedAt: { pos: 2000 } })
+})
+
+test('into a dungeon and out: the position says which instance, and where in it while the game tells', () => {
+  const game = createGame()
+  const seen = strips.instance.map((s) => {
+    game.feed(decodeRow(pixels(s)))
+    return game.state.sections.pos
+  })
+  expect(seen).toEqual([
+    { zone: 'Elwynn Forest', sub: 'Goldshire', map: 1429, x: 42.3, y: 65.7, facing: 90 },
+    { zone: 'The Deadmines', sub: '', facing: 90, inst: { id: 36, name: 'Deadmines', kind: 'party', x: -16, y: -383 } },
+    { zone: 'The Deadmines', sub: '', facing: 90, inst: { id: 36, name: 'Deadmines', kind: 'party', x: -64, y: -821 } },
+    { zone: 'The Deadmines', sub: '', facing: 90, inst: { id: 36, name: 'Deadmines', kind: 'party' } },
+    { zone: 'Westfall', sub: 'Moonbrook', map: 1436, x: 42.3, y: 65.7, facing: 90 },
+  ])
 })
 
 test('a block read many times while it is up counts once', () => {

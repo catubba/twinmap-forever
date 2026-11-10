@@ -21,6 +21,15 @@ const STUB = `
   function GetZoneText() return GAME.zone end
   function GetSubZoneText() return GAME.sub end
   function GetPlayerFacing() return GAME.facing end
+  -- GAME.instance = { name, kind, id } inside a dungeon; GAME.north, GAME.west where the game tells the place in yards.
+  function GetInstanceInfo()
+    local i = GAME.instance
+    if i then return i.name, i.kind, 1, "Normal", 5, 0, false, i.id end
+    return "Eastern Kingdoms", "none", 0, "", 0, 0, false, 0
+  end
+  function UnitPosition()
+    if GAME.north then return GAME.north, GAME.west, 0, GAME.instance and GAME.instance.id or 0 end
+  end
   function InCombatLockdown() return GAME.combat == true end
   Settings = {
     RegisterCanvasLayoutCategory = function(panel, name) return { panel = panel, name = name } end,
