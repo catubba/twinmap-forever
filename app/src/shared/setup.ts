@@ -32,7 +32,13 @@ export interface Page {
   /** Percent done, while the app is working on it. */
   progress?: number
   action?: 'choose-folder' | 'curseforge'
+  /** Said on the page whatever its state: it must be read before the thing it warns of is on. */
+  warning?: string
 }
+
+/** The addon's strip flickers. Said where the addon is taken and where the game is started. */
+export const PHOTOSENSITIVITY =
+  'Photosensitivity warning: the addon sends data by changing the colors of a one pixel line at the edge of the game window, many times per second. Its settings in the game can slow it down or pause it.'
 
 const count = (n: number): string => n.toLocaleString('en-US')
 
@@ -67,6 +73,7 @@ export function setupPages(setup: SetupStatus, tiles: TilesStatus | null, link: 
     id: 'addon',
     title: 'Get the addon',
     intro: 'The Twinmap Forever addon tells this app where your character is. It installs like any other addon, from CurseForge.',
+    warning: PHOTOSENSITIVITY,
     ...(setup.addon
       ? { state: 'done', lines: ['Installed.', `Twinmap Forever ${setup.addon} is in the game's AddOns folder.`] }
       : {
@@ -93,6 +100,7 @@ export function setupPages(setup: SetupStatus, tiles: TilesStatus | null, link: 
     id: 'play',
     title: 'Start the game',
     intro: 'Start World of Warcraft: Forever and log in with a character. Your position appears here on its own.',
+    warning: PHOTOSENSITIVITY,
     ...(live
       ? { state: 'done', lines: ['Connected. Your position is coming through.'] }
       : link?.kind === 'update-app' || link?.kind === 'update-addon'
@@ -106,7 +114,6 @@ export function setupPages(setup: SetupStatus, tiles: TilesStatus | null, link: 
                   ? 'The game is minimized. Bring its window back on screen.'
                   : 'Waiting for the game.',
               'At the character list, open AddOns and make sure Twinmap Forever is ticked.',
-              'Photosensitivity warning: the addon sends data by changing the colors of a one pixel line at the edge of the game window, many times per second. Its settings in the game can slow it down or pause it.',
             ],
           }),
   }

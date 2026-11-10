@@ -31,14 +31,14 @@ export interface InteriorsStatus {
 export function tilesLine(status: TilesStatus): string {
   switch (status.state) {
     case 'looking':
-      return 'Map: looking for the game'
+      return 'Looking for the game.'
     case 'no-game':
-      return 'Map: game folder not found'
+      return 'The game folder was not found.'
     case 'converting':
-      return `Map: reading the game's own pictures, ${status.percent}%`
+      return `Building the map from your game's files, ${status.percent}%.`
     case 'ready':
       return `Map: ${status.tiles} tiles ready, game ${status.version}` + (!status.interiors ? ', reading the rooms' : status.interiors.problem ? `, rooms not read (${status.interiors.problem})` : `, ${status.interiors.pieces} rooms`)
     case 'failed':
-      return `Map: not made (${status.message})`
+      return `The map could not be built: ${status.message}`
   }
 }

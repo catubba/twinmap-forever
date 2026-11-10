@@ -43,6 +43,7 @@
   let maps = $state<GameMap[]>([])
   let continent = $state<Continent>(0)
   let following = $state(true)
+  let zoom = $state(2)
   let offMap = $state(false)
   let interiors: Interiors | undefined
   // The dungeon or raid on show, and how many of its levels: a room is a level up when it lies over another.
@@ -167,6 +168,7 @@
   const arrow = L.marker([0, 0], {
     zIndexOffset: 2000,
     interactive: false,
+    keyboard: false, // nothing to do on it: not a stop for Tab
     icon: L.divIcon({
       className: 'me',
       iconSize: [28, 28],
@@ -315,11 +317,11 @@
     const dungeons = DUNGEON_PINS.filter((d) => d.map === m.id)
     pinned = dungeons.length > 0
     const dot = (u: number, v: number, color: string, name: string): void => {
-      L.circleMarker(atYards({ u, v }), { radius: 6, color: '#000', weight: 1.5, fillColor: color, fillOpacity: 1 }).bindTooltip(name, { direction: 'top', offset: [0, -6] }).addTo(pins)
+      L.circleMarker(atYards({ u, v }), { radius: 6, color: '#000', weight: 1.5, fillColor: color, fillOpacity: 1 }).bindTooltip(name, { direction: 'top', offset: [0, -6], className: 'tip' }).addTo(pins)
     }
     for (const d of dungeons) {
-      for (const [name, u, v] of d.bosses) dot(u, v, '#e0483e', name)
-      if (d.entrance) dot(d.entrance[0], d.entrance[1], '#5fd17a', dungeons.length > 1 ? `Entrance: ${d.name}` : 'Entrance')
+      for (const [name, u, v] of d.bosses) dot(u, v, '#ff5a4d', name)
+      if (d.entrance) dot(d.entrance[0], d.entrance[1], '#5fe35a', dungeons.length > 1 ? `Entrance: ${d.name}` : 'Entrance')
     }
     const box = dungeons.length
       ? dungeons.reduce<Box>((all, d) => [Math.min(all[0], d.bounds[0]), Math.min(all[1], d.bounds[1]), Math.max(all[2], d.bounds[2]), Math.max(all[3], d.bounds[3])], [Infinity, Infinity, -Infinity, -Infinity])
@@ -422,6 +424,7 @@
     pins.addTo(made)
     made.on('dragstart', () => (following = false))
     made.on('zoomend moveend', layout)
+    made.on('zoomend', () => (zoom = made.getZoom()))
     // Names are measured as they are drawn: once the typefaces are in, they are measured again.
     void document.fonts.ready.then(() => {
       for (const n of named) n.sizes = {}
@@ -458,7 +461,12 @@
         if (maps.length && !inside) writeNames()
       })
       .catch(() => {})
-    return () => made.remove()
+    // Gone with the screen: whatever was still waiting (a layout, a list being read) finds no map and does nothing.
+    return () => {
+      clearTimeout(laying)
+      map = undefined
+      made.remove()
+    }
   })
 
 
@@ -473,14 +481,21 @@
     else if (arrow.getLatLng().lat || arrow.getLatLng().lng) place()
   })
 
-  // L opens and closes Layers, F turns Follow on and off, Esc closes the label and then Layers.
+  // L opens and closes Layers, F turns Follow on and off, Esc closes the label and then Layers; with the
+  // keyboard on the map, the space bar puts the label on its middle. Not while Settings lie over the map.
   function key(e: KeyboardEvent): void {
+    if (holder.closest('[inert]')) return
     if (e.ctrlKey || e.altKey || e.metaKey || (e.target instanceof HTMLElement && e.target.matches('input:not([type=checkbox]), textarea'))) return
     if (e.key === 'Escape') {
       if (labelled) labelled = null
       else layersOpen = false
     } else if (e.key === 'l' || e.key === 'L') layersOpen = !layersOpen
     else if (e.key === 'f' || e.key === 'F') follow()
+    else if (e.target === holder && e.key.startsWith('Arrow')) following = false // moved by hand, like a drag
+    else if (e.key === ' ' && e.target === holder && map) {
+      e.preventDefault()
+      map.fire('click', { latlng: map.getCenter(), containerPoint: map.getSize().divideBy(2) })
+    }
   }
 
   $effect(() => {
@@ -513,18 +528,23 @@
     {#if inside}
       <span class="tag">{inside.name}</span>
     {/if}
-    <button class="btn" aria-expanded={layersOpen} aria-controls="layers" onclick={() => (layersOpen = !layersOpen)}>Layers</button>
     {#each [0, 1] as const as which (which)}
       <button class="btn" aria-pressed={!inside && continent === which} onclick={() => choose(which)}>{NAMES[which]}</button>
     {/each}
+    <button class="btn" aria-expanded={layersOpen} aria-controls="layers" title="Layers (L)" onclick={() => (layersOpen = !layersOpen)}>Layers</button>
   </div>
   {#if layersOpen}
     <div class="menu layers" id="layers" role="group" aria-label="Layers" in:fly={drop()} out:fade={gone}>
+      <!-- Only the layers that draw something: a ticked box for one that is not built yet would not be true. -->
       {#each LAYER_GROUPS as group (group.name)}
-        <div class="group">{group.name}</div>
-        {#each group.layers as layer (layer.id)}
-          <label class="item"><input type="checkbox" class="check" bind:checked={layers[layer.id]} disabled={!layer.built} />{layer.name}</label>
-        {/each}
+        {#if group.layers.some((layer) => layer.built)}
+          <div class="group">{group.name}</div>
+          {#each group.layers as layer (layer.id)}
+            {#if layer.built}
+              <label class="item"><input type="checkbox" class="check" bind:checked={layers[layer.id]} />{layer.name}</label>
+            {/if}
+          {/each}
+        {/if}
       {/each}
     </div>
   {/if}
@@ -545,9 +565,9 @@
   {/if}
 </div>
 <div class="corner bottom">
-  <button class="btn" aria-label="Zoom in" onclick={() => map?.zoomIn()}><Glyph name="plus" /></button>
-  <button class="btn" aria-label="Zoom out" onclick={() => map?.zoomOut()}><Glyph name="minus" /></button>
-  <button class="btn" aria-pressed={following} onclick={follow}>Follow</button>
+  <button class="btn" aria-label="Zoom in" title="Zoom in (+)" disabled={zoom >= 9} onclick={() => map?.zoomIn()}><Glyph name="plus" /></button>
+  <button class="btn" aria-label="Zoom out" title="Zoom out (-)" disabled={zoom <= 1} onclick={() => map?.zoomOut()}><Glyph name="minus" /></button>
+  <button class="btn" aria-pressed={following} title="Follow your character (F)" onclick={follow}>Follow</button>
 </div>
 {#if offMap}
   <p class="map-note" in:fly={drop(8)} out:fade={gone}>This place is not on the map.</p>
@@ -600,6 +620,20 @@
     overflow-y: auto;
   }
 
+  /* On a narrow map the buttons go under the zone and its coordinates, which they would cover. */
+  @container (max-width: 640px) {
+    .corner.top {
+      top: 84px;
+    }
+    .layers {
+      max-height: calc(100vh - 312px);
+    }
+  }
+  /* The map draws its keyboard ring on the frame (App.svelte). */
+  .map:focus-visible {
+    outline: none;
+  }
+
   /* The bosses of a raid: the game names them but not where they stand. */
   .bosses {
     min-width: 0;
@@ -628,9 +662,11 @@
     opacity: 0;
     transition: opacity 0.3s;
     color: #fff;
+    /* The close edge is a real one, drawn under the letters: a blur alone gives way on snow. */
+    -webkit-text-stroke: 3px #000;
+    paint-order: stroke fill;
     text-shadow:
       0 1px 2px #000,
-      0 0 3px #000,
       0 4px 12px #000c;
   }
   .map :global(.place.on span) {
@@ -659,5 +695,18 @@
 
   .map :global(.leaflet-container) {
     font: inherit;
+  }
+  /* The name of a boss over its dot: ours, like a menu. */
+  .map :global(.tip) {
+    padding: 2px 8px;
+    border: 1px solid var(--float-edge);
+    border-radius: 0;
+    background: var(--float);
+    box-shadow: 0 0 0 1px #000;
+    font: var(--t-small);
+    color: var(--text);
+  }
+  .map :global(.tip::before) {
+    display: none;
   }
 </style>

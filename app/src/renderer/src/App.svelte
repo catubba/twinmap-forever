@@ -67,12 +67,15 @@
   </div>
 {/if}
 {#if onSetup === false}
-<div class="work" in:fade={screen}>
+<div class="work" in:fade={screen} inert={onSettings}>
   <div class="mapbox">
     {#if mapReady}
       <Map {pos} {insideReady} />
     {:else if tiles}
-      <p class="making" class:failed={tiles.state === 'failed' || tiles.state === 'no-game'}>{tilesLine(tiles)}</p>
+      <div class="making" class:failed={tiles.state === 'failed' || tiles.state === 'no-game'}>
+        <p>{tilesLine(tiles)}</p>
+        {#if tiles.state === 'no-game'}<button class="btn" onclick={() => window.twinmap.chooseGameFolder()}>Choose the game folder</button>{/if}
+      </div>
     {/if}
     {#if pos}
       <div class="readout">
@@ -81,7 +84,7 @@
         {pos.x !== undefined && pos.y !== undefined ? `${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}` : ''}
       </div>
     {/if}
-    {#if status?.line}
+    {#if status?.line && mapReady}
       {#key status.line}<p class="map-note" role="status" in:fly={drop(8)} out:fade={gone}>{status.line}</p>{/key}
     {/if}
   </div>
@@ -168,7 +171,8 @@
     align-items: center;
     gap: 6px;
     margin: 0 0 0 auto;
-    align-self: center;
+    line-height: 31px; /* on the line of the entries beside it */
+    padding-bottom: 2px;
   }
   .status i {
     width: 8px;
@@ -200,6 +204,8 @@
     position: relative;
     overflow: hidden;
     background: #000;
+    /* What lies over the map asks how wide it is: on a narrow one things move out of each other's way. */
+    container-type: inline-size;
   }
   /* The bronze frame, 10 px all round, and a vignette that keeps the eye in the middle. */
   .mapbox::after {
@@ -215,6 +221,19 @@
       inset 0 0 0 7px var(--bronze-600),
       inset 0 0 0 9px var(--bronze-900),
       inset 0 0 0 10px #000,
+      inset 0 0 90px 10px #000c;
+  }
+  /* The map's keyboard ring is drawn just inside the frame: around its own box it would lie under the moulding. */
+  .mapbox:has(:global(.map:focus-visible))::after {
+    box-shadow:
+      inset 0 0 0 1px #000,
+      inset 0 0 0 3px var(--bronze-700),
+      inset 0 0 0 5px var(--bronze-300),
+      inset 0 0 0 7px var(--bronze-600),
+      inset 0 0 0 9px var(--bronze-900),
+      inset 0 0 0 11px #000,
+      inset 0 0 0 14px var(--gold-pale),
+      inset 0 0 0 15px #000,
       inset 0 0 90px 10px #000c;
   }
   /* A lozenge stud on each corner: bronze, with a dark red heart. */
@@ -255,10 +274,14 @@
     inset: 0;
     display: grid;
     place-content: center;
-    margin: 0;
+    justify-items: center;
+    gap: 12px;
     color: var(--text-dim);
   }
-  .making.failed {
+  .making p {
+    margin: 0;
+  }
+  .making.failed p {
     color: var(--objective);
   }
 
