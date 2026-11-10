@@ -12,7 +12,10 @@
   import type { Continent, GameMap } from '../../shared/maps'
   import { pictureOfBlock, tileOfPicture } from '../../shared/pixels'
   import { WORLDS } from '../../shared/world'
+  import { LAYER_GROUPS, layersFrom } from '../../shared/layers'
+  import { wayTo, zoneAt, type Size } from '../../shared/point-label'
   import Glyph from './Glyph.svelte'
+  import PointLabel from './PointLabel.svelte'
   import { pin } from './marks'
 
   // insideReady: the rooms of the buildings are converted, and their list can be asked for.
@@ -42,6 +45,15 @@
   let levels = $state(0)
   let upTo = $state(0)
   let pinned = $state(false)
+
+  // The layers the player wants on the map: remembered from one run of the app to the next.
+  let layers = $state(layersFrom(localStorage.getItem('layers')))
+  let layersOpen = $state(false)
+  // The point the player clicked, with its label: in map units, and where that is in the map's box now.
+  let labelled = $state<{ units: Point; continent: Continent; title: string; where: string; spot: Point; box: Size } | null>(null)
+  // Where the character is on the world map, for the distance on the label.
+  let me = $state<{ units: Point; continent: Continent } | null>(null)
+  const way = $derived(labelled && me && me.continent === labelled.continent ? wayTo(me.units, labelled.units) : null)
 
   // Leaflet's plain coordinates: a map unit is a pixel of zoom 0, north is up.
   const at = (p: Point): L.LatLng => L.latLng(-p.y, p.x)
@@ -205,6 +217,7 @@
     if (!map) return
     ground(WORLDS.find((w) => w.continent === which)!.name)
     inside = null
+    if (labelled && labelled.continent !== which) labelled = null
     showRooms([])
     under = ''
     pins.clearLayers()
@@ -231,6 +244,7 @@
     labels.clearLayers()
     pins.clearLayers()
     inside = m
+    labelled = null
     showCities()
     levels = Math.max(0, ...m.pieces.map((p) => p.level))
     upTo = levels
@@ -271,7 +285,9 @@
   // Puts the arrow on a place, turned as the character is.
   function mark(here: L.LatLng): void {
     if (!map) return
-    arrow.setLatLng(here).addTo(map)
+    arrow.setLatLng(here)
+    if (layers.arrow) arrow.addTo(map)
+    else arrow.remove()
     if (pos?.facing !== undefined) turnTo(360 - pos.facing) // the game counts anticlockwise from north
   }
 
@@ -296,6 +312,7 @@
       if (entering) showInside(dungeon)
       offMap = false
       placed = false // back in the world, the map goes to where the character comes out
+      me = null
       const where = yardsInside(inst)
       if (!where) return void arrow.remove() // the game does not tell the place in here
       // On the way in the whole dungeon is in view, and stays so while the arrow is well inside it.
@@ -308,11 +325,13 @@
     if (!zone?.rect || zone.continent === null || pos?.x === undefined || pos.y === undefined) {
       if (leaving) show(continent, true)
       offMap = pos !== undefined
+      me = null
       arrow.remove()
       return
     }
     offMap = false
     const units = unitsOfPlace(zone.rect, pos.x, pos.y), here = at(units)
+    if (me?.units.x !== units.x || me.units.y !== units.y || me.continent !== zone.continent) me = { units, continent: zone.continent }
     if (zone.continent !== continent || leaving) {
       if (!following && placed && !leaving) return void arrow.remove() // the player is looking at the other continent
       show(zone.continent, false)
@@ -339,8 +358,24 @@
     made.setView([-128, 128], 2)
     pins.addTo(made)
     made.on('dragstart', () => (following = false))
-    // The names of the zones are for looking at a continent, not at a street.
-    made.on('zoomend', () => (made.getZoom() >= 2 && made.getZoom() <= 5.5 ? labels.addTo(made) : labels.remove()))
+    made.on('zoomend', showNames)
+    // A click on the world map puts the label on that point. Inside a dungeon there is nothing to say of a point yet.
+    made.on('click', (e) => {
+      if (inside) return
+      const units = { x: e.latlng.lng, y: -e.latlng.lat }, found = zoneAt(maps, continent, units)
+      labelled = {
+        units,
+        continent,
+        title: found?.zone.name ?? NAMES[continent],
+        where: found ? `${found.place.x.toFixed(1)}, ${found.place.y.toFixed(1)}` : '',
+        spot: e.containerPoint,
+        box: { width: holder.clientWidth, height: holder.clientHeight },
+      }
+    })
+    // The label stays on its point while the map moves under it.
+    made.on('move zoom resize', () => {
+      if (labelled) Object.assign(labelled, { spot: made.latLngToContainerPoint(at(labelled.units)), box: { width: holder.clientWidth, height: holder.clientHeight } })
+    })
     void fetch(`${TILES}/maps.json`)
       .then((answer) => answer.json() as Promise<GameMap[]>)
       .then((list) => {
@@ -350,6 +385,34 @@
       })
     return () => made.remove()
   })
+
+  // The names of the zones are for looking at a continent, not at a street.
+  function showNames(): void {
+    if (!map) return
+    if (layers.zones && map.getZoom() >= 2 && map.getZoom() <= 5.5) labels.addTo(map)
+    else labels.remove()
+  }
+
+  // The choices are saved as they are made, and the map follows them.
+  $effect(() => {
+    localStorage.setItem('layers', JSON.stringify(layers))
+    if (!map) return
+    showNames()
+    if (layers.bosses) pins.addTo(map)
+    else pins.remove()
+    if (!layers.arrow) arrow.remove()
+    else if (arrow.getLatLng().lat || arrow.getLatLng().lng) place()
+  })
+
+  // L opens and closes Layers, F turns Follow on and off, Esc closes the label and then Layers.
+  function key(e: KeyboardEvent): void {
+    if (e.ctrlKey || e.altKey || e.metaKey || (e.target instanceof HTMLElement && e.target.matches('input:not([type=checkbox]), textarea'))) return
+    if (e.key === 'Escape') {
+      if (labelled) labelled = null
+      else layersOpen = false
+    } else if (e.key === 'l' || e.key === 'L') layersOpen = !layersOpen
+    else if (e.key === 'f' || e.key === 'F') follow()
+  }
 
   $effect(() => {
     void pos // each new position moves the arrow
@@ -370,16 +433,32 @@
   })
 </script>
 
+<svelte:window onkeydown={key} />
+
 <div class="map" bind:this={holder}></div>
+{#if labelled}
+  <PointLabel title={labelled.title} where={labelled.where} {way} spot={labelled.spot} box={labelled.box} onclose={() => (labelled = null)} />
+{/if}
 <div class="corner top">
   <div class="line">
     {#if inside}
       <span class="tag">{inside.name}</span>
     {/if}
+    <button class="btn" aria-expanded={layersOpen} aria-controls="layers" onclick={() => (layersOpen = !layersOpen)}>Layers</button>
     {#each [0, 1] as const as which (which)}
       <button class="btn" aria-pressed={!inside && continent === which} onclick={() => choose(which)}>{NAMES[which]}</button>
     {/each}
   </div>
+  {#if layersOpen}
+    <div class="menu layers" id="layers" role="group" aria-label="Layers">
+      {#each LAYER_GROUPS as group (group.name)}
+        <div class="group">{group.name}</div>
+        {#each group.layers as layer (layer.id)}
+          <label class="item"><input type="checkbox" class="check" bind:checked={layers[layer.id]} disabled={!layer.built} />{layer.name}</label>
+        {/each}
+      {/each}
+    </div>
+  {/if}
   {#if inside && levels > 0}
     <div class="line" role="group" aria-label="Levels shown">
       <span class="tag">Levels</span>
@@ -444,6 +523,12 @@
     text-shadow:
       0 1px 3px #000,
       0 0 2px #000;
+  }
+
+  /* Layers stays open until it is closed. It ends above the zoom buttons; on a low window it scrolls. */
+  .layers {
+    max-height: calc(100vh - 250px);
+    overflow-y: auto;
   }
 
   /* The bosses of a raid: the game names them but not where they stand. */

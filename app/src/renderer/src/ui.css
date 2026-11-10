@@ -505,6 +505,10 @@ body {
 .menu .item.is-focus {
   outline-offset: -2px;
 }
+.menu .item:has(:disabled) {
+  color: var(--text-off);
+  cursor: default;
+}
 .menu .item .num {
   margin-left: auto;
   color: var(--text-dim);
