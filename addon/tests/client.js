@@ -21,6 +21,11 @@ const STUB = `
   function GetZoneText() return GAME.zone end
   function GetSubZoneText() return GAME.sub end
   function GetPlayerFacing() return GAME.facing end
+  function InCombatLockdown() return GAME.combat == true end
+  Settings = {
+    RegisterCanvasLayoutCategory = function(panel, name) return { panel = panel, name = name } end,
+    RegisterAddOnCategory = function(category) SETTINGS_CATEGORY = category end,
+  }
   C_Map = {
     GetBestMapForUnit = function() return GAME.map end,
     GetPlayerMapPosition = function() return GAME.x and { x = GAME.x, y = GAME.y } end,
@@ -30,10 +35,14 @@ const STUB = `
   -- Frames and textures answer every method; only what a test looks at does something.
   local function noop() end
   local Widget = { __index = function() return noop end }
-  function CreateFrame()
+  function CreateFrame(_, name)
     local f, cells = setmetatable({ events = {} }, Widget), {}
+    if name then _G[name] = f end
     function f:RegisterEvent(e) self.events[e] = true end
     function f:SetScript(kind, fn) self[kind] = fn end
+    function f:SetPoint(point) self.point = point end
+    function f:SetText(text) self.text = text end
+    function f:CreateFontString() return setmetatable({}, Widget) end
     function f:CreateTexture()
       local t = setmetatable({}, Widget)
       function t:SetColorTexture(r, g, b) self.v = math.floor(r * 4 + g * 2 + b) end
@@ -74,17 +83,19 @@ const STUB = `
     end
   end
   function T_strips() return table.concat(strips, "\\n") end
-  function T_lua(code) return assert(load(code))() end
+  function T_lua(code) return assert(load(code))(ns) end -- the code reads the addon's table as ...
   function T_slash(text)
+    local command, rest = text:match("^(%S+)%s*(.*)$")
     for key, fn in pairs(SlashCmdList) do
       local i = 1
       while _G["SLASH_" .. key .. i] do
-        if _G["SLASH_" .. key .. i] == text then return fn("") end
+        if _G["SLASH_" .. key .. i] == command then return fn(rest) end
         i = i + 1
       end
     end
     error("no such slash command: " .. text)
   end
+  function T_click(name) return rawget(_G[name], "OnClick")(_G[name]) end
   function T_printed() return table.concat(printed, "\\n") end
   function T_ns(key) return tostring(ns[key]) end
 `;
@@ -125,6 +136,7 @@ function loadAddon(dir) {
     printed: () => call('T_printed'),
     ns: (key) => call('T_ns', key),
     lua: (code) => call('T_lua', code),
+    click: (name) => call('T_click', name),
     run: (seconds) => call('T_run', String(seconds)),
     // Every strip drawn so far, oldest first, each a string of cells 0 to 7.
     strips: () => (call('T_strips') || '').split('\n').filter(Boolean),

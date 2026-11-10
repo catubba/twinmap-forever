@@ -5,6 +5,8 @@
 ## Version: 0.0.0
 ## X-Website: https://twinmap.app
 ## X-License: GPL-3.0-only
+## SavedVariables: TwinmapForeverDB
 
 TwinmapForever.lua
 Strip.lua
+Options.lua
