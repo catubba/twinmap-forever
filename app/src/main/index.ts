@@ -45,9 +45,10 @@ function createWindow(): void {
   })
 
   // In development the renderer comes from the dev server, in a build from disk.
-  const devUrl = process.env.ELECTRON_RENDERER_URL
-  if (devUrl) void win.loadURL(devUrl)
-  else void win.loadFile(join(__dirname, '../renderer/index.html'))
+  // TWINMAP_KIT opens the trial page of the basic controls instead of the app.
+  const devUrl = process.env.ELECTRON_RENDERER_URL, hash = process.env.TWINMAP_KIT ? 'kit' : ''
+  if (devUrl) void win.loadURL(`${devUrl}#${hash}`)
+  else void win.loadFile(join(__dirname, '../renderer/index.html'), { hash })
 
   const link = startLink()
   const tiles = startTiles()

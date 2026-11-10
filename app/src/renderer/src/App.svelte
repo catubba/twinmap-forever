@@ -58,14 +58,6 @@
 </main>
 
 <style>
-  :global(html, body) {
-    height: 100%;
-    margin: 0;
-    background: #17110c;
-    color: #f3ead9;
-    font: 15px/1.4 'Segoe UI', system-ui, sans-serif;
-  }
-
   main {
     height: 100vh;
     display: grid;

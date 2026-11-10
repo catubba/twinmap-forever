@@ -1,0 +1,538 @@
+/* The look of the app: colours, type and the basic controls. Everything is drawn here in CSS; no file of the game is used. */
+
+@import '@fontsource/barlow-semi-condensed/latin-400.css';
+@import '@fontsource/barlow-semi-condensed/latin-500.css';
+@import '@fontsource/barlow-semi-condensed/latin-600.css';
+
+/* Marcellus ships as its authors distribute it, untouched: its licence reserves the name for the unmodified font. */
+@font-face {
+  font-family: Marcellus;
+  font-weight: 400;
+  font-display: block;
+  src: url('./fonts/Marcellus-Regular.ttf') format('truetype');
+}
+
+:root {
+  /* Ground */
+  --stone-950: #0d0906;
+  --stone-900: #17110c;
+  --stone-800: #261e16;
+  --stone-700: #2c2118;
+  --stone-600: #3b2e21;
+  --stone-500: #57442f;
+  --ink: #000;
+
+  /* Bronze mouldings and hairlines */
+  --bronze-900: #2a1d0a;
+  --bronze-700: #6b4f1a;
+  --bronze-600: #8a6a2c;
+  --bronze-500: #b8923a;
+  --bronze-400: #d9b45a;
+  --bronze-300: #edd07a;
+
+  /* Gold */
+  --gold: #ffd100;
+  --gold-pale: #fff6c2;
+  --plate-top: #ffe04a;
+  --plate-mid: #e3aa00;
+  --plate-low: #c98f00;
+  --plate-band-top: #b98300;
+  --plate-band-low: #8f6200;
+  --plate-ink: #1a1206;
+
+  /* Text */
+  --text: #f3ead9;
+  --text-dim: #b9a88c;
+  --text-off: #7d705c;
+
+  /* Meanings */
+  --quest: #ffd100;
+  --objective: #ff5a4d;
+  --service: #7fc8ff;
+  --resource: #d9a066;
+  --done: #5fe35a;
+  --xp-top: #b866f5;
+  --xp-low: #6a1fb0;
+  --rested: #4a90e2;
+  --route: #fff;
+
+  /* Floating surfaces: menus, the label on a point */
+  --float: #0c0d13f5;
+  --float-edge: #c9b88f;
+
+  /* Type */
+  --font: 'Barlow Semi Condensed', 'Segoe UI', sans-serif;
+  --display: Marcellus, Georgia, serif;
+  --t-small: 400 13px/17px var(--font);
+  --t-body: 400 15.5px/21px var(--font);
+  --t-label: 400 14px/18px var(--display);
+  --t-title: 400 16px/19px var(--display);
+  --t-nav: 400 17px/31px var(--display);
+  --t-name: 400 25px/28px var(--display);
+  --t-zone: 400 28px/31px var(--display);
+  --t-sign: 600 38px/36px var(--font);
+
+  /* Space, in steps of 4 */
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s6: 24px;
+  --s8: 32px;
+
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --quick: 120ms var(--ease);
+
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='.9' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 .85 0 0 0 0 .6 0 0 0 .24 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+
+  caret-color: var(--gold);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--stone-900);
+  color: var(--text);
+  font: var(--t-body);
+  font-variant-numeric: tabular-nums;
+}
+
+::selection {
+  background: var(--gold);
+  color: var(--plate-ink);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: var(--stone-950);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--bronze-700);
+  border: 1px solid var(--bronze-500);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--bronze-500);
+}
+
+/* The keyboard ring. ponytail: the 1 px black line outside it is left out, an outline has one colour; add it if the ring gets lost over the map. */
+:focus-visible,
+.is-focus {
+  outline: 2px solid var(--gold-pale);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0s !important;
+    animation: none !important;
+  }
+}
+
+/* The panel's ground: fine grain over a vertical fade. */
+.surface {
+  background:
+    var(--grain),
+    linear-gradient(var(--stone-800), var(--stone-900));
+}
+
+/* Wordmark: TWINMAP in spaced capitals, FOREVER under it for the addon. Never in another typeface. */
+.wordmark {
+  font: 400 var(--w, 40px) / 1 var(--display);
+  letter-spacing: 0.14em;
+  margin-right: -0.14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.wordmark small {
+  display: block;
+  font-size: 0.32em;
+  letter-spacing: 0.52em;
+  margin-top: 0.55em;
+}
+
+/* Button. Every button is red; relief is only for what is pressed. */
+.btn {
+  height: 28px;
+  padding: 4px 12px;
+  border: 1px solid #120b05;
+  border-radius: 4px;
+  font: var(--t-label);
+  color: var(--gold);
+  text-shadow: 0 1px 0 #000;
+  white-space: nowrap;
+  cursor: pointer;
+  background: linear-gradient(#b3261a, #701008 55%, #520b06);
+  box-shadow:
+    inset 0 1px 0 #ffb09a66,
+    inset 0 0 0 1px var(--bronze-400),
+    inset 0 -6px 8px #0005,
+    0 2px 4px #000d;
+  transition:
+    box-shadow var(--quick),
+    color var(--quick);
+}
+.btn:hover,
+.btn.is-hover {
+  background: linear-gradient(#c9301f, #82140a 55%, #5e0e09);
+  box-shadow:
+    inset 0 1px 0 #ffb09a66,
+    inset 0 0 0 1px var(--bronze-300),
+    inset 0 -6px 8px #0005,
+    0 2px 4px #000d;
+}
+.btn[aria-pressed='true'] {
+  color: var(--gold-pale);
+  box-shadow:
+    inset 0 0 10px #ffd100a6,
+    inset 0 0 0 1px #ffe98a,
+    0 2px 4px #000d;
+}
+.btn:active,
+.btn.is-pressed {
+  padding: 5px 12px 3px;
+  background: linear-gradient(#520b06, #701008);
+  box-shadow: inset 0 0 0 1px var(--bronze-400);
+}
+.btn[aria-busy='true'] {
+  cursor: progress;
+}
+.btn[aria-busy='true']::after {
+  content: '...';
+  display: inline-block;
+  width: 1em;
+  text-align: left;
+  animation: dots 1.2s steps(1) infinite;
+}
+@keyframes dots {
+  0% {
+    content: '';
+  }
+  25% {
+    content: '.';
+  }
+  50% {
+    content: '..';
+  }
+  75% {
+    content: '...';
+  }
+}
+.btn:disabled {
+  color: var(--text-off);
+  text-shadow: none;
+  cursor: default;
+  background: linear-gradient(#4a3a34, #2e2420);
+  box-shadow: inset 0 0 0 1px #5a4a3c;
+}
+
+/* Title band of a block: as wide as the panel, a gold lozenge, the title, and a count on the right. */
+.band {
+  display: flex;
+  align-items: center;
+  height: 31px;
+  margin: 0;
+  padding: 0 16px 0 14px;
+  font: var(--t-title);
+  color: var(--gold);
+  text-shadow: 0 1px 0 #000;
+  background: linear-gradient(var(--stone-500), var(--stone-700));
+  box-shadow:
+    inset 0 1px 0 #ffffff38,
+    inset 0 -1px 0 #000,
+    0 1px 0 var(--bronze-600),
+    0 -1px 0 #000;
+}
+.band::before {
+  content: '';
+  flex: none;
+  width: 7px;
+  height: 7px;
+  margin: 0 9px 0 2px;
+  rotate: 45deg;
+  background: linear-gradient(135deg, #ffe98a, #b8860b);
+  box-shadow: 0 0 0 1px #000;
+}
+.band .count {
+  margin-left: auto;
+  font: var(--t-body);
+  color: var(--text);
+  text-shadow: none;
+}
+
+/* Row of a list: flat. Name, kind, distance and direction sit in fixed cells; the values change, the places do not. */
+.row {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 56px 60px 12px;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 26px;
+  padding: 0 16px;
+  border: 0;
+  background: none;
+  font: var(--t-body);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--quick);
+}
+.row > :first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.row .num {
+  text-align: right;
+  white-space: nowrap;
+}
+.row .dir {
+  width: 12px;
+  height: 12px;
+  fill: currentColor;
+}
+.row:hover,
+.row.is-hover {
+  background-color: #ffffff0f;
+}
+.row[aria-current='true'] {
+  background-color: #ffffff1a;
+}
+.row[aria-current='true']::before {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 10px;
+  width: 5px;
+  height: 5px;
+  rotate: 45deg;
+  background: var(--gold);
+}
+.row:focus-visible,
+.row.is-focus {
+  outline-offset: -2px;
+}
+.row.done > :first-child {
+  color: var(--done);
+}
+/* An objective under its quest. */
+.row.small {
+  height: 20px;
+  padding-left: 28px;
+  font: var(--t-small);
+  color: var(--text-dim);
+  cursor: default;
+}
+.row.small.done > :first-child {
+  color: var(--text-dim);
+  text-decoration: line-through;
+}
+
+.t-quest {
+  color: var(--quest);
+}
+.t-service {
+  color: var(--service);
+}
+.t-resource {
+  color: var(--resource);
+}
+.t-objective {
+  color: var(--objective);
+}
+
+/* Text field. With the keyboard in it the border lights up; that is its ring. */
+.field {
+  width: 270px;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid #5a4526;
+  border-radius: 3px;
+  background: var(--stone-950);
+  box-shadow: inset 0 2px 4px #000;
+  font: var(--t-body);
+  color: var(--text);
+  transition: border-color var(--quick);
+}
+.field::placeholder {
+  color: var(--text-dim);
+  opacity: 1;
+}
+.field:focus,
+.field.is-focus {
+  outline: none;
+  border-color: var(--bronze-300);
+}
+.field[aria-invalid='true'] {
+  border-color: var(--objective);
+}
+.field:disabled {
+  color: var(--text-off);
+  border-color: #3a2e1c;
+}
+.field:disabled::placeholder {
+  color: var(--text-off);
+}
+/* The line under a field in error: what is wrong and what to do. */
+.field-note {
+  margin: 4px 0 0;
+  font: var(--t-small);
+  color: var(--objective);
+}
+
+/* Checkbox, with the tick drawn by us. */
+.check {
+  appearance: none;
+  flex: none;
+  display: inline-grid;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  border: 1px solid var(--bronze-600);
+  background: var(--stone-950);
+  box-shadow: inset 0 1px 2px #000;
+  cursor: pointer;
+  transition: border-color var(--quick);
+}
+.check::before {
+  content: '';
+  margin: -1px;
+  width: 16px;
+  height: 16px;
+  background: var(--gold);
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 8.5 6.5 11.5 12.5 4.5'/%3E%3C/svg%3E");
+  opacity: 0;
+  transition: opacity var(--quick);
+}
+.check:checked {
+  border-color: var(--bronze-300);
+}
+.check:checked::before {
+  opacity: 1;
+}
+.check:hover,
+.check.is-hover {
+  border-color: var(--bronze-300);
+}
+.check:disabled {
+  border-color: var(--text-off);
+  cursor: default;
+}
+.check:disabled::before {
+  background: var(--text-off);
+}
+.choice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 26px;
+  cursor: pointer;
+}
+.choice:has(:disabled) {
+  color: var(--text-off);
+  cursor: default;
+}
+
+/* Menu and drop-down list: Layers, search results. */
+.menu {
+  min-width: 200px;
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+  background: var(--float);
+  border: 1px solid var(--float-edge);
+  box-shadow:
+    0 0 0 1px #000,
+    0 6px 16px #000000b3;
+}
+.menu .group {
+  padding: 8px 12px 2px;
+  font: 600 13px/17px var(--font);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+.menu .item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 26px;
+  padding: 0 12px;
+  border: 0;
+  background: none;
+  font: var(--t-body);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.menu .item:hover,
+.menu .item.is-hover {
+  background-color: #ffffff14;
+}
+.menu .item:focus-visible,
+.menu .item.is-focus {
+  outline-offset: -2px;
+}
+.menu .item .num {
+  margin-left: auto;
+  color: var(--text-dim);
+}
+
+/* Experience bar: twenty ticks, the rested part after the filled one. Set --v and --rest as percentages. */
+.xp {
+  position: relative;
+  display: flex;
+  height: 14px;
+  overflow: hidden;
+  background: var(--stone-950);
+  border: 2px solid var(--bronze-600);
+  box-shadow: 0 0 0 1px #000;
+}
+.xp::before {
+  content: '';
+  width: var(--v, 0%);
+  background: linear-gradient(var(--xp-top), var(--xp-low));
+}
+.xp::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 calc(5% - 1px), #000 calc(5% - 1px) 5%),
+    linear-gradient(var(--rested), var(--rested)) var(--v, 0%) 0 / var(--rest, 0%) 100% no-repeat;
+}
+
+/* Thin bar: professions, reputations, progress of a guide. */
+.bar {
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: 6px;
+  border: 1px solid var(--bronze-600);
+  background: var(--stone-950);
+}
+.bar::-webkit-progress-bar {
+  background: var(--stone-950);
+}
+.bar::-webkit-progress-value {
+  background: var(--bronze-400);
+}
+.bar::-moz-progress-bar {
+  background: var(--bronze-400);
+}
