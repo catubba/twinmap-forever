@@ -1,9 +1,10 @@
-import { app, BrowserWindow, protocol } from 'electron'
+import { app, BrowserWindow, Menu, protocol, screen } from 'electron'
+import { readFileSync, writeFileSync } from 'node:fs'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { lostPercent } from '../shared/link'
 import type { TilesStatus } from '../shared/tiles-status'
-import { WINDOW } from '../shared/window'
+import { placeWindow, WINDOW } from '../shared/window'
 import { findGameWindow, programOf } from './capture'
 import { gameFolderFrom, registryInstallPath } from './client-files'
 import { startLink } from './link'
@@ -33,15 +34,40 @@ function startTiles(): { status: () => TilesStatus; stop: () => void } {
 }
 
 function createWindow(): void {
+  // The window opens where it was closed: monitor, place, size, and maximized if it was.
+  const placeFile = join(app.getPath('userData'), 'window.json')
+  let saved: unknown = null
+  try {
+    saved = JSON.parse(readFileSync(placeFile, 'utf8'))
+  } catch {
+    // first run, or a file that cannot be read: the window opens centred
+  }
+  const place = placeWindow(saved, screen.getAllDisplays().map((d) => d.workArea), screen.getPrimaryDisplay().workArea)
+
+  // No title bar of the system: the top row of the page is the title bar, and Windows draws its three buttons over it.
   const win = new BrowserWindow({
     title: 'Twinmap',
-    width: WINDOW.width,
-    height: WINDOW.height,
+    ...place,
     minWidth: WINDOW.minWidth,
     minHeight: WINDOW.minHeight,
     backgroundColor: WINDOW.background,
-    autoHideMenuBar: true,
+    titleBarStyle: 'hidden',
+    titleBarOverlay: { color: '#00000000', symbolColor: WINDOW.symbols, height: WINDOW.top },
     webPreferences: { preload: join(__dirname, '../preload/index.js') },
+  })
+  if ((saved as { maximized?: unknown } | null)?.maximized === true) win.maximize()
+  win.on('close', () => {
+    try {
+      writeFileSync(placeFile, JSON.stringify({ ...win.getNormalBounds(), maximized: win.isMaximized() }))
+    } catch {
+      // not being able to remember the place is no reason to refuse to close
+    }
+  })
+  // F11: full screen and back. The top row stays.
+  win.webContents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown' || input.key !== 'F11') return
+    win.setFullScreen(!win.isFullScreen())
+    event.preventDefault()
   })
 
   // In development the renderer comes from the dev server, in a build from disk.
@@ -99,6 +125,9 @@ function createWindow(): void {
     protocol.unhandle('twinmap')
   })
 }
+
+// The shipped app has no menu: with no title bar there is no place for one, and Alt must not bring one up.
+if (app.isPackaged) Menu.setApplicationMenu(null)
 
 void app.whenReady().then(createWindow)
 
