@@ -1,15 +1,16 @@
 // Makes the map tiles on a thread of its own: a minute or two of work the first time, which would
 // stop the reading of the strip if it ran with it. Tells its progress in whole percents.
-import { existsSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parentPort, workerData } from 'node:worker_threads'
-import { gameMaps, UI_MAP_ASSIGNMENT_FILE, UI_MAP_FILE } from '../shared/maps'
+import { gameMaps, UI_MAP_ASSIGNMENT_FILE, UI_MAP_FILE, type GameMap } from '../shared/maps'
+import { AREA_POI_FILE, AREA_TABLE_FILE, places, UI_MAP_X_MAP_ART_FILE, WORLD_MAP_OVERLAY_FILE } from '../shared/places'
 import type { TilesStatus } from '../shared/tiles-status'
 import { readTable } from '../shared/wdc5'
 import { WORLDS } from '../shared/world'
 import { installedBuild, openClientFiles, type ClientFiles } from './client-files'
 import { convertInteriors, ENCOUNTERS_FILE, finishedInteriors, MAP_FILE, mapEntries, ROOM_PICTURES_FILE, roomPictures } from './interiors'
-import { convertWorld, finished, MAPS_FILE, tilesFolder } from './tiles'
+import { convertWorld, finished, MAPS_FILE, PLACES_FILE, tilesFolder } from './tiles'
 
 const { gameFolder, base } = workerData as { gameFolder: string; base: string }
 const tell = (status: TilesStatus): void => parentPort?.postMessage(status)
@@ -45,6 +46,16 @@ try {
     const uiMap = files.read(UI_MAP_FILE), assignments = files.read(UI_MAP_ASSIGNMENT_FILE)
     if (!uiMap || !assignments) throw new Error('the game has no table of its maps')
     writeFileSync(join(folder, MAPS_FILE), JSON.stringify(gameMaps(readTable(uiMap), readTable(assignments))))
+  }
+  // The names of towns, points of interest and areas, to write over the map. A folder made before
+  // the app knew of them gets them now.
+  if (!existsSync(join(folder, PLACES_FILE))) {
+    const files = (client ??= openClientFiles(gameFolder))
+    // The table of the areas has rows the game keeps encrypted: read around them.
+    const [poi, overlays, arts, areas] = [AREA_POI_FILE, WORLD_MAP_OVERLAY_FILE, UI_MAP_X_MAP_ART_FILE, AREA_TABLE_FILE].map((id) => files.read(id, true))
+    const maps = JSON.parse(readFileSync(join(folder, MAPS_FILE), 'utf8')) as GameMap[]
+    // Without the tables the map has the names of its zones only: no reason to refuse it.
+    writeFileSync(join(folder, PLACES_FILE), JSON.stringify(poi && overlays && arts && areas ? places(readTable(poi), readTable(overlays), readTable(arts), readTable(areas), maps) : []))
   }
   const ready = { state: 'ready', folder, version: build.version, tiles, missing, seconds: (Date.now() - started) / 1000, converted } as const
   tell(ready)

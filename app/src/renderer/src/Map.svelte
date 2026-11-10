@@ -13,6 +13,7 @@
   import { pictureOfBlock, tileOfPicture } from '../../shared/pixels'
   import { WORLDS } from '../../shared/world'
   import { LAYER_GROUPS, layersFrom } from '../../shared/layers'
+  import { fitNames, tierRank, tierShows, type NameBox, type NameTier, type Place } from '../../shared/places'
   import { wayTo, zoneAt, type Size } from '../../shared/point-label'
   import { fade, fly } from 'svelte/transition'
   import Glyph from './Glyph.svelte'
@@ -33,6 +34,8 @@
   // are the ruins of Lordaeron, which are a place of their own. Both by the id of their map.
   const ALWAYS_INSIDE = [1455]
   const ROOFED = new Set([1458])
+  const CITY_UNDER = 3e6 // square yards: a zone map smaller than this is a city
+  const FAR = 3 // under this zoom the names of the regions are written small
   const GROUND_INSIDE = 0.45 // how bright the ground of a dungeon is: its rooms are what matters
 
   let holder: HTMLDivElement
@@ -156,7 +159,10 @@
 
   let shown: L.Layer[] = []
   let rooms: L.Layer | undefined
+  // The names written over the map, the most important first; layout() decides which of them show.
   const labels = L.layerGroup()
+  let named: { tier: NameTier; at: L.LatLng; marker: L.Marker; sizes: Record<string, [number, number]> }[] = []
+  let places: Place[] = []
   const pins = L.layerGroup()
   const arrow = L.marker([0, 0], {
     zIndexOffset: 2000,
@@ -214,7 +220,64 @@
     if (box) cities = new RoomsLayer({ pieces, bounds: boundsOfBox(box), minZoom: 3, keepBuffer: 2, zIndex: 3 }).addTo(map)
   }
 
-  // Puts a continent on the map: its tiles and the names of its zones.
+  // Writes the names of the continent on show: its regions, its towns, its points
+  // of interest and the areas of its zones. A city has a map of its own but is not a region:
+  // its name comes with the towns.
+  function writeNames(): void {
+    labels.clearLayers()
+    named = []
+    const name = (tier: NameTier, text: string, at: L.LatLng): void => {
+      const html = `<span>${text.replace(/[&<>]/g, (c) => `&#${c.charCodeAt(0)};`)}</span>`
+      named.push({ tier, at, sizes: {}, marker: L.marker(at, { interactive: false, keyboard: false, icon: L.divIcon({ className: `place ${tier}`, html, iconSize: [0, 0] }) }).addTo(labels) })
+    }
+    const zones = maps.filter((m) => m.level === 'zone' && m.continent === continent && m.rect)
+    // ponytail: a city is told from a region by the size of its map (Stormwind, the largest, is 2.0 million
+    // square yards; Moonglade, the smallest region, 3.5). Read the kind of area from the game if a city ever outgrows this.
+    for (const m of zones) if ((m.rect!.maxX - m.rect!.minX) * (m.rect!.maxY - m.rect!.minY) > CITY_UNDER) name('region', m.name, boundsOf(m).getCenter())
+    for (const p of places) if (p.continent === continent) name(p.kind, p.name, at(p))
+    named.sort((a, b) => tierRank(a.tier) - tierRank(b.tier))
+    layout()
+  }
+
+  // Which names show: the kinds that belong to this zoom, none touching another or the arrow.
+  // A name fades in and out as it gains and loses its place.
+  function layout(): void {
+    if (!map) return
+    if (!layers.zones || inside) return void labels.remove()
+    labels.addTo(map)
+    const view = map, zoom = view.getZoom(), size = view.getSize(), boxes: NameBox[] = []
+    // From far away the regions are written smaller, so that most of them fit on a whole continent.
+    const scale = zoom < FAR ? 'far' : 'near'
+    holder.classList.toggle('far', scale === 'far')
+    named.forEach((n, id) => {
+      const span = n.marker.getElement()?.firstElementChild as HTMLElement | null
+      if (!span || !tierShows(n.tier, zoom)) return
+      const p = view.latLngToContainerPoint(n.at)
+      // A little past the edges too, so a name is there already when the map is dragged to it.
+      if (p.x < -300 || p.y < -200 || p.x > size.x + 300 || p.y > size.y + 200) return
+      const [width, height] = (n.sizes[scale] ??= [span.offsetWidth, span.offsetHeight])
+      if (width) boxes.push({ id, x: p.x, y: p.y, width, height })
+      else delete n.sizes[scale] // not drawn yet: measured the next time
+    })
+    // Kept clear: the arrow, and what is written or pressed over the map (the zone and its coordinates, the buttons).
+    const frame = holder.getBoundingClientRect()
+    const clear = [...holder.parentElement!.querySelectorAll('.corner, .readout')].map((el) => {
+      const r = el.getBoundingClientRect()
+      return { left: r.left - frame.left, top: r.top - frame.top, right: r.right - frame.left, bottom: r.bottom - frame.top }
+    })
+    const me = view.hasLayer(arrow) ? view.latLngToContainerPoint(arrow.getLatLng()) : null
+    if (me) clear.push({ left: me.x - 18, top: me.y - 18, right: me.x + 18, bottom: me.y + 18 })
+    const shown = fitNames(boxes, clear)
+    named.forEach((n, id) => n.marker.getElement()?.classList.toggle('on', shown.has(id)))
+  }
+  // The arrow moves every second: the names make room for it a moment later, once.
+  let laying = 0
+  const layoutSoon = (): void => {
+    clearTimeout(laying)
+    laying = window.setTimeout(layout, 150)
+  }
+
+  // Puts a continent on the map: its tiles and the names written over it.
   function show(which: Continent, fit: boolean): void {
     if (!map) return
     ground(WORLDS.find((w) => w.continent === which)!.name)
@@ -223,12 +286,8 @@
     showRooms([])
     under = ''
     pins.clearLayers()
-    labels.clearLayers()
-    for (const m of maps) {
-      if (m.level !== 'zone' || m.continent !== which || !m.rect) continue
-      L.marker(boundsOf(m).getCenter(), { interactive: false, icon: L.divIcon({ className: 'zone-name', html: `<span>${m.name}</span>`, iconSize: [0, 0] }) }).addTo(labels)
-    }
     continent = which
+    writeNames()
     showCities()
     const whole = maps.find((m) => m.level === 'continent' && m.continent === which && m.parent !== 0)
     // At once: a zoom still running would end by putting this view back over whatever came after it.
@@ -244,6 +303,7 @@
       shown = []
     }
     labels.clearLayers()
+    named = []
     pins.clearLayers()
     inside = m
     labelled = null
@@ -290,6 +350,7 @@
     arrow.setLatLng(here)
     if (layers.arrow) arrow.addTo(map)
     else arrow.remove()
+    layoutSoon()
     if (pos?.facing !== undefined) turnTo(360 - pos.facing) // the game counts anticlockwise from north
   }
 
@@ -360,7 +421,12 @@
     made.setView([-128, 128], 2)
     pins.addTo(made)
     made.on('dragstart', () => (following = false))
-    made.on('zoomend', showNames)
+    made.on('zoomend moveend', layout)
+    // Names are measured as they are drawn: once the typefaces are in, they are measured again.
+    void document.fonts.ready.then(() => {
+      for (const n of named) n.sizes = {}
+      layout()
+    })
     // A click on the world map puts the label on that point. Inside a dungeon there is nothing to say of a point yet.
     made.on('click', (e) => {
       if (inside) return
@@ -385,21 +451,22 @@
         show(continent, true)
         place()
       })
+    void fetch(`${TILES}/places.json`)
+      .then((answer) => (answer.ok ? (answer.json() as Promise<Place[]>) : []))
+      .then((list) => {
+        places = list
+        if (maps.length && !inside) writeNames()
+      })
+      .catch(() => {})
     return () => made.remove()
   })
 
-  // The names of the zones are for looking at a continent, not at a street.
-  function showNames(): void {
-    if (!map) return
-    if (layers.zones && map.getZoom() >= 2 && map.getZoom() <= 5.5) labels.addTo(map)
-    else labels.remove()
-  }
 
   // The choices are saved as they are made, and the map follows them.
   $effect(() => {
     localStorage.setItem('layers', JSON.stringify(layers))
     if (!map) return
-    showNames()
+    layout()
     if (layers.bosses) pins.addTo(map)
     else pins.remove()
     if (!layers.arrow) arrow.remove()
@@ -542,7 +609,7 @@
   }
 
   .map :global(.me),
-  .map :global(.zone-name) {
+  .map :global(.place) {
     background: none;
     border: 0;
   }
@@ -551,15 +618,43 @@
     transition: transform 0.4s linear;
   }
 
-  .map :global(.zone-name span) {
+  /* The names lie over the map as if hung above it: light letters, a close dark edge to read on
+     any ground, and a wide soft shadow under them. Each kind has its size; the larger the thing
+     named, the wider its letters are set. A name fades in and out. */
+  .map :global(.place span) {
     position: absolute;
-    transform: translate(-50%, -50%);
+    translate: -50% -50%;
     white-space: nowrap;
+    opacity: 0;
+    transition: opacity 0.3s;
     color: #fff;
-    font: 600 13px/17px var(--font);
     text-shadow:
-      0 1px 3px #000,
-      0 0 2px #000;
+      0 1px 2px #000,
+      0 0 3px #000,
+      0 4px 12px #000c;
+  }
+  .map :global(.place.on span) {
+    opacity: 1;
+  }
+  .map :global(.region span) {
+    font: 400 17px/22px var(--display);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+  }
+  .map:global(.far) :global(.region span) {
+    font: 400 12.5px/16px var(--display);
+    letter-spacing: 0.14em;
+  }
+  .map :global(.town span) {
+    font: 400 17px/21px var(--display);
+    letter-spacing: 0.03em;
+    color: var(--gold-pale);
+  }
+  .map :global(.poi span),
+  .map :global(.area span) {
+    font: 500 13.5px/17px var(--font);
+    letter-spacing: 0.02em;
+    color: #efe6d2;
   }
 
   .map :global(.leaflet-container) {
