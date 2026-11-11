@@ -4,6 +4,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { QuestieShown, QuestPin } from '../shared/quests'
+import { best, fold, type Found } from '../shared/search'
 import { resourceOf, servicesOf, type FixedPin } from '../shared/services'
 
 /** The file of QuestieDB this app reads, in a game folder. Questie without it gives the app nothing. */
@@ -11,9 +12,9 @@ export const questieFile = (gameFolder: string): string => join(gameFolder, '_fo
 
 // Field numbers, from QuestieDB's src/meta/*Meta.lua.
 export const QUEST = { name: 1, startedBy: 2, finishedBy: 3, reqLevel: 4, level: 5 } as const
-export const NPC = { name: 1, spawns: 7, waypoints: 8, friendly: 13, sub: 14, flags: 15 } as const
+export const NPC = { name: 1, spawns: 7, waypoints: 8, zone: 9, friendly: 13, sub: 14, flags: 15 } as const
 export const OBJECT = { name: 1, spawns: 4 } as const
-export const ITEM = { npcDrops: 2, objectDrops: 3 } as const
+export const ITEM = { name: 1, npcDrops: 2, objectDrops: 3, vendors: 14 } as const
 
 const SAME_SPOT = 0.02 // percent of a zone's map: the addon rounds a place to a hundredth
 
@@ -24,7 +25,7 @@ export type Places = Record<string, [number, number][]>
 export interface Questie {
   /** QuestieDB's own version, as its .toc says. */
   version: string
-  ids: { Quest: number[]; Npc: number[]; Object: number[] }
+  ids: { Quest: number[]; Npc: number[]; Object: number[]; Item: number[] }
   /** One field of one entity, as QuestieDB holds it; undefined when it has none. */
   get: (kind: Kind, id: number, field: number) => unknown
   /** Where an NPC or an object is. A patrol has no spawn: it is where its path starts. */
@@ -97,12 +98,12 @@ export function openQuestie(gameFolder: string): Questie | null {
     return null
   }
   const store = new Map<string, string>()
-  const ids: Questie['ids'] = { Quest: [], Npc: [], Object: [] }
+  const ids: Questie['ids'] = { Quest: [], Npc: [], Object: [], Item: [] }
   for (const m of text.matchAll(/^## X-(Quest|Npc|Object|Item)-(.+?): ?(.*)$/gm)) {
     store.set(`${m[1]}-${m[2]}`, m[3]!)
     // Every entity has a row of its scalars, -S: that row is the list of what there is.
-    const scalars = m[1] !== 'Item' && /^(\d+)-S$/.exec(m[2]!)
-    if (scalars) ids[m[1] as 'Quest' | 'Npc' | 'Object'].push(+scalars[1]!)
+    const scalars = /^(\d+)-S$/.exec(m[2]!)
+    if (scalars) ids[m[1] as Kind].push(+scalars[1]!)
   }
   if (!ids.Quest.length) return null
 
@@ -162,6 +163,75 @@ export function openQuestie(gameFolder: string): Questie | null {
   }
 
   return { version: /^## Version: *(.+)$/m.exec(text)?.[1]?.trim() ?? 'unknown', ids, get, places, zoneIndex }
+}
+
+/** Every name the search looks through: NPCs, quests and items, each once for all that share it. */
+export interface SearchIndex { kind: Found['kind']; name: string; lower: string; ids: number[] }
+
+export function searchIndex(db: Questie): SearchIndex[] {
+  const index: SearchIndex[] = []
+  for (const [kind, from, field] of [['npc', 'Npc', NPC.name], ['quest', 'Quest', QUEST.name], ['item', 'Item', ITEM.name]] as const) {
+    const byName = new Map<string, SearchIndex>()
+    for (const id of db.ids[from]) {
+      const name = db.get(from, id, field)
+      if (typeof name !== 'string' || !name) continue
+      const entry = byName.get(name)
+      if (entry) entry.ids.push(id)
+      else byName.set(name, { kind, name, lower: fold(name), ids: [id] })
+    }
+    index.push(...byName.values())
+  }
+  return index
+}
+
+/**
+ * What the search finds for what was typed: the best names that have a place on the map. An NPC is
+ * where it stands, in its own zone first; a quest where it is taken; an item on who sells it, or
+ * drops it, or on what holds it.
+ */
+export function search(db: Questie, index: SearchIndex[], typed: string, most = 12): Found[] {
+  const text = (v: unknown): string => (typeof v === 'string' ? v : '')
+  const numbers = (t: unknown): number[] => list(t).filter((n): n is number => typeof n === 'number')
+  const spot = (kind: 'Npc' | 'Object', id: number): { area: number; x: number; y: number } | null => {
+    const places = db.places(kind, id), home = kind === 'Npc' ? db.get('Npc', id, NPC.zone) : undefined
+    const area = typeof home === 'number' && places[home]?.length ? String(home) : Object.keys(places).find((a) => places[a]!.length)
+    const first = area === undefined ? undefined : places[area]![0]
+    return first ? { area: +area!, x: first[0], y: first[1] } : null
+  }
+  // The first of these that has a place, and its name.
+  const firstOf = (kind: 'Npc' | 'Object', ids: number[]): { where: { area: number; x: number; y: number }; name: string } | null => {
+    for (const id of ids) {
+      const where = spot(kind, id)
+      if (where) return { where, name: text(db.get(kind, id, kind === 'Npc' ? NPC.name : OBJECT.name)) }
+    }
+    return null
+  }
+  const found: Found[] = []
+  // Many more than asked are looked at: plenty of names (quest items, creatures of an event) have no place.
+  for (const entry of best(index, typed, most * 6)) {
+    if (found.length >= most) break
+    for (const id of entry.ids) {
+      let hit: Found | null = null
+      if (entry.kind === 'npc') {
+        const where = spot('Npc', id)
+        if (where) hit = { kind: 'npc', name: entry.name, note: text(db.get('Npc', id, NPC.sub)) || 'NPC', ...where }
+      } else if (entry.kind === 'quest') {
+        const from = db.get('Quest', id, QUEST.startedBy), giver = firstOf('Npc', numbers(at(from, 1))) ?? firstOf('Object', numbers(at(from, 2)))
+        const level = db.get('Quest', id, QUEST.level)
+        if (giver) hit = { kind: 'quest', name: entry.name, note: `Quest${typeof level === 'number' && level > 0 ? `, level ${level}` : ''}, from ${giver.name}`, ...giver.where }
+      } else {
+        const seller = firstOf('Npc', numbers(db.get('Item', id, ITEM.vendors))), dropper = seller ? null : firstOf('Npc', numbers(db.get('Item', id, ITEM.npcDrops)))
+        const holder = seller || dropper ? null : firstOf('Object', numbers(db.get('Item', id, ITEM.objectDrops)))
+        const who = seller ?? dropper ?? holder
+        if (who) hit = { kind: 'item', name: entry.name, note: `${seller ? 'Sold by' : dropper ? 'Dropped by' : 'Found in'} ${who.name}`, ...who.where }
+      }
+      if (hit) {
+        found.push(hit)
+        break
+      }
+    }
+  }
+  return found
 }
 
 /**

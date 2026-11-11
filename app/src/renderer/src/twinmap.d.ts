@@ -1,5 +1,6 @@
 import type { LinkSnapshot } from '../../shared/link'
 import type { QuestsStatus } from '../../shared/quests'
+import type { Found } from '../../shared/search'
 import type { SetupStatus } from '../../shared/setup'
 import type { TilesStatus } from '../../shared/tiles-status'
 
@@ -16,6 +17,7 @@ declare global {
       retryTiles: () => Promise<void>
       drawn: () => void
       setOnTop: (on: boolean) => Promise<void>
+      search: (typed: string) => Promise<Found[]>
     }
   }
 }

@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, test } from 'vitest'
 import { shownFrom } from '../shared/quests'
-import { cbor, fixedPins, ITEM, NPC, OBJECT, openQuestie, QUEST, questPins } from './questie'
+import { cbor, fixedPins, ITEM, NPC, OBJECT, openQuestie, QUEST, questPins, search, searchIndex } from './questie'
 
 // Writes a value the way QuestieDB does: CBOR, then base64. Only what these tests need.
 function enc(v: unknown): Buffer {
@@ -124,6 +124,40 @@ test('who offers a service is pinned where they stand, and so are ore and herbs'
   ])
 })
 
+test('the search finds NPCs, quests and items by name, each on a place of the map', () => {
+  const db = openQuestie(game([
+    ...LINES,
+    `## X-Npc-105-S: ${b64({ [NPC.name]: 'Smith Hale', [NPC.sub]: 'Armorer', [NPC.zone]: 40 })}`,
+    `## X-Npc-105-${NPC.spawns}: ${b64({ 12: [[1, 2]], 40: [[55, 45]] })}`,
+    // The same name twice: the first has no place, the second has.
+    `## X-Npc-106-S: ${b64({ [NPC.name]: 'Cellar Ghost' })}`,
+    `## X-Npc-107-S: ${b64({ [NPC.name]: 'Cellar Ghost' })}`,
+    `## X-Npc-107-${NPC.spawns}: ${b64({ 12: [[9, 9]] })}`,
+    `## X-Item-55-S: ${b64({ [ITEM.name]: 'Strange Key' })}`,
+    `## X-Item-56-S: ${b64({ [ITEM.name]: 'Smithing Hammer' })}`,
+    `## X-Item-56-${ITEM.vendors}: ${b64([105])}`,
+    `## X-Item-56-${ITEM.npcDrops}: ${b64([102])}`,
+    `## X-Item-57-S: ${b64({ [ITEM.name]: 'Mill Notice' })}`,
+    `## X-Item-57-${ITEM.objectDrops}: ${b64([900])}`,
+    `## X-Item-58-S: ${b64({ [ITEM.name]: 'Key to Nowhere' })}`,
+  ]))!
+  const index = searchIndex(db)
+  const told = (typed: string): string[] => search(db, index, typed).map((f) => `${f.kind} ${f.name} (${f.note}) ${f.area} ${f.x},${f.y}`)
+  // An NPC in the zone that is its own, whatever the case of what was typed.
+  expect(told('smith h')).toEqual(['npc Smith Hale (Armorer) 40 55,45'])
+  // Names that start with what was typed first, then the ones with a word that does. No place, no result.
+  expect(told('cellar'), 'the quest of that name is taken from nobody: it has no place').toEqual(['npc Cellar Rat (NPC) 12 10.5,20.25', 'npc Cellar Ghost (NPC) 12 9,9'])
+  // A quest where it is taken.
+  expect(told('parcel')).toEqual(['quest A Parcel for the Miller (Quest, level 12, from Miller Odo) 12 42.5,65.25'])
+  // An item on who sells it before who drops it; on what holds it; one nobody has is not found.
+  expect(told('smithing')).toEqual(['item Smithing Hammer (Sold by Smith Hale) 40 55,45'])
+  expect(told('strange key')).toEqual(['item Strange Key (Dropped by Cellar Rat) 12 10.5,20.25'])
+  expect(told('mill n')).toEqual(['item Mill Notice (Found in Mill Notice Board) 12 50,50'])
+  expect(told('nowhere')).toEqual([])
+  expect(told('  ')).toEqual([])
+  expect(search(db, index, 'e', 3)).toHaveLength(3)
+})
+
 test('what comes off the strip is checked before it is used', () => {
   const told = shownFrom({
     icons: { a: [6, 12, 2423, 7446, 64, 40, 5650, 4725], t: [12, 12, 4210, 'x'], o: [102, 40, 4400] },
@@ -151,7 +185,7 @@ test('values come back as QuestieDB wrote them', () => {
 test('with QuestieDB in the game folder, quests, NPCs and objects are read with their places', () => {
   const db = openQuestie(game(LINES))!
   expect(db.version).toBe('1.2.3')
-  expect(db.ids).toEqual({ Quest: [7, 8, 9, 10], Npc: [101, 102, 103], Object: [900] })
+  expect(db.ids).toEqual({ Quest: [7, 8, 9, 10], Npc: [101, 102, 103], Object: [900], Item: [] })
   // A scalar from the row of scalars, a table from its own line, a field that is not there.
   expect(db.get('Quest', 7, QUEST.name)).toBe('A Parcel for the Miller')
   expect(db.get('Quest', 7, QUEST.finishedBy)).toEqual([[102], [900]])
