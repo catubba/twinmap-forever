@@ -5,9 +5,9 @@ export const LAYER_GROUPS = [
   {
     name: 'Quests',
     layers: [
-      { id: 'available', name: 'Available', built: false },
-      { id: 'turnin', name: 'Turn in', built: false },
-      { id: 'objectives', name: 'Objectives', built: false },
+      { id: 'available', name: 'Available', built: true },
+      { id: 'turnin', name: 'Turn in', built: true },
+      { id: 'objectives', name: 'Objectives', built: true },
     ],
   },
   {

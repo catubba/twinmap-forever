@@ -3,6 +3,7 @@
 // failure, and to stay over other windows. It says one: that its opening screen is drawn.
 import { contextBridge, ipcRenderer } from 'electron'
 import type { LinkSnapshot } from '../shared/link'
+import type { QuestsStatus } from '../shared/quests'
 import type { SetupStatus } from '../shared/setup'
 import type { TilesStatus } from '../shared/tiles-status'
 
@@ -15,6 +16,9 @@ contextBridge.exposeInMainWorld('twinmap', {
   },
   onSetup: (listener: (status: SetupStatus) => void) => {
     ipcRenderer.on('setup', (_event, status: SetupStatus) => listener(status))
+  },
+  onQuests: (listener: (status: QuestsStatus) => void) => {
+    ipcRenderer.on('quests', (_event, status: QuestsStatus) => listener(status))
   },
   // Opens the folder picker. Gives back what is wrong with the folder picked, or null.
   chooseGameFolder: (): Promise<string | null> => ipcRenderer.invoke('choose-game-folder'),

@@ -3,6 +3,7 @@
 // QuestieDB keeps every entity in its .toc, as base64 CBOR, one metadata line per field.
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import type { QuestieShown, QuestPin, QuestPinType } from '../shared/quests'
 
 /** The file of QuestieDB this app reads, in a game folder. Questie without it gives the app nothing. */
 export const questieFile = (gameFolder: string): string => join(gameFolder, '_forever_', 'Interface', 'AddOns', 'QuestieDB', 'QuestieDB_Forever.toc')
@@ -158,4 +159,65 @@ export function openQuestie(gameFolder: string): Questie | null {
   }
 
   return { version: /^## Version: *(.+)$/m.exec(text)?.[1]?.trim() ?? 'unknown', ids, get, places, zoneIndex }
+}
+
+/**
+ * The pins of what Questie shows, on every zone: where each quest on offer is taken, where a
+ * finished one is handed in, where what is still to find is. No rule of its own about which
+ * quests: that is Questie's, and comes with `shown`.
+ */
+export function questPins(db: Questie, shown: QuestieShown): QuestPin[] {
+  const pins = new Map<string, QuestPin>()
+  const text = (v: unknown, or: string): string => (typeof v === 'string' && v ? v : or)
+  const add = (type: QuestPinType, area: string, x: number, y: number, name: string, quest: string): void => {
+    const key = `${type}:${area}:${x}:${y}:${name}`
+    const pin = pins.get(key)
+    if (!pin) pins.set(key, { type, area: +area, x, y, name, quests: [quest] })
+    else if (!pin.quests.includes(quest)) pin.quests.push(quest)
+  }
+  const at1 = (kind: 'Npc' | 'Object', id: unknown, type: QuestPinType, quest: string): void => {
+    if (typeof id !== 'number') return
+    const name = text(db.get(kind, id, kind === 'Npc' ? NPC.name : OBJECT.name), kind === 'Npc' ? 'Someone' : 'Something')
+    for (const [area, spots] of Object.entries(db.places(kind, id))) for (const [x, y] of spots) add(type, area, x, y, name, quest)
+  }
+  // A list of QuestieDB's: creatures first, objects second.
+  const both = (t: unknown, type: QuestPinType, quest: string): void => {
+    for (const id of list(at(t, 1))) at1('Npc', id, type, quest)
+    for (const id of list(at(t, 2))) at1('Object', id, type, quest)
+  }
+
+  for (const id of shown.available) {
+    const level = db.get('Quest', id, QUEST.level)
+    const quest = (typeof level === 'number' && level > 0 ? `[${level}] ` : '') + text(db.get('Quest', id, QUEST.name), `Quest ${id}`)
+    const starters = db.get('Quest', id, QUEST.startedBy)
+    both(starters, 'available', quest)
+    // A quest that starts from a thing: whoever drops it, whatever holds it.
+    for (const item of shown.items ? list(at(starters, 3)) : []) {
+      if (typeof item !== 'number') continue
+      for (const npc of list(db.get('Item', item, ITEM.npcDrops))) at1('Npc', npc, 'available', quest)
+      for (const object of list(db.get('Item', item, ITEM.objectDrops))) at1('Object', object, 'available', quest)
+    }
+  }
+
+  for (const active of shown.active) {
+    const quest = text(db.get('Quest', active.id, QUEST.name), `Quest ${active.id}`)
+    if (active.done) both(db.get('Quest', active.id, QUEST.finishedBy), 'turnin', quest)
+    for (const target of active.targets) {
+      const m = /^([mo])_(\d+)$/.exec(target)
+      if (m) at1(m[1] === 'm' ? 'Npc' : 'Object', +m[2]!, 'objective', quest)
+    }
+    if (!active.event) continue
+    // Places where something is to be done: the end of an escort, a spot to scout.
+    const areas = [at(db.get('Quest', active.id, QUEST.triggerEnd), 2), ...list(db.get('Quest', active.id, QUEST.extra)).map((e) => at(e, 1))]
+    for (const places of areas) {
+      if (!places || typeof places !== 'object') continue
+      for (const [area, spots] of Object.entries(places)) {
+        for (const p of list(spots)) {
+          const x = at(p, 1), y = at(p, 2)
+          if (typeof x === 'number' && typeof y === 'number' && x > 0) add('objective', area, x, y, quest, quest)
+        }
+      }
+    }
+  }
+  return [...pins.values()]
 }

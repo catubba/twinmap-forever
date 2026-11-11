@@ -3,12 +3,14 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { linkStatus, lostPercent } from '../shared/link'
+import { shownFrom, type QuestsStatus } from '../shared/quests'
 import { CURSEFORGE, setupComplete, setupPages } from '../shared/setup'
 import type { TilesStatus } from '../shared/tiles-status'
 import { placeWindow, WINDOW } from '../shared/window'
 import { findGameWindow, programOf } from './capture'
 import { gameFolderFrom, registryInstallPath } from './client-files'
 import { startLink } from './link'
+import startQuestieWorker from './questie-worker?nodeWorker'
 import { readSettings, setupStatus, writeSettings } from './setup'
 import { servedFile } from './tiles'
 import startTilesWorker from './tiles-worker?nodeWorker'
@@ -40,6 +42,25 @@ function startTiles(gameFolder: string | null): { status: () => TilesStatus; sto
   worker.on('message', (told: TilesStatus) => (status = told))
   worker.on('error', (e) => (status = { state: 'failed', message: e instanceof Error ? e.message : String(e) }))
   return { status: () => status, stop: () => void worker.terminate() }
+}
+
+// The quests on the map: the player's QuestieDB is opened once, and asked for the pins of what
+// Questie shows each time the addon tells something new. tell: called with every answer.
+function startQuests(gameFolder: string | null, tell: (status: QuestsStatus) => void): { show: (section: unknown) => void; stop: () => void } {
+  if (!gameFolder) return { show: () => {}, stop: () => {} }
+  const worker = startQuestieWorker({ workerData: { gameFolder } })
+  worker.on('message', tell)
+  worker.on('error', () => tell({ questie: null, pins: [] })) // no quests on the map; the rest of the app goes on
+  let last = ''
+  return {
+    show: (section) => {
+      const told = JSON.stringify(section ?? null)
+      if (told === last) return
+      last = told
+      worker.postMessage(shownFrom(section))
+    },
+    stop: () => void worker.terminate(),
+  }
 }
 
 function createWindow(): void {
@@ -98,6 +119,14 @@ function createWindow(): void {
   const settings = readSettings(settingsFile)
   let gameFolder = findGameFolder(settings.gameFolder)
   let tiles = startTiles(gameFolder)
+  // The pins go to the window when they change, and once more when its page has loaded.
+  let questsNow: QuestsStatus = { questie: null, pins: [] }
+  const tellQuests = (status: QuestsStatus): void => {
+    questsNow = status
+    if (!win.isDestroyed()) win.webContents.send('quests', status)
+  }
+  let quests = startQuests(gameFolder, tellQuests)
+  win.webContents.on('did-finish-load', () => win.webContents.send('quests', questsNow))
 
   // What the window may ask for, and only this: to let the player pick the game folder, to open the
   // addon's page on CurseForge in the browser, and (further down) to keep the window over the others.
@@ -113,6 +142,8 @@ function createWindow(): void {
       gameFolder = found
       tiles.stop()
       tiles = startTiles(found)
+      quests.stop()
+      quests = startQuests(found, tellQuests)
     }
     return null
   })
@@ -134,7 +165,7 @@ function createWindow(): void {
     setup = setupStatus(gameFolder, settings, app.getVersion())
   })
   const look = setInterval(() => {
-    if (!gameFolder) gameFolder = findGameFolder(settings.gameFolder) // the game may be started after the app
+    if (!gameFolder && (gameFolder = findGameFolder(settings.gameFolder))) quests = startQuests(gameFolder, tellQuests) // the game may be started after the app
     if (gameFolder && tiles.status().state === 'no-game') tiles = startTiles(gameFolder)
     setup = setupStatus(gameFolder, settings, app.getVersion())
     if (!settings.setupDone && setupComplete(setupPages(setup, tiles.status(), linkStatus(link.snapshot(), Date.now())))) {
@@ -156,7 +187,9 @@ function createWindow(): void {
     return new Response(new Uint8Array(bytes), { headers: { 'content-type': type, 'access-control-allow-origin': '*', 'cache-control': 'max-age=3600' } })
   })
   const show = setInterval(() => {
-    win.webContents.send('link', link.snapshot())
+    const snapshot = link.snapshot()
+    quests.show(snapshot.state.sections.questie)
+    win.webContents.send('link', snapshot)
     win.webContents.send('tiles', tiles.status())
     win.webContents.send('setup', setup)
   }, SHOW_EVERY)
@@ -192,6 +225,7 @@ function createWindow(): void {
     ipcMain.removeHandler('set-on-top')
     link.stop()
     tiles.stop()
+    quests.stop()
     protocol.unhandle('twinmap')
   })
 }

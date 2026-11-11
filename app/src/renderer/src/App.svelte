@@ -4,6 +4,7 @@
   import { tilesLine, type TilesStatus } from '../../shared/tiles-status'
   import { onMount } from 'svelte'
   import { fade, fly } from 'svelte/transition'
+  import type { QuestPin } from '../../shared/quests'
   import type { SetupStatus } from '../../shared/setup'
   import FirstRun from './FirstRun.svelte'
   import Logo from './Logo.svelte'
@@ -17,6 +18,11 @@
   window.twinmap.onLink((snapshot) => {
     link = snapshot
     now = Date.now()
+  })
+  // The pins of the quests Questie shows: they come when they change, not with every reading.
+  let quests = $state.raw<QuestPin[]>([])
+  window.twinmap.onQuests((status) => {
+    quests = status.pins
   })
   let tiles = $state<TilesStatus | null>(null)
   window.twinmap.onTiles((status) => {
@@ -102,7 +108,7 @@
 <div class="work" in:fade={screen} inert={onSettings}>
   <div class="mapbox">
     {#if mapReady}
-      <Map {pos} at={link?.state.updatedAt.pos} {insideReady} />
+      <Map {pos} at={link?.state.updatedAt.pos} {insideReady} {quests} />
     {:else if tiles}
       <div class="making" class:failed={tiles.state === 'failed' || tiles.state === 'no-game'}>
         <p>{tilesLine(tiles)}</p>
