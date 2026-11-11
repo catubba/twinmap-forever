@@ -1,0 +1,101 @@
+// The route: stops the player chose on the map, in the order to walk them, and what the band of the
+// next stop says about the one ahead.
+import type { Point } from './geo'
+import type { Continent } from './maps'
+import { wayOf } from './now'
+import { wayTo } from './point-label'
+
+export interface Stop {
+  name: string
+  continent: Continent
+  /** Where it is, in map units (geo.ts). */
+  at: Point
+  /** The same point as the game names it, a zone map and a percent of it; null where no zone is. */
+  pin: { m: number; x: number; y: number } | null
+}
+
+export interface Route {
+  stops: Stop[]
+  /** The stop to walk to now: those before it are done. As many as the stops: the route is complete. */
+  next: number
+  /** The game has this very route. Any change makes it false again. */
+  sent: boolean
+}
+
+export const MAX_STOPS = 30
+const ARRIVE = 15 // yards from a stop at which the character is there
+const RUN = 7 // yards a second on foot, as on the label of a point
+
+export const noRoute = (): Route => ({ stops: [], next: 0, sent: false })
+
+const number = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v)
+function stopFrom(saved: unknown): Stop | null {
+  if (typeof saved !== 'object' || !saved) return null
+  const { name, continent, at, pin } = saved as Record<string, unknown>
+  const p = at as Partial<Point> | null, g = pin as Partial<NonNullable<Stop['pin']>> | null
+  if (typeof name !== 'string' || (continent !== 0 && continent !== 1) || typeof p !== 'object' || !p || !number(p.x) || !number(p.y)) return null
+  return { name, continent, at: { x: p.x, y: p.y }, pin: typeof g === 'object' && g && number(g.m) && number(g.x) && number(g.y) ? { m: g.m, x: g.x, y: g.y } : null }
+}
+
+/** The route as it was saved; none where nothing readable is there. */
+export function routeFrom(saved: string | null): Route {
+  try {
+    const read = JSON.parse(saved ?? '') as Partial<Route> | null
+    if (!read || !Array.isArray(read.stops)) return noRoute()
+    const stops = read.stops.map(stopFrom).filter((s): s is Stop => s !== null).slice(0, MAX_STOPS)
+    const next = number(read.next) ? Math.max(0, Math.min(Math.floor(read.next), stops.length)) : 0
+    return stops.length ? { stops, next, sent: read.sent === true } : noRoute()
+  } catch {
+    return noRoute()
+  }
+}
+
+const same = (a: Point, b: Point): boolean => Math.abs(a.x - b.x) < 1e-6 && Math.abs(a.y - b.y) < 1e-6
+/** Whether a point is already a stop still to walk. */
+export const inRoute = (route: Route, continent: Continent, at: Point): boolean => route.stops.some((s, i) => i >= route.next && s.continent === continent && same(s.at, at))
+
+/** A stop more, at the end. A route already walked to its end starts anew with it. */
+export function addStop(route: Route, stop: Stop): Route {
+  if (route.next >= route.stops.length) return { stops: [stop], next: 0, sent: false }
+  if (route.stops.length >= MAX_STOPS || inRoute(route, stop.continent, stop.at)) return route
+  return { stops: [...route.stops, stop], next: route.next, sent: false }
+}
+
+/** Without one stop. The last one taken away leaves no route. */
+export function removeStop(route: Route, index: number): Route {
+  if (!route.stops[index]) return route
+  const stops = route.stops.filter((_, i) => i !== index)
+  return stops.length ? { stops, next: index < route.next ? route.next - 1 : route.next, sent: false } : noRoute()
+}
+
+/** A stop still to walk, moved among the others still to walk. */
+export function moveStop(route: Route, from: number, to: number): Route {
+  if (from === to || Math.min(from, to) < route.next || Math.max(from, to) >= route.stops.length) return route
+  const stops = [...route.stops]
+  stops.splice(to, 0, ...stops.splice(from, 1))
+  return { stops, next: route.next, sent: false }
+}
+
+/** On to the stop after: the one ahead is skipped, or was reached. The game still has the same route. */
+export const advance = (route: Route): Route => (route.next < route.stops.length ? { ...route, next: route.next + 1 } : route)
+
+/** What the band of the next stop shows. */
+export type Band =
+  | { state: 'none' }
+  | { state: 'complete' }
+  // The name and number of the stop alone: the game is closed, or the character is where no way can be told (another continent, a dungeon).
+  | { state: 'closed' | 'elsewhere'; name: string; n: number; of: number }
+  // far: "410 yd south-west". turn: degrees clockwise from north, which is up on the map. minutes: on foot, in a straight line.
+  | { state: 'going' | 'arrived'; name: string; n: number; of: number; far: string; turn: number; minutes: number }
+
+/** me: where the character is on the continents, or null (in a dungeon, or not known). live: the strip is being read. */
+export function bandOf(route: Route, me: { continent: Continent; at: Point } | null, live: boolean): Band {
+  if (!route.stops.length) return { state: 'none' }
+  const stop = route.stops[route.next]
+  if (!stop) return { state: 'complete' }
+  const said = { name: stop.name, n: route.next + 1, of: route.stops.length }
+  if (!live) return { state: 'closed', ...said }
+  if (!me || me.continent !== stop.continent) return { state: 'elsewhere', ...said }
+  const { yards, turn } = wayOf(me.at, stop.at)
+  return { state: yards <= ARRIVE ? 'arrived' : 'going', ...said, far: wayTo(me.at, stop.at).far, turn, minutes: Math.max(1, Math.round(yards / RUN / 60)) }
+}

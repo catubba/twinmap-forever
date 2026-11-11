@@ -1,16 +1,50 @@
 <script lang="ts">
-  // The Now column: the quests of the log with something to do in this zone, and who is near.
+  // The Now column: the next stop of the route, the quests of the log with something to do in this
+  // zone, and who is near.
   // Nothing to click to make it work: it composes itself from where the character is.
   import type { Position } from '../../shared/game'
   import type { GameMap } from '../../shared/maps'
   import { nearbyRows, nearest, questsHere, steady, wayOf, whereIs, type NowRow } from '../../shared/now'
   import type { QuestPin } from '../../shared/quests'
+  import { bandOf, type Route, type Stop } from '../../shared/route'
   import type { FixedPin } from '../../shared/services'
   import Glyph from './Glyph.svelte'
+  import NextStop from './NextStop.svelte'
 
   // onpick: a row was chosen, the map should go there. onpoint: the pointer or the keyboard is on
   // a row (or on none: null), the map should show which pin it is.
-  let { pos, quests, fixed, side, ready, onpick, onpoint }: { pos: Position | undefined; quests: QuestPin[]; fixed: FixedPin[]; side?: string; ready: boolean; onpick?: (row: NowRow) => void; onpoint?: (row: NowRow | null) => void } = $props()
+  // live: the strip is being read. route and its five callbacks: the stops, and what the band's buttons do.
+  let {
+    pos,
+    quests,
+    fixed,
+    side,
+    ready,
+    live,
+    route,
+    onpick,
+    onpoint,
+    onskip,
+    onclear,
+    onremove,
+    onmove,
+    onstop,
+  }: {
+    pos: Position | undefined
+    quests: QuestPin[]
+    fixed: FixedPin[]
+    side?: string
+    ready: boolean
+    live: boolean
+    route: Route
+    onpick?: (row: NowRow) => void
+    onpoint?: (row: NowRow | null) => void
+    onskip: () => void
+    onclear: () => void
+    onremove: (index: number) => void
+    onmove: (from: number, to: number) => void
+    onstop: (stop: Stop) => void
+  } = $props()
 
   const NEAR = 8 // rows of Nearby
 
@@ -56,6 +90,7 @@
 {/snippet}
 
 <div class="now">
+  <NextStop {route} band={bandOf(route, me, live)} {onskip} {onclear} {onremove} {onmove} onpick={onstop} />
   {#if lists.here.length}
     <h2 class="band">Quests here <span class="count">{lists.here.length}</span></h2>
     {@render rows(lists.here)}

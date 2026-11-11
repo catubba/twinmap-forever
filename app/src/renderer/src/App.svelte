@@ -6,6 +6,7 @@
   import { fade, fly } from 'svelte/transition'
   import type { QuestPin } from '../../shared/quests'
   import type { FixedPin } from '../../shared/services'
+  import { addStop, advance, moveStop, noRoute, removeStop, routeFrom } from '../../shared/route'
   import { inboxFrom } from '../../shared/send'
   import Now from './Now.svelte'
   import Search from './Search.svelte'
@@ -33,6 +34,9 @@
     quests = status.pins
     if (status.fixed) fixed = status.fixed
   })
+  // The route: kept from one run of the app to the next.
+  let route = $state.raw(routeFrom(localStorage.getItem('route')))
+  $effect(() => localStorage.setItem('route', JSON.stringify(route)))
   let tiles = $state<TilesStatus | null>(null)
   window.twinmap.onTiles((status) => {
     tiles = status
@@ -122,7 +126,7 @@
 <div class="work" in:fade={screen} inert={onSettings}>
   <div class="mapbox">
     {#if mapReady}
-      <Map {pos} at={link?.state.updatedAt.pos} bind:this={mapView} {insideReady} {quests} {fixed} side={char?.side} {live} {inbox} />
+      <Map {pos} at={link?.state.updatedAt.pos} bind:this={mapView} {insideReady} {quests} {fixed} side={char?.side} {live} {inbox} {route} onroute={(stop) => (route = addStop(route, stop))} />
     {:else if tiles}
       <div class="making" class:failed={tiles.state === 'failed' || tiles.state === 'no-game'}>
         <p>{tilesLine(tiles)}</p>
@@ -148,7 +152,20 @@
   </div>
 
   <aside class="panel surface" aria-label="Now">
-    <Now {pos} {quests} {fixed} side={char?.side} ready={mapReady} onpick={(row) => mapView?.goTo({ continent: row.continent, at: row.at, title: row.name })} onpoint={(row) => mapView?.pointAt(row)} />
+    <Now
+      {pos}
+      {quests}
+      {fixed}
+      side={char?.side}
+      ready={mapReady}
+      live={!!live}
+      {route}
+      onskip={() => (route = advance(route))}
+      onclear={() => (route = noRoute())}
+      onremove={(index) => (route = removeStop(route, index))}
+      onmove={(from, to) => (route = moveStop(route, from, to))}
+      onstop={(stop) => mapView?.goTo({ continent: stop.continent, at: stop.at, title: stop.name })}
+      onpick={(row) => mapView?.goTo({ continent: row.continent, at: row.at, title: row.name })} onpoint={(row) => mapView?.pointAt(row)} />
     {#if char}
       <footer>
         <p>

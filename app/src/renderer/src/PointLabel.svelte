@@ -1,7 +1,7 @@
 <script lang="ts">
   // The label on a point of the map: its name, where it is, how far and how long on foot. It opens
   // on the side with the most room and a thin line ties it to the point. Send to game marks the point
-  // in the game, and says Sent once the addon tells it has it; Add to route stays off until routes come.
+  // in the game, and says Sent once the addon tells it has it; Add to route puts it at the end of the route.
   import type { Point } from '../../shared/geo'
   import { labelPlace, type Size } from '../../shared/point-label'
   import { fade, scale } from 'svelte/transition'
@@ -17,6 +17,8 @@
     sending, // whether the point can be sent to the game now, and why not
     acked, // the number of the last send the game has, as the addon tells it
     onsend, // sends the point: gives back the number of the send, or what went wrong
+    routed, // the point is already a stop of the route
+    onroute, // adds the point to the route
     onclose,
   }: {
     title: string
@@ -27,6 +29,8 @@
     sending: { can: boolean; why: string }
     acked: number | undefined
     onsend: () => Promise<{ seq: number } | { error: string }>
+    routed: boolean
+    onroute: () => void
     onclose: () => void
   } = $props()
 
@@ -76,7 +80,7 @@
   {#if way}<p>{way.far}, {way.time}</p>{/if}
   <div class="go">
     <button class="btn" disabled={!sending.can} aria-busy={phase === 'sending'} onclick={go}>{phase === 'sending' ? 'Sending' : phase === 'sent' ? 'Sent' : 'Send to game'}</button>
-    <button class="btn" disabled title="Routes come in a later version.">Add to route</button>
+    <button class="btn" disabled={routed} onclick={onroute}>{routed ? 'In route' : 'Add to route'}</button>
   </div>
   {#if note || !sending.can}<p class="dim why" role="status">{note || sending.why}</p>{/if}
 </div>
