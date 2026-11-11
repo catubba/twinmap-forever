@@ -31,7 +31,7 @@ export interface Page {
   lines: string[]
   /** Percent done, while the app is working on it. */
   progress?: number
-  action?: 'choose-folder' | 'curseforge'
+  action?: 'choose-folder' | 'curseforge' | 'retry'
   /** Said on the page whatever its state: it must be read before the thing it warns of is on. */
   warning?: string
 }
@@ -65,7 +65,7 @@ export function setupPages(setup: SetupStatus, tiles: TilesStatus | null, link: 
         : tiles.state === 'converting'
           ? { state: 'working', lines: ["Reading the game's own pictures of the world."], progress: tiles.percent }
           : tiles.state === 'failed'
-            ? { state: 'problem', lines: ['The map could not be built.', tiles.message] }
+            ? { state: 'problem', lines: ['The map could not be built.', tiles.message], action: 'retry' }
             : { state: 'done', lines: ['The map is ready.', `${count(tiles.tiles)} tiles from game version ${tiles.version}.`] }),
   }
 

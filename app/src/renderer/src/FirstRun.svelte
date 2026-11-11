@@ -75,6 +75,8 @@
             <button class="btn" onclick={choose}>{page.state === 'done' ? 'Choose another folder' : 'Choose the game folder'}</button>
           {:else if page.action === 'curseforge'}
             <button class="btn" onclick={() => window.twinmap.openCurseForge()}>Get Twinmap Forever on CurseForge</button>
+          {:else if page.action === 'retry'}
+            <button class="btn" onclick={() => window.twinmap.retryTiles()}>Try again</button>
           {/if}
         </div>
       </section>
