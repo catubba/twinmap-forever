@@ -1,5 +1,6 @@
 import type { LinkSnapshot } from '../../shared/link'
 import type { QuestsStatus } from '../../shared/quests'
+import type { RouteNews } from '../../shared/route'
 import type { Found } from '../../shared/search'
 import type { Pin } from '../../shared/send'
 import type { SetupStatus } from '../../shared/setup'
@@ -20,6 +21,8 @@ declare global {
       setOnTop: (on: boolean) => Promise<void>
       search: (typed: string) => Promise<Found[]>
       sendPin: (pin: Pin) => Promise<{ seq: number } | { error: string }>
+      sendRoute: (route: RouteNews | false) => Promise<{ seq: number } | { error: string }>
+      sendStep: (step: { t: number; at: number }) => Promise<{ seq: number } | { error: string }>
     }
   }
 }

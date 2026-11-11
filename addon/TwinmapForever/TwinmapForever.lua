@@ -34,7 +34,10 @@ end)
 
 SLASH_TWINMAP1 = "/twinmap"
 SlashCmdList["TWINMAP"] = function(msg)
-  if (msg or ""):lower():match("^%s*(.-)%s*$") == "pause" then
+  local word = (msg or ""):lower():match("^%s*(.-)%s*$")
+  if word == "skip" then
+    if not ns.SkipStop() then print("Twinmap Forever: no route to skip on.") end
+  elseif word == "pause" then
     ns.db.paused = not ns.db.paused
     print(ns.db.paused and "Twinmap Forever: strip paused." or "Twinmap Forever: strip on.")
   else

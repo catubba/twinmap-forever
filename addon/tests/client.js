@@ -46,7 +46,8 @@ const STUB = `
   -- GAME.noPinMap: a map the game allows no pin on.
   C_Map = {
     GetBestMapForUnit = function() return GAME.map end,
-    GetPlayerMapPosition = function() return GAME.x and { x = GAME.x, y = GAME.y } end,
+    -- The place on a map is told only for the map the character is on.
+    GetPlayerMapPosition = function(map) return GAME.x and (map == nil or map == GAME.map) and { x = GAME.x, y = GAME.y } or nil end,
     CanSetUserWaypointOnMap = function(map) return map ~= GAME.noPinMap end,
     SetUserWaypoint = function(point) WAYPOINT = point end,
     ClearUserWaypoint = function() WAYPOINT, TRACKED = nil, nil end,
