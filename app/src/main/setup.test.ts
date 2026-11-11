@@ -15,10 +15,12 @@ const CONNECTED: LinkStatus = { kind: 'connected', word: 'Connected', tone: 'don
 const CLOSED: LinkStatus = { kind: 'closed', word: 'Game not running', tone: 'objective' }
 const READY: TilesStatus = { state: 'ready', folder: 'x', version: '1.60.1', tiles: 9302, missing: 0, seconds: 16, converted: true }
 
-test('the addon is found by its .toc, with its version; Questie by its folder', () => {
+test('the addon is found by its .toc, with its version; Questie by the file of its data', () => {
   const game = folder()
   expect(setupStatus(game, {}, '0.1.0')).toEqual({ gameFolder: game, addon: null, questie: false, done: false, version: '0.1.0', onTop: false })
-  addons(game, 'TwinmapForever', 'Questie')
+  addons(game, 'TwinmapForever', 'Questie', 'QuestieDB')
+  expect(setupStatus(game, {}, '0.1.0').questie, 'Questie with no data to read').toBe(false)
+  writeFileSync(join(game, '_forever_', 'Interface', 'AddOns', 'QuestieDB', 'QuestieDB_Forever.toc'), '## Version: 1.0.13\r\n')
   expect(addonVersion(game), 'a folder with no .toc is not the addon').toBeNull()
   writeFileSync(join(game, '_forever_', 'Interface', 'AddOns', 'TwinmapForever', 'TwinmapForever.toc'), '## Interface: 11508\r\n## Title: Twinmap Forever\r\n## Version: 0.1.0\r\nTwinmapForever.lua\r\n')
   expect(setupStatus(game, { setupDone: true, onTop: true }, '0.1.0')).toEqual({ gameFolder: game, addon: '0.1.0', questie: true, done: true, version: '0.1.0', onTop: true })
