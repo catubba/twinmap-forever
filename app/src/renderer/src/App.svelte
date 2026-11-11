@@ -6,6 +6,7 @@
   import { fade, fly } from 'svelte/transition'
   import type { QuestPin } from '../../shared/quests'
   import type { FixedPin } from '../../shared/services'
+  import Now from './Now.svelte'
   import type { SetupStatus } from '../../shared/setup'
   import FirstRun from './FirstRun.svelte'
   import Logo from './Logo.svelte'
@@ -24,6 +25,8 @@
   let quests = $state.raw<QuestPin[]>([])
   // Services, ore and herbs: they come once.
   let fixed = $state.raw<FixedPin[]>([])
+  // The map on show: the panel sends it to the place of a row.
+  let mapView = $state<Map>()
   window.twinmap.onQuests((status) => {
     quests = status.pins
     if (status.fixed) fixed = status.fixed
@@ -112,7 +115,7 @@
 <div class="work" in:fade={screen} inert={onSettings}>
   <div class="mapbox">
     {#if mapReady}
-      <Map {pos} at={link?.state.updatedAt.pos} {insideReady} {quests} {fixed} side={char?.side} />
+      <Map {pos} at={link?.state.updatedAt.pos} bind:this={mapView} {insideReady} {quests} {fixed} side={char?.side} />
     {:else if tiles}
       <div class="making" class:failed={tiles.state === 'failed' || tiles.state === 'no-game'}>
         <p>{tilesLine(tiles)}</p>
@@ -138,6 +141,7 @@
   </div>
 
   <aside class="panel surface" aria-label="Now">
+    <Now {pos} {quests} {fixed} side={char?.side} ready={mapReady} onpick={(row) => mapView?.goTo({ continent: row.continent, at: row.at, title: row.name })} />
     {#if char}
       <footer>
         <p>

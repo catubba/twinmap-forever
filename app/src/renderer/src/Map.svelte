@@ -355,6 +355,27 @@
     show(which, true)
   }
 
+  /**
+   * Takes the map to a place and opens the label on it: for a row chosen in the panel, for a
+   * result of the search. zoom: how near to look, when the map is farther than that.
+   */
+  export function goTo(to: { continent: Continent; at: Point; title: string; zoom?: number }): void {
+    if (!map || !maps.length) return
+    following = false
+    if (inside || continent !== to.continent) show(to.continent, false)
+    const view = map
+    view.setView(at(to.at), Math.max(view.getZoom(), to.zoom ?? 5), { animate: false })
+    const found = zoneAt(maps, to.continent, to.at)
+    labelled = {
+      units: to.at,
+      continent: to.continent,
+      title: to.title,
+      where: found ? `${found.zone.name} ${found.place.x.toFixed(1)}, ${found.place.y.toFixed(1)}` : '',
+      spot: view.latLngToContainerPoint(at(to.at)),
+      box: { width: holder.clientWidth, height: holder.clientHeight },
+    }
+  }
+
   function follow(): void {
     following = !following
     if (following) place(true)
