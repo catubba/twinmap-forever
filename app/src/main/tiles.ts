@@ -56,6 +56,7 @@ export const MAPS_FILE = 'maps.json'
 export const PLACES_FILE = 'places.json'
 /** The doors of the dungeons and the flight routes (shared/services.ts), kept the same way. */
 export const TRAVEL_FILE = 'travel.json'
+export const ICONS_FOLDER = 'icons'
 
 /**
  * The file the window may have for a path it asks, or null: only what the converters write, nothing
@@ -64,6 +65,8 @@ export const TRAVEL_FILE = 'travel.json'
  * and the pictures of the rooms (interiors.ts).
  */
 export function servedFile(base: string, path: string): string | null {
+  const icon = /^\/icons\/([a-z0-9-]{1,40})\.png$/.exec(path)
+  if (icon) return joinPath(base, ICONS_FOLDER, `${icon[1]}.png`)
   const m = /^\/(?:(maps|places|travel|interiors)\.json|rooms\/(\d{1,9})\.dxt|([a-z]+|i\d{1,5})\/(?:blocks\/(\d{1,2})\/(\d{1,2})\.dxt|(\d)\/(\d{1,3})\/(\d{1,3})\.png))$/.exec(path)
   if (!m) return null
   if (m[1]) return joinPath(base, `${m[1]}.json`)

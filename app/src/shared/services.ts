@@ -96,3 +96,37 @@ export function travel(maps: Table, taxiNodes: Table, taxiPaths: Table): Travel 
   }
   return { doors: doors.map(({ at: _at, ...door }) => door), nodes, routes: [...routes.values()] }
 }
+
+/**
+ * The item each kind of vein gives, by the word of the vein's name that tells it (with a dash for
+ * a space): the game's own number of the ore. Found by asking the player's QuestieDB what every
+ * vein holds. A vein of none of these takes the picture of mining.
+ */
+// ponytail: a list by hand, as the herbs above; read it from QuestieDB at run time if the game adds ores.
+export const ORE_ITEMS = { copper: 2770, tin: 2771, silver: 2775, iron: 2772, gold: 2776, mithril: 3858, truesilver: 7911, 'dark-iron': 11370, thorium: 10620, incendicite: 3340, indurium: 5833, bloodstone: 4278 } as const
+const ORES_LONGEST_FIRST = Object.keys(ORE_ITEMS).sort((a, b) => b.length - a.length) // "Truesilver" is not silver, "Dark Iron" not iron
+
+const ICON_ORDER = ['flight', 'inn', 'bank', 'auction', 'stable', 'repair', 'trainers', 'vendors', 'ore', 'herbs'] as const satisfies readonly FixedLayer[]
+const CLASS_TRAINER = /\b(Warrior|Paladin|Hunter|Rogue|Priest|Shaman|Mage|Warlock|Druid) Trainer\b/
+// What is sold, told by what the game writes under the name of who sells it.
+const SOLD: [RegExp, string][] = [
+  [/reagent/i, 'reagents'],
+  [/poison/i, 'poisons'],
+  [/ammo|bowyer|fletcher|gunsmith|arrow|bullet/i, 'ammunition'],
+  [/food|drink|baker|butcher|cook|fruit|fish|meat|cheese|bread|mushroom|bartender|barmaid|wine|innkeeper/i, 'food'],
+]
+
+/**
+ * The picture a pin is drawn with (icons.ts writes them): of the first of its layers that is
+ * shown, in the order above, so that an innkeeper who also sells is drawn as an inn.
+ */
+export function iconOf(pin: Pick<FixedPin, 'name' | 'sub' | 'layers'>, shown: (layer: FixedLayer) => boolean = () => true): string {
+  const layer = ICON_ORDER.find((l) => pin.layers.includes(l) && shown(l)) ?? pin.layers[0]
+  if (layer === 'trainers') return CLASS_TRAINER.test(pin.sub ?? '') ? 'class' : 'profession'
+  if (layer === 'vendors') return SOLD.find(([told]) => told.test(pin.sub ?? ''))?.[1] ?? 'vendors'
+  if (layer === 'ore') {
+    const name = pin.name.toLowerCase().replaceAll(' ', '-'), ore = ORES_LONGEST_FIRST.find((o) => name.includes(o))
+    return ore ? `ore-${ore}` : 'ore'
+  }
+  return layer ?? 'vendors'
+}
