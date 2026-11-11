@@ -69,6 +69,25 @@ end
 -- Sections: what gets sent. Each builder runs in a pcall.
 ---------------------------------------------------------------------------
 
+-- Inside a dungeon or a raid the minimap is put at its widest once, on the way in: the app finds
+-- the place from its picture, and the more rooms it shows the surer the place. On the way out it
+-- goes back to what it was, unless the game or the player has changed it meanwhile. The zoom of
+-- before is kept in the saved choices, so reloading the interface inside does not lose it.
+local function Widen(inside)
+  if not (Minimap and ns.db) then return end
+  local zoom = Num(Try(Minimap.GetZoom, Minimap))
+  if not zoom then return end
+  if inside then
+    if ns.db.zoomBefore == nil then
+      ns.db.zoomBefore = zoom
+      if zoom ~= 0 then Try(Minimap.SetZoom, Minimap, 0) end
+    end
+  elseif ns.db.zoomBefore ~= nil then
+    if zoom == 0 and ns.db.zoomBefore ~= 0 then Try(Minimap.SetZoom, Minimap, ns.db.zoomBefore) end
+    ns.db.zoomBefore = nil
+  end
+end
+
 local function BuildPos()
   local out = { zone = Str(Try(GetZoneText)), sub = Str(Try(GetSubZoneText)) }
   local mapId = Num(Try(C_Map.GetBestMapForUnit, "player"))
@@ -89,6 +108,7 @@ local function BuildPos()
   -- Inside a dungeon, a raid or a battleground: which one. It travels with the position, so the
   -- app never holds the place of one moment with the instance of another.
   local name, kind, _, _, _, _, _, id = Try(GetInstanceInfo)
+  Widen(kind == "party" or kind == "raid")
   if Str(kind) and kind ~= "none" and Num(id) then
     local inst = { id = id, name = Str(name), kind = kind }
     -- Where in it, if the game tells addons: yards of the world, north then west, to the yard.
