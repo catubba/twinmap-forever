@@ -379,6 +379,14 @@
     }
   }
 
+  // A ring around one pin: the one whose row in the Now panel is under the pointer. The map does
+  // not move for it: a pin out of view stays out of view.
+  const ring = L.marker([0, 0], { interactive: false, keyboard: false, zIndexOffset: 2000, icon: L.divIcon({ className: 'ring', iconSize: [34, 34] }) })
+  export function pointAt(to: { continent: Continent; at: Point } | null): void {
+    if (!map || !to || inside || to.continent !== continent) return void ring.remove()
+    ring.setLatLng(at(to.at)).addTo(map)
+  }
+
   function follow(): void {
     following = !following
     if (following) place(true)
@@ -903,6 +911,28 @@
     padding: 8px 12px 8px 32px;
     list-style: decimal;
     font: var(--t-small);
+  }
+
+  /* The ring is drawn inside the marker: the marker itself is moved by the map. */
+  .map :global(.ring) {
+    background: none;
+    border: 0;
+    pointer-events: none;
+  }
+  .map :global(.ring::after) {
+    content: '';
+    position: absolute;
+    inset: 0;
+    box-sizing: border-box;
+    border: 2px solid var(--gold);
+    border-radius: 50%;
+    box-shadow: 0 0 0 1.5px #000, inset 0 0 0 1.5px #000, 0 0 10px 2px #ffd10099;
+    animation: ring 1.1s ease-in-out infinite alternate;
+  }
+  @keyframes -global-ring {
+    to {
+      transform: scale(1.18);
+    }
   }
 
   .map :global(.me),
