@@ -92,6 +92,16 @@
     onsent(t)
     return ''
   }
+  // The row chosen last keeps its mark, here and on the map, until another is chosen, it is chosen
+  // again, or it leaves the lists.
+  let chosen = $state<string | null>(null)
+  const kept = $derived([...lists.here, ...lists.near].find((row) => row.key === chosen) ?? null)
+  let over = $state.raw<NowRow | null>(null) // the row under the pointer or the keyboard: it comes first
+  $effect(() => onpoint?.(over ?? kept))
+  function pick(row: NowRow): void {
+    chosen = chosen === row.key ? null : row.key
+    if (chosen) onpick?.(row)
+  }
   const yards = (n: number): string => `${Math.round(n).toLocaleString('en-US')} yd`
 </script>
 
@@ -99,7 +109,7 @@
   <div class="rows">
     {#each list as row (row.key)}
       {@const way = wayOf(me!.at, row.at)}
-      <button class="row" onclick={() => onpick?.(row)} onpointerenter={() => onpoint?.(row)} onpointerleave={() => onpoint?.(null)} onfocus={() => onpoint?.(row)} onblur={() => onpoint?.(null)}>
+      <button class="row" aria-current={row.key === chosen} onclick={() => pick(row)} onpointerenter={() => (over = row)} onpointerleave={() => (over = null)} onfocus={() => (over = row)} onblur={() => (over = null)}>
         <span>{row.name}</span>
         <span class="t-{row.tone}">{row.kind}</span>
         <span class="num">{yards(way.yards)}</span>
