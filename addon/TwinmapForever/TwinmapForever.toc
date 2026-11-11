@@ -10,4 +10,5 @@
 TwinmapForever.lua
 Strip.lua
 Questie.lua
+Inbox.lua
 Options.lua

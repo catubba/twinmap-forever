@@ -13,7 +13,8 @@ import { gameFolderFrom, registryInstallPath } from './client-files'
 import { startLink } from './link'
 import type { Answer, Asked } from './questie-worker'
 import startQuestieWorker from './questie-worker?nodeWorker'
-import { readSettings, setupStatus, writeSettings } from './setup'
+import { addonsFolder, readSettings, setupStatus, writeSettings } from './setup'
+import { installChannel } from './signal'
 import { servedFile } from './tiles'
 import startTilesWorker from './tiles-worker?nodeWorker'
 
@@ -162,6 +163,7 @@ function createWindow(): void {
     writeSettings(settingsFile, settings)
     if (found !== gameFolder) {
       gameFolder = found
+      channel = null
       tiles.stop()
       tiles = startTiles(found)
       quests.stop()
@@ -180,6 +182,13 @@ function createWindow(): void {
   })
   // Where the first run stands, looked at every couple of seconds: an addon installed meanwhile shows by itself.
   let setup = setupStatus(gameFolder, settings, app.getVersion())
+  // The way back to the game: once the addon is there, the bank of font names and the slots go next
+  // to it, by themselves and once. Where that fails (a folder that cannot be written) the map works all the same.
+  let channel: Promise<unknown> | null = null
+  const readyChannel = (): void => {
+    if (gameFolder && setup.addon !== null) channel ??= installChannel(addonsFolder(gameFolder)).catch(() => {})
+  }
+  readyChannel()
   win.setAlwaysOnTop(settings.onTop === true)
   // From the settings: the window over the others or not. The choice is kept.
   ipcMain.handle('set-on-top', (_event, on: unknown) => {
@@ -192,6 +201,7 @@ function createWindow(): void {
     if (!gameFolder && (gameFolder = findGameFolder(settings.gameFolder))) quests = startQuests(gameFolder, tellQuests) // the game may be started after the app
     if (gameFolder && tiles.status().state === 'no-game') tiles = startTiles(gameFolder)
     setup = setupStatus(gameFolder, settings, app.getVersion())
+    readyChannel()
     if (!settings.setupDone && setupComplete(setupPages(setup, tiles.status(), linkStatus(link.snapshot(), Date.now())))) {
       settings.setupDone = true
       writeSettings(settingsFile, settings)
