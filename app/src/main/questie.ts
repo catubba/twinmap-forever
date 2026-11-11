@@ -4,8 +4,8 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { QuestieShown, QuestPin } from '../shared/quests'
-import { best, fold, type Found } from '../shared/search'
-import { resourceOf, servicesOf, type FixedPin } from '../shared/services'
+import { best, fold, wordsMatch, type Found } from '../shared/search'
+import { resourceOf, servicesOf, type FixedPin, type ServiceLayer } from '../shared/services'
 
 /** The file of QuestieDB this app reads, in a game folder. Questie without it gives the app nothing. */
 export const questieFile = (gameFolder: string): string => join(gameFolder, '_forever_', 'Interface', 'AddOns', 'QuestieDB', 'QuestieDB_Forever.toc')
@@ -184,12 +184,35 @@ export function searchIndex(db: Questie): SearchIndex[] {
   return index
 }
 
+/** What each service is called by who looks for it, beside what the game writes under the name. */
+const SERVICE_WORDS: Record<ServiceLayer, string> = { flight: 'flight master taxi', inn: 'inn innkeeper', vendors: 'vendor', repair: 'repair', trainers: 'trainer', bank: 'bank banker', auction: 'auction house auctioneer', stable: 'stable master' }
+
+/** Every NPC that does something for a player, with the words that tell what: for the search by what one does. */
+export interface Doer { id: number; name: string; note: string; lower: string; side: string }
+
+export function doerIndex(db: Questie): Doer[] {
+  const doers: Doer[] = []
+  for (const id of db.ids.Npc) {
+    const name = db.get('Npc', id, NPC.name), sub = db.get('Npc', id, NPC.sub), flags = db.get('Npc', id, NPC.flags), side = db.get('Npc', id, NPC.friendly)
+    const layers = typeof flags === 'number' ? servicesOf(flags) : []
+    const told = typeof sub === 'string' ? sub : ''
+    // Someone friendly to no side serves no player; someone with no title and no service does nothing to look for.
+    if (typeof name !== 'string' || !name || typeof side !== 'string' || !side || (!told && !layers.length)) continue
+    doers.push({ id, name, note: told || layers.map((layer) => SERVICE_WORDS[layer].split(' ')[0]).join(', '), lower: fold(`${told} ${layers.map((layer) => SERVICE_WORDS[layer]).join(' ')}`), side })
+  }
+  return doers
+}
+
+const DOERS_MOST = 400 // who does what was typed: all of them go to the window, which knows which are near
+const DOERS_FROM = 3 // letters typed before the search looks at what people do
+
 /**
- * What the search finds for what was typed: the best names that have a place on the map. An NPC is
+ * What the search finds for what was typed: the best names that have a place on the map, and after
+ * them everyone who does what was typed ("first aid", "repair", "gryphon master"), each marked so. An NPC is
  * where it stands, in its own zone first; a quest where it is taken; an item on who sells it, or
  * drops it, or on what holds it.
  */
-export function search(db: Questie, index: SearchIndex[], typed: string, most = 12): Found[] {
+export function search(db: Questie, index: SearchIndex[], typed: string, most = 12, doers: Doer[] = []): Found[] {
   const text = (v: unknown): string => (typeof v === 'string' ? v : '')
   const numbers = (t: unknown): number[] => list(t).filter((n): n is number => typeof n === 'number')
   const spot = (kind: 'Npc' | 'Object', id: number): { area: number; x: number; y: number } | null => {
@@ -229,6 +252,17 @@ export function search(db: Questie, index: SearchIndex[], typed: string, most = 
         found.push(hit)
         break
       }
+    }
+  }
+  const wanted = fold(typed)
+  if (wanted.length >= DOERS_FROM) {
+    let more = DOERS_MOST
+    for (const doer of doers) {
+      if (!wordsMatch(doer.lower, wanted)) continue
+      const where = spot('Npc', doer.id)
+      if (!where) continue
+      found.push({ kind: 'npc', name: doer.name, note: doer.note, ...where, does: true, side: doer.side })
+      if (--more === 0) break
     }
   }
   return found

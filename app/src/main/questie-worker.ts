@@ -4,7 +4,7 @@
 import { parentPort, workerData } from 'node:worker_threads'
 import type { QuestieShown, QuestsStatus } from '../shared/quests'
 import type { Found } from '../shared/search'
-import { fixedPins, openQuestie, questPins, search, searchIndex } from './questie'
+import { doerIndex, fixedPins, openQuestie, questPins, search, searchIndex } from './questie'
 
 /** What the main process asks. */
 export type Asked = { shown: QuestieShown } | { search: string; id: number }
@@ -16,7 +16,8 @@ const tell = (status: QuestsStatus | Answer): void => parentPort?.postMessage(st
 tell({ questie: db?.version ?? null, pins: [], fixed: db ? fixedPins(db) : [] })
 // The names to search, read once: twenty thousand items that nothing else decodes.
 const index = db ? searchIndex(db) : []
+const doers = db ? doerIndex(db) : []
 parentPort?.on('message', (asked: Asked) => {
-  if ('search' in asked) tell({ id: asked.id, found: db ? search(db, index, asked.search) : [] })
+  if ('search' in asked) tell({ id: asked.id, found: db ? search(db, index, asked.search, undefined, doers) : [] })
   else if (db) tell({ questie: db.version, pins: questPins(db, asked.shown) })
 })

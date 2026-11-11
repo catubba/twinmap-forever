@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, test } from 'vitest'
 import { shownFrom } from '../shared/quests'
-import { cbor, fixedPins, ITEM, NPC, OBJECT, openQuestie, QUEST, questPins, search, searchIndex } from './questie'
+import { cbor, doerIndex, fixedPins, ITEM, NPC, OBJECT, openQuestie, QUEST, questPins, search, searchIndex } from './questie'
 
 // Writes a value the way QuestieDB does: CBOR, then base64. Only what these tests need.
 function enc(v: unknown): Buffer {
@@ -221,4 +221,31 @@ test.skipIf(!process.env.TWINMAP_QUESTIE)('the real QuestieDB opens in under two
   console.log(`QuestieDB ${db.version}: ${db.ids.Quest.length} quests, ${db.ids.Npc.length} NPCs, ${db.ids.Object.length} objects, ${db.zoneIndex.Npc.size} zones, ${Math.round(ms)} ms`)
   expect(db.get('Quest', db.ids.Quest[0]!, QUEST.name)).toBeTypeOf('string')
   expect(ms).toBeLessThan(2000)
+})
+
+test('the search finds who does what was typed, whatever they are called', () => {
+  const db = openQuestie(game([
+    ...LINES,
+    `## X-Npc-201-S: ${b64({ [NPC.name]: 'Shaina Fuller', [NPC.sub]: 'First Aid Trainer', [NPC.friendly]: 'A', [NPC.flags]: 16 })}`,
+    `## X-Npc-201-${NPC.spawns}: ${b64({ 12: [[43, 66]] })}`,
+    `## X-Npc-202-S: ${b64({ [NPC.name]: 'Arnok', [NPC.sub]: 'First Aid Trainer', [NPC.friendly]: 'H', [NPC.flags]: 16 })}`,
+    `## X-Npc-202-${NPC.spawns}: ${b64({ 40: [[5, 6]] })}`,
+    // No title under the name: found by the service alone.
+    `## X-Npc-203-S: ${b64({ [NPC.name]: 'Dungar Longdrink', [NPC.friendly]: 'A', [NPC.flags]: 8 })}`,
+    `## X-Npc-203-${NPC.spawns}: ${b64({ 12: [[71, 72]] })}`,
+    // Friendly to nobody, and one that does nothing: neither is found so.
+    `## X-Npc-204-S: ${b64({ [NPC.name]: 'Defias Medic', [NPC.sub]: 'First Aid Trainer', [NPC.flags]: 16 })}`,
+    `## X-Npc-204-${NPC.spawns}: ${b64({ 12: [[1, 1]] })}`,
+    `## X-Npc-205-S: ${b64({ [NPC.name]: 'First Mate Aid', [NPC.friendly]: 'A' })}`,
+    `## X-Npc-205-${NPC.spawns}: ${b64({ 12: [[2, 2]] })}`,
+  ]))!
+  const index = searchIndex(db), doers = doerIndex(db)
+  const told = (typed: string): string[] => search(db, index, typed, 12, doers).filter((f) => f.does).map((f) => `${f.name} (${f.note}) ${f.side} ${f.area} ${f.x},${f.y}`)
+  expect(told('first aid')).toEqual(['Shaina Fuller (First Aid Trainer) A 12 43,66', 'Arnok (First Aid Trainer) H 40 5,6'])
+  expect(told('Trainer FIRST')).toHaveLength(2)
+  expect(told('flight')).toEqual(['Dungar Longdrink (flight) A 12 71,72'])
+  // Too little typed to mean a trade.
+  expect(told('fi')).toEqual([])
+  // By name it is still found as before.
+  expect(search(db, index, 'first mate', 12, doers).map((f) => f.name)).toEqual(['First Mate Aid'])
 })
