@@ -593,7 +593,30 @@
   // on each other.
   const FIXED_ZOOM: Record<FixedLayer, number> = { flight: 3, inn: 3.5, bank: 4, auction: 4, stable: 4, repair: 4.5, trainers: 4.5, vendors: 4.5, ore: 5.5, herbs: 5.5 }
   const LAYER_NAMES = Object.fromEntries(LAYER_GROUPS.flatMap((group) => group.layers.map((layer) => [layer.id, layer.name]))) as Record<LayerId, string>
-  const MOST = 2500 // pins drawn at once: past this the map would stutter, and nothing could be told apart anyway
+  // They are painted on one canvas, not made one element each: three thousand elements over the map
+  // brought dragging down to eight frames a second. The shapes and colours are those of marks.ts
+  // (a square for a service, a lozenge for ore and herbs), with the same black outline.
+  const fixedCanvas = L.canvas({ padding: 0.5 })
+  const FixedPinMark = L.CircleMarker.extend({
+    _updatePath(this: L.CircleMarker & { _renderer: { _ctx: CanvasRenderingContext2D }; _point: L.Point; _empty: () => boolean; options: { lozenge: boolean; fillColor: string } }) {
+      if (this._empty()) return
+      const ctx = this._renderer._ctx, { x, y } = this._point
+      ctx.beginPath()
+      if (this.options.lozenge) {
+        ctx.moveTo(x, y - 5.1)
+        ctx.lineTo(x + 5.1, y)
+        ctx.lineTo(x, y + 5.1)
+        ctx.lineTo(x - 5.1, y)
+        ctx.closePath()
+      } else ctx.rect(x - 6.25, y - 6.25, 12.5, 12.5)
+      ctx.fillStyle = this.options.fillColor
+      ctx.fill()
+      ctx.lineWidth = 1.5
+      ctx.lineJoin = 'round'
+      ctx.strokeStyle = '#000'
+      ctx.stroke()
+    },
+  }) as unknown as new (at: L.LatLng, options: L.CircleMarkerOptions & { lozenge: boolean }) => L.CircleMarker
   const fixedGroup = L.layerGroup()
   let laid: { pin: FixedPin; at: L.LatLng }[] = []
   // What is drawn now: more than the view, so that the map can move a little (it does all the time
@@ -609,19 +632,25 @@
     fixedGroup.addTo(map)
     const view = map.getBounds().pad(0.5), far = map.getZoom()
     drawnFor = { view, far }
-    let drawn = 0
-    for (const { pin: p, at: where } of laid) {
-      if (!p.layers.some((layer) => layers[layer] && far >= FIXED_ZOOM[layer]) || !view.contains(where)) continue
-      if (++drawn > MOST) break
-      const service = p.side !== undefined, size = service ? 14 : 12
-      // Names come from the player's QuestieDB: written as text, never as markup.
-      const tip = document.createElement('span')
-      tip.append(Object.assign(document.createElement('b'), { textContent: p.name }))
-      if (p.sub) tip.append(document.createElement('br'), p.sub)
-      tip.append(document.createElement('br'), p.layers.map((layer) => LAYER_NAMES[layer]).join(', '))
-      L.marker(where, { keyboard: false, zIndexOffset: service ? -500 : -1000, icon: L.divIcon({ className: 'door', iconSize: [size, size], html: pin(service ? 'service' : 'resource') }) })
-        .bindTooltip(tip, { direction: 'top', offset: [0, -size / 2], className: 'tip' })
-        .addTo(fixedGroup)
+    // Ore and herbs first, so that who offers a service is painted over them.
+    for (const service of [false, true]) {
+      for (const { pin: p, at: where } of laid) {
+        if ((p.side !== undefined) !== service || !p.layers.some((layer) => layers[layer] && far >= FIXED_ZOOM[layer]) || !view.contains(where)) continue
+        new FixedPinMark(where, { renderer: fixedCanvas, radius: 7, lozenge: !service, fillColor: service ? '#7fc8ff' : '#d9a066', bubblingMouseEvents: false })
+          // Made when the pointer comes over the pin, not for every pin. Names come from the
+          // player's QuestieDB: written as text, never as markup.
+          .bindTooltip(
+            () => {
+              const tip = document.createElement('span')
+              tip.append(Object.assign(document.createElement('b'), { textContent: p.name }))
+              if (p.sub) tip.append(document.createElement('br'), p.sub)
+              tip.append(document.createElement('br'), p.layers.map((layer) => LAYER_NAMES[layer]).join(', '))
+              return tip
+            },
+            { direction: 'top', offset: [0, -7], className: 'tip' },
+          )
+          .addTo(fixedGroup)
+      }
     }
   }
   $effect(() => {
