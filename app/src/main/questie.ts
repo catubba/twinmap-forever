@@ -3,17 +3,19 @@
 // QuestieDB keeps every entity in its .toc, as base64 CBOR, one metadata line per field.
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import type { QuestieShown, QuestPin, QuestPinType } from '../shared/quests'
+import type { QuestieShown, QuestPin } from '../shared/quests'
 import { resourceOf, servicesOf, type FixedPin } from '../shared/services'
 
 /** The file of QuestieDB this app reads, in a game folder. Questie without it gives the app nothing. */
 export const questieFile = (gameFolder: string): string => join(gameFolder, '_forever_', 'Interface', 'AddOns', 'QuestieDB', 'QuestieDB_Forever.toc')
 
 // Field numbers, from QuestieDB's src/meta/*Meta.lua.
-export const QUEST = { name: 1, startedBy: 2, finishedBy: 3, reqLevel: 4, level: 5, triggerEnd: 9, extra: 29 } as const
+export const QUEST = { name: 1, startedBy: 2, finishedBy: 3, reqLevel: 4, level: 5 } as const
 export const NPC = { name: 1, spawns: 7, waypoints: 8, friendly: 13, sub: 14, flags: 15 } as const
 export const OBJECT = { name: 1, spawns: 4 } as const
 export const ITEM = { npcDrops: 2, objectDrops: 3 } as const
+
+const SAME_SPOT = 0.02 // percent of a zone's map: the addon rounds a place to a hundredth
 
 export type Kind = 'Quest' | 'Npc' | 'Object' | 'Item'
 /** Places by zone (the game's area number, as text): x and y in percent of the zone. */
@@ -186,61 +188,60 @@ export function fixedPins(db: Questie): FixedPin[] {
 }
 
 /**
- * The pins of what Questie shows, on every zone: where each quest on offer is taken, where a
- * finished one is handed in, where what is still to find is. No rule of its own about which
- * quests: that is Questie's, and comes with `shown`.
+ * The pins of what Questie shows: one for each icon it holds, on the very spot. Which quests, how
+ * many icons and where are Questie's own; QuestieDB gives the names: of the quest, and of who or
+ * what stands there.
  */
 export function questPins(db: Questie, shown: QuestieShown): QuestPin[] {
-  const pins = new Map<string, QuestPin>()
+  type Who = ['Npc' | 'Object', number]
   const text = (v: unknown, or: string): string => (typeof v === 'string' && v ? v : or)
-  const add = (type: QuestPinType, area: string, x: number, y: number, name: string, quest: string): void => {
-    const key = `${type}:${area}:${x}:${y}:${name}`
-    const pin = pins.get(key)
-    if (!pin) pins.set(key, { type, area: +area, x, y, name, quests: [quest] })
-    else if (!pin.quests.includes(quest)) pin.quests.push(quest)
-  }
-  const at1 = (kind: 'Npc' | 'Object', id: unknown, type: QuestPinType, quest: string): void => {
-    if (typeof id !== 'number') return
-    const name = text(db.get(kind, id, kind === 'Npc' ? NPC.name : OBJECT.name), kind === 'Npc' ? 'Someone' : 'Something')
-    for (const [area, spots] of Object.entries(db.places(kind, id))) for (const [x, y] of spots) add(type, area, x, y, name, quest)
-  }
+  const named = ([kind, id]: Who): string => text(db.get(kind, id, kind === 'Npc' ? NPC.name : OBJECT.name), kind === 'Npc' ? 'Someone' : 'Something')
+  const numbers = (t: unknown): number[] => list(t).filter((n): n is number => typeof n === 'number')
   // A list of QuestieDB's: creatures first, objects second.
-  const both = (t: unknown, type: QuestPinType, quest: string): void => {
-    for (const id of list(at(t, 1))) at1('Npc', id, type, quest)
-    for (const id of list(at(t, 2))) at1('Object', id, type, quest)
+  const both = (t: unknown): Who[] => [...numbers(at(t, 1)).map((id): Who => ['Npc', id]), ...numbers(at(t, 2)).map((id): Who => ['Object', id])]
+  // Who a quest is taken from: its givers, and whoever drops or holds a thing that starts it.
+  const starters = (quest: number): Who[] => {
+    const t = db.get('Quest', quest, QUEST.startedBy)
+    const dropped = numbers(at(t, 3)).flatMap((item) => [...numbers(db.get('Item', item, ITEM.npcDrops)).map((id): Who => ['Npc', id]), ...numbers(db.get('Item', item, ITEM.objectDrops)).map((id): Who => ['Object', id])])
+    return [...both(t), ...dropped]
   }
-
-  for (const id of shown.available) {
-    const level = db.get('Quest', id, QUEST.level)
-    const quest = (typeof level === 'number' && level > 0 ? `[${level}] ` : '') + text(db.get('Quest', id, QUEST.name), `Quest ${id}`)
-    const starters = db.get('Quest', id, QUEST.startedBy)
-    both(starters, 'available', quest)
-    // A quest that starts from a thing: whoever drops it, whatever holds it.
-    for (const item of shown.items ? list(at(starters, 3)) : []) {
-      if (typeof item !== 'number') continue
-      for (const npc of list(db.get('Item', item, ITEM.npcDrops))) at1('Npc', npc, 'available', quest)
-      for (const object of list(db.get('Item', item, ITEM.objectDrops))) at1('Object', object, 'available', quest)
-    }
-  }
-
-  for (const active of shown.active) {
-    const quest = text(db.get('Quest', active.id, QUEST.name), `Quest ${active.id}`)
-    if (active.done) both(db.get('Quest', active.id, QUEST.finishedBy), 'turnin', quest)
-    for (const target of active.targets) {
-      const m = /^([mo])_(\d+)$/.exec(target)
-      if (m) at1(m[1] === 'm' ? 'Npc' : 'Object', +m[2]!, 'objective', quest)
-    }
-    if (!active.event) continue
-    // Places where something is to be done: the end of an escort, a spot to scout.
-    const areas = [at(db.get('Quest', active.id, QUEST.triggerEnd), 2), ...list(db.get('Quest', active.id, QUEST.extra)).map((e) => at(e, 1))]
-    for (const places of areas) {
-      if (!places || typeof places !== 'object') continue
-      for (const [area, spots] of Object.entries(places)) {
-        for (const p of list(spots)) {
-          const x = at(p, 1), y = at(p, 2)
-          if (typeof x === 'number' && typeof y === 'number' && x > 0) add('objective', area, x, y, quest, quest)
-        }
+  const targets = new Map(
+    shown.active.map((q) => [
+      q.id,
+      q.targets.flatMap((t): Who[] => {
+        const m = /^([mo])_(\d+)$/.exec(t)
+        return m ? [[m[1] === 'm' ? 'Npc' : 'Object', +m[2]!]] : []
+      }),
+    ]),
+  )
+  // Of these, the one nearest to a spot of a zone, and how far (in percent of the zone's map).
+  const nearest = (who: Who[], area: number, x: number, y: number): { who: Who; far: number } | null => {
+    let best: { who: Who; far: number } | null = null
+    for (const w of who) {
+      for (const [sx, sy] of db.places(w[0], w[1])[area] ?? []) {
+        const far = Math.hypot(sx - x, sy - y)
+        if (!best || far < best.far) best = { who: w, far }
       }
+    }
+    return best
+  }
+
+  const pins = new Map<string, QuestPin>()
+  for (const type of ['available', 'turnin', 'objective'] as const) {
+    for (const icon of shown.icons[type]) {
+      const title = text(db.get('Quest', icon.quest, QUEST.name), `Quest ${icon.quest}`)
+      const level = db.get('Quest', icon.quest, QUEST.level)
+      const quest = type === 'available' && typeof level === 'number' && level > 0 ? `[${level}] ${title}` : title
+      const who = type === 'available' ? starters(icon.quest) : type === 'turnin' ? both(db.get('Quest', icon.quest, QUEST.finishedBy)) : (targets.get(icon.quest) ?? [])
+      // Givers stand on the icon itself. What is to find is gathered by Questie into one icon in
+      // the middle of a few: the nearest is the one. An icon Questie moved (to the door of a
+      // dungeon, to the zone around a place) is named only when there is no doubt about who.
+      const found = nearest(who, icon.area, icon.x, icon.y)
+      const name = found && (type === 'objective' || found.far < SAME_SPOT) ? named(found.who) : who.length === 1 ? named(who[0]!) : title
+      const key = `${type}:${icon.area}:${icon.x}:${icon.y}`
+      const pin = pins.get(key)
+      if (!pin) pins.set(key, { type, area: icon.area, x: icon.x, y: icon.y, name, quests: [quest] })
+      else if (!pin.quests.includes(quest)) pin.quests.push(quest)
     }
   }
   return [...pins.values()]

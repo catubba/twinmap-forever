@@ -56,48 +56,48 @@ const LINES = [
   `## X-Quest-9-S: ${b64({ [QUEST.name]: 'The Strange Key', [QUEST.level]: 5 })}`,
   `## X-Quest-9-${QUEST.startedBy}: ${b64([null, null, [55]])}`,
   `## X-Quest-10-S: ${b64({ [QUEST.name]: 'Scout the Ford' })}`,
-  `## X-Quest-10-${QUEST.triggerEnd}: ${b64(['Scout the ford', { 40: [[61.5, 30]] }])}`,
 ]
 
 // What the pins of one kind say, shortest first to read.
 const told = (pins: ReturnType<typeof questPins>, type: string): string[] => pins.filter((p) => p.type === type).map((p) => `${p.area} ${p.x},${p.y} ${p.name}: ${p.quests.join(' + ')}`).sort()
+// What Questie shows: icons as quest, area, x, y.
+type Icon = [number, number, number, number]
+const shown = (icons: { available?: Icon[]; turnin?: Icon[]; objective?: Icon[] }, active: { id: number; targets: string[] }[] = []): Parameters<typeof questPins>[1] => {
+  const of = (list: Icon[] = []) => list.map(([quest, area, x, y]) => ({ quest, area, x, y }))
+  return { icons: { available: of(icons.available), turnin: of(icons.turnin), objective: of(icons.objective) }, active: active.map((q) => ({ ...q, done: false })) }
+}
 
-test('a quest on offer is pinned on whoever gives it, in every zone they stand in', () => {
+test('an icon of a quest on offer is a pin on the same spot, named after who stands there', () => {
   const db = openQuestie(game(LINES))!
-  const pins = questPins(db, { available: [7], items: false, active: [] })
-  expect(told(pins, 'available')).toEqual(['12 42.5,65.25 Miller Odo: [12] A Parcel for the Miller', '40 10,20 Miller Odo: [12] A Parcel for the Miller'])
-  expect(pins).toHaveLength(2)
-  // One that starts from a thing: on everyone who drops it.
-  expect(told(questPins(db, { available: [9], items: true, active: [] }), 'available')).toHaveLength(40)
-  expect(questPins(db, { available: [9], items: false, active: [] }), 'with that switch of Questie off').toEqual([])
-  // Nothing of its own: a quest Questie does not show is not on the map.
-  expect(questPins(db, { available: [], items: false, active: [] })).toEqual([])
+  // Questie shows the miller in one of the two zones he stands in: so does the app, and no more.
+  expect(told(questPins(db, shown({ available: [[7, 12, 42.5, 65.25]] })), 'available')).toEqual(['12 42.5,65.25 Miller Odo: [12] A Parcel for the Miller'])
+  // One that starts from a thing forty rats drop: Questie draws three, and the app draws those three.
+  const key = questPins(db, shown({ available: [[9, 12, 10.5, 20.25], [9, 12, 11.5, 20.25], [9, 12, 12.5, 20.25]] }))
+  expect(told(key, 'available')).toEqual(['12 10.5,20.25 Cellar Rat: [5] The Strange Key', '12 11.5,20.25 Cellar Rat: [5] The Strange Key', '12 12.5,20.25 Cellar Rat: [5] The Strange Key'])
+  // Nothing of its own: with no icon there is no pin.
+  expect(questPins(db, shown({}))).toEqual([])
 })
 
-test('a quest in the log is pinned where it is handed in only once it is finished', () => {
+test('an icon Questie moved keeps its place, and is named only when there is no doubt', () => {
   const db = openQuestie(game(LINES))!
-  const open = questPins(db, { available: [], items: false, active: [{ id: 7, done: false, event: false, targets: [] }] })
-  expect(told(open, 'turnin')).toEqual([])
-  const done = questPins(db, { available: [], items: false, active: [{ id: 7, done: true, event: false, targets: [] }] })
-  // Handed in to a creature or to an object: both are pinned.
-  expect(told(done, 'turnin')).toContain('12 50,50 Mill Notice Board: A Parcel for the Miller')
-  expect(told(done, 'turnin')).toHaveLength(41)
+  // The miller drawn at the door of a dungeon, in a zone he does not stand in: he is the only giver.
+  expect(told(questPins(db, shown({ available: [[7, 1497, 72.41, 11.37]] })), 'available')).toEqual(['1497 72.41,11.37 Miller Odo: [12] A Parcel for the Miller'])
+  // Handed in to a creature or to an object, and the icon on neither: the quest names the pin.
+  expect(told(questPins(db, shown({ turnin: [[7, 1497, 72.41, 11.37]] })), 'turnin')).toEqual(['1497 72.41,11.37 A Parcel for the Miller: A Parcel for the Miller'])
+  expect(told(questPins(db, shown({ turnin: [[7, 12, 50, 50]] })), 'turnin')).toEqual(['12 50,50 Mill Notice Board: A Parcel for the Miller'])
+  // A quest QuestieDB does not know still has its pin.
+  expect(told(questPins(db, shown({ available: [[9999, 12, 1, 2]] })), 'available')).toEqual(['12 1,2 Quest 9999: Quest 9999'])
 })
 
-test('what is still to find is pinned: creatures, objects, and places where something is to be done', () => {
+test('an icon of what is still to find is named after the nearest of the things to find', () => {
   const db = openQuestie(game(LINES))!
-  const pins = questPins(db, {
-    available: [],
-    items: false,
-    active: [
-      { id: 8, done: false, event: false, targets: ['m_103', 'o_900', 'x_1', 'm_99999'] },
-      { id: 10, done: false, event: true, targets: [] },
-    ],
-  })
-  expect(told(pins, 'objective')).toEqual(['12 50,50 Mill Notice Board: Rats in the Cellar', '40 33.5,44.5 Road Warden: Rats in the Cellar', '40 61.5,30 Scout the Ford: Scout the Ford'])
-  // The same creature wanted by two quests is one pin that names both.
-  const two = questPins(db, { available: [], items: false, active: [{ id: 8, done: false, event: false, targets: ['m_103'] }, { id: 10, done: false, event: false, targets: ['m_103'] }] })
-  expect(told(two, 'objective')).toEqual(['40 33.5,44.5 Road Warden: Rats in the Cellar + Scout the Ford'])
+  const active = [{ id: 8, targets: ['m_103', 'o_900', 'x_1', 'm_99999'] }, { id: 10, targets: [] }]
+  // Questie gathers a few places into one icon in their middle: not on anyone, but near someone.
+  const pins = questPins(db, shown({ objective: [[8, 12, 49, 51], [8, 40, 33, 44], [10, 40, 61.5, 30]] }, active))
+  expect(told(pins, 'objective')).toEqual(['12 49,51 Mill Notice Board: Rats in the Cellar', '40 33,44 Road Warden: Rats in the Cellar', '40 61.5,30 Scout the Ford: Scout the Ford'])
+  // Two quests with an icon on the same spot are one pin that names both.
+  const two = questPins(db, shown({ objective: [[8, 40, 33, 44], [10, 40, 33, 44]] }, [{ id: 8, targets: ['m_103'] }, { id: 10, targets: ['m_103'] }]))
+  expect(told(two, 'objective')).toEqual(['40 33,44 Road Warden: Rats in the Cellar + Scout the Ford'])
 })
 
 test('who offers a service is pinned where they stand, and so are ore and herbs', () => {
@@ -125,13 +125,19 @@ test('who offers a service is pinned where they stand, and so are ore and herbs'
 })
 
 test('what comes off the strip is checked before it is used', () => {
-  expect(shownFrom({ available: [6, 'x', 64, 1.5], items: false, active: [{ id: 12, done: true, event: false, targets: ['m_5', 7] }, { id: 'no' }, null] })).toEqual({
-    available: [6, 64],
-    items: false,
-    active: [{ id: 12, done: true, event: false, targets: ['m_5'] }],
+  const told = shownFrom({
+    icons: { a: [6, 12, 2423, 7446, 64, 40, 5650, 4725], t: [12, 12, 4210, 'x'], o: [102, 40, 4400] },
+    active: [{ id: 12, done: true, targets: ['m_5', 7] }, { id: 'no' }, null],
   })
-  expect(shownFrom(undefined)).toEqual({ available: [], items: false, active: [] })
-  expect(shownFrom('nonsense')).toEqual({ available: [], items: false, active: [] })
+  expect(told).toEqual({
+    icons: { available: [{ quest: 6, area: 12, x: 24.23, y: 74.46 }, { quest: 64, area: 40, x: 56.5, y: 47.25 }], turnin: [], objective: [] },
+    active: [{ id: 12, done: true, targets: ['m_5'] }],
+  })
+  const nothing = { icons: { available: [], turnin: [], objective: [] }, active: [] }
+  expect(shownFrom(undefined)).toEqual(nothing)
+  expect(shownFrom('nonsense')).toEqual(nothing)
+  // What an addon older than the icons sent: no pins, and no fault.
+  expect(shownFrom({ available: [6, 64], items: true, active: [] })).toEqual(nothing)
 })
 
 test('values come back as QuestieDB wrote them', () => {
