@@ -8,8 +8,9 @@
   import type { FixedPin } from '../../shared/services'
   import Glyph from './Glyph.svelte'
 
-  // onpick: a row was chosen, the map should go there.
-  let { pos, quests, fixed, side, ready, onpick }: { pos: Position | undefined; quests: QuestPin[]; fixed: FixedPin[]; side?: string; ready: boolean; onpick?: (row: NowRow) => void } = $props()
+  // onpick: a row was chosen, the map should go there. onpoint: the pointer or the keyboard is on
+  // a row (or on none: null), the map should show which pin it is.
+  let { pos, quests, fixed, side, ready, onpick, onpoint }: { pos: Position | undefined; quests: QuestPin[]; fixed: FixedPin[]; side?: string; ready: boolean; onpick?: (row: NowRow) => void; onpoint?: (row: NowRow | null) => void } = $props()
 
   const NEAR = 8 // rows of Nearby
 
@@ -44,7 +45,7 @@
   <div class="rows">
     {#each list as row (row.key)}
       {@const way = wayOf(me!.at, row.at)}
-      <button class="row" onclick={() => onpick?.(row)}>
+      <button class="row" onclick={() => onpick?.(row)} onpointerenter={() => onpoint?.(row)} onpointerleave={() => onpoint?.(null)} onfocus={() => onpoint?.(row)} onblur={() => onpoint?.(null)}>
         <span>{row.name}</span>
         <span class="t-{row.tone}">{row.kind}</span>
         <span class="num">{yards(way.yards)}</span>

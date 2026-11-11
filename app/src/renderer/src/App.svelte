@@ -145,7 +145,7 @@
   </div>
 
   <aside class="panel surface" aria-label="Now">
-    <Now {pos} {quests} {fixed} side={char?.side} ready={mapReady} onpick={(row) => mapView?.goTo({ continent: row.continent, at: row.at, title: row.name })} />
+    <Now {pos} {quests} {fixed} side={char?.side} ready={mapReady} onpick={(row) => mapView?.goTo({ continent: row.continent, at: row.at, title: row.name })} onpoint={(row) => mapView?.pointAt(row)} />
     {#if char}
       <footer>
         <p>
