@@ -93,7 +93,7 @@
     return ''
   }
   // The row chosen last keeps its mark, here and on the map, until another is chosen, it is chosen
-  // again, or it leaves the lists.
+  // again, it leaves the lists, or it is let go (clicked, below).
   let chosen = $state<string | null>(null)
   const kept = $derived([...lists.here, ...lists.near].find((row) => row.key === chosen) ?? null)
   let over = $state.raw<NowRow | null>(null) // the row under the pointer or the keyboard: it comes first
@@ -102,8 +102,23 @@
     chosen = chosen === row.key ? null : row.key
     if (chosen) onpick?.(row)
   }
+  // The mark goes with Escape (not while typing: there Escape is the field's), with a click on the
+  // column beside the rows, and with a click on the map: the eye has gone elsewhere. A drag of the
+  // map is not a click.
+  let down = { x: 0, y: 0 }
+  function clicked(e: MouseEvent): void {
+    const on = e.target as Element
+    if (Math.hypot(e.clientX - down.x, e.clientY - down.y) > 5) return
+    if (on.closest('.leaflet-container') || (on.closest('.now') && !on.closest('button'))) chosen = null
+  }
   const yards = (n: number): string => `${Math.round(n).toLocaleString('en-US')} yd`
 </script>
+
+<svelte:window
+  onkeydown={(e) => e.key === 'Escape' && !(e.target as Element).closest('input, textarea') && (chosen = null)}
+  onpointerdown={(e) => (down = { x: e.clientX, y: e.clientY })}
+  onclick={clicked}
+/>
 
 {#snippet rows(list: NowRow[])}
   <div class="rows">
