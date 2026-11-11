@@ -147,7 +147,7 @@ test('paused, nothing is drawn; back on, the position is sent again even if unch
 
   addon.slash('/twinmap pause');
   addon.run(3);
-  const all = blocks(addon);
+  const all = blocks(addon).filter((b) => b.section === 'pos'); // the inbox has its say too by now
   assert.equal(all.length, 2);
   assert.equal(all[1].text, all[0].text);
   assert.equal(addon.printed(), 'Twinmap Forever: strip paused.\nTwinmap Forever: strip on.');

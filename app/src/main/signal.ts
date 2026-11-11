@@ -218,10 +218,11 @@ export async function installChannel(addons: string): Promise<boolean> {
 
 /**
  * Sends news to the game. changed: the parts this send changes, by name; false for a part taken away.
- * The addon has it within a few seconds, out of combat. inFont: it went in the font and costs no
- * slot (unless the addon missed the send before it); bytes: how big the news was.
+ * The addon has it within a few seconds, out of combat. seq: the number of this send, which the
+ * addon tells back once it has it. inFont: it went in the font and costs no slot (unless the addon
+ * missed the send before it); bytes: how big the news was.
  */
-export function send(addons: string, changed: Record<string, unknown>): { inFont: boolean; bytes: number } {
+export function send(addons: string, changed: Record<string, unknown>): { seq: number; inFont: boolean; bytes: number } {
   if (!channelInstalled(addons)) throw new Error('the channel is not installed')
   const box = readOutbox(addons)
   const prev = box.seq, seq = (prev % SEQ_MAX) + 1
@@ -238,5 +239,5 @@ export function send(addons: string, changed: Record<string, unknown>): { inFont
   const news = Buffer.from(JSON.stringify({ seq, prev, parts: changed }))
   const inFont = news.length <= CAPACITY
   writeSignal(join(addons, SIGNAL), seq, inFont ? news : undefined)
-  return { inFont, bytes: news.length }
+  return { seq, inFont, bytes: news.length }
 }

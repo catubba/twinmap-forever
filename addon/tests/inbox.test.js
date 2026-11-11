@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { loadAddon } = require('./client');
+const { decodeStrip } = require('./decode');
 
 const DIR = path.join(__dirname, '..', 'TwinmapForever');
 const SIGNAL = 'TwinmapForever_Signal';
@@ -189,6 +190,68 @@ test('slots that cannot be loaded: it says so, and the news comes once they can'
   enter();
   addon.run(7);
   assert.deepEqual(got(), ['pin=nil', 'pin=Two']);
+});
+
+// Send to game, whole: the pin the app sends becomes the game's own map pin, and the strip tells the app it arrived.
+const told = (addon) => addon.strips().map(decodeStrip).filter((b) => b.section === 'inbox').map((b) => JSON.parse(b.text));
+const waypoint = (addon) => addon.lua('return WAYPOINT and (WAYPOINT.m .. " " .. WAYPOINT.x .. " " .. WAYPOINT.y .. " " .. tostring(TRACKED))');
+
+test('a pin sent from the app is marked in the game and followed, and the strip says which send arrived', () => {
+  const { addon } = world();
+  addon.lua('(...).db.mode = "fast"');
+  addon.run(8);
+  const before = told(addon).at(-1);
+  assert.equal(before.left, 30);
+  assert.equal(before.off, undefined);
+  const { seq } = app.send(addons, { pin: { m: 1429, x: 43.71, y: 65.8, name: 'Lion\'s Pride Inn', t: 1001 } });
+  assert.equal(seq, before.seq % 60 + 1);
+  addon.run(8);
+  assert.equal(waypoint(addon), '1429 0.4371 0.658 true');
+  assert.equal(addon.printed(), 'Twinmap Forever: Lion\'s Pride Inn is marked on your map.');
+  assert.deepEqual(told(addon).at(-1), { seq, left: 30 });
+});
+
+test('a pin the player removed does not come back at the next login, and a new one does', () => {
+  const { addon, enter } = world();
+  app.send(addons, { pin: { m: 1429, x: 10, y: 20, name: 'Old', t: 1 } });
+  addon.run(7);
+  addon.lua('C_Map.ClearUserWaypoint()');
+  addon.reload();
+  enter();
+  addon.run(7);
+  assert.equal(waypoint(addon), null);
+  app.send(addons, { pin: { m: 1429, x: 30, y: 40, name: 'New', t: 2 } });
+  addon.run(7);
+  assert.equal(waypoint(addon), '1429 0.3 0.4 true');
+});
+
+test('a map the game allows no pin on: it says so and marks nothing; a pin that is not one is left alone', () => {
+  const { addon } = world();
+  addon.lua('GAME.noPinMap = 1455');
+  app.send(addons, { pin: { m: 1455, x: 50, y: 50, name: 'The Great Forge', t: 3 } });
+  addon.run(7);
+  assert.equal(waypoint(addon), null);
+  assert.equal(addon.printed(), 'Twinmap Forever: The Great Forge cannot be marked: the game allows no pin on that map.');
+  app.send(addons, { pin: { m: 1429, x: 500, y: 'north', t: 4 } });
+  addon.run(7);
+  assert.equal(waypoint(addon), null);
+});
+
+test('the strip tells the app why nothing can arrive, and how many slots are left', () => {
+  const { addon } = world();
+  addon.lua('(...).db.mode = "fast"');
+  addon.run(6);
+  app.send(addons, { big: 'x'.repeat(1100) });
+  addon.run(8);
+  assert.equal(told(addon).at(-1).left, 29);
+  const bare = loadAddon(DIR);
+  bare.fire('PLAYER_LOGIN');
+  bare.lua('(...).db.mode = "fast"');
+  bare.fire('PLAYER_ENTERING_WORLD');
+  bare.run(20);
+  assert.deepEqual(told(bare), [], 'said before it knew');
+  bare.run(20);
+  assert.deepEqual(told(bare).at(-1), { seq: 0, left: 30, off: 'fonts not readable' });
 });
 
 test('with no bank to read (the addon without the app) it gives up quietly, and /twinmap tells', () => {

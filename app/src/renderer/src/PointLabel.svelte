@@ -1,7 +1,7 @@
 <script lang="ts">
   // The label on a point of the map: its name, where it is, how far and how long on foot. It opens
-  // on the side with the most room and a thin line ties it to the point. Its two buttons stay off
-  // until the app can send to the game.
+  // on the side with the most room and a thin line ties it to the point. Send to game marks the point
+  // in the game, and says Sent once the addon tells it has it; Add to route stays off until routes come.
   import type { Point } from '../../shared/geo'
   import { labelPlace, type Size } from '../../shared/point-label'
   import { fade, scale } from 'svelte/transition'
@@ -14,8 +14,50 @@
     way, // distance, direction and time from the character, when it is on this map
     spot, // the point, in pixels of the map's box
     box, // the map's box
+    sending, // whether the point can be sent to the game now, and why not
+    acked, // the number of the last send the game has, as the addon tells it
+    onsend, // sends the point: gives back the number of the send, or what went wrong
     onclose,
-  }: { title: string; where: string; way: { far: string; time: string } | null; spot: Point; box: Size; onclose: () => void } = $props()
+  }: {
+    title: string
+    where: string
+    way: { far: string; time: string } | null
+    spot: Point
+    box: Size
+    sending: { can: boolean; why: string }
+    acked: number | undefined
+    onsend: () => Promise<{ seq: number } | { error: string }>
+    onclose: () => void
+  } = $props()
+
+  const SENT_FOR = 2000 // ms the button says Sent
+  const GIVE_UP = 20_000 // ms without a word from the game: it reads nothing in combat
+  let phase = $state<'rest' | 'sending' | 'sent'>('rest')
+  let awaited = $state<number | null>(null)
+  let note = $state('')
+  async function go(): Promise<void> {
+    if (phase !== 'rest') return
+    phase = 'sending'
+    note = ''
+    const answer = await onsend()
+    if ('error' in answer) {
+      phase = 'rest'
+      note = answer.error
+    } else awaited = answer.seq
+  }
+  $effect(() => {
+    if (phase === 'sending' && awaited !== null && acked === awaited) phase = 'sent'
+  })
+  $effect(() => {
+    if (phase === 'rest') return
+    const sent = phase === 'sent'
+    const timer = setTimeout(() => {
+      phase = 'rest'
+      awaited = null
+      if (!sent) note = 'No answer from the game yet. It takes the pin once you are out of combat.'
+    }, sent ? SENT_FOR : GIVE_UP)
+    return () => clearTimeout(timer)
+  })
 
   let width = $state(0), height = $state(0)
   const at = $derived(labelPlace(spot, box, { width, height }))
@@ -33,9 +75,10 @@
   {#if where}<p class="dim">{where}</p>{/if}
   {#if way}<p>{way.far}, {way.time}</p>{/if}
   <div class="go">
-    <button class="btn" disabled title="Sending to the game comes in a later version.">Send to game</button>
+    <button class="btn" disabled={!sending.can} aria-busy={phase === 'sending'} onclick={go}>{phase === 'sending' ? 'Sending' : phase === 'sent' ? 'Sent' : 'Send to game'}</button>
     <button class="btn" disabled title="Routes come in a later version.">Add to route</button>
   </div>
+  {#if note || !sending.can}<p class="dim why" role="status">{note || sending.why}</p>{/if}
 </div>
 
 <style>
@@ -82,6 +125,14 @@
   }
   .dim {
     color: var(--text-dim);
+  }
+  /* Sending and Sent are shorter words: the button keeps its width, so the one beside it stays put. */
+  .go .btn:first-child {
+    min-width: 112px;
+  }
+  .why {
+    margin-top: 7px;
+    max-width: 296px;
   }
   .go {
     display: flex;

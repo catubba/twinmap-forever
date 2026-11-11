@@ -43,6 +43,8 @@ local function Stop(why, line)
   if line then print("Twinmap Forever: " .. line) end
 end
 
+local used = 0 -- slots loaded in this session of the interface
+
 -- Loads the next slot not used in this session of the interface (/reload frees them all) and takes
 -- everything it has. The number we hold moves only when this works, so what could not be loaded now
 -- is loaded after the /reload or the restart that the message asks for.
@@ -55,12 +57,21 @@ local function LoadNextSlot()
       if type(got) ~= "table" or type(got.parts) ~= "table" or not Num(got.seq) then
         return Stop("slot " .. tostring(reason or "empty"), "what Twinmap sent cannot be loaded. Keep the Twinmap Forever slot addons enabled; after Twinmap's first run, restart the game.")
       end
+      used = i
       ns.db.inbox = { seq = got.seq, parts = got.parts }
       return TellAll()
     end
   end
+  used = SLOTS
   Stop("slots used up", "type /reload to go on receiving from Twinmap.")
 end
+
+-- What the app must know of its way to the game: the number of the last news that arrived, so it
+-- can say "sent"; how many slots are left before a /reload; and why nothing can arrive, if so.
+ns.sections[#ns.sections + 1] = { name = "inbox", period = 1, build = function()
+  if not (ns.db and ns.db.inbox) or ns.signal == "waiting" then return end
+  return { seq = ns.db.inbox.seq, left = SLOTS - used, off = ns.signal ~= "reading" and ns.signal or nil }
+end }
 
 local text, reading
 local fails, acc = 0, POLL

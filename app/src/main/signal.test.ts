@@ -49,7 +49,7 @@ test('the bank and the slots are made once, next to the addon, with no step by h
 })
 
 test('a send changes every name in place, keeps the links, and says whether it fitted in the font', () => {
-  expect(send(addons, { pin: { m: 1429, x: 43.7, y: 65.8 } })).toEqual({ inFont: true, bytes: 63 })
+  expect(send(addons, { pin: { m: 1429, x: 43.7, y: 65.8 } })).toEqual({ seq: 1, inFont: true, bytes: 63 })
   for (const i of [0, 500, 5000, BANK - 1]) {
     const got = read(readFileSync(signal(i)))
     expect(got.n).toBe(1)

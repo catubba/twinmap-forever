@@ -42,10 +42,17 @@ const STUB = `
     RegisterCanvasLayoutCategory = function(panel, name) return { panel = panel, name = name } end,
     RegisterAddOnCategory = function(category) SETTINGS_CATEGORY = category end,
   }
+  -- The game's own map pin: WAYPOINT is where it stands, TRACKED whether it is followed on screen.
+  -- GAME.noPinMap: a map the game allows no pin on.
   C_Map = {
     GetBestMapForUnit = function() return GAME.map end,
     GetPlayerMapPosition = function() return GAME.x and { x = GAME.x, y = GAME.y } end,
+    CanSetUserWaypointOnMap = function(map) return map ~= GAME.noPinMap end,
+    SetUserWaypoint = function(point) WAYPOINT = point end,
+    ClearUserWaypoint = function() WAYPOINT, TRACKED = nil, nil end,
   }
+  UiMapPoint = { CreateFromCoordinates = function(map, x, y) return { m = map, x = x, y = y } end }
+  C_SuperTrack = { SetSuperTrackedUserWaypoint = function(on) TRACKED = on end }
   LEVELS = {} -- every channel value a texture was given, as a key
 
   -- Frames and textures answer every method; only what a test looks at does something.
