@@ -50,7 +50,7 @@ function startQuests(gameFolder: string | null, tell: (status: QuestsStatus) => 
   if (!gameFolder) return { show: () => {}, stop: () => {} }
   const worker = startQuestieWorker({ workerData: { gameFolder } })
   worker.on('message', tell)
-  worker.on('error', () => tell({ questie: null, pins: [] })) // no quests on the map; the rest of the app goes on
+  worker.on('error', () => tell({ questie: null, pins: [], fixed: [] })) // no quests on the map; the rest of the app goes on
   let last = ''
   return {
     show: (section) => {
@@ -122,7 +122,7 @@ function createWindow(): void {
   // The pins go to the window when they change, and once more when its page has loaded.
   let questsNow: QuestsStatus = { questie: null, pins: [] }
   const tellQuests = (status: QuestsStatus): void => {
-    questsNow = status
+    questsNow = { ...status, fixed: status.fixed ?? questsNow.fixed } // the fixed pins come once: kept for a page that loads later
     if (!win.isDestroyed()) win.webContents.send('quests', status)
   }
   let quests = startQuests(gameFolder, tellQuests)

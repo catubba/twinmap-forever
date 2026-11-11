@@ -5,12 +5,13 @@ import { join } from 'node:path'
 import { parentPort, workerData } from 'node:worker_threads'
 import { gameMaps, UI_MAP_ASSIGNMENT_FILE, UI_MAP_FILE, type GameMap } from '../shared/maps'
 import { AREA_POI_FILE, AREA_TABLE_FILE, places, UI_MAP_X_MAP_ART_FILE, WORLD_MAP_OVERLAY_FILE } from '../shared/places'
+import { TAXI_NODES_FILE, TAXI_PATH_FILE, travel } from '../shared/services'
 import type { TilesStatus } from '../shared/tiles-status'
 import { readTable } from '../shared/wdc5'
 import { WORLDS } from '../shared/world'
 import { installedBuild, openClientFiles, type ClientFiles } from './client-files'
 import { convertInteriors, ENCOUNTERS_FILE, finishedInteriors, MAP_FILE, mapEntries, ROOM_PICTURES_FILE, roomPictures } from './interiors'
-import { convertWorld, finished, MAPS_FILE, PLACES_FILE, tilesFolder } from './tiles'
+import { convertWorld, finished, MAPS_FILE, PLACES_FILE, tilesFolder, TRAVEL_FILE } from './tiles'
 
 const { gameFolder, base } = workerData as { gameFolder: string; base: string }
 const tell = (status: TilesStatus): void => parentPort?.postMessage(status)
@@ -56,6 +57,12 @@ try {
     const maps = JSON.parse(readFileSync(join(folder, MAPS_FILE), 'utf8')) as GameMap[]
     // Without the tables the map has the names of its zones only: no reason to refuse it.
     writeFileSync(join(folder, PLACES_FILE), JSON.stringify(poi && overlays && arts && areas ? places(readTable(poi), readTable(overlays), readTable(arts), readTable(areas), maps) : []))
+  }
+  // The doors of the dungeons and the flight routes. Without the tables the map has none of them.
+  if (!existsSync(join(folder, TRAVEL_FILE))) {
+    const files = (client ??= openClientFiles(gameFolder))
+    const [maps, nodes, paths] = [MAP_FILE, TAXI_NODES_FILE, TAXI_PATH_FILE].map((id) => files.read(id, true))
+    writeFileSync(join(folder, TRAVEL_FILE), JSON.stringify(maps && nodes && paths ? travel(readTable(maps), readTable(nodes), readTable(paths)) : { doors: [], nodes: [], routes: [] }))
   }
   const ready = { state: 'ready', folder, version: build.version, tiles, missing, seconds: (Date.now() - started) / 1000, converted } as const
   tell(ready)

@@ -29,6 +29,8 @@ export interface Character {
   max?: number
   /** Rested experience still to spend. */
   rested?: number
+  /** "A" for the Alliance, "H" for the Horde. */
+  side?: string
 }
 
 export interface Instance {

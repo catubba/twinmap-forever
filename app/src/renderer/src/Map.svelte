@@ -12,9 +12,10 @@
   import { boxOf, buildingsAt, piecesIn, roomPixels, yardsInside, YARDS_PER_UNIT, type Box, type InteriorMap, type Interiors, type Piece, type Yards } from '../../shared/inside'
   import type { Continent, GameMap } from '../../shared/maps'
   import type { QuestPin } from '../../shared/quests'
+  import { serves, type FixedLayer, type FixedPin, type Travel } from '../../shared/services'
   import { pictureOfBlock, tileOfPicture } from '../../shared/pixels'
   import { WORLDS } from '../../shared/world'
-  import { LAYER_GROUPS, layersFrom } from '../../shared/layers'
+  import { LAYER_GROUPS, layersFrom, type LayerId } from '../../shared/layers'
   import { fitNames, tierRank, tierShows, type NameBox, type NameTier, type Place } from '../../shared/places'
   import { wayTo, zoneAt, type Size } from '../../shared/point-label'
   import { fade, fly } from 'svelte/transition'
@@ -25,7 +26,7 @@
 
   // at: when the position was read off the game, in milliseconds.
   // insideReady: the rooms of the buildings are converted, and their list can be asked for.
-  let { pos, at: readAt, insideReady, quests = [] }: { pos: Position | undefined; at: number | undefined; insideReady: boolean; quests?: QuestPin[] } = $props()
+  let { pos, at: readAt, insideReady, quests = [], fixed = [], side }: { pos: Position | undefined; at: number | undefined; insideReady: boolean; quests?: QuestPin[]; fixed?: FixedPin[]; side?: string } = $props()
 
   const TILES = 'twinmap://tiles'
   const TOP_ZOOM = 7 // the game's own detail: a block's picture is four tiles
@@ -512,6 +513,11 @@
         show(continent, true)
         place()
       })
+    void fetch(`${TILES}/travel.json`)
+      .then((answer) => (answer.ok ? (answer.json() as Promise<Travel>) : travel))
+      .then((told) => (travel = told))
+      .catch(() => {})
+    made.on('moveend', movedFixed)
     void fetch(`${TILES}/places.json`)
       .then((answer) => (answer.ok ? (answer.json() as Promise<Place[]>) : []))
       .then((list) => {
@@ -554,6 +560,79 @@
   $effect(() => {
     for (const [id, group] of Object.entries(questLayers) as [keyof typeof questLayers, L.LayerGroup][]) {
       if (map && layers[id] && !inside && zoom >= PIN_ZOOM) group.addTo(map)
+      else group.remove()
+    }
+  })
+
+  // Who offers a service, and where ore and herbs grow. There are thousands on a continent: only
+  // those in view are on the map, and each layer only from the zoom at which its pins stop lying
+  // on each other.
+  const FIXED_ZOOM: Record<FixedLayer, number> = { flight: 3, inn: 3.5, bank: 4, auction: 4, stable: 4, repair: 4.5, trainers: 4.5, vendors: 4.5, ore: 5.5, herbs: 5.5 }
+  const LAYER_NAMES = Object.fromEntries(LAYER_GROUPS.flatMap((group) => group.layers.map((layer) => [layer.id, layer.name]))) as Record<LayerId, string>
+  const MOST = 2500 // pins drawn at once: past this the map would stutter, and nothing could be told apart anyway
+  const fixedGroup = L.layerGroup()
+  let laid: { pin: FixedPin; at: L.LatLng }[] = []
+  // What is drawn now: more than the view, so that the map can move a little (it does all the time
+  // while it follows the character) without the pins being made again.
+  let drawnFor: { view: L.LatLngBounds; far: number } | null = null
+  function movedFixed(): void {
+    if (!map || !drawnFor || drawnFor.far !== map.getZoom() || !drawnFor.view.contains(map.getBounds())) drawFixed()
+  }
+  function drawFixed(): void {
+    fixedGroup.clearLayers()
+    drawnFor = null
+    if (!map || inside) return void fixedGroup.remove()
+    fixedGroup.addTo(map)
+    const view = map.getBounds().pad(0.5), far = map.getZoom()
+    drawnFor = { view, far }
+    let drawn = 0
+    for (const { pin: p, at: where } of laid) {
+      if (!p.layers.some((layer) => layers[layer] && far >= FIXED_ZOOM[layer]) || !view.contains(where)) continue
+      if (++drawn > MOST) break
+      const service = p.side !== undefined, size = service ? 14 : 12
+      // Names come from the player's QuestieDB: written as text, never as markup.
+      const tip = document.createElement('span')
+      tip.append(Object.assign(document.createElement('b'), { textContent: p.name }))
+      if (p.sub) tip.append(document.createElement('br'), p.sub)
+      tip.append(document.createElement('br'), p.layers.map((layer) => LAYER_NAMES[layer]).join(', '))
+      L.marker(where, { keyboard: false, zIndexOffset: service ? -500 : -1000, icon: L.divIcon({ className: 'door', iconSize: [size, size], html: pin(service ? 'service' : 'resource') }) })
+        .bindTooltip(tip, { direction: 'top', offset: [0, -size / 2], className: 'tip' })
+        .addTo(fixedGroup)
+    }
+  }
+  $effect(() => {
+    const zones = new Map(maps.filter((m) => m.level === 'zone' && m.rect && m.area && m.continent === continent).map((m) => [m.area, m]))
+    laid = fixed.flatMap((p) => {
+      const zone = zones.get(p.area)
+      return zone?.rect && serves(p, side) ? [{ pin: p, at: at(unitsOfPlace(zone.rect, p.x, p.y)) }] : []
+    })
+    drawFixed()
+  })
+  $effect(() => {
+    void [inside, ...Object.values(layers)]
+    drawFixed()
+  })
+
+  // The doors of the dungeons and the flight routes of the character's side, from the game's own tables.
+  let travel = $state.raw<Travel>({ doors: [], nodes: [], routes: [] })
+  const travelLayers = { dungeons: L.layerGroup(), routes: L.layerGroup() }
+  $effect(() => {
+    for (const group of Object.values(travelLayers)) group.clearLayers()
+    for (const door of travel.doors) {
+      if (door.continent !== continent) continue
+      L.marker(at(door), { keyboard: false, zIndexOffset: 200, icon: L.divIcon({ className: 'door', iconSize: [16, 16], html: pin('dungeon') }) })
+        .bindTooltip(door.names.join(', '), { direction: 'top', offset: [0, -8], className: 'tip' })
+        .addTo(travelLayers.dungeons)
+    }
+    for (const [a, b] of travel.routes) {
+      const from = travel.nodes[a], to = travel.nodes[b]
+      if (!from || !to || from.continent !== continent || !serves(from, side) || !serves(to, side)) continue
+      L.polyline([at(from), at(to)], { color: '#7fc8ff', weight: 1.5, opacity: 0.6, interactive: false }).addTo(travelLayers.routes)
+    }
+  })
+  $effect(() => {
+    for (const [id, group] of Object.entries(travelLayers) as [keyof typeof travelLayers, L.LayerGroup][]) {
+      if (map && layers[id] && !inside && zoom >= 2) group.addTo(map)
       else group.remove()
     }
   })

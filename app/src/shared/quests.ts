@@ -1,5 +1,6 @@
 // The quests on the map: what the addon tells of Questie, and the pins the app makes of it with
 // the places of the player's own QuestieDB.
+import type { FixedPin } from './services'
 
 /** What Questie is showing in the game, as the addon sends it: numbers only. */
 export interface QuestieShown {
@@ -38,6 +39,8 @@ export interface QuestsStatus {
   /** QuestieDB's version, or null when the player has none. */
   questie: string | null
   pins: QuestPin[]
+  /** Services, ore and herbs: told once, when the QuestieDB is opened, since they do not change. */
+  fixed?: FixedPin[]
 }
 
 const ids = (v: unknown): number[] => (Array.isArray(v) ? v.filter((n): n is number => Number.isInteger(n)) : [])

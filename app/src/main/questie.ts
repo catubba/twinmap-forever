@@ -4,6 +4,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { QuestieShown, QuestPin, QuestPinType } from '../shared/quests'
+import { resourceOf, servicesOf, type FixedPin } from '../shared/services'
 
 /** The file of QuestieDB this app reads, in a game folder. Questie without it gives the app nothing. */
 export const questieFile = (gameFolder: string): string => join(gameFolder, '_forever_', 'Interface', 'AddOns', 'QuestieDB', 'QuestieDB_Forever.toc')
@@ -159,6 +160,29 @@ export function openQuestie(gameFolder: string): Questie | null {
   }
 
   return { version: /^## Version: *(.+)$/m.exec(text)?.[1]?.trim() ?? 'unknown', ids, get, places, zoneIndex }
+}
+
+/**
+ * The pins that are there whatever the character does: every NPC with a service to offer, on each
+ * place it stands, and every vein of ore and every herb.
+ */
+export function fixedPins(db: Questie): FixedPin[] {
+  const pins: FixedPin[] = []
+  const add = (kind: 'Npc' | 'Object', id: number, pin: Omit<FixedPin, 'area' | 'x' | 'y'>): void => {
+    for (const [area, spots] of Object.entries(db.places(kind, id))) for (const [x, y] of spots) pins.push({ area: +area, x, y, ...pin })
+  }
+  for (const id of db.ids.Npc) {
+    const flags = db.get('Npc', id, NPC.flags), side = db.get('Npc', id, NPC.friendly), name = db.get('Npc', id, NPC.name), sub = db.get('Npc', id, NPC.sub)
+    const layers = typeof flags === 'number' ? servicesOf(flags) : []
+    // Someone friendly to no side serves no player.
+    if (!layers.length || typeof side !== 'string' || !side || typeof name !== 'string') continue
+    add('Npc', id, { name, ...(typeof sub === 'string' && sub ? { sub } : {}), layers, side })
+  }
+  for (const id of db.ids.Object) {
+    const name = db.get('Object', id, OBJECT.name), layer = typeof name === 'string' ? resourceOf(name) : null
+    if (layer) add('Object', id, { name: name as string, layers: [layer] })
+  }
+  return pins
 }
 
 /**

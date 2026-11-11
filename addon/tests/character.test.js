@@ -25,6 +25,15 @@ test('level and experience go out, and again when they change', () => {
   assert.deepEqual(blocks(addon, 'char').at(-1), { level: 13, xp: 8950, max: 13600 });
 });
 
+test('the side of the character goes out as one letter', () => {
+  const addon = enterWorld('GAME.level, GAME.faction = 13, "Horde"');
+  addon.run(10);
+  assert.deepEqual(blocks(addon, 'char'), [{ level: 13, side: 'H' }]);
+  addon.lua('GAME.faction = "Neutral"');
+  addon.run(4);
+  assert.deepEqual(blocks(addon, 'char').at(-1), { level: 13 });
+});
+
 test('when the game tells nothing of the character, nothing is sent about it', () => {
   const addon = enterWorld();
   addon.run(10);

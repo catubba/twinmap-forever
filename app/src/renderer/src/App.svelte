@@ -5,6 +5,7 @@
   import { onMount } from 'svelte'
   import { fade, fly } from 'svelte/transition'
   import type { QuestPin } from '../../shared/quests'
+  import type { FixedPin } from '../../shared/services'
   import type { SetupStatus } from '../../shared/setup'
   import FirstRun from './FirstRun.svelte'
   import Logo from './Logo.svelte'
@@ -21,8 +22,11 @@
   })
   // The pins of the quests Questie shows: they come when they change, not with every reading.
   let quests = $state.raw<QuestPin[]>([])
+  // Services, ore and herbs: they come once.
+  let fixed = $state.raw<FixedPin[]>([])
   window.twinmap.onQuests((status) => {
     quests = status.pins
+    if (status.fixed) fixed = status.fixed
   })
   let tiles = $state<TilesStatus | null>(null)
   window.twinmap.onTiles((status) => {
@@ -108,7 +112,7 @@
 <div class="work" in:fade={screen} inert={onSettings}>
   <div class="mapbox">
     {#if mapReady}
-      <Map {pos} at={link?.state.updatedAt.pos} {insideReady} {quests} />
+      <Map {pos} at={link?.state.updatedAt.pos} {insideReady} {quests} {fixed} side={char?.side} />
     {:else if tiles}
       <div class="making" class:failed={tiles.state === 'failed' || tiles.state === 'no-game'}>
         <p>{tilesLine(tiles)}</p>

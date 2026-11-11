@@ -102,10 +102,13 @@ local function BuildPos()
 end
 
 -- Level and experience, for the bar at the foot of the app's panel. Nothing at the level cap but the level.
+-- The side too ("A" or "H"): the app shows only who serves it.
 local function BuildChar()
   local level = Num(Try(UnitLevel, "player"))
   if not level then return end
-  return { level = level, xp = Num(Try(UnitXP, "player")), max = Num(Try(UnitXPMax, "player")), rested = Num(Try(GetXPExhaustion)) }
+  local faction = Str(Try(UnitFactionGroup, "player"))
+  local side = (faction == "Alliance" and "A") or (faction == "Horde" and "H") or nil
+  return { level = level, xp = Num(Try(UnitXP, "player")), max = Num(Try(UnitXPMax, "player")), rested = Num(Try(GetXPExhaustion)), side = side }
 end
 
 -- name, seconds between checks, builder. combat: also sent during a fight; the rest waits for its end.
