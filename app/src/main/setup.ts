@@ -1,11 +1,14 @@
 // What the first run needs to know: where the game is, whether the addon is in it, whether Questie
-// is. The app only looks: the addon comes from CurseForge, and nothing here writes into the game's folder.
+// is. Here the app only looks: the addon comes from CurseForge. What it writes next to the addon is in signal.ts.
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { SetupStatus } from '../shared/setup'
 import { questieFile } from './questie'
 
 const ADDONS = ['_forever_', 'Interface', 'AddOns']
+
+/** The folder of a game where addons live. */
+export const addonsFolder = (gameFolder: string): string => join(gameFolder, ...ADDONS)
 
 /** The player's choices the app keeps between runs. */
 export interface Settings {

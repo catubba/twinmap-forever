@@ -32,7 +32,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 ================================================================================
 wow-ai
 https://github.com/chelinho139/wow-ai
-Used in: addon/TwinmapForever/Strip.lua (strip codec and drawing)
+Used in: addon/TwinmapForever/Strip.lua (strip codec and drawing), addon/TwinmapForever/Inbox.lua and app/src/main/signal.ts (load-on-demand slots)
 ================================================================================
 
 MIT License

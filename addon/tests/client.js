@@ -46,12 +46,54 @@ const STUB = `
     GetBestMapForUnit = function() return GAME.map end,
     GetPlayerMapPosition = function() return GAME.x and { x = GAME.x, y = GAME.y } end,
   }
-  UIParent = {}
   LEVELS = {} -- every channel value a texture was given, as a key
 
   -- Frames and textures answer every method; only what a test looks at does something.
   local function noop() end
   local Widget = { __index = function() return noop end }
+  -- Fonts as measured in the game: a new name says no once and loads late, then stays cached with
+  -- what the file said, through /reload. Until then the text measures the font it had. A width
+  -- comes back to the whole pixel, 0.064 pixels a unit, with the trailing letter C in it.
+  local fontCache, slots = {}, {}
+  UIParent = {}
+  function UIParent:CreateFontString()
+    local s = setmetatable({ widths = false, text = "" }, Widget)
+    function s:SetFont(path)
+      if path:find("FRIZQT") then self.widths = false return true end
+      if fontCache[path] == nil then fontCache[path] = false return false end
+      fontCache[path] = fontCache[path] or T_fontWidths(path) or false
+      if not fontCache[path] then return false end
+      self.widths = fontCache[path]
+      return true
+    end
+    function s:SetText(text) self.text = text end
+    function s:GetStringWidth()
+      if not self.widths then return 90 end
+      local a, b, c = self.text:byte(1, 3)
+      local glyph = #self.text == 2 and a - 64 or 4 + (a - 0xE0) * 4096 + (b - 0x80) * 64 + (c - 0x80) - 0xE000
+      local hi, lo = self.widths:byte(1 + 4 * glyph, 2 + 4 * glyph)
+      return math.floor(32 + (hi and hi * 256 + lo or 0) * 0.064 + 0.5)
+    end
+    return s
+  end
+  C_EncodingUtil = { DeserializeJSON = function(text) return load(T_jsonAsLua(text))() end }
+  -- The slots the app wrote, loaded as the game does: once each, until the interface is reloaded.
+  C_AddOns = {
+    IsAddOnLoaded = function(name) return slots[name] == true end,
+    LoadAddOn = function(name)
+      local source = not GAME.slotsOff and T_slotSource(name)
+      if not source then return false, "MISSING" end
+      slots[name] = true
+      assert(load(source, "=" .. name))()
+      return true
+    end,
+  }
+  function T_slots()
+    local n = 0
+    for _ in pairs(slots) do n = n + 1 end
+    return n
+  end
+
   function CreateFrame(_, name)
     local f, cells = setmetatable({ events = {} }, Widget), {}
     if name then _G[name] = f end
@@ -89,6 +131,8 @@ const STUB = `
   -- What the test drives.
   local ns = {}
   function T_load(name, source, chunk) return assert(load(source, "@" .. chunk))(name, ns) end
+  -- /reload: the interface starts over, the saved variables and the fonts already read stay.
+  function T_reload() frames, slots, ns, SlashCmdList = {}, {}, {}, {} end
   function T_fire(event)
     for _, f in ipairs(frames) do
       local fn = rawget(f, "OnEvent")
@@ -135,7 +179,8 @@ function readToc(file) {
   return { meta, files };
 }
 
-function loadAddon(dir) {
+// addons: the AddOns folder the fonts and the slots are read from, as the app wrote them; without it there are none.
+function loadAddon(dir, { addons } = {}) {
   const name = path.basename(dir), toc = readToc(path.join(dir, name + '.toc'));
   const L = lauxlib.luaL_newstate();
   lualib.luaL_openlibs(L);
@@ -150,12 +195,49 @@ function loadAddon(dir) {
     return out;
   };
 
+  const inAddons = (...parts) => (addons ? path.join(addons, ...parts) : null);
+  const register = (name, fn) => lua.lua_register(L, to_luastring(name), (l) => {
+    const out = fn(to_jsstring(lauxlib.luaL_checkstring(l, 1)));
+    if (out === null) return 0;
+    lua.lua_pushstring(l, typeof out === 'string' ? to_luastring(out) : out);
+    return 1;
+  });
+  // The widths of a font of the bank, 4 bytes a letter, as they are in the file; nothing for a file that is not there.
+  register('T_fontWidths', (name) => {
+    const file = inAddons(...name.split('\\').slice(2));
+    if (!file || !fs.existsSync(file)) return null;
+    const font = fs.readFileSync(file);
+    for (let i = 0; i < font.readUInt16BE(4); i++) {
+      const at = 12 + i * 16;
+      if (font.toString('latin1', at, at + 4) === 'hmtx') return Uint8Array.from(font.subarray(font.readUInt32BE(at + 8), font.readUInt32BE(at + 8) + font.readUInt32BE(at + 12)));
+    }
+    return null;
+  });
+  // The game's own JSON reader, as Lua source for this one.
+  const luaOf = (v) => (v === null ? 'nil' : Array.isArray(v) ? '{' + v.map(luaOf).join(',') + '}'
+    : typeof v === 'object' ? '{' + Object.entries(v).map(([k, x]) => `[${JSON.stringify(k)}]=${luaOf(x)}`).join(',') + '}' : JSON.stringify(v));
+  register('T_jsonAsLua', (text) => 'return ' + luaOf(JSON.parse(text)));
+  register('T_slotSource', (name) => {
+    const file = inAddons(name, 'Inbox.lua');
+    return file && fs.existsSync(file) ? Uint8Array.from(fs.readFileSync(file)) : null;
+  });
+
   if (lauxlib.luaL_dostring(L, to_luastring(STUB)) !== lua.LUA_OK) throw new Error(to_jsstring(lua.lua_tostring(L, -1)));
-  for (const f of toc.files) call('T_load', name, fs.readFileSync(path.join(dir, f), 'utf8'), f);
+  const run = () => {
+    for (const f of toc.files) call('T_load', name, fs.readFileSync(path.join(dir, f), 'utf8'), f);
+  };
+  run();
 
   return {
     meta: toc.meta,
     fire: (event) => call('T_fire', event),
+    // /reload: the addon is loaded again, with what it saved.
+    reload: () => {
+      call('T_reload');
+      run();
+    },
+    // How many slots were loaded since the last reload.
+    slots: () => Number(call('T_slots')),
     slash: (text) => call('T_slash', text),
     printed: () => call('T_printed'),
     ns: (key) => call('T_ns', key),
