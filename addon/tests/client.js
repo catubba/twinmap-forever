@@ -37,6 +37,7 @@ const STUB = `
   function UnitXP() return GAME.xp end
   function UnitXPMax() return GAME.xpMax end
   function GetXPExhaustion() return GAME.rested end
+  function UnitFactionGroup() return GAME.faction end -- "Alliance", "Horde"; unset, the game does not tell
   Settings = {
     RegisterCanvasLayoutCategory = function(panel, name) return { panel = panel, name = name } end,
     RegisterAddOnCategory = function(category) SETTINGS_CATEGORY = category end,

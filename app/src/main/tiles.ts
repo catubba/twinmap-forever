@@ -54,15 +54,17 @@ export function tileFile(folder: string, zoom: number, column: number, row: numb
 export const MAPS_FILE = 'maps.json'
 /** The names written over the map (shared/places.ts), kept the same way. */
 export const PLACES_FILE = 'places.json'
+/** The doors of the dungeons and the flight routes (shared/services.ts), kept the same way. */
+export const TRAVEL_FILE = 'travel.json'
 
 /**
  * The file the window may have for a path it asks, or null: only what the converters write, nothing
  * else on the disk. base: the folder of the build. path: as in "/azeroth/blocks/31/49.dxt". A
- * ground is a continent by its name or a dungeon by "i" and its number; the rest is the three lists
+ * ground is a continent by its name or a dungeon by "i" and its number; the rest is the four lists
  * and the pictures of the rooms (interiors.ts).
  */
 export function servedFile(base: string, path: string): string | null {
-  const m = /^\/(?:(maps|places|interiors)\.json|rooms\/(\d{1,9})\.dxt|([a-z]+|i\d{1,5})\/(?:blocks\/(\d{1,2})\/(\d{1,2})\.dxt|(\d)\/(\d{1,3})\/(\d{1,3})\.png))$/.exec(path)
+  const m = /^\/(?:(maps|places|travel|interiors)\.json|rooms\/(\d{1,9})\.dxt|([a-z]+|i\d{1,5})\/(?:blocks\/(\d{1,2})\/(\d{1,2})\.dxt|(\d)\/(\d{1,3})\/(\d{1,3})\.png))$/.exec(path)
   if (!m) return null
   if (m[1]) return joinPath(base, `${m[1]}.json`)
   if (m[2]) return joinPath(base, 'rooms', `${m[2]}.dxt`)

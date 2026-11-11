@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, test } from 'vitest'
 import { shownFrom } from '../shared/quests'
-import { cbor, ITEM, NPC, OBJECT, openQuestie, QUEST, questPins } from './questie'
+import { cbor, fixedPins, ITEM, NPC, OBJECT, openQuestie, QUEST, questPins } from './questie'
 
 // Writes a value the way QuestieDB does: CBOR, then base64. Only what these tests need.
 function enc(v: unknown): Buffer {
@@ -98,6 +98,30 @@ test('what is still to find is pinned: creatures, objects, and places where some
   // The same creature wanted by two quests is one pin that names both.
   const two = questPins(db, { available: [], items: false, active: [{ id: 8, done: false, event: false, targets: ['m_103'] }, { id: 10, done: false, event: false, targets: ['m_103'] }] })
   expect(told(two, 'objective')).toEqual(['40 33.5,44.5 Road Warden: Rats in the Cellar + Scout the Ford'])
+})
+
+test('who offers a service is pinned where they stand, and so are ore and herbs', () => {
+  const db = openQuestie(game([
+    ...LINES,
+    `## X-Npc-105-S: ${b64({ [NPC.name]: 'Smith Hale', [NPC.friendly]: 'AH', [NPC.sub]: 'Armorer', [NPC.flags]: 4 + 16384 })}`,
+    `## X-Npc-105-${NPC.spawns}: ${b64({ 40: [[55, 45]] })}`,
+    // With a service, but friendly to no side: not for a player.
+    `## X-Npc-106-S: ${b64({ [NPC.name]: 'Bandit Fence', [NPC.flags]: 4 })}`,
+    `## X-Npc-106-${NPC.spawns}: ${b64({ 40: [[1, 1]] })}`,
+    `## X-Object-901-S: ${b64({ [OBJECT.name]: 'Copper Vein' })}`,
+    `## X-Object-901-${OBJECT.spawns}: ${b64({ 12: [[30, 30], [31, 32]] })}`,
+    `## X-Object-902-S: ${b64({ [OBJECT.name]: 'Peacebloom' })}`,
+    `## X-Object-902-${OBJECT.spawns}: ${b64({ 40: [[70, 70]] })}`,
+  ]))!
+  expect(fixedPins(db)).toEqual([
+    // Miller Odo sells (flags 4) in the two zones he stands in; the place inside an instance is left out.
+    { area: 12, x: 42.5, y: 65.25, name: 'Miller Odo', layers: ['vendors'], side: 'A' },
+    { area: 40, x: 10, y: 20, name: 'Miller Odo', layers: ['vendors'], side: 'A' },
+    { area: 40, x: 55, y: 45, name: 'Smith Hale', sub: 'Armorer', layers: ['vendors', 'repair'], side: 'AH' },
+    { area: 12, x: 30, y: 30, name: 'Copper Vein', layers: ['ore'] },
+    { area: 12, x: 31, y: 32, name: 'Copper Vein', layers: ['ore'] },
+    { area: 40, x: 70, y: 70, name: 'Peacebloom', layers: ['herbs'] },
+  ])
 })
 
 test('what comes off the strip is checked before it is used', () => {

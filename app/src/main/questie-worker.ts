@@ -3,11 +3,11 @@
 // what that is.
 import { parentPort, workerData } from 'node:worker_threads'
 import type { QuestieShown, QuestsStatus } from '../shared/quests'
-import { openQuestie, questPins } from './questie'
+import { fixedPins, openQuestie, questPins } from './questie'
 
 const db = openQuestie((workerData as { gameFolder: string }).gameFolder)
 const tell = (status: QuestsStatus): void => parentPort?.postMessage(status)
-tell({ questie: db?.version ?? null, pins: [] })
+tell({ questie: db?.version ?? null, pins: [], fixed: db ? fixedPins(db) : [] })
 parentPort?.on('message', (shown: QuestieShown) => {
   if (db) tell({ questie: db.version, pins: questPins(db, shown) })
 })
