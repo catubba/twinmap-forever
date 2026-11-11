@@ -1,7 +1,7 @@
 // The layers of the map, in the groups the Layers button shows. A layer that is not built yet is
 // listed, greyed out: its turn comes with the data that fills it.
 export const LAYER_GROUPS = [
-  { name: 'You', layers: [{ id: 'arrow', name: 'Arrow', built: true }] },
+  { name: 'You', layers: [{ id: 'arrow', name: 'Arrow', built: true }, { id: 'route', name: 'Route', built: true }] },
   {
     name: 'Quests',
     layers: [

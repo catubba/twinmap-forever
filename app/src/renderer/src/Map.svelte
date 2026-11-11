@@ -22,12 +22,13 @@
   import Glyph from './Glyph.svelte'
   import { drop, gone, still } from './motion'
   import PointLabel from './PointLabel.svelte'
+  import { inRoute, noRoute, type Route, type Stop } from '../../shared/route'
   import { sendState, type Inbox } from '../../shared/send'
   import { pin } from './marks'
 
   // at: when the position was read off the game, in milliseconds.
   // insideReady: the rooms of the buildings are converted, and their list can be asked for.
-  let { pos, at: readAt, insideReady, quests = [], fixed = [], side, live = false, inbox = null }: { pos: Position | undefined; at: number | undefined; insideReady: boolean; quests?: QuestPin[]; fixed?: FixedPin[]; side?: string; live?: boolean; inbox?: Inbox | null } = $props()
+  let { pos, at: readAt, insideReady, quests = [], fixed = [], side, live = false, inbox = null, route = noRoute(), onroute }: { pos: Position | undefined; at: number | undefined; insideReady: boolean; quests?: QuestPin[]; fixed?: FixedPin[]; side?: string; live?: boolean; inbox?: Inbox | null; route?: Route; onroute?: (stop: Stop) => void } = $props()
 
   const TILES = 'twinmap://tiles'
   const TOP_ZOOM = 7 // the game's own detail: a block's picture is four tiles
@@ -64,7 +65,7 @@
   let layersOpen = $state(false)
   // The point the player clicked, with its label: in map units, and where that is in the map's box now.
   // pin: the same point as the game names it, a zone map and a place on it; none where no zone is.
-  let labelled = $state<{ units: Point; continent: Continent; title: string; where: string; spot: Point; box: Size; pin: { m: number; x: number; y: number } | null } | null>(null)
+  let labelled = $state<{ units: Point; continent: Continent; title: string; where: string; spot: Point; box: Size; pin: { m: number; x: number; y: number } | null; plain?: boolean } | null>(null)
   // Where the character is on the world map, for the distance on the label.
   let me = $state<{ units: Point; continent: Continent } | null>(null)
   const way = $derived(labelled && me && me.continent === labelled.continent ? wayTo(me.units, labelled.units) : null)
@@ -534,6 +535,7 @@
         title: found?.zone.name ?? NAMES[continent],
         where: found ? `${found.place.x.toFixed(1)}, ${found.place.y.toFixed(1)}` : '',
         spot: e.containerPoint,
+        plain: true, // a bare point of the map: as a stop it is told from the others by its coordinates
         box: { width: holder.clientWidth, height: holder.clientHeight },
         pin: found ? { m: found.zone.id, ...found.place } : null,
       }
@@ -734,6 +736,28 @@
     }
   })
 
+  // The route: a white line through its stops on this continent, and a disc on each. A stop done is
+  // a dull disc with no number; the last has a ring more.
+  const routeLayer = L.layerGroup()
+  $effect(() => {
+    routeLayer.clearLayers()
+    const line: L.LatLng[][] = [[]]
+    route.stops.forEach((stop, i) => {
+      if (stop.continent !== continent) return void line.push([]) // the line does not cross the sea
+      const done = i < route.next, last = i === route.stops.length - 1
+      if (i >= route.next - 1) line.at(-1)!.push(at(stop.at))
+      const html = `<i></i>${done ? '' : `<b>${i + 1}</b>`}`
+      L.marker(at(stop.at), { keyboard: false, zIndexOffset: 600, icon: L.divIcon({ className: `stop${done ? ' done' : ''}${last ? ' last' : ''}`, iconSize: [16, 16], html }) })
+        .bindTooltip(Object.assign(document.createElement('span'), { textContent: stop.name }), { direction: 'top', offset: [0, -8], className: 'tip' })
+        .addTo(routeLayer)
+    })
+    for (const [color, weight] of [['#000', 5.5], ['#fff', 3]] as const) L.polyline(line, { color, weight, interactive: false, lineJoin: 'round' }).addTo(routeLayer)
+  })
+  $effect(() => {
+    if (map && layers.route && !inside) routeLayer.addTo(map)
+    else routeLayer.remove()
+  })
+
   // The choices are saved as they are made, and the map follows them.
   $effect(() => {
     localStorage.setItem('layers', JSON.stringify(layers))
@@ -795,6 +819,8 @@
       sending={sendState(live, inbox, !!labelled.pin)}
       acked={inbox?.seq}
       onsend={() => (labelled?.pin ? window.twinmap.sendPin({ ...labelled.pin, name: labelled.title }) : Promise.resolve({ error: 'There is nothing to send.' }))}
+      routed={inRoute(route, labelled.continent, labelled.units)}
+      onroute={() => labelled && onroute?.({ name: labelled.plain ? `${labelled.title} ${labelled.where}` : labelled.title, continent: labelled.continent, at: { ...labelled.units }, pin: labelled.pin && { ...labelled.pin } })}
       onclose={() => (labelled = null)}
     />
   {/key}
@@ -951,6 +977,41 @@
     }
   }
 
+  /* A stop of the route: a dark disc with a gold ring, its number in white beside it. */
+  .map :global(.stop) {
+    background: none;
+    border: 0;
+  }
+  .map :global(.stop i) {
+    position: absolute;
+    inset: 0;
+    box-sizing: border-box;
+    border: 2.5px solid var(--gold);
+    border-radius: 50%;
+    background: var(--plate-ink);
+    box-shadow: 0 0 0 1.5px #000;
+  }
+  .map :global(.stop.last i) {
+    box-shadow:
+      0 0 0 1.5px #000,
+      inset 0 0 0 1.5px var(--plate-ink),
+      inset 0 0 0 3px var(--gold);
+  }
+  .map :global(.stop.done i) {
+    border-color: var(--text-dim);
+    background: var(--text-dim);
+  }
+  .map :global(.stop b) {
+    position: absolute;
+    left: 20px;
+    top: -2px;
+    font: 600 14px/20px var(--font);
+    color: #fff;
+    text-shadow:
+      0 0 2px #000,
+      0 0 2px #000,
+      0 1px 2px #000;
+  }
   .map :global(.me),
   .map :global(.door),
   .map :global(.place) {
