@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { inboxFrom, pinFrom, sendState } from './send'
+import { inboxFrom, pinFrom, routeNewsFrom, sendState, stepFrom } from './send'
 
 test('a pin is checked before it leaves: a real map, a place on it, a name of plain text', () => {
   expect(pinFrom({ m: 1429, x: 43.712, y: 65.8, name: 'Lion\'s Pride Inn' })).toEqual({ m: 1429, x: 43.71, y: 65.8, name: 'Lion\'s Pride Inn' })
@@ -25,4 +25,16 @@ test('a send can go only to a game that listens, and the player is told what to 
   expect(sendState(true, null, true).why).toContain('not listening yet')
   expect(sendState(true, { seq: 3, left: 0, off: 'slots used up' }, true).why).toContain('/reload')
   expect(sendState(true, { seq: 0, left: 30, off: 'fonts not readable' }, true).why).toContain('Restart the game once')
+})
+
+test('a route and a step are checked before they leave', () => {
+  const stop = { m: 1432, x: 40, y: 50, rx: 0.5, ry: 0.75, name: 'First|stop' }
+  expect(routeNewsFrom({ t: 5, at: 1, stops: [stop], more: 1 })).toEqual({ t: 5, at: 1, stops: [{ ...stop, name: 'First/stop' }] })
+  expect(routeNewsFrom(false), 'the route taken away').toBe(false)
+  for (const wrong of [null, {}, { t: 5, at: 1, stops: [] }, { t: 5, at: 0, stops: [stop] }, { t: 5, at: 1, stops: [{ ...stop, rx: 0 }] }, { t: 5, at: 1, stops: [{ ...stop, x: 101 }] }, { t: 5, at: 1, stops: Array(31).fill(stop) }]) {
+    expect(routeNewsFrom(wrong), JSON.stringify(wrong)?.slice(0, 60)).toBeNull()
+  }
+  expect(stepFrom({ t: 5, at: 3 })).toEqual({ t: 5, at: 3 })
+  expect(stepFrom({ t: 5, at: 2.5 })).toBeNull()
+  expect(sendState(true, { seq: 1, left: 30 }, false, 'A stop is').why).toBe('A stop is in no zone the game can mark.')
 })

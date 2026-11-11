@@ -1,9 +1,10 @@
 // The route: stops the player chose on the map, in the order to walk them, and what the band of the
 // next stop says about the one ahead.
-import type { Point } from './geo'
-import type { Continent } from './maps'
+import { UNITS_PER_BLOCK, unitsOfRect, type Point } from './geo'
+import type { Continent, GameMap } from './maps'
 import { wayOf } from './now'
 import { wayTo } from './point-label'
+import { BLOCK_YARDS } from './world'
 
 export interface Stop {
   name: string
@@ -20,6 +21,8 @@ export interface Route {
   next: number
   /** The game has this very route. Any change makes it false again. */
   sent: boolean
+  /** When it was sent: the game tells its place on the route under this number. */
+  t?: number
 }
 
 export const MAX_STOPS = 30
@@ -44,7 +47,8 @@ export function routeFrom(saved: string | null): Route {
     if (!read || !Array.isArray(read.stops)) return noRoute()
     const stops = read.stops.map(stopFrom).filter((s): s is Stop => s !== null).slice(0, MAX_STOPS)
     const next = number(read.next) ? Math.max(0, Math.min(Math.floor(read.next), stops.length)) : 0
-    return stops.length ? { stops, next, sent: read.sent === true } : noRoute()
+    const sent = read.sent === true && number(read.t)
+    return stops.length ? { stops, next, sent, ...(sent ? { t: read.t } : {}) } : noRoute()
   } catch {
     return noRoute()
   }
@@ -78,6 +82,42 @@ export function moveStop(route: Route, from: number, to: number): Route {
 
 /** On to the stop after: the one ahead is skipped, or was reached. The game still has the same route. */
 export const advance = (route: Route): Route => (route.next < route.stops.length ? { ...route, next: route.next + 1 } : route)
+
+/** A route as it goes to the game: every stop on a zone map, with how near counts as there, in percent of that map. */
+export interface RouteNews {
+  t: number
+  /** The stop to start from, counted from 1. */
+  at: number
+  stops: { m: number; x: number; y: number; rx: number; ry: number; name: string }[]
+}
+
+const round = (v: number, places: number): number => Math.round(v * 10 ** places) / 10 ** places
+
+/** The route for the game, or null when it has nothing left to walk or a stop lies in no zone the game can mark. */
+export function routeNews(route: Route, maps: GameMap[], t: number): RouteNews | null {
+  if (route.next >= route.stops.length) return null
+  const stops: RouteNews['stops'] = []
+  for (const stop of route.stops) {
+    const zone = stop.pin && maps.find((m) => m.id === stop.pin!.m)
+    if (!stop.pin || !zone?.rect) return null
+    const [a, b] = unitsOfRect(zone.rect), near = (ARRIVE / BLOCK_YARDS) * UNITS_PER_BLOCK // the arriving distance, in map units
+    stops.push({ m: stop.pin.m, x: round(stop.pin.x, 2), y: round(stop.pin.y, 2), rx: round((near / Math.abs(b.x - a.x)) * 100, 3), ry: round((near / Math.abs(b.y - a.y)) * 100, 3), name: stop.name.slice(0, 40) })
+  }
+  return { t, at: route.next + 1, stops }
+}
+
+/** Where the game is on a route, as the addon tells it on the strip, checked. at: the stop it walks to, from 1; past the last, the route is done. */
+export function gameRouteFrom(section: unknown): { t: number; at: number; of: number } | null {
+  if (typeof section !== 'object' || !section) return null
+  const { t, at, of } = section as Record<string, unknown>
+  return number(t) && number(at) && number(of) ? { t, at, of } : null
+}
+
+/** The route moved on to where the game is on it. Only forwards, and only when the game has this very route. */
+export function followed(route: Route, game: { t: number; at: number } | null): Route {
+  const there = game && route.sent && game.t === route.t ? Math.min(game.at - 1, route.stops.length) : 0
+  return there > route.next ? { ...route, next: there } : route
+}
 
 /** What the band of the next stop shows. */
 export type Band =

@@ -9,16 +9,26 @@
   let {
     route,
     band,
-    onskip, // on to the stop after: also called when the character has been at the stop for a moment
-    onclear,
+    sending, // whether the route can be sent to the game now, and why not
+    inGame, // the game tells it has this very route
+    onsend, // sends the route: gives back what went wrong, or nothing
+    onskip, // on to the stop after, asked by the player
+    onarrive, // on to the stop after: the character has been at the stop for a moment
+    onclear, // the route is taken away, asked by the player
+    onend, // the route was walked to its end
     onremove,
     onmove,
     onpick, // a stop of the list was chosen: the map should go there
   }: {
     route: Route
     band: Band
+    sending: { can: boolean; why: string }
+    inGame: boolean
+    onsend: () => Promise<string>
     onskip: () => void
+    onarrive: () => void
     onclear: () => void
+    onend: () => void
     onremove: (index: number) => void
     onmove: (from: number, to: number) => void
     onpick: (stop: Stop) => void
@@ -30,13 +40,17 @@
   const dwelling = $derived(band.state === 'arrived' ? `at ${band.n}` : band.state === 'complete' ? 'complete' : '')
   $effect(() => {
     if (!dwelling) return
-    const timer = setTimeout(() => (dwelling === 'complete' ? onclear() : onskip()), DWELL)
+    const timer = setTimeout(() => (dwelling === 'complete' ? onend() : onarrive()), DWELL)
     return () => clearTimeout(timer)
   })
   $effect(() => {
     if (band.state === 'none') editing = false
   })
   const open = { duration: still() ? 0 : 160 }
+  let note = $state('') // what went wrong with the last send
+  async function send(): Promise<void> {
+    note = await onsend()
+  }
 </script>
 
 {#if band.state === 'none'}
@@ -75,7 +89,10 @@
         <button class="btn" onclick={onclear}>Clear</button>
       </div>
       {#if !route.sent}
-        <p class="unsent">Not in game yet <button class="btn" disabled title="Sending a route comes with the next step.">Send route to game</button></p>
+        <p class="unsent">Not in game yet <button class="btn" disabled={!sending.can} onclick={send}>Send route to game</button></p>
+        {#if note || !sending.can}<p class="why" role="status">{note || sending.why}</p>{/if}
+      {:else if !inGame && sending.can}
+        <p class="why" role="status">On its way to the game.</p>
       {/if}
     {/if}
   </section>
@@ -202,6 +219,10 @@
     justify-content: space-between;
     gap: 8px;
     margin: 0;
+    padding: 0 16px 12px;
+  }
+  .why {
+    margin: -4px 0 0;
     padding: 0 16px 12px;
   }
   /* On the gold the ring of the keyboard is dark. */

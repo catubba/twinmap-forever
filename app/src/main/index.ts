@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { linkStatus, lostPercent } from '../shared/link'
 import { shownFrom, type QuestsStatus } from '../shared/quests'
 import type { Found } from '../shared/search'
-import { pinFrom } from '../shared/send'
+import { pinFrom, routeNewsFrom, stepFrom } from '../shared/send'
 import { CURSEFORGE, setupComplete, setupPages } from '../shared/setup'
 import type { TilesStatus } from '../shared/tiles-status'
 import { placeWindow, WINDOW } from '../shared/window'
@@ -192,14 +192,27 @@ function createWindow(): void {
   readyChannel()
   // Send to game: a point of the map becomes a pin in the game. The answer is the number of the
   // send, which the addon tells back on the strip once it has it, or what went wrong.
-  ipcMain.handle('send-pin', (_event, asked: unknown): { seq: number } | { error: string } => {
-    const pin = pinFrom(asked)
-    if (!pin || !gameFolder) return { error: 'There is nothing to send.' }
+  type Sent = { seq: number } | { error: string }
+  const sendParts = (parts: Record<string, unknown> | null): Sent => {
+    if (!parts || !gameFolder) return { error: 'There is nothing to send.' }
     try {
-      return { seq: send(addonsFolder(gameFolder), { pin: { ...pin, t: Date.now() } }).seq }
+      return { seq: send(addonsFolder(gameFolder), parts).seq }
     } catch {
       return { error: 'Twinmap could not write next to the addon in the game folder.' }
     }
+  }
+  ipcMain.handle('send-pin', (_event, asked: unknown): Sent => {
+    const pin = pinFrom(asked)
+    return sendParts(pin && { pin: { ...pin, t: Date.now() } })
+  })
+  // The route, whole, or false to take it away from the game; and a step ahead on the route the game has.
+  ipcMain.handle('send-route', (_event, asked: unknown): Sent => {
+    const route = routeNewsFrom(asked)
+    return sendParts(route === null ? null : { route })
+  })
+  ipcMain.handle('send-step', (_event, asked: unknown): Sent => {
+    const step = stepFrom(asked)
+    return sendParts(step && { step })
   })
   win.setAlwaysOnTop(settings.onTop === true)
   // From the settings: the window over the others or not. The choice is kept.
@@ -270,6 +283,8 @@ function createWindow(): void {
     ipcMain.removeHandler('retry-tiles')
     ipcMain.removeHandler('set-on-top')
     ipcMain.removeHandler('send-pin')
+    ipcMain.removeHandler('send-route')
+    ipcMain.removeHandler('send-step')
     link.stop()
     tiles.stop()
     quests.stop()

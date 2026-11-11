@@ -6,14 +6,16 @@
   import type { GameMap } from '../../shared/maps'
   import { nearbyRows, nearest, questsHere, steady, wayOf, whereIs, type NowRow } from '../../shared/now'
   import type { QuestPin } from '../../shared/quests'
-  import { bandOf, type Route, type Stop } from '../../shared/route'
+  import { bandOf, routeNews, type Route, type Stop } from '../../shared/route'
+  import { sendState, type Inbox } from '../../shared/send'
   import type { FixedPin } from '../../shared/services'
   import Glyph from './Glyph.svelte'
   import NextStop from './NextStop.svelte'
 
   // onpick: a row was chosen, the map should go there. onpoint: the pointer or the keyboard is on
   // a row (or on none: null), the map should show which pin it is.
-  // live: the strip is being read. route and its five callbacks: the stops, and what the band's buttons do.
+  // live: the strip is being read. inbox: the way back to the game. route and its callbacks: the stops, and
+  // what the band's buttons do. inGame: the game tells it has this route. onsent: the route went to the game, under this number.
   let {
     pos,
     quests,
@@ -21,11 +23,16 @@
     side,
     ready,
     live,
+    inbox,
     route,
+    inGame,
     onpick,
     onpoint,
+    onsent,
     onskip,
+    onarrive,
     onclear,
+    onend,
     onremove,
     onmove,
     onstop,
@@ -36,7 +43,12 @@
     side?: string
     ready: boolean
     live: boolean
+    inbox: Inbox | null
     route: Route
+    inGame: boolean
+    onsent: (t: number) => void
+    onarrive: () => void
+    onend: () => void
     onpick?: (row: NowRow) => void
     onpoint?: (row: NowRow | null) => void
     onskip: () => void
@@ -72,6 +84,14 @@
     near = steady(near, nearest(around, me.continent, me.at, NEAR), now)
     return { here: here.rows, near: near.rows }
   })
+  // The route as the game takes it: none while a stop lies in no zone, or nothing is left to walk.
+  const news = $derived(routeNews(route, maps, 1))
+  async function sendRoute(): Promise<string> {
+    const t = Date.now(), answer = await window.twinmap.sendRoute(routeNews(route, maps, t) ?? false)
+    if ('error' in answer) return answer.error
+    onsent(t)
+    return ''
+  }
   const yards = (n: number): string => `${Math.round(n).toLocaleString('en-US')} yd`
 </script>
 
@@ -90,7 +110,7 @@
 {/snippet}
 
 <div class="now">
-  <NextStop {route} band={bandOf(route, me, live)} {onskip} {onclear} {onremove} {onmove} onpick={onstop} />
+  <NextStop {route} band={bandOf(route, me, live)} sending={sendState(live, inbox, news !== null, 'A stop is')} {inGame} onsend={sendRoute} {onskip} {onarrive} {onclear} {onend} {onremove} {onmove} onpick={onstop} />
   {#if lists.here.length}
     <h2 class="band">Quests here <span class="count">{lists.here.length}</span></h2>
     {@render rows(lists.here)}

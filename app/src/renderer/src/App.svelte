@@ -6,7 +6,7 @@
   import { fade, fly } from 'svelte/transition'
   import type { QuestPin } from '../../shared/quests'
   import type { FixedPin } from '../../shared/services'
-  import { addStop, advance, moveStop, noRoute, removeStop, routeFrom } from '../../shared/route'
+  import { addStop, advance, followed, gameRouteFrom, moveStop, noRoute, removeStop, routeFrom } from '../../shared/route'
   import { inboxFrom } from '../../shared/send'
   import Now from './Now.svelte'
   import Search from './Search.svelte'
@@ -82,6 +82,19 @@
   const char = $derived(link?.state.sections.char)
   // The way back to the game, as the addon tells it; nothing while the strip is not coming.
   const inbox = $derived(live ? inboxFrom(link?.state.sections.inbox) : null)
+  // Where the game is on the route it has: the app's route follows it, and a skip here is told to it.
+  const gameRoute = $derived(live ? gameRouteFrom(link?.state.sections.route) : null)
+  $effect(() => {
+    route = followed(route, gameRoute)
+  })
+  function skip(): void {
+    route = advance(route)
+    if (route.sent && route.t) void window.twinmap.sendStep({ t: route.t, at: route.next + 1 })
+  }
+  function clear(): void {
+    if (route.sent) void window.twinmap.sendRoute(false)
+    route = noRoute()
+  }
   const xp = $derived(char ? experience(char) : null)
   const mapReady = $derived(tiles?.state === 'ready')
   const insideReady = $derived(tiles?.state === 'ready' && !!tiles.interiors && !tiles.interiors.problem)
@@ -159,9 +172,14 @@
       side={char?.side}
       ready={mapReady}
       live={!!live}
+      {inbox}
       {route}
-      onskip={() => (route = advance(route))}
-      onclear={() => (route = noRoute())}
+      inGame={route.sent && gameRoute?.t === route.t}
+      onsent={(t) => (route = { ...route, sent: true, t })}
+      onskip={skip}
+      onarrive={() => (route = advance(route))}
+      onclear={clear}
+      onend={() => (route = noRoute())}
       onremove={(index) => (route = removeStop(route, index))}
       onmove={(from, to) => (route = moveStop(route, from, to))}
       onstop={(stop) => mapView?.goTo({ continent: stop.continent, at: stop.at, title: stop.name })}

@@ -12,4 +12,5 @@ Strip.lua
 Questie.lua
 Inbox.lua
 Pin.lua
+Route.lua
 Options.lua

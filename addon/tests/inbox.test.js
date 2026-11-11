@@ -237,6 +237,91 @@ test('a map the game allows no pin on: it says so and marks nothing; a pin that 
   assert.equal(waypoint(addon), null);
 });
 
+// The route in the game: the next stop is the game's pin, and reaching it, skipping it and the end of the route all tell the app.
+const onStrip = (addon) => addon.strips().map(decodeStrip).filter((b) => b.section === 'route').map((b) => JSON.parse(b.text)).at(-1);
+const threeStops = (t) => ({ t, at: 1, stops: [
+  { m: 1432, x: 40, y: 50, rx: 0.5, ry: 0.75, name: 'First' },
+  { m: 1432, x: 60, y: 50, rx: 0.5, ry: 0.75, name: 'Second' },
+  { m: 1429, x: 20, y: 20, rx: 0.4, ry: 0.6, name: 'Third' },
+] });
+function onRoute(t) {
+  const { addon, enter } = world();
+  addon.lua('(...).db.mode = "fast"; GAME.map, GAME.x, GAME.y = 1432, 0.30, 0.50');
+  app.send(addons, { route: threeStops(t) });
+  addon.run(8);
+  return { addon, enter };
+}
+
+test('a route sent from the app marks its first stop, and arriving moves the pin to the next', () => {
+  const { addon } = onRoute(11);
+  assert.equal(waypoint(addon), '1432 0.4 0.5 true');
+  assert.equal(addon.printed(), 'Twinmap Forever: stop 1 of 3, First.');
+  assert.deepEqual(onStrip(addon), { t: 11, at: 1, of: 3 });
+  addon.lua('GAME.x = 0.39'); // one percent away, the stop is half a percent wide
+  addon.run(2);
+  assert.deepEqual(onStrip(addon), { t: 11, at: 1, of: 3 }, 'arrived from too far');
+  addon.lua('GAME.x, GAME.y = 0.397, 0.505');
+  addon.run(2);
+  assert.equal(waypoint(addon), '1432 0.6 0.5 true');
+  assert.deepEqual(onStrip(addon), { t: 11, at: 2, of: 3 });
+  assert.equal(addon.printed().split('\n').at(-1), 'Twinmap Forever: stop 2 of 3, Second.');
+  // On another map the place tells nothing of a stop of this one.
+  addon.lua('GAME.map, GAME.x, GAME.y = 1429, 0.6, 0.5');
+  addon.run(2);
+  assert.deepEqual(onStrip(addon), { t: 11, at: 2, of: 3 });
+});
+
+test('a stop is skipped from the game and from the app, only forwards', () => {
+  const { addon } = onRoute(12);
+  addon.slash('/twinmap skip');
+  addon.run(2);
+  assert.deepEqual(onStrip(addon), { t: 12, at: 2, of: 3 });
+  app.send(addons, { step: { t: 12, at: 3 } });
+  addon.run(8);
+  assert.equal(waypoint(addon), '1429 0.2 0.2 true');
+  assert.deepEqual(onStrip(addon), { t: 12, at: 3, of: 3 });
+  app.send(addons, { step: { t: 12, at: 1 } });
+  app.send(addons, { step: { t: 99, at: 3 } });
+  addon.run(8);
+  assert.deepEqual(onStrip(addon), { t: 12, at: 3, of: 3 }, 'went back, or took a step of another route');
+});
+
+test('past the last stop the route is complete: the pin goes, the strip says so, and there is nothing left to skip', () => {
+  const { addon } = onRoute(13);
+  addon.slash('/twinmap skip');
+  addon.slash('/twinmap skip');
+  addon.lua('GAME.map, GAME.x, GAME.y = 1429, 0.2, 0.2');
+  addon.run(2);
+  assert.equal(waypoint(addon), null);
+  assert.deepEqual(onStrip(addon), { t: 13, at: 4, of: 3 });
+  assert.equal(addon.printed().split('\n').at(-1), 'Twinmap Forever: route complete.');
+  addon.slash('/twinmap skip');
+  assert.equal(addon.printed().split('\n').at(-1), 'Twinmap Forever: no route to skip on.');
+});
+
+test('a /reload keeps the place on the route, a new route starts where the app says, and one taken away clears the pin', () => {
+  const { addon, enter } = onRoute(14);
+  addon.slash('/twinmap skip');
+  addon.reload();
+  enter();
+  addon.lua('(...).db.mode = "fast"');
+  addon.run(8);
+  assert.deepEqual(onStrip(addon), { t: 14, at: 2, of: 3 });
+  assert.equal(waypoint(addon), '1432 0.6 0.5 true');
+  app.send(addons, { route: { ...threeStops(15), at: 3 } });
+  addon.run(8);
+  assert.deepEqual(onStrip(addon), { t: 15, at: 3, of: 3 });
+  app.send(addons, { route: false });
+  addon.run(8);
+  assert.equal(waypoint(addon), null);
+  addon.slash('/twinmap skip');
+  assert.equal(addon.printed().split('\n').at(-1), 'Twinmap Forever: no route to skip on.');
+  // A route that is not one is no route.
+  app.send(addons, { route: { t: 16, stops: [{ m: 1432, x: 'east' }] } });
+  addon.run(8);
+  assert.equal(waypoint(addon), null);
+});
+
 test('the strip tells the app why nothing can arrive, and how many slots are left', () => {
   const { addon } = world();
   addon.lua('(...).db.mode = "fast"');
