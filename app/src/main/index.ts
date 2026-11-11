@@ -187,7 +187,13 @@ function createWindow(): void {
   // to it, by themselves and once. Where that fails (a folder that cannot be written) the map works all the same.
   let channel: Promise<unknown> | null = null
   const readyChannel = (): void => {
-    if (gameFolder && setup.addon !== null) channel ??= installChannel(addonsFolder(gameFolder)).catch(() => {})
+    if (!gameFolder || setup.addon === null || channel) return
+    const addons = addonsFolder(gameFolder)
+    // Once the way is there, the addon is told that this app was just opened and has heard nothing yet:
+    // a game already running then sends everything again at once. Small enough to ride the font.
+    channel = installChannel(addons)
+      .then(() => void send(addons, { sync: Date.now() }))
+      .catch(() => {})
   }
   readyChannel()
   // Send to game: a point of the map becomes a pin in the game. The answer is the number of the

@@ -73,6 +73,14 @@ ns.sections[#ns.sections + 1] = { name = "inbox", period = 1, build = function()
   return { seq = ns.db.inbox.seq, left = SLOTS - used, off = ns.signal ~= "reading" and ns.signal or nil }
 end }
 
+-- The app was just opened and has heard nothing yet: it says so with a number new each time, and
+-- everything is sent again at once. The same number told again, at a login, asks for nothing.
+ns.receivers.sync = function(session)
+  if session == nil or session == ns.db.syncSeen then return end
+  ns.db.syncSeen = session
+  ns.ResendAll()
+end
+
 local text, reading
 local fails, acc = 0, POLL
 

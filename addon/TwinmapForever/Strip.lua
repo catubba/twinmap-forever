@@ -19,7 +19,7 @@ local _, ns = ...
 -- Tuning knobs.
 local CELL = 1        -- physical pixels per cell
 local RESERVED = 40   -- bytes of a block that are not section data: header, checksum, record
-local REFRESH = 30    -- resend an unchanged section this often: nothing acks, a block can be missed, and an app opened after the game has heard nothing yet
+local REFRESH = 30    -- resend an unchanged section this often: nothing acks and a block can be missed. An app opened after the game asks for everything itself (Inbox.lua)
 local START_DELAY = 5 -- seconds after entering the world
 
 local MAGIC1, MAGIC2 = 0xC7, 0x1B
@@ -363,6 +363,11 @@ local function Next(combat)
   for i, item in ipairs(queue) do
     if item.combat or not combat then return table.remove(queue, i) end
   end
+end
+
+-- Everything is sent again, changed or not: asked for when someone new is reading the strip.
+function ns.ResendAll()
+  for _, s in ipairs(SECTIONS) do s.nextAt, s.json = 0, nil end
 end
 
 local driver = CreateFrame("Frame")
