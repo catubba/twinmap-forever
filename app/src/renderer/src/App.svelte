@@ -34,8 +34,9 @@
   })
 
   // The opening screen: the mark on the ground of the app, until the first screen is known and drawn
-  // under it. The map gets a moment to lay its first tiles, so it is never seen coming in.
-  const SETTLE = 450 // ms
+  // under it, and for long enough to see the mark and read the name. Meanwhile the map lays its
+  // first tiles, so it is never seen coming in.
+  const SETTLE = 1500 // ms
   let opening = $state(true)
   // The window is see-through until the mark is on it, in its own letters and drawn: then it is told to show.
   let seen = $state(false)

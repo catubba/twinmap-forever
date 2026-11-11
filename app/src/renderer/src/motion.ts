@@ -18,7 +18,7 @@ export const pop = (): ScaleParams => ({ start: still() ? 1 : 0.94, duration: OP
 export const gone: FadeParams = { duration: 120 }
 export const screen: FadeParams = { duration: 220, easing: cubicOut }
 /** The opening screen giving way to the first one. */
-export const opened: FadeParams = { duration: 360, easing: cubicOut }
+export const opened: FadeParams = { duration: 600 }
 /** A page coming in from the side the player is going to: 1 from the right, -1 from the left. */
 export const pageIn = (dir: number): FlyParams => ({ x: still() ? 0 : 56 * dir, duration: PAGE, easing: cubicOut })
 export const pageOut = (dir: number): FlyParams => ({ x: still() ? 0 : -56 * dir, duration: 200, easing: cubicOut })
