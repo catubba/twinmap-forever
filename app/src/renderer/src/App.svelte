@@ -97,7 +97,7 @@
     </nav>
   {/if}
   {#if onSetup === false && !onSettings && mapReady}
-    <Search ready={mapReady} onpick={(place) => mapView?.goTo(place)} />
+    <Search ready={mapReady} {pos} side={char?.side} onpick={(place) => mapView?.goTo(place)} />
   {/if}
   {#if status}
     <p class="status" class:alone={onSetup !== false || onSettings || !mapReady}><i class={status.tone}></i>{status.word}</p>

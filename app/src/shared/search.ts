@@ -10,6 +10,19 @@ export interface Found {
   area: number
   x: number
   y: number
+  /** Found by what it does, not by its name: "first aid" finds who teaches it. */
+  does?: true
+  /** Whom an NPC found so serves: "A", "H" or "AH". */
+  side?: string
+}
+
+/**
+ * Whether a text answers what was typed word by word: each word typed starts a word of the text,
+ * in any order. So "first aid" and "trainer first" both find "first aid trainer". Both folded.
+ */
+export function wordsMatch(text: string, typed: string): boolean {
+  const words = text.split(' ')
+  return typed.split(' ').every((wanted) => words.some((word) => word.startsWith(wanted)))
 }
 
 /**

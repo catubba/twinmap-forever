@@ -3,13 +3,16 @@
   // player's QuestieDB. The results open under the field; one chosen takes the map to its place.
   import { unitsOfPlace, type Point } from '../../shared/geo'
   import type { Continent, GameMap } from '../../shared/maps'
+  import { wayOf, whereIs } from '../../shared/now'
   import { best, fold } from '../../shared/search'
+  import { serves } from '../../shared/services'
   import Glyph from './Glyph.svelte'
 
   export interface Place { continent: Continent; at: Point; title: string; where?: string; whole?: GameMap }
-  let { ready, onpick }: { ready: boolean; onpick: (place: Place) => void } = $props()
+  let { ready, onpick, pos, side }: { ready: boolean; onpick: (place: Place) => void; pos?: { map?: number; x?: number; y?: number }; side?: string } = $props()
 
-  const MOST = 12 // results under the field
+  const MOST = 14 // results under the field
+  const DOERS = 8 // of which found by what they do, the nearest, at most
   const ZONES = 4 // of which zones, at most
 
   // The maps of the game, from the folder of the tiles: there once the map is made.
@@ -22,7 +25,7 @@
       .catch(() => {})
   })
 
-  interface Result extends Place { note: string }
+  interface Result extends Place { note: string; yards?: number }
   let typed = $state('')
   let results = $state.raw<Result[]>([])
   let open = $state(false)
@@ -39,11 +42,20 @@
     const byArea = new Map(zones.filter((z) => z.area).map((z) => [z.area, z]))
     const found = await window.twinmap.search(wanted)
     if (mine !== asked) return // something else was typed while this was being looked for
+    const me = whereIs(zones, pos)
+    const named: Result[] = [], doers: Result[] = []
     for (const f of found) {
       const zone = byArea.get(f.area) // a place in a zone the app has no map of cannot be shown
-      if (zone) places.push({ continent: zone.continent!, at: unitsOfPlace(zone.rect!, f.x, f.y), title: f.name, where: `${zone.name} ${f.x.toFixed(1)}, ${f.y.toFixed(1)}`, note: f.note })
+      if (!zone || (f.does && !serves(f, side))) continue
+      const at = unitsOfPlace(zone.rect!, f.x, f.y)
+      // How far, when the character is on the same continent: there is no walking to the other.
+      const yards = me && me.continent === zone.continent ? wayOf(me.at, at).yards : undefined
+      ;(f.does ? doers : named).push({ continent: zone.continent!, at, title: f.name, where: `${zone.name} ${f.x.toFixed(1)}, ${f.y.toFixed(1)}`, note: `${f.note}, ${zone.name}`, yards })
     }
-    results = places.slice(0, MOST)
+    // Who does what was typed comes first, the nearest first; then what is called so, unless it is one of them.
+    doers.sort((a, b) => (a.yards ?? Infinity) - (b.yards ?? Infinity))
+    const first = doers.slice(0, DOERS)
+    results = [...places, ...first, ...named.filter((n) => !first.some((d) => d.title === n.title && d.where === n.where))].slice(0, MOST)
     chosen = 0
     open = true
     took = performance.now() - started
@@ -95,6 +107,7 @@
           <button class="item" class:is-hover={i === chosen} id="search-result-{i}" role="option" aria-selected={i === chosen} tabindex="-1" onclick={() => pick(result)}>
             <span class="name">{result.title}</span>
             <span class="num">{result.note}</span>
+            {#if result.yards !== undefined}<span class="far">{Math.round(result.yards).toLocaleString('en-US')} yd</span>{/if}
           </button>
         </li>
       {:else}
@@ -132,18 +145,25 @@
     right: 0;
     top: 30px;
     z-index: 2500;
-    width: 420px;
+    width: 520px;
     white-space: nowrap;
   }
   .name {
     flex: none;
-    max-width: 60%;
+    max-width: 45%;
     overflow: hidden;
     text-overflow: ellipsis;
   }
   .num {
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+  .far {
+    flex: none;
+    min-width: 62px;
+    text-align: right;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
   }
   .none {
     padding: 4px 12px;
