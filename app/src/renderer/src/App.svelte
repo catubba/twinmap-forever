@@ -7,6 +7,7 @@
   import type { QuestPin } from '../../shared/quests'
   import type { FixedPin } from '../../shared/services'
   import Now from './Now.svelte'
+  import Search from './Search.svelte'
   import type { SetupStatus } from '../../shared/setup'
   import FirstRun from './FirstRun.svelte'
   import Logo from './Logo.svelte'
@@ -95,8 +96,11 @@
       <button class="tab" aria-current={onSettings ? undefined : 'page'} onclick={() => (onSettings = false)}>Now</button>
     </nav>
   {/if}
+  {#if onSetup === false && !onSettings && mapReady}
+    <Search ready={mapReady} onpick={(place) => mapView?.goTo(place)} />
+  {/if}
   {#if status}
-    <p class="status"><i class={status.tone}></i>{status.word}</p>
+    <p class="status" class:alone={onSetup !== false || onSettings || !mapReady}><i class={status.tone}></i>{status.word}</p>
   {/if}
   {#if onSetup === false}
     <button class="entry" aria-current={onSettings ? 'page' : undefined} onclick={() => (onSettings = !onSettings)}>Settings</button>
@@ -234,9 +238,13 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    margin: 0 0 0 auto;
+    margin: 0;
     line-height: 31px; /* on the line of the entries beside it */
     padding-bottom: 2px;
+  }
+  /* Without the search before it, the state of the link is what goes to the right. */
+  .status.alone {
+    margin-left: auto;
   }
   .status i {
     width: 8px;

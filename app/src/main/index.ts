@@ -4,12 +4,14 @@ import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { linkStatus, lostPercent } from '../shared/link'
 import { shownFrom, type QuestsStatus } from '../shared/quests'
+import type { Found } from '../shared/search'
 import { CURSEFORGE, setupComplete, setupPages } from '../shared/setup'
 import type { TilesStatus } from '../shared/tiles-status'
 import { placeWindow, WINDOW } from '../shared/window'
 import { findGameWindow, programOf } from './capture'
 import { gameFolderFrom, registryInstallPath } from './client-files'
 import { startLink } from './link'
+import type { Answer, Asked } from './questie-worker'
 import startQuestieWorker from './questie-worker?nodeWorker'
 import { readSettings, setupStatus, writeSettings } from './setup'
 import { servedFile } from './tiles'
@@ -46,19 +48,36 @@ function startTiles(gameFolder: string | null): { status: () => TilesStatus; sto
 
 // The quests on the map: the player's QuestieDB is opened once, and asked for the pins of what
 // Questie shows each time the addon tells something new. tell: called with every answer.
-function startQuests(gameFolder: string | null, tell: (status: QuestsStatus) => void): { show: (section: unknown) => void; stop: () => void } {
-  if (!gameFolder) return { show: () => {}, stop: () => {} }
+function startQuests(gameFolder: string | null, tell: (status: QuestsStatus) => void): { show: (section: unknown) => void; search: (typed: string) => Promise<Found[]>; stop: () => void } {
+  if (!gameFolder) return { show: () => {}, search: () => Promise.resolve([]), stop: () => {} }
   const worker = startQuestieWorker({ workerData: { gameFolder } })
-  worker.on('message', tell)
-  worker.on('error', () => tell({ questie: null, pins: [], fixed: [] })) // no quests on the map; the rest of the app goes on
+  // A search waits for the answer that carries its number.
+  const asked = new Map<number, (found: Found[]) => void>()
+  let searches = 0
+  const post = (message: Asked): void => worker.postMessage(message)
+  worker.on('message', (told: QuestsStatus | Answer) => {
+    if (!('found' in told)) return tell(told)
+    asked.get(told.id)?.(told.found)
+    asked.delete(told.id)
+  })
+  worker.on('error', () => {
+    tell({ questie: null, pins: [], fixed: [] }) // no quests on the map; the rest of the app goes on
+    for (const answer of asked.values()) answer([])
+    asked.clear()
+  })
   let last = ''
   return {
     show: (section) => {
       const told = JSON.stringify(section ?? null)
       if (told === last) return
       last = told
-      worker.postMessage(shownFrom(section))
+      post({ shown: shownFrom(section) })
     },
+    search: (typed) =>
+      new Promise((answer) => {
+        asked.set(++searches, answer)
+        post({ search: typed, id: searches })
+      }),
     stop: () => void worker.terminate(),
   }
 }
@@ -147,6 +166,8 @@ function createWindow(): void {
     }
     return null
   })
+  // The search of the top row: what was typed, cut to a sane length.
+  ipcMain.handle('search', (_event, typed: unknown): Promise<Found[]> => (typeof typed === 'string' ? quests.search(typed.slice(0, 80)) : Promise.resolve([])))
   ipcMain.handle('open-curseforge', () => shell.openExternal(CURSEFORGE))
   // A conversion that failed is started again, from where it stopped: the cause may be gone (a full disk, a folder in use).
   ipcMain.handle('retry-tiles', () => {
