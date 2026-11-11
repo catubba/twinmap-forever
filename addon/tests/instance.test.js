@@ -116,3 +116,39 @@ test('in a dungeon the position says where the minimap is on the window, and now
   addon.run(2);
   assert.equal(positions(addon).at(-1).inst, undefined);
 });
+
+test('the minimap is put at its widest on the way into a dungeon and back as it was on the way out', () => {
+  const MINIMAP = `
+    ZOOM = 3
+    Minimap = {
+      GetCenter = function() return 100, 100 end, GetWidth = function() return 198 end, GetEffectiveScale = function() return 0.64 end,
+      GetZoom = function() return ZOOM end, SetZoom = function(_, zoom) ZOOM = zoom; SETS = (SETS or 0) + 1 end,
+    }
+    function GetCVar() return "0" end`;
+  const zoom = (addon) => addon.lua('return ZOOM');
+  const addon = enterWorld(MINIMAP);
+  addon.run(10);
+  assert.equal(zoom(addon), 3); // the open world: left alone
+
+  addon.lua(DEADMINES);
+  addon.run(2);
+  assert.equal(zoom(addon), 0);
+  assert.equal(positions(addon).at(-1).inst.mini.zoom, 0);
+  // The player zooms in inside: that is theirs, it is not put back.
+  addon.lua('ZOOM = 2');
+  addon.run(5);
+  assert.equal(zoom(addon), 2);
+  addon.lua('ZOOM = 0');
+
+  addon.lua('GAME.instance = nil; GAME.zone, GAME.sub, GAME.map, GAME.x = "Westfall", "Moonbrook", 1436, 0.42');
+  addon.run(2);
+  assert.equal(zoom(addon), 3);
+
+  // Out with a zoom the game or the player set meanwhile: left as it is, and the next way in starts afresh.
+  addon.lua(DEADMINES);
+  addon.run(2);
+  addon.lua('ZOOM = 1; GAME.instance = nil; GAME.zone, GAME.sub, GAME.map, GAME.x = "Westfall", "Moonbrook", 1436, 0.42');
+  addon.run(2);
+  assert.equal(zoom(addon), 1);
+  assert.equal(addon.lua('return SETS'), 3);
+});
