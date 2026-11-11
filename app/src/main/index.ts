@@ -15,6 +15,7 @@ import startTilesWorker from './tiles-worker?nodeWorker'
 
 const SHOW_EVERY = 50 // ms between updates of the window: a position must be there well before the arrow needs it (BEHIND in glide.ts)
 const LOG_EVERY = 5000 // ms between writes of the measures
+const SHOW_AFTER = 3000 // ms after which the window shows itself even if its page has not said it is drawn
 
 const BLANK = Buffer.from('R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==', 'base64') // a see-through picture of one pixel
 
@@ -59,11 +60,19 @@ function createWindow(): void {
     minWidth: WINDOW.minWidth,
     minHeight: WINDOW.minHeight,
     backgroundColor: WINDOW.background,
+    opacity: 0, // see-through until the opening screen is drawn on it: never an empty window
     titleBarStyle: 'hidden',
     titleBarOverlay: { color: '#00000000', symbolColor: WINDOW.symbols, height: WINDOW.top },
     webPreferences: { preload: join(__dirname, '../preload/index.js') },
   })
   if ((saved as { maximized?: unknown } | null)?.maximized === true) win.maximize()
+  // The page says when its opening screen is drawn; a page that never says so is shown all the same.
+  // (A window kept hidden instead draws nothing new until it is shown, and is seen empty for a moment.)
+  const open = (): void => {
+    if (!win.isDestroyed()) win.setOpacity(1)
+  }
+  ipcMain.once('drawn', open)
+  setTimeout(open, SHOW_AFTER)
   win.on('close', () => {
     try {
       writeFileSync(placeFile, JSON.stringify({ ...win.getNormalBounds(), maximized: win.isMaximized() }))
@@ -108,6 +117,12 @@ function createWindow(): void {
     return null
   })
   ipcMain.handle('open-curseforge', () => shell.openExternal(CURSEFORGE))
+  // A conversion that failed is started again, from where it stopped: the cause may be gone (a full disk, a folder in use).
+  ipcMain.handle('retry-tiles', () => {
+    if (tiles.status().state !== 'failed') return
+    tiles.stop()
+    tiles = startTiles(gameFolder)
+  })
   // Where the first run stands, looked at every couple of seconds: an addon installed meanwhile shows by itself.
   let setup = setupStatus(gameFolder, settings, app.getVersion())
   win.setAlwaysOnTop(settings.onTop === true)
@@ -173,6 +188,7 @@ function createWindow(): void {
     clearInterval(look)
     ipcMain.removeHandler('choose-game-folder')
     ipcMain.removeHandler('open-curseforge')
+    ipcMain.removeHandler('retry-tiles')
     ipcMain.removeHandler('set-on-top')
     link.stop()
     tiles.stop()

@@ -11,6 +11,8 @@ declare global {
       onSetup: (listener: (status: SetupStatus) => void) => void
       chooseGameFolder: () => Promise<string | null>
       openCurseForge: () => Promise<void>
+      retryTiles: () => Promise<void>
+      drawn: () => void
       setOnTop: (on: boolean) => Promise<void>
     }
   }

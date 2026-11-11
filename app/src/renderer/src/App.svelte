@@ -2,11 +2,13 @@
   // The main screen: the top row with the state of the link, the map in its frame, and the Now panel.
   import { experience, linkStatus, type LinkSnapshot } from '../../shared/link'
   import { tilesLine, type TilesStatus } from '../../shared/tiles-status'
+  import { onMount } from 'svelte'
   import { fade, fly } from 'svelte/transition'
   import type { SetupStatus } from '../../shared/setup'
   import FirstRun from './FirstRun.svelte'
+  import Logo from './Logo.svelte'
   import Map from './Map.svelte'
-  import { drop, gone, screen } from './motion'
+  import { drop, gone, opened, screen } from './motion'
   import Settings from './Settings.svelte'
 
   let link = $state<LinkSnapshot | null>(null)
@@ -31,6 +33,27 @@
     onSetup ??= !told.done
   })
 
+  // The opening screen: the mark on the ground of the app, until the first screen is known and drawn
+  // under it. The map gets a moment to lay its first tiles, so it is never seen coming in.
+  const SETTLE = 450 // ms
+  let opening = $state(true)
+  // The window is see-through until the mark is on it, in its own letters and drawn: then it is told to show.
+  let seen = $state(false)
+  onMount(() => {
+    const frame = (): Promise<void> => new Promise((done) => requestAnimationFrame(() => done()))
+    void document.fonts.load('40px Marcellus').catch(() => {}).then(frame).then(frame).then(() => {
+      window.twinmap.drawn()
+      seen = true
+    })
+  })
+  // Told afresh many times a second: only the change from unknown to known may start the wait.
+  const known = $derived(seen && !!setup && !!tiles && tiles.state !== 'looking')
+  $effect(() => {
+    if (!opening || !known) return
+    const timer = setTimeout(() => (opening = false), SETTLE)
+    return () => clearTimeout(timer)
+  })
+
   const status = $derived(link ? linkStatus(link, now) : null)
   // The position is shown only while it is coming: an arrow left where the character was an hour ago would lie.
   const live = $derived(status?.kind === 'connected' || status?.kind === 'combat')
@@ -46,6 +69,10 @@
     wrong = (await window.twinmap.chooseGameFolder()) ?? ''
   }
 </script>
+
+{#if opening}
+  <div class="opening" out:fade={opened}><Logo size={96} stacked /></div>
+{/if}
 
 <!-- The top row is the window's title bar too: it drags the window, a double click maximizes it. -->
 <header class="top">
@@ -82,6 +109,9 @@
           {#if wrong}<p>{wrong}</p>{/if}
           <button class="btn" onclick={choose}>Choose the game folder</button>
         {/if}
+        {#if tiles.state === 'failed'}
+          <button class="btn" onclick={() => window.twinmap.retryTiles()}>Try again</button>
+        {/if}
       </div>
     {/if}
     {#if pos}
@@ -113,6 +143,18 @@
 {/if}
 
 <style>
+  /* Over everything, the top row too; it drags the window as the top row does. */
+  .opening {
+    position: fixed;
+    inset: 0;
+    z-index: 3000;
+    display: grid;
+    place-content: center;
+    background: var(--stone-900);
+    color: var(--gold);
+    -webkit-app-region: drag;
+  }
+
   .top {
     display: flex;
     align-items: flex-end;

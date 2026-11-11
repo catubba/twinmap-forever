@@ -54,7 +54,7 @@ test('the pages of the first run, from nothing to the arrow', () => {
 
 test('what went wrong is said on its page: a map not built, an addon to tick, one of the two to update', () => {
   const installed = { gameFolder: 'D:\\WoW', addon: '0.1.0', questie: true, done: false, version: '0.1.0', onTop: false }
-  expect(setupPages(installed, { state: 'failed', message: 'disk full' }, CLOSED)[1]).toMatchObject({ state: 'problem', lines: ['The map could not be built.', 'disk full'] })
+  expect(setupPages(installed, { state: 'failed', message: 'disk full' }, CLOSED)[1]).toMatchObject({ state: 'problem', lines: ['The map could not be built.', 'disk full'], action: 'retry' })
   const lost = setupPages(installed, READY, { kind: 'lost', word: 'Link lost', tone: 'objective' })[4]!
   expect(lost.state).toBe('todo')
   expect(lost.lines.join(' ')).toContain('make sure Twinmap Forever is ticked')
