@@ -322,6 +322,25 @@ test('a /reload keeps the place on the route, a new route starts where the app s
   assert.equal(waypoint(addon), null);
 });
 
+test('an app just opened asks for everything, and has it within seconds though nothing changed', () => {
+  const { addon, enter } = world();
+  addon.lua('(...).db.mode = "fast"; GAME.level, GAME.xp, GAME.xpMax, GAME.faction = 13, 8400, 13600, "Alliance"');
+  addon.run(12);
+  const sections = (from) => [...new Set(addon.strips().slice(from).map(decodeStrip).map((b) => b.section))].sort();
+  let mark = addon.strips().length;
+  addon.run(8);
+  assert.deepEqual(sections(mark), ['pos'], 'unchanged sections went out again unasked');
+  mark = addon.strips().length;
+  assert.equal(app.send(addons, { sync: 1731350000000 }).inFont, true);
+  addon.run(8);
+  assert.deepEqual(sections(mark), ['char', 'inbox', 'pos']);
+  assert.equal(addon.slots(), 0);
+  // The same number again, at a login, asks for nothing more than a login sends anyway.
+  addon.reload();
+  enter();
+  assert.equal(addon.lua('return string.format("%.0f", (...).db.syncSeen)'), '1731350000000');
+});
+
 test('the strip tells the app why nothing can arrive, and how many slots are left', () => {
   const { addon } = world();
   addon.lua('(...).db.mode = "fast"');
