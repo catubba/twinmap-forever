@@ -1,7 +1,8 @@
 <script lang="ts">
   // The label on a point of the map: its name, where it is, how far and how long on foot. It opens
   // on the side with the most room and a thin line ties it to the point. Send to game marks the point
-  // in the game, and says Sent once the addon tells it has it; Add to route puts it at the end of the route.
+  // in the game, and says Sent once the addon tells it has it; Add to route puts it at the end of the route. Save keeps the point among My pins; a saved one is
+  // renamed by writing over its name, and Remove takes it away.
   import type { Point } from '../../shared/geo'
   import { labelPlace, type Size } from '../../shared/point-label'
   import { fade, scale } from 'svelte/transition'
@@ -19,6 +20,10 @@
     onsend, // sends the point: gives back the number of the send, or what went wrong
     routed, // the point is already a stop of the route
     onroute, // adds the point to the route
+    saved, // the point is one of My pins
+    onsave,
+    onrename,
+    onremove,
     onclose,
   }: {
     title: string
@@ -31,6 +36,10 @@
     onsend: () => Promise<{ seq: number } | { error: string }>
     routed: boolean
     onroute: () => void
+    saved: boolean
+    onsave: () => void
+    onrename: (name: string) => void
+    onremove: () => void
     onclose: () => void
   } = $props()
 
@@ -75,12 +84,17 @@
 </svg>
 <div class="label" data-side={at.side} role="dialog" in:scale={pop()} out:fade={gone} aria-label={title} style:left="{at.left}px" style:top="{at.top}px" style:visibility={width ? 'visible' : 'hidden'} bind:offsetWidth={width} bind:offsetHeight={height}>
   <button class="close" aria-label="Close" onclick={onclose}><Glyph name="close" size={14} /></button>
-  <h3>{title}</h3>
+  {#if saved}
+    <input class="name" aria-label="Name of the pin" value={title} maxlength="60" spellcheck="false" onchange={(e) => onrename(e.currentTarget.value)} onkeydown={(e) => e.key === 'Enter' && e.currentTarget.blur()} />
+  {:else}
+    <h3>{title}</h3>
+  {/if}
   {#if where}<p class="dim">{where}</p>{/if}
   {#if way}<p>{way.far}, {way.time}</p>{/if}
   <div class="go">
     <button class="btn" disabled={!sending.can} aria-busy={phase === 'sending'} onclick={go}>{phase === 'sending' ? 'Sending' : phase === 'sent' ? 'Sent' : 'Send to game'}</button>
     <button class="btn" disabled={routed} onclick={onroute}>{routed ? 'In route' : 'Add to route'}</button>
+    {#if saved}<button class="btn" onclick={onremove}>Remove</button>{:else}<button class="btn" onclick={onsave}>Save</button>{/if}
   </div>
   {#if note || !sending.can}<p class="dim why" role="status">{note || sending.why}</p>{/if}
 </div>
@@ -109,7 +123,7 @@
     position: absolute;
     z-index: 1150;
     min-width: 236px;
-    max-width: 320px;
+    max-width: 344px;
     padding: 10px 12px;
     border: 2px solid var(--float-edge);
     border-radius: 7px;
@@ -123,6 +137,27 @@
     font: 400 18px/22px var(--display);
     color: var(--gold);
     text-shadow: 0 1px 0 #000;
+  }
+  /* The name of a saved pin is written over: it looks like the title until it is pointed at or held. */
+  .name {
+    display: block;
+    width: calc(100% - 24px);
+    margin: -3px 0 -1px -5px;
+    padding: 2px 4px;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    background: none;
+    font: 400 18px/22px var(--display);
+    color: var(--gold);
+    text-shadow: 0 1px 0 #000;
+  }
+  .name:hover {
+    border-color: var(--bronze-600);
+  }
+  .name:focus {
+    border-color: var(--gold-pale);
+    background: #0008;
+    outline: none;
   }
   p {
     margin: 0;
