@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { linkStatus, lostPercent } from '../shared/link'
 import { shownFrom, type QuestsStatus } from '../shared/quests'
 import type { Found } from '../shared/search'
+import { pinFrom } from '../shared/send'
 import { CURSEFORGE, setupComplete, setupPages } from '../shared/setup'
 import type { TilesStatus } from '../shared/tiles-status'
 import { placeWindow, WINDOW } from '../shared/window'
@@ -14,7 +15,7 @@ import { startLink } from './link'
 import type { Answer, Asked } from './questie-worker'
 import startQuestieWorker from './questie-worker?nodeWorker'
 import { addonsFolder, readSettings, setupStatus, writeSettings } from './setup'
-import { installChannel } from './signal'
+import { installChannel, send } from './signal'
 import { servedFile } from './tiles'
 import startTilesWorker from './tiles-worker?nodeWorker'
 
@@ -189,6 +190,17 @@ function createWindow(): void {
     if (gameFolder && setup.addon !== null) channel ??= installChannel(addonsFolder(gameFolder)).catch(() => {})
   }
   readyChannel()
+  // Send to game: a point of the map becomes a pin in the game. The answer is the number of the
+  // send, which the addon tells back on the strip once it has it, or what went wrong.
+  ipcMain.handle('send-pin', (_event, asked: unknown): { seq: number } | { error: string } => {
+    const pin = pinFrom(asked)
+    if (!pin || !gameFolder) return { error: 'There is nothing to send.' }
+    try {
+      return { seq: send(addonsFolder(gameFolder), { pin: { ...pin, t: Date.now() } }).seq }
+    } catch {
+      return { error: 'Twinmap could not write next to the addon in the game folder.' }
+    }
+  })
   win.setAlwaysOnTop(settings.onTop === true)
   // From the settings: the window over the others or not. The choice is kept.
   ipcMain.handle('set-on-top', (_event, on: unknown) => {
@@ -257,6 +269,7 @@ function createWindow(): void {
     ipcMain.removeHandler('open-curseforge')
     ipcMain.removeHandler('retry-tiles')
     ipcMain.removeHandler('set-on-top')
+    ipcMain.removeHandler('send-pin')
     link.stop()
     tiles.stop()
     quests.stop()

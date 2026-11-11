@@ -11,4 +11,5 @@ TwinmapForever.lua
 Strip.lua
 Questie.lua
 Inbox.lua
+Pin.lua
 Options.lua

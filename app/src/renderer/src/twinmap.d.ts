@@ -1,6 +1,7 @@
 import type { LinkSnapshot } from '../../shared/link'
 import type { QuestsStatus } from '../../shared/quests'
 import type { Found } from '../../shared/search'
+import type { Pin } from '../../shared/send'
 import type { SetupStatus } from '../../shared/setup'
 import type { TilesStatus } from '../../shared/tiles-status'
 
@@ -18,6 +19,7 @@ declare global {
       drawn: () => void
       setOnTop: (on: boolean) => Promise<void>
       search: (typed: string) => Promise<Found[]>
+      sendPin: (pin: Pin) => Promise<{ seq: number } | { error: string }>
     }
   }
 }

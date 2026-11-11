@@ -6,6 +6,7 @@
   import { fade, fly } from 'svelte/transition'
   import type { QuestPin } from '../../shared/quests'
   import type { FixedPin } from '../../shared/services'
+  import { inboxFrom } from '../../shared/send'
   import Now from './Now.svelte'
   import Search from './Search.svelte'
   import type { SetupStatus } from '../../shared/setup'
@@ -75,6 +76,8 @@
   const pos = $derived(live ? link?.state.sections.pos : undefined)
   // Level and experience stay as last seen.
   const char = $derived(link?.state.sections.char)
+  // The way back to the game, as the addon tells it; nothing while the strip is not coming.
+  const inbox = $derived(live ? inboxFrom(link?.state.sections.inbox) : null)
   const xp = $derived(char ? experience(char) : null)
   const mapReady = $derived(tiles?.state === 'ready')
   const insideReady = $derived(tiles?.state === 'ready' && !!tiles.interiors && !tiles.interiors.problem)
@@ -100,7 +103,7 @@
     <Search ready={mapReady} {pos} side={char?.side} onpick={(place) => mapView?.goTo(place)} />
   {/if}
   {#if status}
-    <p class="status" class:alone={onSetup !== false || onSettings || !mapReady}><i class={status.tone}></i>{status.word}</p>
+    <p class="status" class:alone={onSetup !== false || onSettings || !mapReady}><i class={status.tone}></i>{status.word}{#if inbox && !inbox.off}<span class="left" class:low={inbox.left < 5}>{inbox.left} sends left</span>{/if}</p>
   {/if}
   {#if onSetup === false}
     <button class="entry" aria-current={onSettings ? 'page' : undefined} onclick={() => (onSettings = !onSettings)}>Settings</button>
@@ -119,7 +122,7 @@
 <div class="work" in:fade={screen} inert={onSettings}>
   <div class="mapbox">
     {#if mapReady}
-      <Map {pos} at={link?.state.updatedAt.pos} bind:this={mapView} {insideReady} {quests} {fixed} side={char?.side} />
+      <Map {pos} at={link?.state.updatedAt.pos} bind:this={mapView} {insideReady} {quests} {fixed} side={char?.side} {live} {inbox} />
     {:else if tiles}
       <div class="making" class:failed={tiles.state === 'failed' || tiles.state === 'no-game'}>
         <p>{tilesLine(tiles)}</p>
@@ -245,6 +248,13 @@
   /* Without the search before it, the state of the link is what goes to the right. */
   .status.alone {
     margin-left: auto;
+  }
+  .status .left {
+    margin-left: 6px;
+    color: var(--text-dim);
+  }
+  .status .left.low {
+    color: var(--objective);
   }
   .status i {
     width: 8px;

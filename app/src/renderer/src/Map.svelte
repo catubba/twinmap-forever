@@ -22,11 +22,12 @@
   import Glyph from './Glyph.svelte'
   import { drop, gone, still } from './motion'
   import PointLabel from './PointLabel.svelte'
+  import { sendState, type Inbox } from '../../shared/send'
   import { pin } from './marks'
 
   // at: when the position was read off the game, in milliseconds.
   // insideReady: the rooms of the buildings are converted, and their list can be asked for.
-  let { pos, at: readAt, insideReady, quests = [], fixed = [], side }: { pos: Position | undefined; at: number | undefined; insideReady: boolean; quests?: QuestPin[]; fixed?: FixedPin[]; side?: string } = $props()
+  let { pos, at: readAt, insideReady, quests = [], fixed = [], side, live = false, inbox = null }: { pos: Position | undefined; at: number | undefined; insideReady: boolean; quests?: QuestPin[]; fixed?: FixedPin[]; side?: string; live?: boolean; inbox?: Inbox | null } = $props()
 
   const TILES = 'twinmap://tiles'
   const TOP_ZOOM = 7 // the game's own detail: a block's picture is four tiles
@@ -62,7 +63,8 @@
   let layers = $state(layersFrom(localStorage.getItem('layers')))
   let layersOpen = $state(false)
   // The point the player clicked, with its label: in map units, and where that is in the map's box now.
-  let labelled = $state<{ units: Point; continent: Continent; title: string; where: string; spot: Point; box: Size } | null>(null)
+  // pin: the same point as the game names it, a zone map and a place on it; none where no zone is.
+  let labelled = $state<{ units: Point; continent: Continent; title: string; where: string; spot: Point; box: Size; pin: { m: number; x: number; y: number } | null } | null>(null)
   // Where the character is on the world map, for the distance on the label.
   let me = $state<{ units: Point; continent: Continent } | null>(null)
   const way = $derived(labelled && me && me.continent === labelled.continent ? wayTo(me.units, labelled.units) : null)
@@ -376,6 +378,7 @@
       where: to.where ?? (found ? `${found.zone.name} ${found.place.x.toFixed(1)}, ${found.place.y.toFixed(1)}` : ''),
       spot: view.latLngToContainerPoint(at(to.at)),
       box: { width: holder.clientWidth, height: holder.clientHeight },
+      pin: found ? { m: found.zone.id, ...found.place } : null,
     }
   }
 
@@ -532,6 +535,7 @@
         where: found ? `${found.place.x.toFixed(1)}, ${found.place.y.toFixed(1)}` : '',
         spot: e.containerPoint,
         box: { width: holder.clientWidth, height: holder.clientHeight },
+        pin: found ? { m: found.zone.id, ...found.place } : null,
       }
     })
     // The label stays on its point while the map moves under it.
@@ -781,7 +785,19 @@
 
 <div class="map" bind:this={holder}></div>
 {#if labelled}
-  <PointLabel title={labelled.title} where={labelled.where} {way} spot={labelled.spot} box={labelled.box} onclose={() => (labelled = null)} />
+  {#key labelled.units}
+    <PointLabel
+      title={labelled.title}
+      where={labelled.where}
+      {way}
+      spot={labelled.spot}
+      box={labelled.box}
+      sending={sendState(live, inbox, !!labelled.pin)}
+      acked={inbox?.seq}
+      onsend={() => (labelled?.pin ? window.twinmap.sendPin({ ...labelled.pin, name: labelled.title }) : Promise.resolve({ error: 'There is nothing to send.' }))}
+      onclose={() => (labelled = null)}
+    />
+  {/key}
 {/if}
 <div class="corner top">
   <div class="line">

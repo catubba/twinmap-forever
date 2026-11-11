@@ -1,0 +1,28 @@
+import { expect, test } from 'vitest'
+import { inboxFrom, pinFrom, sendState } from './send'
+
+test('a pin is checked before it leaves: a real map, a place on it, a name of plain text', () => {
+  expect(pinFrom({ m: 1429, x: 43.712, y: 65.8, name: 'Lion\'s Pride Inn' })).toEqual({ m: 1429, x: 43.71, y: 65.8, name: 'Lion\'s Pride Inn' })
+  expect(pinFrom({ m: 1429, x: 0, y: 100, name: ' |cffff0000red|r\n ' + 'x'.repeat(200) })?.name).toBe('/cffff0000red/r  ' + 'x'.repeat(63))
+  expect(pinFrom({ m: 1429, x: 1, y: 1, name: ' \t ' })?.name).toBe('Pin')
+  for (const wrong of [null, 'pin', {}, { m: 0, x: 1, y: 1, name: 'a' }, { m: 1.5, x: 1, y: 1, name: 'a' }, { m: 1, x: -1, y: 1, name: 'a' }, { m: 1, x: 1, y: 101, name: 'a' }, { m: 1, x: '1', y: 1, name: 'a' }, { m: 1, x: 1, y: 1 }]) {
+    expect(pinFrom(wrong), JSON.stringify(wrong)).toBeNull()
+  }
+})
+
+test('what the addon tells of its inbox is taken only when it is what it should be', () => {
+  expect(inboxFrom({ seq: 7, left: 30 })).toEqual({ seq: 7, left: 30 })
+  expect(inboxFrom({ seq: 7, left: 0, off: 'slots used up', more: 1 })).toEqual({ seq: 7, left: 0, off: 'slots used up' })
+  expect(inboxFrom({ seq: '7', left: 30 })).toBeNull()
+  expect(inboxFrom(undefined)).toBeNull()
+})
+
+test('a send can go only to a game that listens, and the player is told what to do otherwise', () => {
+  const listening = { seq: 3, left: 30 }
+  expect(sendState(true, listening, true)).toEqual({ can: true, why: '' })
+  expect(sendState(true, listening, false).why).toContain('no zone')
+  expect(sendState(false, listening, true).why).toBe('The game is not connected.')
+  expect(sendState(true, null, true).why).toContain('not listening yet')
+  expect(sendState(true, { seq: 3, left: 0, off: 'slots used up' }, true).why).toContain('/reload')
+  expect(sendState(true, { seq: 0, left: 30, off: 'fonts not readable' }, true).why).toContain('Restart the game once')
+})
