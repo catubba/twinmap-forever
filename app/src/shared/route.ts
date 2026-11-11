@@ -32,7 +32,8 @@ const RUN = 7 // yards a second on foot, as on the label of a point
 export const noRoute = (): Route => ({ stops: [], next: 0, sent: false })
 
 const number = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v)
-function stopFrom(saved: unknown): Stop | null {
+/** A stop as it was saved, checked. */
+export function stopFrom(saved: unknown): Stop | null {
   if (typeof saved !== 'object' || !saved) return null
   const { name, continent, at, pin } = saved as Record<string, unknown>
   const p = at as Partial<Point> | null, g = pin as Partial<NonNullable<Stop['pin']>> | null

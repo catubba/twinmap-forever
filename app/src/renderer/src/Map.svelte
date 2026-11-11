@@ -23,6 +23,7 @@
   import { drop, gone, still } from './motion'
   import PointLabel from './PointLabel.svelte'
   import { inRoute, noRoute, type Route, type Stop } from '../../shared/route'
+  import { removePin, renamePin, savedAt, savedFrom, savePin } from '../../shared/saved'
   import { sendState, type Inbox } from '../../shared/send'
   import { pin } from './marks'
 
@@ -69,6 +70,13 @@
   // Where the character is on the world map, for the distance on the label.
   let me = $state<{ units: Point; continent: Continent } | null>(null)
   const way = $derived(labelled && me && me.continent === labelled.continent ? wayTo(me.units, labelled.units) : null)
+  // My pins: the points the player saved, remembered from one run of the app to the next.
+  let myPins = $state.raw(savedFrom(localStorage.getItem('pins')))
+  $effect(() => localStorage.setItem('pins', JSON.stringify(myPins)))
+  // The labelled point as one of them, or -1; and the point under the name it goes by: a saved one has its own.
+  const savedIndex = $derived(labelled ? savedAt(myPins, labelled.continent, labelled.units) : -1)
+  const pointName = $derived(!labelled ? '' : savedIndex >= 0 ? myPins[savedIndex]!.name : labelled.plain ? `${labelled.title} ${labelled.where}` : labelled.title)
+  const asStop = (): Stop | null => labelled && { name: pointName, continent: labelled.continent, at: { ...labelled.units }, pin: labelled.pin && { ...labelled.pin } }
 
   // Leaflet's plain coordinates: a map unit is a pixel of zoom 0, north is up.
   const at = (p: Point): L.LatLng => L.latLng(-p.y, p.x)
@@ -736,6 +744,35 @@
     }
   })
 
+  // My pins: a small flag on each saved point of this continent. A click opens its label.
+  const myPinsLayer = L.layerGroup()
+  $effect(() => {
+    myPinsLayer.clearLayers()
+    for (const saved of myPins) {
+      if (saved.continent !== continent) continue
+      L.marker(at(saved.at), { keyboard: false, zIndexOffset: 400, icon: L.divIcon({ className: 'door mine', iconSize: [16, 16], html: pin('flag') }) })
+        .bindTooltip(Object.assign(document.createElement('span'), { textContent: saved.name }), { direction: 'top', offset: [0, -8], className: 'tip' })
+        .on('click', () => {
+          if (!map) return
+          const found = zoneAt(maps, saved.continent, saved.at)
+          labelled = {
+            units: { ...saved.at },
+            continent: saved.continent,
+            title: saved.name,
+            where: found ? `${found.zone.name} ${found.place.x.toFixed(1)}, ${found.place.y.toFixed(1)}` : '',
+            spot: map.latLngToContainerPoint(at(saved.at)),
+            box: { width: holder.clientWidth, height: holder.clientHeight },
+            pin: saved.pin && { ...saved.pin },
+          }
+        })
+        .addTo(myPinsLayer)
+    }
+  })
+  $effect(() => {
+    if (map && layers.mypins && !inside) myPinsLayer.addTo(map)
+    else myPinsLayer.remove()
+  })
+
   // The route: a white line through its stops on this continent, and a disc on each. A stop done is
   // a dull disc with no number; the last has a ring more.
   const routeLayer = L.layerGroup()
@@ -811,16 +848,26 @@
 {#if labelled}
   {#key labelled.units}
     <PointLabel
-      title={labelled.title}
+      title={savedIndex >= 0 ? pointName : labelled.title}
       where={labelled.where}
       {way}
       spot={labelled.spot}
       box={labelled.box}
       sending={sendState(live, inbox, !!labelled.pin)}
       acked={inbox?.seq}
-      onsend={() => (labelled?.pin ? window.twinmap.sendPin({ ...labelled.pin, name: labelled.title }) : Promise.resolve({ error: 'There is nothing to send.' }))}
+      onsend={() => (labelled?.pin ? window.twinmap.sendPin({ ...labelled.pin, name: pointName }) : Promise.resolve({ error: 'There is nothing to send.' }))}
       routed={inRoute(route, labelled.continent, labelled.units)}
-      onroute={() => labelled && onroute?.({ name: labelled.plain ? `${labelled.title} ${labelled.where}` : labelled.title, continent: labelled.continent, at: { ...labelled.units }, pin: labelled.pin && { ...labelled.pin } })}
+      onroute={() => {
+        const stop = asStop()
+        if (stop) onroute?.(stop)
+      }}
+      saved={savedIndex >= 0}
+      onsave={() => {
+        const pin = asStop()
+        if (pin) myPins = savePin(myPins, pin)
+      }}
+      onrename={(name) => (myPins = renamePin(myPins, savedIndex, name))}
+      onremove={() => (myPins = removePin(myPins, savedIndex))}
       onclose={() => (labelled = null)}
     />
   {/key}
