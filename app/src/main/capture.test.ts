@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process'
 import { join } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { afterAll, beforeAll, expect, test } from 'vitest'
-import { findWindow, readRow, type WindowHandle } from './capture'
+import { findWindow, readBox, readRow, type WindowHandle } from './capture'
 
 // A real window on the real screen, drawn by capture.test.ps1 with the same formulas as below.
 const TITLE = `Twinmap capture test ${process.pid}`
@@ -51,4 +51,16 @@ test('the bottom row is read too, and it is another row', () => {
 test('a window that does not exist is not found, and gives no row', () => {
   expect(findWindow('Twinmap: no such window')).toBeNull()
   expect(readRow(0x7fff_fff0n)).toBeNull()
+})
+
+test('a square of the window is read too: its first row is the top row, red first', () => {
+  const box = readBox(hwnd!, 0, 0, 16)
+  expect(box?.rgb.length).toBe(16 * 16 * 3)
+  const top = expected((x) => (x * 7 + 3) % 8).slice(0, 16 * 3)
+  // The row comes as blue, green, red; the square as red, green, blue.
+  expect([...box!.rgb.subarray(0, 16 * 3)]).toEqual(Array.from({ length: 16 }, (_, x) => [top[x * 3 + 2], top[x * 3 + 1], top[x * 3]]).flat())
+  // Past the window there is nothing to read.
+  expect(readBox(hwnd!, WIDTH - 8, 0, 16)).toBeNull()
+  expect(readBox(hwnd!, -1, 0, 16)).toBeNull()
+  expect(readBox(0x7fff_fff0n, 0, 0, 16)).toBeNull()
 })

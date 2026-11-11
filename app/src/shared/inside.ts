@@ -61,6 +61,9 @@ export function yardsInside(inst: Instance): Yards | undefined {
   return inst.x === undefined || inst.y === undefined ? undefined : { u: MIDDLE - inst.y, v: MIDDLE - inst.x }
 }
 
+/** The other way: a place in the yards of the pieces as the game would tell it, x to the north and y to the west. */
+export const worldOfYards = (at: Yards): { x: number; y: number } => ({ x: MIDDLE - at.v, y: MIDDLE - at.u })
+
 // How far a piece reaches from its middle, however it is turned.
 const reach = (p: Piece): number => Math.hypot(p.width, p.height) / 2
 

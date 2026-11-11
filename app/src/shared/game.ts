@@ -1,5 +1,6 @@
 // What the app knows about the character and about its link with the game: the one place.
 // It is fed the readings of the strip, one after the other, and nothing else changes it.
+import type { MinimapPlace } from './minimap'
 import { PROTOCOL, type Reading } from './strip'
 
 /** Where the character is. Every field is missing when the game does not tell. */
@@ -43,6 +44,8 @@ export interface Instance {
   /** Where the character is, in yards of the world: x to the north, y to the west. Missing when the game does not tell addons. */
   x?: number
   y?: number
+  /** Where the minimap is on the game's window: sent inside dungeons and raids only, where the app finds the place from it (minimap.ts). */
+  mini?: MinimapPlace
 }
 
 export interface ProtocolMismatch {

@@ -133,7 +133,10 @@ function createWindow(): void {
   if (devUrl) void win.loadURL(`${devUrl}#${hash}`)
   else void win.loadFile(join(__dirname, '../renderer/index.html'), { hash })
 
-  const link = startLink()
+  const link = startLink(() => {
+    const made = tiles.status()
+    return made.state === 'ready' ? made.folder : null
+  })
   const settingsFile = join(app.getPath('userData'), 'settings.json')
   const settings = readSettings(settingsFile)
   let gameFolder = findGameFolder(settings.gameFolder)

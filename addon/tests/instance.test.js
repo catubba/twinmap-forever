@@ -79,3 +79,40 @@ test('a value the game hides during a fight is never sent', () => {
   addon.run(10);
   assert.deepEqual(positions(addon)[0].inst, { id: 36, kind: 'party' });
 });
+
+test('in a dungeon the position says where the minimap is on the window, and nowhere else', () => {
+  // A minimap of 198 units at a scale of 0.64 on a window 1440 pixels high, as measured in the game.
+  const MINIMAP = `
+    GAME.width, GAME.height = 2560, 1440
+    Minimap = {
+      GetCenter = function() return 2006.5, 1043.75 end, GetWidth = function() return 198 end,
+      GetEffectiveScale = function() return 0.64 end, GetZoom = function() return MINIZOOM or 0 end,
+    }
+    function GetCVar(name) return name == "rotateMinimap" and ROTATES or "0" end`;
+  const addon = enterWorld(MINIMAP);
+  addon.run(10);
+  assert.equal(positions(addon).at(-1).inst, undefined);
+  assert.equal(JSON.stringify(positions(addon)).includes('mini'), false);
+
+  addon.lua(DEADMINES);
+  addon.run(2);
+  assert.deepEqual(positions(addon).at(-1).inst, { id: 36, name: 'Deadmines', kind: 'party', mini: { x: 2408, y: 188, size: 238, zoom: 0 } });
+
+  // The zoom changed, then the minimap set to turn with the character: both are said.
+  addon.lua('MINIZOOM = 2');
+  addon.run(2);
+  assert.equal(positions(addon).at(-1).inst.mini.zoom, 2);
+  addon.lua('ROTATES = "1"');
+  addon.run(2);
+  assert.equal(positions(addon).at(-1).inst.mini.turns, true);
+
+  // A battleground is an instance too, but the game tells the place there: no minimap is asked for.
+  addon.lua('GAME.instance = { name = "Warsong Gulch", kind = "pvp", id = 489 }');
+  addon.run(2);
+  assert.equal(positions(addon).at(-1).inst.mini, undefined);
+
+  // Out again: nothing of the minimap goes out.
+  addon.lua('GAME.instance = nil; GAME.zone, GAME.sub, GAME.map, GAME.x = "Westfall", "Moonbrook", 1436, 0.42');
+  addon.run(2);
+  assert.equal(positions(addon).at(-1).inst, undefined);
+});
