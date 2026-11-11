@@ -12,7 +12,7 @@
   import { boxOf, buildingsAt, piecesIn, roomPixels, yardsInside, YARDS_PER_UNIT, type Box, type InteriorMap, type Interiors, type Piece, type Yards } from '../../shared/inside'
   import type { Continent, GameMap } from '../../shared/maps'
   import type { QuestPin } from '../../shared/quests'
-  import { serves, type FixedLayer, type FixedPin, type Travel } from '../../shared/services'
+  import { iconOf, serves, type FixedLayer, type FixedPin, type Travel } from '../../shared/services'
   import { pictureOfBlock, tileOfPicture } from '../../shared/pixels'
   import { WORLDS } from '../../shared/world'
   import { LAYER_GROUPS, layersFrom, type LayerId } from '../../shared/layers'
@@ -594,13 +594,39 @@
   const FIXED_ZOOM: Record<FixedLayer, number> = { flight: 3, inn: 3.5, bank: 4, auction: 4, stable: 4, repair: 4.5, trainers: 4.5, vendors: 4.5, ore: 5.5, herbs: 5.5 }
   const LAYER_NAMES = Object.fromEntries(LAYER_GROUPS.flatMap((group) => group.layers.map((layer) => [layer.id, layer.name]))) as Record<LayerId, string>
   // They are painted on one canvas, not made one element each: three thousand elements over the map
-  // brought dragging down to eight frames a second. The shapes and colours are those of marks.ts
-  // (a square for a service, a lozenge for ore and herbs), with the same black outline.
+  // brought dragging down to eight frames a second. Each is the picture the game itself has for it
+  // (main/icons.ts takes them from the player's game); where the game gave none, the shapes and
+  // colours of marks.ts: a square for a service, a lozenge for ore and herbs.
   const fixedCanvas = L.canvas({ padding: 0.5 })
+  const pictures = new Map<string, HTMLImageElement>()
+  let pictureCame = false
+  function pictureOf(name: string): HTMLImageElement {
+    let picture = pictures.get(name)
+    if (!picture) {
+      picture = new Image()
+      // The pins already painted plain are painted again, once for all the pictures of a frame.
+      picture.onload = () => {
+        if (pictureCame) return
+        pictureCame = true
+        requestAnimationFrame(() => {
+          pictureCame = false
+          drawFixed()
+        })
+      }
+      picture.src = `${TILES}/icons/${name}.png`
+      pictures.set(name, picture)
+    }
+    return picture
+  }
   const FixedPinMark = L.CircleMarker.extend({
-    _updatePath(this: L.CircleMarker & { _renderer: { _ctx: CanvasRenderingContext2D }; _point: L.Point; _empty: () => boolean; options: { lozenge: boolean; fillColor: string } }) {
+    _updatePath(this: L.CircleMarker & { _renderer: { _ctx: CanvasRenderingContext2D }; _point: L.Point; _empty: () => boolean; options: { lozenge: boolean; fillColor: string; picture: HTMLImageElement } }) {
       if (this._empty()) return
-      const ctx = this._renderer._ctx, { x, y } = this._point
+      const ctx = this._renderer._ctx, { x, y } = this._point, picture = this.options.picture
+      if (picture.naturalWidth) {
+        const size = this.options.lozenge ? 20 : 24
+        ctx.imageSmoothingQuality = 'high'
+        return void ctx.drawImage(picture, x - size / 2, y - size / 2, size, size)
+      }
       ctx.beginPath()
       if (this.options.lozenge) {
         ctx.moveTo(x, y - 5.1)
@@ -616,7 +642,7 @@
       ctx.strokeStyle = '#000'
       ctx.stroke()
     },
-  }) as unknown as new (at: L.LatLng, options: L.CircleMarkerOptions & { lozenge: boolean }) => L.CircleMarker
+  }) as unknown as new (at: L.LatLng, options: L.CircleMarkerOptions & { lozenge: boolean; picture: HTMLImageElement }) => L.CircleMarker
   const fixedGroup = L.layerGroup()
   let laid: { pin: FixedPin; at: L.LatLng }[] = []
   // What is drawn now: more than the view, so that the map can move a little (it does all the time
@@ -635,8 +661,10 @@
     // Ore and herbs first, so that who offers a service is painted over them.
     for (const service of [false, true]) {
       for (const { pin: p, at: where } of laid) {
-        if ((p.side !== undefined) !== service || !p.layers.some((layer) => layers[layer] && far >= FIXED_ZOOM[layer]) || !view.contains(where)) continue
-        new FixedPinMark(where, { renderer: fixedCanvas, radius: 7, lozenge: !service, fillColor: service ? '#7fc8ff' : '#d9a066', bubblingMouseEvents: false })
+        const shown = (layer: FixedLayer): boolean => layers[layer] && far >= FIXED_ZOOM[layer]
+        if ((p.side !== undefined) !== service || !p.layers.some(shown) || !view.contains(where)) continue
+        // The radius is what the pointer feels, smaller than the picture: two people a few yards apart both answer.
+        new FixedPinMark(where, { renderer: fixedCanvas, radius: 7, lozenge: !service, fillColor: service ? '#7fc8ff' : '#d9a066', picture: pictureOf(iconOf(p, shown)), bubblingMouseEvents: false })
           // Made when the pointer comes over the pin, not for every pin. Names come from the
           // player's QuestieDB: written as text, never as markup.
           .bindTooltip(
@@ -647,7 +675,7 @@
               tip.append(document.createElement('br'), p.layers.map((layer) => LAYER_NAMES[layer]).join(', '))
               return tip
             },
-            { direction: 'top', offset: [0, -7], className: 'tip' },
+            { direction: 'top', offset: [0, -9], className: 'tip' },
           )
           .addTo(fixedGroup)
       }

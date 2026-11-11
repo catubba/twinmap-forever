@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest'
 import { unitsOfWorld } from './geo'
-import { resourceOf, serves, servicesOf, travel } from './services'
+import { iconOf, resourceOf, serves, servicesOf, travel, type FixedLayer } from './services'
 import type { Row, Table } from './wdc5'
 
 // A table of the game, as far as these readers look at one: rows of columns, a column a value or a list.
@@ -80,4 +80,21 @@ test('doors and flights come from the tables of the maps and of the flight paths
   expect(told.nodes.map((n) => `${n.continent} ${n.name} ${n.side}`)).toEqual(['0 Stormwind, Elwynn A', '0 Sentinel Hill, Westfall A', '0 Undercity, Tirisfal H', '1 Orgrimmar, Durotar H'])
   expect(told.nodes[0]).toMatchObject(unitsOfWorld(-8833, 479))
   expect(told.routes).toEqual([[0, 1]])
+})
+
+test('a pin takes the picture of what it is', () => {
+  const pin = (name: string, layers: FixedLayer[], sub?: string) => ({ name, layers, sub })
+  expect(iconOf(pin('Dungar Longdrink', ['flight'], 'Gryphon Master'))).toBe('flight')
+  // An innkeeper sells too: drawn as an inn, and as who sells food with the inns turned off.
+  expect(iconOf(pin('Innkeeper Farley', ['vendors', 'inn'], 'Innkeeper'))).toBe('inn')
+  expect(iconOf(pin('Innkeeper Farley', ['vendors', 'inn'], 'Innkeeper'), (layer) => layer !== 'inn')).toBe('food')
+  expect(iconOf(pin('Wu Shen', ['trainers'], 'Warrior Trainer'))).toBe('class')
+  expect(iconOf(pin('Tannysa', ['trainers'], 'Herbalism Trainer'))).toBe('profession')
+  expect(iconOf(pin('Jasper Fel', ['vendors'], 'Shady Dealer'))).toBe('vendors')
+  expect(iconOf(pin('Lina Stover', ['vendors'], 'Bow & Arrow Merchant'))).toBe('ammunition')
+  expect(iconOf(pin('Copper Vein', ['ore']))).toBe('ore-copper')
+  expect(iconOf(pin('Ooze Covered Truesilver Deposit', ['ore']))).toBe('ore-truesilver')
+  expect(iconOf(pin('Dark Iron Deposit', ['ore']))).toBe('ore-dark-iron')
+  expect(iconOf(pin('Strange Vein', ['ore']))).toBe('ore')
+  expect(iconOf(pin('Peacebloom', ['herbs']))).toBe('herbs')
 })

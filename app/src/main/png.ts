@@ -1,10 +1,10 @@
 // Writes a picture as a PNG file: what the tiles of the lower zoom levels are kept as.
 import { crc32, deflateSync } from 'node:zlib'
 
-/** A PNG file of red, green, blue bytes, no transparency. */
-export function encodePng(rgb: Uint8Array, width: number, height: number): Buffer {
-  const raw = Buffer.alloc(height * (width * 3 + 1)) // each row starts with a byte: no filter
-  for (let y = 0; y < height; y++) raw.set(rgb.subarray(y * width * 3, (y + 1) * width * 3), y * (width * 3 + 1) + 1)
+/** A PNG file of red, green, blue bytes; with channels 4 each pixel has its transparency after them. */
+export function encodePng(rgb: Uint8Array, width: number, height: number, channels: 3 | 4 = 3): Buffer {
+  const raw = Buffer.alloc(height * (width * channels + 1)) // each row starts with a byte: no filter
+  for (let y = 0; y < height; y++) raw.set(rgb.subarray(y * width * channels, (y + 1) * width * channels), y * (width * channels + 1) + 1)
   const chunk = (tag: string, data: Buffer): Buffer => {
     const b = Buffer.alloc(12 + data.length)
     b.writeUInt32BE(data.length)
@@ -17,6 +17,6 @@ export function encodePng(rgb: Uint8Array, width: number, height: number): Buffe
   head.writeUInt32BE(width)
   head.writeUInt32BE(height, 4)
   head[8] = 8 // bits a channel
-  head[9] = 2 // red, green, blue
+  head[9] = channels === 4 ? 6 : 2 // red, green, blue, and transparency or not
   return Buffer.concat([Buffer.from('89504e470d0a1a0a', 'hex'), chunk('IHDR', head), chunk('IDAT', deflateSync(raw)), chunk('IEND', Buffer.alloc(0))])
 }

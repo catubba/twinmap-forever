@@ -73,3 +73,57 @@ export function decodeBlp(f: Buffer): Image {
   const rgb = decodeDxt(f.subarray(data), width, height, alphaEncoding === 0 ? 0 : 8)
   return { width, height, rgb: Buffer.from(rgb.buffer, rgb.byteOffset, rgb.byteLength) }
 }
+
+/** A picture with its transparency: four bytes a pixel (red, green, blue, alpha), rows from the top. */
+export interface Cutout {
+  width: number
+  height: number
+  rgba: Uint8Array
+}
+
+/**
+ * A picture of the game with its transparency, as icons and cursors need: the pallet, DXT1, DXT3
+ * and DXT5 blocks, and plain blue, green, red, alpha bytes.
+ */
+export function decodeBlpCutout(f: Buffer): Cutout {
+  if (f.toString('latin1', 0, 4) !== 'BLP2') throw new Error('not a BLP2 picture')
+  const encoding = f[8]!, alphaBits = f[9]!, alphaKind = f[10]!
+  const width = f.readUInt32LE(12), height = f.readUInt32LE(16), at = f.readUInt32LE(20), pixels = width * height
+  const rgba = new Uint8Array(pixels * 4).fill(255)
+  if (encoding === 3) {
+    for (let i = 0; i < pixels; i++) rgba.set([f[at + i * 4 + 2]!, f[at + i * 4 + 1]!, f[at + i * 4]!, f[at + i * 4 + 3]!], i * 4)
+    return { width, height, rgba }
+  }
+  const { rgb } = decodeBlp(f)
+  for (let i = 0; i < pixels; i++) rgba.set(rgb.subarray(i * 3, i * 3 + 3), i * 4)
+  if (encoding === 1) {
+    // After the pallet choices: a byte, a bit, or nothing a pixel.
+    for (let i = 0; i < pixels && alphaBits; i++) rgba[i * 4 + 3] = alphaBits === 8 ? f[at + pixels + i]! : alphaBits === 1 ? ((f[at + pixels + (i >> 3)]! >> (i & 7)) & 1) * 255 : 255
+    return { width, height, rgba }
+  }
+  const step = alphaKind === 0 ? 8 : 16
+  for (let by = 0, p = at; by < height; by += 4) {
+    for (let bx = 0; bx < width; bx += 4, p += step) {
+      const alpha = new Array<number>(16).fill(255)
+      if (alphaKind === 0) {
+        // DXT1: with the first color not above the second, the fourth choice is a hole.
+        const holes = alphaBits > 0 && f.readUInt16LE(p) <= f.readUInt16LE(p + 2), choice = f.readUInt32LE(p + 4)
+        for (let i = 0; i < 16 && holes; i++) if (((choice >>> (i * 2)) & 3) === 3) alpha[i] = 0
+      } else if (alphaKind === 1) {
+        // DXT3: four bits a pixel.
+        for (let i = 0; i < 16; i++) alpha[i] = ((f[p + (i >> 1)]! >> ((i & 1) * 4)) & 15) * 17
+      } else {
+        // DXT5: two levels, and three bits a pixel choosing among them and the steps between.
+        const a0 = f[p]!, a1 = f[p + 1]!, levels = [a0, a1]
+        for (let i = 1; i <= 6; i++) levels.push(a0 > a1 ? Math.round(((7 - i) * a0 + i * a1) / 7) : i <= 4 ? Math.round(((5 - i) * a0 + i * a1) / 5) : i === 5 ? 0 : 255)
+        const bits = f.readUIntLE(p + 2, 6)
+        for (let i = 0; i < 16; i++) alpha[i] = levels[Math.floor(bits / 8 ** i) % 8]!
+      }
+      for (let i = 0; i < 16; i++) {
+        const x = bx + (i & 3), y = by + (i >> 2)
+        if (x < width && y < height) rgba[(y * width + x) * 4 + 3] = alpha[i]!
+      }
+    }
+  }
+  return { width, height, rgba }
+}
