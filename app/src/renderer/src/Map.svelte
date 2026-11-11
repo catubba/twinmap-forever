@@ -11,6 +11,7 @@
   import { addFix, BEHIND, PERIOD, whereAt, type Fix } from '../../shared/glide'
   import { boxOf, buildingsAt, piecesIn, roomPixels, yardsInside, YARDS_PER_UNIT, type Box, type InteriorMap, type Interiors, type Piece, type Yards } from '../../shared/inside'
   import type { Continent, GameMap } from '../../shared/maps'
+  import type { QuestPin } from '../../shared/quests'
   import { pictureOfBlock, tileOfPicture } from '../../shared/pixels'
   import { WORLDS } from '../../shared/world'
   import { LAYER_GROUPS, layersFrom } from '../../shared/layers'
@@ -24,7 +25,7 @@
 
   // at: when the position was read off the game, in milliseconds.
   // insideReady: the rooms of the buildings are converted, and their list can be asked for.
-  let { pos, at: readAt, insideReady }: { pos: Position | undefined; at: number | undefined; insideReady: boolean } = $props()
+  let { pos, at: readAt, insideReady, quests = [] }: { pos: Position | undefined; at: number | undefined; insideReady: boolean; quests?: QuestPin[] } = $props()
 
   const TILES = 'twinmap://tiles'
   const TOP_ZOOM = 7 // the game's own detail: a block's picture is four tiles
@@ -37,6 +38,7 @@
   const ALWAYS_INSIDE = [1455]
   const ROOFED = new Set([1458])
   const CITY_UNDER = 3e6 // square yards: a zone map smaller than this is a city
+  const PIN_ZOOM = 3.5 // under this zoom the pins of a zone lie on each other: they are not shown
   const FAR = 3 // under this zoom the names of the regions are written small
   const EDGE = 14 // px from the edge of the map's box that a name keeps clear: the frame and a little air
   const GROUND_INSIDE = 0.45 // how bright the ground of a dungeon is: its rooms are what matters
@@ -526,6 +528,35 @@
     }
   })
 
+
+  // The quests Questie shows, on the zones of the continent in view: where to take one, where to hand
+  // one in, where what is still to find is. Each kind is a layer of its own.
+  const questLayers = { available: L.layerGroup(), turnin: L.layerGroup(), objectives: L.layerGroup() }
+  const QUEST_PINS = { available: ['quest', 'available', 500], turnin: ['turnin', 'turnin', 1000], objective: ['objective', 'objectives', 0] } as const
+  $effect(() => {
+    for (const group of Object.values(questLayers)) group.clearLayers()
+    const zones = new Map(maps.filter((m) => m.level === 'zone' && m.rect && m.area && m.continent === continent).map((m) => [m.area, m]))
+    for (const p of quests) {
+      const zone = zones.get(p.area)
+      if (!zone?.rect) continue
+      const [drawing, layer, above] = QUEST_PINS[p.type]
+      // Names come from the player's QuestieDB: written as text, never as markup.
+      const tip = document.createElement('span')
+      tip.append(Object.assign(document.createElement('b'), { textContent: p.name }))
+      for (const quest of p.quests) if (quest !== p.name) tip.append(document.createElement('br'), quest)
+      const size = drawing === 'objective' ? 9 : 20
+      L.marker(at(unitsOfPlace(zone.rect, p.x, p.y)), { keyboard: false, zIndexOffset: above, icon: L.divIcon({ className: 'door', iconSize: [size, size], html: pin(drawing) }) })
+        .bindTooltip(tip, { direction: 'top', offset: [0, -size / 2], className: 'tip' })
+        .addTo(questLayers[layer])
+    }
+  })
+  // Not inside a dungeon, whose map is another; not from far, where they would cover the land.
+  $effect(() => {
+    for (const [id, group] of Object.entries(questLayers) as [keyof typeof questLayers, L.LayerGroup][]) {
+      if (map && layers[id] && !inside && zoom >= PIN_ZOOM) group.addTo(map)
+      else group.remove()
+    }
+  })
 
   // The choices are saved as they are made, and the map follows them.
   $effect(() => {

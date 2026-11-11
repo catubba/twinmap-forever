@@ -112,9 +112,10 @@ end
 -- refresh: seconds after which it is sent again unchanged, when not REFRESH. The position is the
 -- heartbeat: the app takes the strip for stopped when none comes for a while. It is also read four
 -- times a second: the app's arrow glides from one reading to the next, and counts on this period
--- (PERIOD in the app's glide.ts).
+-- (PERIOD in the app's glide.ts). first: its block goes out before the ones waiting, so a long
+-- section cut in many blocks never holds the arrow back.
 local SECTIONS = {
-  { name = "pos", period = 0.25, build = BuildPos, combat = true, refresh = 10 },
+  { name = "pos", period = 0.25, build = BuildPos, combat = true, refresh = 10, first = true },
   { name = "char", period = 2, build = BuildChar },
 }
 ns.sections = SECTIONS -- other files add their own
@@ -299,7 +300,8 @@ local function Enqueue(s, json)
     pos = stop + 1
   end
   for i, part in ipairs(parts) do
-    queue[#queue + 1] = { name = name, combat = s.combat, text = table.concat({ name, version, i, #parts, part }, US) }
+    local item = { name = name, combat = s.combat, text = table.concat({ name, version, i, #parts, part }, US) }
+    if s.first then table.insert(queue, i, item) else queue[#queue + 1] = item end
   end
 end
 

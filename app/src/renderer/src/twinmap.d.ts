@@ -1,4 +1,5 @@
 import type { LinkSnapshot } from '../../shared/link'
+import type { QuestsStatus } from '../../shared/quests'
 import type { SetupStatus } from '../../shared/setup'
 import type { TilesStatus } from '../../shared/tiles-status'
 
@@ -9,6 +10,7 @@ declare global {
       onLink: (listener: (snapshot: LinkSnapshot) => void) => void
       onTiles: (listener: (status: TilesStatus) => void) => void
       onSetup: (listener: (status: SetupStatus) => void) => void
+      onQuests: (listener: (status: QuestsStatus) => void) => void
       chooseGameFolder: () => Promise<string | null>
       openCurseForge: () => Promise<void>
       retryTiles: () => Promise<void>

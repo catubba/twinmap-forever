@@ -9,4 +9,5 @@
 
 TwinmapForever.lua
 Strip.lua
+Questie.lua
 Options.lua
