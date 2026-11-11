@@ -19,7 +19,7 @@ local _, ns = ...
 -- Tuning knobs.
 local CELL = 1        -- physical pixels per cell
 local RESERVED = 40   -- bytes of a block that are not section data: header, checksum, record
-local REFRESH = 600   -- resend an unchanged section this often: nothing acks, a block can be missed
+local REFRESH = 30    -- resend an unchanged section this often: nothing acks, a block can be missed, and an app opened after the game has heard nothing yet
 local START_DELAY = 5 -- seconds after entering the world
 
 local MAGIC1, MAGIC2 = 0xC7, 0x1B

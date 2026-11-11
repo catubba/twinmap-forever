@@ -592,6 +592,10 @@
   // those in view are on the map, and each layer only from the zoom at which its pins stop lying
   // on each other.
   const FIXED_ZOOM: Record<FixedLayer, number> = { flight: 3, inn: 3.5, bank: 4, auction: 4, stable: 4, repair: 4.5, trainers: 4.5, vendors: 4.5, ore: 5.5, herbs: 5.5 }
+  /** Turns a whole group of layers on or off. */
+  function showAll(ids: readonly LayerId[], on: boolean): void {
+    for (const id of ids) layers[id] = on
+  }
   const LAYER_NAMES = Object.fromEntries(LAYER_GROUPS.flatMap((group) => group.layers.map((layer) => [layer.id, layer.name]))) as Record<LayerId, string>
   // They are painted on one canvas, not made one element each: three thousand elements over the map
   // brought dragging down to eight frames a second. Each is the picture the game itself has for it
@@ -786,7 +790,10 @@
       <!-- Only the layers that draw something: a ticked box for one that is not built yet would not be true. -->
       {#each LAYER_GROUPS as group (group.name)}
         {#if group.layers.some((layer) => layer.built)}
-          <div class="group">{group.name}</div>
+          <!-- The name of a group turns all of it off, or on when any of it is off. -->
+          {@const all = group.layers.filter((layer) => layer.built).map((layer) => layer.id)}
+          {@const on = all.every((id) => layers[id])}
+          <button class="group" aria-pressed={on} title={on ? `Hide all ${group.name}` : `Show all ${group.name}`} onclick={() => showAll(all, !on)}>{group.name}</button>
           {#each group.layers as layer (layer.id)}
             {#if layer.built}
               <label class="item"><input type="checkbox" class="check" bind:checked={layers[layer.id]} />{layer.name}</label>
