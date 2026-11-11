@@ -88,6 +88,45 @@ info.writeUInt16LE(1, 12) // planes
 info.writeUInt16LE(32, 14) // bits per pixel
 
 /**
+ * A square of the window's client area, as shown on screen: three bytes a pixel (red, green,
+ * blue), rows from the top. x, y: its top left corner, in pixels of the window. Null when there is
+ * nothing to read, or the square reaches past the window.
+ */
+export function readBox(hwnd: WindowHandle, x: number, y: number, size: number): { size: number; rgb: Uint8Array } | null {
+  if (IsIconic(hwnd) || size <= 0) return null
+  const rect = { left: 0, top: 0, right: 0, bottom: 0 }
+  if (!GetClientRect(hwnd, rect) || x < 0 || y < 0 || x + size > rect.right || y + size > rect.bottom) return null
+  const origin = { x, y }
+  if (!ClientToScreen(hwnd, origin)) return null
+  if (screenDC === undefined) {
+    screenDC = GetDC(null) as bigint
+    memoryDC = CreateCompatibleDC(screenDC) as bigint
+  }
+  // Made and let go each time: the square is asked for twice a second at most.
+  const box = CreateCompatibleBitmap(screenDC, size, size) as bigint
+  const head = Buffer.alloc(40)
+  head.writeUInt32LE(40, 0)
+  head.writeInt32LE(size, 4)
+  head.writeInt32LE(-size, 8) // top row first
+  head.writeUInt16LE(1, 12)
+  head.writeUInt16LE(32, 14)
+  const previous = SelectObject(memoryDC, box)
+  const copied = BitBlt(memoryDC, 0, 0, size, size, screenDC, origin.x, origin.y, SRCCOPY)
+  SelectObject(memoryDC, previous)
+  const pixels = Buffer.alloc(size * size * 4)
+  const read = copied && GetDIBits(screenDC, box, 0, size, pixels, head, 0) === size
+  DeleteObject(box)
+  if (!read) return null
+  const rgb = new Uint8Array(size * size * 3)
+  for (let i = 0; i < size * size; i++) {
+    rgb[i * 3] = pixels[i * 4 + 2]!
+    rgb[i * 3 + 1] = pixels[i * 4 + 1]!
+    rgb[i * 3 + 2] = pixels[i * 4]!
+  }
+  return { size, rgb }
+}
+
+/**
  * The top or bottom row of the window's client area, as shown on screen: 4 bytes per pixel, in the
  * order blue, green, red, unused. Null when there is nothing to read: the window is gone, minimized
  * or empty. A window covered by another one gives the pixels of what covers it.

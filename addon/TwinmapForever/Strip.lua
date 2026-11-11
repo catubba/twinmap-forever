@@ -94,6 +94,20 @@ local function BuildPos()
     -- Where in it, if the game tells addons: yards of the world, north then west, to the yard.
     local north, west = Try(UnitPosition, "player")
     if Num(north) and Num(west) then inst.x, inst.y = Round(north, 1), Round(west, 1) end
+    -- In a dungeon or a raid the game tells addons no place: the app finds it from the picture of
+    -- the minimap on the screen. So here, and nowhere else, it is told where the minimap is: the
+    -- pixels of its middle from the top left of the window, its width, its zoom, and whether it
+    -- turns with the character.
+    if (kind == "party" or kind == "raid") and Minimap then
+      local cx, cy = Try(Minimap.GetCenter, Minimap)
+      local width, scale = Num(Try(Minimap.GetWidth, Minimap)), Num(Try(Minimap.GetEffectiveScale, Minimap))
+      local _, physH = GetPhysicalScreenSize()
+      if Num(cx) and Num(cy) and width and scale and Num(physH) then
+        local pixel = scale * physH / 768
+        inst.mini = { x = Round(cx * pixel, 1), y = Round(physH - cy * pixel, 1), size = Round(width * pixel, 1), zoom = Num(Try(Minimap.GetZoom, Minimap)) or 0 }
+        if Try(GetCVar, "rotateMinimap") == "1" then inst.mini.turns = true end
+      end
+    end
     out.inst = inst
   end
   -- In a fight only this section goes out: the app says so, instead of showing the rest as fresh.

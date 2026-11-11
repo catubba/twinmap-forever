@@ -1,10 +1,12 @@
 // The link with the game: finds its window, reads the strip off it many times a second, and
 // keeps the character's state up to date.
-import { createGame } from '../shared/game'
+import { createGame, type GameState } from '../shared/game'
 import type { LinkSnapshot } from '../shared/link'
 import { decodeRow } from '../shared/strip'
 import { readFileSync } from 'node:fs'
-import { findGameWindow, readRow, windowState, type WindowHandle } from './capture'
+import { worldOfYards } from '../shared/inside'
+import { findGameWindow, readBox, readRow, windowState, type WindowHandle } from './capture'
+import { startInside, type Inside } from './minimap'
 
 // Tuning knobs.
 const READ_EVERY = 15 // ms: a block stays up 50 ms, so it is seen about three times
@@ -29,8 +31,21 @@ function replayed(file: string): (() => Uint8Array | null) {
   }
 }
 
-export function startLink(): { snapshot: () => LinkSnapshot; stop: () => void } {
+/** tilesFolder: where the converter keeps the build's pictures, once it has them: the rooms of the dungeons are there. */
+/** The state with the place found from the minimap put where the game's own would be: the map draws the arrow from it. */
+function withInside(state: GameState, found: (Inside & { at: number }) | null): GameState {
+  const pos = state.sections.pos
+  if (!found || !pos?.inst) return state
+  // The app counts a facing anticlockwise from north, as the game does.
+  const facing = found.facing === undefined ? pos.facing : (360 - found.facing) % 360
+  return { ...state, sections: { ...state.sections, pos: { ...pos, facing, inst: { ...pos.inst, ...worldOfYards(found) } } }, updatedAt: { ...state.updatedAt, pos: Math.max(state.updatedAt.pos ?? 0, found.at) } }
+}
+
+export function startLink(tilesFolder: () => string | null = () => null): { snapshot: () => LinkSnapshot; stop: () => void } {
   const game = createGame()
+  // Inside a dungeon the game tells addons no place: there, and only there, it is found from the minimap on the screen.
+  const inside = startInside(tilesFolder)
+  let found: (Inside & { at: number }) | null = null
   const startedAt = Date.now(), cpuAtStart = process.cpuUsage()
   let hwnd: WindowHandle | null = null
   let status: LinkSnapshot['game'] = 'closed'
@@ -72,6 +87,8 @@ export function startLink(): { snapshot: () => LinkSnapshot; stop: () => void } 
     const reading = decodeRow(row)
     if (reading.kind !== 'none') edgeSeenAt = now
     game.feed(reading, now)
+    const window = hwnd, place = inside.look(game.state.sections.pos, (x, y, size) => readBox(window, x, y, size), now)
+    found = place && (found && found.u === place.u && found.v === place.v && found.facing === place.facing ? found : { ...place, at: now })
   }, READ_EVERY)
 
   return {
@@ -80,7 +97,7 @@ export function startLink(): { snapshot: () => LinkSnapshot; stop: () => void } 
       const elapsed = Date.now() - startedAt
       return {
         game: status,
-        state: game.state,
+        state: withInside(game.state, found),
         seconds: elapsed / 1000,
         reads,
         cpu: elapsed ? ((cpu.user + cpu.system) / 1000 / elapsed) * 100 : 0,
