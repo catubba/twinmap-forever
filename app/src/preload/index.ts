@@ -3,6 +3,7 @@
 // failure, to stay over other windows, to show the map on the home network, to search the player's QuestieDB, to mark a point in the
 // game, to send it a route, and to step ahead on that route. It says one: that its opening screen is drawn.
 import { contextBridge, ipcRenderer } from 'electron'
+import type { FeedbackWay } from '../shared/feedback'
 import type { Kept, KeptKey } from '../shared/kept'
 import type { LinkSnapshot } from '../shared/link'
 import type { Updating } from '../main/update'
@@ -40,6 +41,8 @@ contextBridge.exposeInMainWorld('twinmap', {
   chooseGameFolder: (): Promise<string | null> => ipcRenderer.invoke('choose-game-folder'),
   // The page of Twinmap Forever on CurseForge, or the one of an optional addon when it is named.
   openCurseForge: (addon?: Optional): Promise<void> => ipcRenderer.invoke('open-curseforge', addon),
+  // Opens the player's feedback where they chose to write it, with the details the app adds.
+  openFeedback: (way: FeedbackWay, details: string): Promise<void> => ipcRenderer.invoke('open-feedback', way, details),
   // Builds the map again after a failure.
   retryTiles: (): Promise<void> => ipcRenderer.invoke('retry-tiles'),
   // The opening screen is drawn: the window can show itself.

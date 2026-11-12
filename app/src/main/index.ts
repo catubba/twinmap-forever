@@ -8,6 +8,7 @@ import { linkStatus, lostPercent } from '../shared/link'
 import { shownFrom, type QuestsStatus } from '../shared/quests'
 import type { Found } from '../shared/search'
 import { marksNews, pinFrom, routeNewsFrom, stepFrom, takenFrom } from '../shared/send'
+import { feedbackLink } from '../shared/feedback'
 import { pageOf, setupComplete, setupPages, type SetupStatus } from '../shared/setup'
 import type { TilesStatus } from '../shared/tiles-status'
 import { placeWindow, WINDOW } from '../shared/window'
@@ -266,6 +267,11 @@ function createWindow(): void {
     return ask ? walks.far(ask) : Promise.resolve([])
   })
   ipcMain.handle('open-curseforge', (_event, addon: unknown) => shell.openExternal(pageOf(addon)))
+  // Feedback: an issue on GitHub or a letter in the player's mail program, and no other address.
+  ipcMain.handle('open-feedback', (_event, way: unknown, details: unknown) => {
+    const link = feedbackLink(way, details)
+    if (link) void shell.openExternal(link)
+  })
   // A conversion that failed is started again, from where it stopped: the cause may be gone (a full disk, a folder in use).
   asks('retry-tiles', () => {
     if (tiles.status().state !== 'failed') return
@@ -444,6 +450,7 @@ function createWindow(): void {
     clearInterval(look)
     ipcMain.removeHandler('choose-game-folder')
     ipcMain.removeHandler('open-curseforge')
+    ipcMain.removeHandler('open-feedback')
     ipcMain.removeHandler('set-on-top')
     ipcMain.removeHandler('set-lan')
     for (const name of Object.keys(calls)) ipcMain.removeHandler(name)

@@ -1,6 +1,7 @@
 <script lang="ts">
   // The main screen: the top row with the state of the link, the map in its frame, and the Now panel.
   import { experience, linkStatus, type LinkSnapshot } from '../../shared/link'
+  import { feedbackDetails } from '../../shared/feedback'
   import { tilesLine, type TilesStatus } from '../../shared/tiles-status'
   import { onMount } from 'svelte'
   import { fade, fly } from 'svelte/transition'
@@ -14,6 +15,7 @@
   import Now from './Now.svelte'
   import Search from './Search.svelte'
   import type { SetupStatus } from '../../shared/setup'
+  import Feedback from './Feedback.svelte'
   import FirstRun from './FirstRun.svelte'
   import Glyph from './Glyph.svelte'
   import Logo from './Logo.svelte'
@@ -57,6 +59,8 @@
   let onSetup = $state<boolean | null>(null)
   // Settings lie over the map, which stays as it was underneath.
   let onSettings = $state(false)
+  // Feedback is a small window over whatever is on show.
+  let onFeedback = $state(false)
   window.twinmap.onSetup((told) => {
     setup = told
     // On a phone there are no steps to go through, only the wait for them to be done on the computer: it ends by itself.
@@ -152,11 +156,17 @@
   {#if status}
     <p class="status" class:alone={onSetup !== false || onSettings || !mapReady}><i class={status.tone} title={status.word}></i><span class="word">{status.word}</span>{#if inbox && !inbox.off}<span class="left" class:low={inbox.left < 5}>{inbox.left} sends left</span>{/if}</p>
   {/if}
+  {#if setup}
+    <button class="entry" onclick={() => (onFeedback = true)}>Feedback</button>
+  {/if}
   {#if onSetup === false}
     <button class="entry" aria-current={onSettings ? 'page' : undefined} onclick={() => (onSettings = !onSettings)}>Settings</button>
   {/if}
 </header>
 
+{#if onFeedback && setup}
+  <Feedback details={feedbackDetails(setup, tiles, status?.word ?? null)} onclose={() => (onFeedback = false)} />
+{/if}
 {#if onSetup && setup}
   <div class="whole" out:fade={gone}>
     {#if inApp}
