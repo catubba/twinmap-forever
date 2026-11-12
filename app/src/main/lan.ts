@@ -110,13 +110,13 @@ export function startLan(port: number, asks: LanAsks, failed: (message: string) 
     const plain = (status: number, text = ''): void => void res.writeHead(status, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' }).end(text)
     if (!isHome(req.socket.remoteAddress)) return plain(403)
     const url = new URL(req.url ?? '/', 'http://twinmap')
-    // The address of the settings carries the code: the browser keeps it, and the address bar loses it.
-    const shown = url.searchParams.get('k')
-    if (shown !== null && same(shown, asks.code)) {
-      return void res.writeHead(302, { 'set-cookie': `k=${asks.code}; Max-Age=31536000; Path=/; HttpOnly; SameSite=Strict`, location: '/', 'cache-control': 'no-store' }).end()
-    }
+    // The address of the settings carries the code. The page comes with it at once and the browser is
+    // given the code to keep: the page then takes it off its address bar (renderer/src/web.ts).
+    // Lax and not Strict, and no sending on to the plain address: a phone gets here from its camera
+    // or from another app, and a browser holds a Strict cookie back on a visit that began elsewhere.
+    const shown = url.searchParams.get('k'), fresh = shown !== null && same(shown, asks.code)
     const kept = /(?:^|;\s*)k=([^;]+)/.exec(req.headers.cookie ?? '')?.[1]
-    if (!kept || !same(kept, asks.code)) return plain(403, "Open Twinmap's settings on the computer and scan the code again.")
+    if (!fresh && !(kept && same(kept, asks.code))) return plain(403, "Open Twinmap's settings on the computer and scan the code again.")
 
     if (url.pathname === '/events') {
       res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store', connection: 'keep-alive' })
@@ -151,7 +151,11 @@ export function startLan(port: number, asks: LanAsks, failed: (message: string) 
     const bytes = type && file.startsWith(asks.page + sep) ? await readFile(file).catch(() => null) : null
     if (!bytes) return plain(404)
     // The page itself is asked for every time, so an app that was updated shows its new one; its parts carry their own names.
-    res.writeHead(200, { 'content-type': type, 'cache-control': file.endsWith('index.html') ? 'no-store' : 'max-age=31536000, immutable' }).end(bytes)
+    res.writeHead(200, {
+      'content-type': type,
+      'cache-control': file.endsWith('index.html') ? 'no-store' : 'max-age=31536000, immutable',
+      ...(fresh ? { 'set-cookie': `k=${asks.code}; Max-Age=31536000; Path=/; HttpOnly; SameSite=Lax` } : {}),
+    }).end(bytes)
   }
 
   const server = createServer((req, res) => {
