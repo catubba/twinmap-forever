@@ -113,8 +113,11 @@ says which.
 MapUtils
 by D4KiR (an addon for World of Warcraft: Forever)
 Used in: addon/TwinmapForever/Marks.lua (how a frame is placed on the canvas of
-the game's world map and keeps its size at every zoom, adapted from
-libs/D4Lib/D4Waypoints.lua of MapUtils 1.6.1)
+the game's world map and keeps its size at every zoom, and how a click on that
+map is taken) and addon/TwinmapForever/Arrow.lua (how far a point is and which
+way, from the character's place in the world, and how many yards the minimap
+shows), adapted from libs/D4Lib/D4Waypoints.lua and gathernodes.lua of
+MapUtils 1.6.1
 ================================================================================
 
 Copyright (c) 2026 D4KiR
