@@ -1,32 +1,51 @@
 -- The marks: the points saved on Twinmap's map (My pins), drawn on the game's world map as small
 -- flags, as many as there are. The app sends each as a part of its own, named "mark" and its place;
 -- a part taken away takes its flag away. Alt and a right click on a flag removes it here: the strip
--- tells the app, which forgets the point and takes the part away. Only frames of ours are drawn,
--- and nothing of the game's own map is touched.
+-- tells the app, which forgets the point and takes the part away. Alt and a left click on the map
+-- sets a new one: it is drawn at once, told on the strip, and kept here until the app says it has
+-- taken it among its pins. Only frames of ours are drawn, and nothing of the game's own map is touched.
 -- value: { m = map, x = 0 to 100, y = 0 to 100, name = text }.
--- Placing a frame on the map's canvas adapted from MapUtils, Copyright (c) 2026 D4KiR, GPL-3.0: see THIRD-PARTY-LICENSES.
+-- Placing a frame on the map's canvas and taking a click on it adapted from MapUtils, Copyright (c) 2026 D4KiR, GPL-3.0: see THIRD-PARTY-LICENSES.
 local _, ns = ...
 
 local SIZE = 16
 local IVORY = { 0.953, 0.918, 0.851 } -- the flag of the app's map (marks.ts)
+local WAITING = 20 -- marks set here that the app has not taken yet: more than these are not set
 
-local marks = {} -- part -> { m, x, y (0 to 1), name, continent, world }
+local marks = {} -- part -> { m, x, y (0 to 1), name, continent, world }: the app's pins
+local fresh = {} -- id -> the same, for the marks set here that the app has not taken yet
 local flags = {} -- the frames, used again from one drawing to the next
 local hooked = false
 local Redraw
 
--- The marks removed here that the app has not taken away yet, by part. Kept through a /reload.
-local function Gone()
-  if type(ns.db.marksGone) ~= "table" then ns.db.marksGone = {} end
-  return ns.db.marksGone
+local function Say(line) print("Twinmap Forever: " .. line) end
+
+-- Kept through a /reload and from one run of the game to the next: the marks removed here that
+-- the app has not taken away yet, by part, and the ones set here that it has not taken, by id.
+local function Kept(key)
+  if type(ns.db[key]) ~= "table" then ns.db[key] = {} end
+  return ns.db[key]
 end
+local function Gone() return Kept("marksGone") end
+local function New() return Kept("marksNew") end
 
 local function InRange(v) return type(v) == "number" and v >= 0 and v <= 100 end
 
+local function Mark(value)
+  if type(value) == "table" and type(value.m) == "number" and InRange(value.x) and InRange(value.y) then
+    return { m = value.m, x = value.x / 100, y = value.y / 100, name = type(value.name) == "string" and value.name or "Pin" }
+  end
+end
+
 local function Remove(flag)
-  if not (flag.part and marks[flag.part]) then return end
-  Gone()[flag.part] = true
-  print("Twinmap Forever: " .. flag.name .. " is no longer among your pins.")
+  if flag.id then
+    New()[flag.id], fresh[flag.id] = nil, nil
+  elseif flag.part and marks[flag.part] then
+    Gone()[flag.part] = true
+  else
+    return
+  end
+  Say(flag.name .. " is no longer among your pins.")
   Redraw()
 end
 
@@ -81,6 +100,29 @@ local function Where(mark, map)
   if type(x) == "number" and type(y) == "number" and x >= 0 and x <= 1 and y >= 0 and y <= 1 then return x, y end
 end
 
+-- Alt and a left click on the map: a mark of ours on that point, named as the app names a bare
+-- point, by its zone and its coordinates. Gives back whether the click was ours, as the map asks.
+local function OnMapClick(map, button, x, y)
+  if button ~= "LeftButton" or not IsAltKeyDown() then return false end
+  local m = map and map.GetMapID and map:GetMapID()
+  if type(m) ~= "number" or type(x) ~= "number" or type(y) ~= "number" or x < 0 or x > 1 or y < 0 or y > 1 then return false end
+  local new, count = New(), 0
+  for _ in pairs(new) do count = count + 1 end
+  if count >= WAITING then
+    Say("open Twinmap before setting more pins: it has not taken the last " .. WAITING .. " yet.")
+    return true
+  end
+  local px, py = math.floor(x * 10000 + 0.5) / 100, math.floor(y * 10000 + 0.5) / 100
+  local info = C_Map.GetMapInfo and C_Map.GetMapInfo(m)
+  local name = ("%s %.1f, %.1f"):format(type(info) == "table" and type(info.name) == "string" and info.name or "Pin", px, py)
+  local id = ("%dx%dy%d"):format(m, math.floor(px * 100 + 0.5), math.floor(py * 100 + 0.5))
+  new[id] = { m = m, x = px, y = py, name = name }
+  fresh[id] = Mark(new[id])
+  Say(name .. " is among your pins.")
+  Redraw()
+  return true
+end
+
 local function Draw()
   local world = WorldMapFrame
   if not (world and world.GetCanvas and world.GetMapID) then return end
@@ -89,28 +131,37 @@ local function Draw()
     if world.OnMapChanged then hooksecurefunc(world, "OnMapChanged", Redraw) end
     if world.OnCanvasScaleChanged then hooksecurefunc(world, "OnCanvasScaleChanged", Redraw) end
     world:HookScript("OnShow", Redraw)
+    if world.AddCanvasClickHandler then
+      world:AddCanvasClickHandler(function(map, button, x, y)
+        local ok, ours = pcall(OnMapClick, map, button, x, y)
+        return ok and ours
+      end, 100)
+    end
   end
   local n = 0
   local map = world:IsShown() and world:GetMapID()
+  local canvas = map and world:GetCanvas()
+  -- The canvas grows with the zoom: the flag is scaled back, so it keeps its size on the screen.
+  local scale = 1 / math.max(world.GetCanvasScale and world:GetCanvasScale() or 1, 0.01)
+  local function Put(mark, part, id)
+    local x, y = Where(mark, map)
+    if not x then return end
+    n = n + 1
+    local flag = flags[n] or NewFlag(canvas)
+    flags[n] = flag
+    flag.part, flag.id, flag.name = part or false, id or false, mark.name
+    flag:SetScale(scale)
+    flag:ClearAllPoints()
+    flag:SetPoint("CENTER", canvas, "TOPLEFT", canvas:GetWidth() * x / scale, -canvas:GetHeight() * y / scale)
+    flag:SetFrameLevel(canvas:GetFrameLevel() + 2400)
+    flag:Show()
+  end
   if map then
-    local canvas, gone = world:GetCanvas(), Gone()
-    -- The canvas grows with the zoom: the flag is scaled back, so it keeps its size on the screen.
-    local scale = 1 / math.max(world.GetCanvasScale and world:GetCanvasScale() or 1, 0.01)
+    local gone = Gone()
     for part, mark in pairs(marks) do
-      local x, y
-      if not gone[part] then x, y = Where(mark, map) end
-      if x then
-        n = n + 1
-        local flag = flags[n] or NewFlag(canvas)
-        flags[n] = flag
-        flag.part, flag.name = part, mark.name
-        flag:SetScale(scale)
-        flag:ClearAllPoints()
-        flag:SetPoint("CENTER", canvas, "TOPLEFT", canvas:GetWidth() * x / scale, -canvas:GetHeight() * y / scale)
-        flag:SetFrameLevel(canvas:GetFrameLevel() + 2400)
-        flag:Show()
-      end
+      if not gone[part] then Put(mark, part, nil) end
     end
+    for id, mark in pairs(fresh) do Put(mark, nil, id) end
   end
   for i = n + 1, #flags do flags[i]:Hide() end
 end
@@ -120,21 +171,38 @@ Redraw = function() pcall(Draw) end
 -- Every part named "mark" and a place comes here, with its name: one point each.
 ns.receivers.mark = function(value, part)
   if type(part) ~= "string" or part == "mark" then return end
-  if type(value) == "table" and type(value.m) == "number" and InRange(value.x) and InRange(value.y) then
-    marks[part] = { m = value.m, x = value.x / 100, y = value.y / 100, name = type(value.name) == "string" and value.name or "Pin" }
-  else
-    marks[part] = nil
-    Gone()[part] = nil -- the app has taken it away: nothing is left to tell
+  marks[part] = Mark(value)
+  if not marks[part] then Gone()[part] = nil end -- the app has taken it away: nothing is left to tell
+  Redraw()
+end
+
+-- The marks set here that the app now has among its pins, by id: from now on they are its own.
+ns.receivers.taken = function(ids)
+  if type(ids) ~= "table" then return end
+  local new = New()
+  for _, id in ipairs(ids) do
+    if type(id) == "string" then new[id], fresh[id] = nil, nil end
   end
   Redraw()
 end
 
--- What the app must know: the marks the player removed in the game, until it takes them away itself.
--- Told as long as there is a mark, also when none is removed: the app must hear that the list is empty again.
+-- What the app must know: the marks the player removed in the game, until it takes them away
+-- itself, and the ones set in the game, until it takes them. Told as long as there is a mark, also
+-- when both lists are empty: the app must hear that they are empty again.
 ns.sections[#ns.sections + 1] = { name = "marks", period = 1, build = function()
-  if not ns.db or (next(marks) == nil and next(Gone()) == nil) then return end
-  local gone = {}
+  if not ns.db or (next(marks) == nil and next(Gone()) == nil and next(New()) == nil) then return end
+  local gone, new = {}, {}
   for part in pairs(Gone()) do gone[#gone + 1] = part end
   table.sort(gone)
-  return { gone = gone }
+  for id, mark in pairs(New()) do new[#new + 1] = { id = id, m = mark.m, x = mark.x, y = mark.y, name = mark.name } end
+  table.sort(new, function(a, b) return a.id < b.id end)
+  return { gone = gone, new = new }
 end }
+
+-- At login the marks set here and not taken yet are drawn again, and the map is asked for its clicks.
+local frame = CreateFrame("Frame")
+frame:RegisterEvent("PLAYER_ENTERING_WORLD")
+frame:SetScript("OnEvent", function()
+  for id, value in pairs(New()) do fresh[id] = fresh[id] or Mark(value) end
+  Redraw()
+end)

@@ -111,3 +111,24 @@ export function goneFrom(section: unknown): string[] {
   const gone = typeof section === 'object' && section ? (section as { gone?: unknown }).gone : null
   return Array.isArray(gone) ? gone.filter((part): part is string => typeof part === 'string') : []
 }
+
+/** A mark the player set in the game with Alt and a click, as the strip tells it: its place as the game names it. */
+export interface GameMark extends Pin {
+  /** The name the addon knows it by until the app has taken it. */
+  id: string
+}
+
+/** The marks set in the game that the app has not taken yet, as the strip tells them, checked. */
+export function setFrom(section: unknown): GameMark[] {
+  const set = typeof section === 'object' && section ? (section as { new?: unknown }).new : null
+  if (!Array.isArray(set)) return []
+  return set.flatMap((told: unknown): GameMark[] => {
+    const pin = pinFrom(told), id = (told as { id?: unknown } | null)?.id
+    return pin && typeof id === 'string' && id.length > 0 && id.length <= 40 ? [{ ...pin, id }] : []
+  })
+}
+
+/** The ids of the marks set in the game that the app now has among its pins, as the window tells them, checked. */
+export function takenFrom(asked: unknown): string[] {
+  return Array.isArray(asked) ? asked.filter((id): id is string => typeof id === 'string' && id.length > 0 && id.length <= 40).slice(0, 50) : []
+}

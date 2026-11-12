@@ -49,6 +49,7 @@ const STUB = `
   -- GAME.noPinMap: a map the game allows no pin on.
   C_Map = {
     GetBestMapForUnit = function() return GAME.map end,
+    GetMapInfo = function(map) return { mapID = map, name = GAME.zone } end,
     -- The place on a map is told only for the map the character is on.
     GetPlayerMapPosition = function(map) return GAME.x and (map == nil or map == GAME.map) and { x = GAME.x, y = GAME.y } or nil end,
     CanSetUserWaypointOnMap = function(map) return map ~= GAME.noPinMap end,
@@ -63,6 +64,7 @@ const STUB = `
   function IsAltKeyDown() return GAME.alt == true end
   WorldMapFrame = { OnMapChanged = true }
   function WorldMapFrame:HookScript() end
+  function WorldMapFrame:AddCanvasClickHandler(handler) MAP_CLICK = handler end
   function WorldMapFrame:IsShown() return GAME.mapOpen == true end
   function WorldMapFrame:GetMapID() return GAME.shown end
   function WorldMapFrame:GetCanvasScale() return GAME.canvasScale or 1 end
@@ -196,15 +198,17 @@ const STUB = `
   function T_flags()
     local out = {}
     for _, f in ipairs(frames) do
-      if rawget(f, "part") and f.shown then out[#out + 1] = ("%s %.0f %.0f"):format(f.name, f.x * (f.scale or 1), -f.y * (f.scale or 1)) end
+      if rawget(f, "part") ~= nil and f.shown then out[#out + 1] = ("%s %.0f %.0f"):format(f.name, f.x * (f.scale or 1), -f.y * (f.scale or 1)) end
     end
     table.sort(out)
     return table.concat(out, "; ")
   end
+  -- A click on the world map, at a place 0 to 1 from its top left: gives back whether an addon took it.
+  function T_mapClick(button, x, y) return tostring(MAP_CLICK ~= nil and MAP_CLICK(WorldMapFrame, button, tonumber(x), tonumber(y))) end
   -- A click on the flag of that name, with a button of the mouse.
   function T_flagClick(name, button)
     for _, f in ipairs(frames) do
-      if rawget(f, "part") and f.shown and f.name == name then return rawget(f, "OnMouseUp")(f, button) end
+      if rawget(f, "part") ~= nil and f.shown and f.name == name then return rawget(f, "OnMouseUp")(f, button) end
     end
     error("no flag on the map: " .. name)
   end
@@ -291,6 +295,7 @@ function loadAddon(dir, { addons } = {}) {
     click: (name) => call('T_click', name),
     flags: () => call('T_flags') || '',
     flagClick: (name, button) => call('T_flagClick', name, button),
+    mapClick: (button, x, y) => call('T_mapClick', button, String(x), String(y)) === 'true',
     // Drags a slider to a value.
     slide: (name, value) => call('T_slide', name, String(value)),
     run: (seconds) => call('T_run', String(seconds)),

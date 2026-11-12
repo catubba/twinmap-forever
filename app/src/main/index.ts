@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { linkStatus, lostPercent } from '../shared/link'
 import { shownFrom, type QuestsStatus } from '../shared/quests'
 import type { Found } from '../shared/search'
-import { marksNews, pinFrom, routeNewsFrom, stepFrom } from '../shared/send'
+import { marksNews, pinFrom, routeNewsFrom, stepFrom, takenFrom } from '../shared/send'
 import { CURSEFORGE, setupComplete, setupPages } from '../shared/setup'
 import type { TilesStatus } from '../shared/tiles-status'
 import { placeWindow, WINDOW } from '../shared/window'
@@ -192,14 +192,18 @@ function createWindow(): void {
   // every 5 seconds: so the changes of a few seconds go out together, and never right behind the send before.
   const MARKS_WAIT = 8000
   let marksAsked: unknown = null
+  let takenAsked: string[] = [] // the marks set in the game that are now among the pins here: told with them, in the same send
   let marksTimer: ReturnType<typeof setTimeout> | null = null
   const sendMarks = (): void => {
     marksTimer = null
     if (!gameFolder) return
     try {
       const addons = addonsFolder(gameFolder)
-      const changed = marksNews(marksAsked, sentParts(addons))
-      if (changed && Object.keys(changed).length > 0) send(addons, changed)
+      const have = sentParts(addons)
+      const changed: Record<string, unknown> | null = marksNews(marksAsked, have)
+      if (!changed) return
+      if (JSON.stringify(have.taken ?? []) !== JSON.stringify(takenAsked)) changed.taken = takenAsked.length > 0 ? takenAsked : false
+      if (Object.keys(changed).length > 0) send(addons, changed)
     } catch {
       // the way to the game is not there yet: they go once it is
     }
@@ -230,8 +234,9 @@ function createWindow(): void {
     const pin = pinFrom(asked)
     return sendParts(pin && { pin: { ...pin, t: Date.now() } })
   })
-  ipcMain.handle('send-marks', (_event, asked: unknown): void => {
+  ipcMain.handle('send-marks', (_event, asked: unknown, taken: unknown): void => {
     marksAsked = asked
+    takenAsked = takenFrom(taken)
     marksTimer ??= setTimeout(sendMarks, MARKS_WAIT)
   })
   // The route, whole, or false to take it away from the game; and a step ahead on the route the game has.
