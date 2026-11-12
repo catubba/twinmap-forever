@@ -1,11 +1,11 @@
 <script lang="ts">
-  // The Now column: the next stop of the route, the quests of the log with something to do in this
-  // zone, and who is near.
+  // The Now column: the next stop of the route, every quest of the log (the nearest first), and
+  // who is near.
   // Nothing to click to make it work: it composes itself from where the character is.
   import type { Position } from '../../shared/game'
   import type { GameMap } from '../../shared/maps'
-  import { nearbyRows, nearest, questsHere, steady, wayOf, whereIs, type NowRow } from '../../shared/now'
-  import type { QuestPin } from '../../shared/quests'
+  import { nearbyRows, nearest, questRows, steady, wayOf, whereIs, type NowRow, type PlacelessRow } from '../../shared/now'
+  import type { LogQuest, QuestPin } from '../../shared/quests'
   import { bandOf, routeNews, type Route, type Stop } from '../../shared/route'
   import { sendState, type Inbox } from '../../shared/send'
   import type { FixedPin } from '../../shared/services'
@@ -19,6 +19,7 @@
   let {
     pos,
     quests,
+    log,
     fixed,
     side,
     ready,
@@ -39,6 +40,7 @@
   }: {
     pos: Position | undefined
     quests: QuestPin[]
+    log: LogQuest[]
     fixed: FixedPin[]
     side?: string
     ready: boolean
@@ -78,11 +80,11 @@
   let here: { rows: NowRow[]; at: number } | null = null
   let near: { rows: NowRow[]; at: number } | null = null
   const lists = $derived.by(() => {
-    if (!me) return ((here = near = null), { here: [], near: [] })
-    const now = Date.now()
-    here = steady(here, questsHere(quests, me.zone, me.at), now)
+    if (!me) return ((here = near = null), { here: [], placeless: [] as PlacelessRow[], near: [] })
+    const now = Date.now(), all = questRows(log, quests, maps, me.continent, me.at)
+    here = steady(here, all.placed, now)
     near = steady(near, nearest(around, me.continent, me.at, NEAR), now)
-    return { here: here.rows, near: near.rows }
+    return { here: here.rows, placeless: all.placeless, near: near.rows }
   })
   // The route as the game takes it: none while a stop lies in no zone, or nothing is left to walk.
   const news = $derived(routeNews(route, maps, 1))
@@ -123,12 +125,13 @@
 {#snippet rows(list: NowRow[])}
   <div class="rows">
     {#each list as row (row.key)}
-      {@const way = wayOf(me!.at, row.at)}
-      <button class="row" aria-current={row.key === chosen} onclick={() => pick(row)} onpointerenter={() => (over = row)} onpointerleave={() => (over = null)} onfocus={() => (over = row)} onblur={() => (over = null)}>
+      <!-- A place on the other continent has no distance to walk: the row still takes the map there. -->
+      {@const way = row.continent === me!.continent ? wayOf(me!.at, row.at) : null}
+      <button class="row" title={way ? undefined : 'On the other continent'} aria-current={row.key === chosen} onclick={() => pick(row)} onpointerenter={() => (over = row)} onpointerleave={() => (over = null)} onfocus={() => (over = row)} onblur={() => (over = null)}>
         <span>{row.name}</span>
         <span class="t-{row.tone}">{row.kind}</span>
-        <span class="num">{yards(way.yards)}</span>
-        <Glyph name="direction" size={12} turn={way.turn} />
+        <span class="num">{way ? yards(way.yards) : ''}</span>
+        {#if way}<Glyph name="direction" size={12} turn={way.turn} />{/if}
       </button>
     {/each}
   </div>
@@ -136,9 +139,15 @@
 
 <div class="now">
   <NextStop {route} band={bandOf(route, me, live)} sending={sendState(live, inbox, news !== null, 'A stop is')} {inGame} onsend={sendRoute} {onskip} {onarrive} {onclear} {onend} {onremove} {onmove} onpick={onstop} />
-  {#if lists.here.length}
-    <h2 class="band">Quests here <span class="count">{lists.here.length}</span></h2>
+  {#if lists.here.length + lists.placeless.length}
+    <h2 class="band">Quests <span class="count">{lists.here.length + lists.placeless.length}</span></h2>
     {@render rows(lists.here)}
+    <!-- In the log, with no place on the map: in a dungeon, or one Questie cannot place. -->
+    <div class="rows placeless">
+      {#each lists.placeless as row (row.key)}
+        <div class="row"><span>{row.name}</span><span class="t-{row.tone}">{row.kind}</span></div>
+      {/each}
+    </div>
   {/if}
   {#if lists.near.length}
     <h2 class="band">Nearby</h2>
@@ -155,5 +164,18 @@
   /* More room above a title than under it: the band belongs to its own rows. */
   .rows {
     padding: 6px 0 16px;
+  }
+  /* The rows with no place follow the others as one list, and are not for clicking. */
+  .rows:has(+ .placeless) {
+    padding-bottom: 0;
+  }
+  .placeless {
+    padding-top: 0;
+  }
+  .placeless .row {
+    cursor: default;
+  }
+  .placeless .row:hover {
+    background: none;
   }
 </style>

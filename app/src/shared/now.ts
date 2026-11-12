@@ -1,9 +1,8 @@
-// The Now panel: the quests of the log with something to do in the zone the character is in, and
-// who is near. Every row has a place; how far and which way are worked out again with each
+// The Now panel: every quest of the log, the nearest first, and who is near. Every row has a place; how far and which way are worked out again with each
 // reading of the position, while the order of the rows changes at most every few seconds.
 import { UNITS_PER_BLOCK, unitsOfPlace, type Point } from './geo'
 import type { Continent, GameMap } from './maps'
-import type { QuestPin } from './quests'
+import type { LogQuest, QuestPin } from './quests'
 import { serves, type FixedPin, type ServiceLayer } from './services'
 import { BLOCK_YARDS } from './world'
 
@@ -39,24 +38,35 @@ export function wayOf(from: Point, to: Point): { yards: number; turn: number } {
 const far = (from: Point, row: NowRow): number => Math.hypot(row.at.x - from.x, row.at.y - from.y)
 const zonesByArea = (maps: GameMap[]): Map<number, GameMap> => new Map(maps.filter((m) => m.level === 'zone' && m.rect && m.area && m.continent !== null).map((m) => [m.area, m]))
 
+/** A quest of the log with no pin on a map the app has: in a dungeon, or one Questie cannot place. */
+export type PlacelessRow = Omit<NowRow, 'continent' | 'at'>
+
 /**
- * The quests of the log with a pin in this zone: one row each, on the nearest of its pins. One to
- * hand in comes before one with things still to find.
+ * Every quest of the log, as the journal of the game has them, however far. One row each, on the
+ * nearest of its pins: those on the character's continent first, the nearest first; then those
+ * with pins on the other continent only; and apart, those with no pin at all.
  */
-export function questsHere(pins: QuestPin[], zone: GameMap, from: Point): NowRow[] {
-  if (!zone.rect || zone.continent === null) return []
-  const rows = new Map<string, NowRow>()
+export function questRows(log: LogQuest[], pins: QuestPin[], maps: GameMap[], continent: Continent, from: Point): { placed: NowRow[]; placeless: PlacelessRow[] } {
+  const zones = zonesByArea(maps), best = new Map<string, NowRow>()
   for (const pin of pins) {
-    if (pin.type === 'available' || pin.area !== zone.area) continue
-    const at = unitsOfPlace(zone.rect, pin.x, pin.y)
+    const zone = zones.get(pin.area)
+    if (pin.type === 'available' || !zone) continue
+    const at = unitsOfPlace(zone.rect!, pin.x, pin.y)
     for (const quest of pin.quests) {
-      const row: NowRow = { key: `q:${quest}`, name: quest, kind: pin.type === 'turnin' ? 'Hand in' : 'Objective', tone: pin.type === 'turnin' ? 'quest' : 'objective', continent: zone.continent, at }
-      const before = rows.get(row.key)
-      // A quest ready to hand in has no objective left: but if both kinds are there, the hand-in wins.
-      if (!before || (before.tone === row.tone ? far(from, row) < far(from, before) : row.tone === 'quest')) rows.set(row.key, row)
+      const row: NowRow = { key: `q:${quest}`, name: quest, kind: pin.type === 'turnin' ? 'Hand in' : 'Objective', tone: pin.type === 'turnin' ? 'quest' : 'objective', continent: zone.continent!, at }
+      const before = best.get(row.key), here = row.continent === continent
+      if (!before || (here !== (before.continent === continent) ? here : here && far(from, row) < far(from, before))) best.set(row.key, row)
     }
   }
-  return [...rows.values()].sort((a, b) => Number(b.tone === 'quest') - Number(a.tone === 'quest') || far(from, a) - far(from, b))
+  const near: NowRow[] = [], away: NowRow[] = [], placeless: PlacelessRow[] = [], seen = new Set<string>()
+  for (const quest of log) {
+    const key = `q:${quest.name}`, row = best.get(key)
+    if (seen.has(key)) continue // two quests of one name are one row
+    seen.add(key)
+    if (!row) placeless.push({ key, name: quest.name, kind: quest.done ? 'Hand in' : 'Objective', tone: quest.done ? 'quest' : 'objective' })
+    else (row.continent === continent ? near : away).push(row)
+  }
+  return { placed: [...near.sort((a, b) => far(from, a) - far(from, b)), ...away], placeless }
 }
 
 // The word for each service, in the order they are told when someone offers several.
