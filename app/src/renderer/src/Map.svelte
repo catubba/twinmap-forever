@@ -614,7 +614,11 @@
       })
       .catch(() => {})
     // Gone with the screen: whatever was still waiting (a layout, a list being read) finds no map and does nothing.
+    // The map is told when its box changes: the panel beside it opens and closes, a phone is turned.
+    const sized = new ResizeObserver(() => made.invalidateSize())
+    sized.observe(holder)
     return () => {
+      sized.disconnect()
       clearTimeout(laying)
       cancelAnimationFrame(gliding)
       map = undefined
