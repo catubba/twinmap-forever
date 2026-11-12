@@ -5,6 +5,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { Kept, KeptKey } from '../shared/kept'
 import type { LinkSnapshot } from '../shared/link'
+import type { Updating } from '../main/update'
 import type { QuestsStatus } from '../shared/quests'
 import type { RouteNews } from '../shared/route'
 import type { Found } from '../shared/search'
@@ -30,6 +31,10 @@ contextBridge.exposeInMainWorld('twinmap', {
   keep: (key: KeptKey, value: unknown): Promise<void> => ipcRenderer.invoke('keep', key, value),
   onQuests: (listener: (status: QuestsStatus) => void) => {
     ipcRenderer.on('quests', (_event, status: QuestsStatus) => listener(status))
+  },
+  // In the small window of an update: which version is coming down, and how far along it is.
+  onUpdate: (listener: (updating: Updating) => void) => {
+    ipcRenderer.on('update', (_event, updating: Updating) => listener(updating))
   },
   // Opens the folder picker. Gives back what is wrong with the folder picked, or null.
   chooseGameFolder: (): Promise<string | null> => ipcRenderer.invoke('choose-game-folder'),

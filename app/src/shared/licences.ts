@@ -10,7 +10,7 @@ export interface ThirdParty {
 
 /** Each entry of the file: a heading between two lines of equals signs, then the text up to the next heading. */
 export function thirdParties(text: string): ThirdParty[] {
-  const parts = text.replace(/\r\n/g, '\n').split(/^={20,}$/m)
+  const parts = text.replace(/\r\n/g, '\n').split(/^={80}$/m)
   const out: ThirdParty[] = []
   for (let i = 1; i + 1 < parts.length; i += 2) {
     const [name = '', ...about] = parts[i]!.trim().split('\n')

@@ -21,6 +21,7 @@ import { addonsFolder, readSettings, setupStatus, writeSettings } from './setup'
 import { installChannel, send, sentParts } from './signal'
 import { servedFile } from './tiles'
 import startTilesWorker from './tiles-worker?nodeWorker'
+import { updateFirst } from './update'
 import startWalkWorker from './walk-worker?nodeWorker'
 import { navFolder } from './nav'
 import { encodePng } from './png'
@@ -459,7 +460,8 @@ function createWindow(): void {
 // The shipped app has no menu: with no title bar there is no place for one, and Alt must not bring one up.
 if (app.isPackaged) Menu.setApplicationMenu(null)
 
-void app.whenReady().then(createWindow)
+// A newer version of the app, if there is one, comes first: see update.ts.
+void app.whenReady().then(() => updateFirst(createWindow))
 
 // Windows only: closing the last window closes the app.
 app.on('window-all-closed', () => app.quit())
