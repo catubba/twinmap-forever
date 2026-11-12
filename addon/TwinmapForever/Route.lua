@@ -59,6 +59,11 @@ ns.receivers.step = function(value)
   if route and type(value) == "table" and value.t == route.t and type(value.at) == "number" and value.at > index then Go(value.at) end
 end
 
+-- For Shortest Path, when it guides the route (ShortestPath.lua): the route with the stop it is at, and a
+-- step on to a stop further on, as Shortest Path reaches it.
+function ns.RouteAt() return route, index end
+function ns.RouteReached(i) if route and i > index then Go(i) end end
+
 -- /twinmap skip: on to the stop after. Gives back whether there was a route to skip on.
 function ns.SkipStop()
   if not route or index > #route.stops then return false end
@@ -77,6 +82,7 @@ frame:SetScript("OnUpdate", function(_, elapsed)
   acc = 0
   local stop = route and route.stops[index]
   if not stop then return end
+  if ns.Guiding and ns.Guiding() then return end -- Shortest Path says when a stop is reached
   -- The character's place on the stop's own map: nothing where it is not on that map, or in an instance.
   local ok, here = pcall(C_Map.GetPlayerMapPosition, stop.m, "player")
   local x, y = ok and here and here.x, ok and here and here.y
