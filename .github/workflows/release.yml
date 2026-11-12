@@ -1,0 +1,63 @@
+name: Release
+
+# A tag like v0.1.0 makes a release: the installer is built with that version, published with the
+# two files the app needs to update itself, and sent to VirusTotal. A version with a dash in it
+# (v0.1.0-rc.1) is published as a pre-release, which the app does not update to.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: app
+        shell: bash
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci
+      - run: npm run check
+      - run: npm test
+
+      - name: Build the installer
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          npx electron-vite build
+          npx electron-builder --win nsis --publish never -c.extraMetadata.version="$VERSION"
+
+      # The installer, its blockmap and the file that names the latest version: the app updates itself only with all three.
+      - name: Publish the release
+        run: |
+          PRE=""
+          case "$VERSION" in *-*) PRE="--prerelease" ;; esac
+          UPDATE_FILES=$(ls dist/*.yml | grep -v builder-)
+          gh release create "$GITHUB_REF_NAME" --title "Twinmap $VERSION" --generate-notes $PRE \
+            "dist/Twinmap-Setup-$VERSION.exe" "dist/Twinmap-Setup-$VERSION.exe.blockmap" $UPDATE_FILES
+
+      # The result goes into the release notes, and into virustotal.json for the badge of the README.
+      # A scan that fails does not take the release back: it is published already.
+      - name: Scan the installer with VirusTotal
+        continue-on-error: true
+        env:
+          VT_API_KEY: ${{ secrets.VT_API_KEY }}
+        run: |
+          if [ -z "$VT_API_KEY" ]; then
+            echo "::warning::VT_API_KEY is not set: the installer was not scanned"
+            exit 0
+          fi
+          node scripts/virustotal.js "dist/Twinmap-Setup-$VERSION.exe" dist/vt
+          gh release upload "$GITHUB_REF_NAME" dist/vt/virustotal.json --clobber
+          { gh release view "$GITHUB_REF_NAME" --json body -q .body; echo; cat dist/vt/virustotal.md; } > dist/vt/notes.md
+          gh release edit "$GITHUB_REF_NAME" --notes-file dist/vt/notes.md

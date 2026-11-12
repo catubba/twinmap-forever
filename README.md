@@ -3,6 +3,7 @@
 [![CI](https://img.shields.io/github/actions/workflow/status/catubba/twinmap-forever/ci.yml?branch=main&label=CI)](https://github.com/catubba/twinmap-forever/actions)
 [![Release](https://img.shields.io/github/v/release/catubba/twinmap-forever)](https://github.com/catubba/twinmap-forever/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/catubba/twinmap-forever/total)](https://github.com/catubba/twinmap-forever/releases)
+[![VirusTotal](https://img.shields.io/endpoint?url=https%3A%2F%2Fgithub.com%2Fcatubba%2Ftwinmap-forever%2Freleases%2Flatest%2Fdownload%2Fvirustotal.json)](https://github.com/catubba/twinmap-forever/releases/latest)
 [![License](https://img.shields.io/github/license/catubba/twinmap-forever)](LICENSE)
 [![Ko-fi](https://img.shields.io/badge/Ko--fi-buy%20me%20a%20coffee-ff5e5b?logo=kofi&logoColor=white)](https://ko-fi.com/catubba)
 
@@ -42,7 +43,7 @@ After that the app updates itself: every time it starts it looks for a newer ver
 
 The installer is not signed yet, so Windows SmartScreen may stop it the first time. Click **More info**, then **Run anyway**. This happens only on the first download, not on updates.
 
-You do not have to take our word for it: the code is all here, and every release can be built from it.
+You do not have to take our word for it: the code is all here, every release can be built from it, and every installer is scanned by [VirusTotal](https://www.virustotal.com) when it is published. The result is in the notes of each release and in the badge at the top of this page.
 
 ### What you need
 
