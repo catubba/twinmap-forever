@@ -91,7 +91,9 @@ export function startLink(tilesFolder: () => string | null = () => null): { snap
     if (read.drew) drew = read.drew
     if (reading.kind !== 'none') edgeSeenAt = now
     game.feed(reading, now)
-    const window = hwnd, place = inside.look(game.state.sections.pos, (x, y, size) => readBox(window, x, y, size), now)
+    // The addon tells where the minimap is in pixels of the game: on a stretched game the square is as much further and bigger on screen.
+    const window = hwnd, stretch = drew ? (row.length >> 2) / drew : 1
+    const place = inside.look(game.state.sections.pos, (x, y, size) => readBox(window, Math.round(x * stretch), Math.round(y * stretch), Math.round(size * stretch)), now)
     found = place && (found && found.u === place.u && found.v === place.v && found.facing === place.facing ? found : { ...place, at: now })
   }, READ_EVERY)
 

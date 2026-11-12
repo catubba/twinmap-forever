@@ -93,3 +93,25 @@ test('the minimap is read inside dungeons and raids only', () => {
   expect(readsMinimap({ inst: { kind: 'party', mini: { ...mini, x: NaN } } })).toBeNull()
   expect(readsMinimap({ inst: { kind: 'party', mini: { ...mini, size: 5000 } } })).toBeNull()
 })
+
+// A game stretched to fill a wider monitor: the square of the minimap is bigger on screen, each pixel a blend of its neighbours.
+function stretchedBox(box: Box, size: number): Box {
+  const rgb = new Uint8Array(size * size * 3), at = (x: number, y: number): number => box.rgb[(y * box.size + x) * 3]!
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const u = Math.max(0, Math.min(box.size - 1, ((x + 0.5) * box.size) / size - 0.5)), v = Math.max(0, Math.min(box.size - 1, ((y + 0.5) * box.size) / size - 0.5))
+      const a = Math.floor(u), b = Math.floor(v), a1 = Math.min(box.size - 1, a + 1), b1 = Math.min(box.size - 1, b + 1), s = u - a, t = v - b
+      const g = at(a, b) * (1 - s) * (1 - t) + at(a1, b) * s * (1 - t) + at(a, b1) * (1 - s) * t + at(a1, b1) * s * t
+      rgb.fill(Math.round(g), (y * size + x) * 3, (y * size + x) * 3 + 3)
+    }
+  }
+  return { size, rgb }
+}
+
+test('the minimap of a game at 1920 stretched over 2560 pixels is found as well', () => {
+  const mosaic = rooms(700, 640), levels = levelsOf(mosaic)
+  const found = locate(levels, stretchedBox(shown(mosaic, 1320, 2290, 238), Math.round((238 * 2560) / 1920)), 0)!
+  expect(found.score).toBeGreaterThan(SURE)
+  expect(Math.abs(found.u - 1320)).toBeLessThanOrEqual(1.5)
+  expect(Math.abs(found.v - 2290)).toBeLessThanOrEqual(1.5)
+})
