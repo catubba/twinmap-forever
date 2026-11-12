@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest'
 import { unitsOfPlace } from './geo'
 import type { GameMap } from './maps'
-import { nearbyRows, nearest, questsHere, REORDER_EVERY, steady, wayOf, whereIs, type NowRow } from './now'
+import { nearbyRows, nearest, questRows, REORDER_EVERY, steady, wayOf, whereIs, type NowRow } from './now'
 import type { QuestPin } from './quests'
 import type { FixedPin } from './services'
 
@@ -31,17 +31,32 @@ test('how far and which way: yards, and degrees clockwise from north', () => {
   expect(wayOf(me, place(50.5, 50)).yards, 'walking up to someone').toBeLessThan(10)
 })
 
-test('the quests of the log with a pin in this zone, each on its nearest: to hand in first', () => {
+test('every quest of the log, however far, each on its nearest pin: the nearest first', () => {
   const pins = [
     quest('objective', 12, 80, 50, 'Cellar Rat', 'Rats in the Cellar'),
     quest('objective', 12, 55, 50, 'Cellar Rat', 'Rats in the Cellar', 'A Second Quest'),
     quest('turnin', 12, 10, 10, 'Miller Odo', 'A Parcel for the Miller'),
-    quest('objective', 40, 50, 50, 'Road Warden', 'Elsewhere'), // another zone
+    quest('objective', 40, 50, 50, 'Road Warden', 'Elsewhere'), // another zone of this continent
+    quest('objective', 17, 50, 50, 'Far Shore Crab', 'Overseas'), // the other continent
+    quest('objective', 17, 50, 50, 'Far Shore Crab', 'Rats in the Cellar'), // nearer pins are on this continent
+    quest('objective', 999, 50, 50, 'Deep Rat', 'In a Dungeon'), // a map the app does not have
     quest('available', 12, 50, 51, 'Smith Hale', '[5] Not Taken Yet'), // not in the log
   ]
   const me = at(1, 50, 50)
-  const rows = questsHere(pins, me.zone, me.at)
-  expect(rows.map((r) => `${r.name} | ${r.kind} | ${Math.round(wayOf(me.at, r.at).yards)}`)).toEqual(['A Parcel for the Miller | Hand in | 566', 'Rats in the Cellar | Objective | 50', 'A Second Quest | Objective | 50'])
+  const log = ['Overseas', 'Elsewhere', 'A Parcel for the Miller', 'Rats in the Cellar', 'In a Dungeon', 'No Pin, Done', 'A Second Quest'].map((name) => ({ name, done: name.endsWith('Done') }))
+  const rows = questRows(log, pins, MAPS, me.continent, me.at)
+  // On this continent by distance, whatever the zone; then the other continent; a hand-in is not put first.
+  expect(rows.placed.map((r) => `${r.name} | ${r.kind} | ${r.continent === me.continent ? Math.round(wayOf(me.at, r.at).yards) : 'away'}`)).toEqual([
+    'Rats in the Cellar | Objective | 50',
+    'A Second Quest | Objective | 50',
+    'A Parcel for the Miller | Hand in | 566',
+    'Elsewhere | Objective | 1000',
+    'Overseas | Objective | away',
+  ])
+  // In the log with no pin on a map: still told, as the journal has them.
+  expect(rows.placeless.map((r) => `${r.name} | ${r.kind}`)).toEqual(['In a Dungeon | Objective', 'No Pin, Done | Hand in'])
+  // A pin of a quest that is not in the log makes no row.
+  expect(questRows([], pins, MAPS, me.continent, me.at)).toEqual({ placed: [], placeless: [] })
 })
 
 test('who is near: givers of quests and services of the character\'s side, each once, the nearest first', () => {

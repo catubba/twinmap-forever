@@ -38,11 +38,20 @@ export interface QuestPin {
   quests: string[]
 }
 
-/** What the main process tells the window: whether the player has Questie's data, and the pins. */
+/** A quest of the log, by the name its pins carry. */
+export interface LogQuest {
+  name: string
+  /** Ready to hand in. */
+  done: boolean
+}
+
+/** What the main process tells the window: whether the player has Questie's data, the pins and the log. */
 export interface QuestsStatus {
   /** QuestieDB's version, or null when the player has none. */
   questie: string | null
   pins: QuestPin[]
+  /** Every quest of the log, with or without a pin: told with the pins, once the game has spoken. */
+  log?: LogQuest[]
   /** Services, ore and herbs: told once, when the QuestieDB is opened, since they do not change. */
   fixed?: FixedPin[]
 }

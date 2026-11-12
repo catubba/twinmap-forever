@@ -3,7 +3,7 @@
 // QuestieDB keeps every entity in its .toc, as base64 CBOR, one metadata line per field.
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import type { QuestieShown, QuestPin } from '../shared/quests'
+import type { LogQuest, QuestieShown, QuestPin } from '../shared/quests'
 import { best, fold, wordsMatch, type Found } from '../shared/search'
 import { resourceOf, servicesOf, type FixedPin, type ServiceLayer } from '../shared/services'
 
@@ -289,6 +289,14 @@ export function fixedPins(db: Questie): FixedPin[] {
     if (layer) add('Object', id, { name: name as string, layers: [layer] })
   }
   return pins
+}
+
+/** The quests of the log, each by the name its pins carry. */
+export function questLog(db: Questie, shown: QuestieShown): LogQuest[] {
+  return shown.active.map((q) => {
+    const name = db.get('Quest', q.id, QUEST.name)
+    return { name: typeof name === 'string' && name ? name : `Quest ${q.id}`, done: q.done }
+  })
 }
 
 /**

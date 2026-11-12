@@ -4,7 +4,7 @@
   import { tilesLine, type TilesStatus } from '../../shared/tiles-status'
   import { onMount } from 'svelte'
   import { fade, fly } from 'svelte/transition'
-  import type { QuestPin } from '../../shared/quests'
+  import type { LogQuest, QuestPin } from '../../shared/quests'
   import type { FixedPin } from '../../shared/services'
   import { addStop, advance, followed, gameRouteFrom, moveStop, noRoute, removeStop, routeFrom } from '../../shared/route'
   import { inboxFrom } from '../../shared/send'
@@ -30,8 +30,11 @@
   let fixed = $state.raw<FixedPin[]>([])
   // The map on show: the panel sends it to the place of a row.
   let mapView = $state<Map>()
+  // The quests of the log, with a pin or without.
+  let log = $state.raw<LogQuest[]>([])
   window.twinmap.onQuests((status) => {
     quests = status.pins
+    if (status.log) log = status.log
     if (status.fixed) fixed = status.fixed
   })
   // The route: kept from one run of the app to the next.
@@ -168,6 +171,7 @@
     <Now
       {pos}
       {quests}
+    {log}
       {fixed}
       side={char?.side}
       ready={mapReady}

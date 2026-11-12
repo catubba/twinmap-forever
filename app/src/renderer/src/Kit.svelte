@@ -41,7 +41,7 @@
     ['small', 'Stonesplinter Trogg 6/10'],
     ['body', 'Innkeeper Hearthstove, 32 yd'],
     ['label', 'Send to game'],
-    ['title', 'Quests here'],
+    ['title', 'Quests'],
     ['nav', 'Character'],
     ['name', 'Stonesplinter Valley'],
     ['zone', 'Loch Modan'],
