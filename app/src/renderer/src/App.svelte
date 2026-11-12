@@ -8,6 +8,7 @@
   import type { FixedPin } from '../../shared/services'
   import { addStop, advance, followed, gameRouteFrom, moveStop, noRoute, removeStop, routeFrom } from '../../shared/route'
   import { followFrom, goneFrom, inboxFrom, setFrom } from '../../shared/send'
+  import { journeyFrom } from '../../shared/journey'
   import Now from './Now.svelte'
   import Search from './Search.svelte'
   import type { SetupStatus } from '../../shared/setup'
@@ -179,6 +180,7 @@
       {inbox}
       {route}
       inGame={route.sent && gameRoute?.t === route.t}
+      journey={live ? journeyFrom(link?.state.sections.journey) : null}
       onsent={(t) => (route = { ...route, sent: true, t })}
       onskip={skip}
       onarrive={() => (route = advance(route))}

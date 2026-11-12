@@ -15,4 +15,5 @@ Pin.lua
 Route.lua
 Marks.lua
 Arrow.lua
+ShortestPath.lua
 Options.lua
