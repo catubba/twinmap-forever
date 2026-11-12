@@ -49,3 +49,15 @@ test.skipIf(!INSTALLED || !existsSync(INSTALLED))('the grid in the folder of Sho
 test('a folder with no Shortest Path Forever in it gives no grid', () => {
   expect(readAddonNav(join(__dirname, 'nowhere'), 0)).toBeNull()
 })
+
+// Stormwind is walked on the floors of its buildings: the streets, the bridges over the canals.
+const STORMWIND = { minX: -9154.2, minY: -14.6, maxX: -7995.8, maxY: 1722.9 }
+const stormwind = (px: number, py: number): Yards => [STORMWIND.maxX - (py / 100) * (STORMWIND.maxX - STORMWIND.minX), STORMWIND.maxY - (px / 100) * (STORMWIND.maxY - STORMWIND.minY)]
+
+test('across Stormwind the way goes by its streets and bridges, which are floors and not the base surface', () => {
+  const find = walker(shipped), from = stormwind(62, 72), to = stormwind(38, 80)
+  const walk = find(from, to)!
+  expect(walk.yards).toBeGreaterThan(crow(from, to) * 1.2)
+  expect(walk.yards).toBeLessThan(crow(from, to) * 2)
+  expect(find(stormwind(62, 72), stormwind(50, 45))!.yards).toBeGreaterThan(crow(stormwind(62, 72), stormwind(50, 45)))
+})
