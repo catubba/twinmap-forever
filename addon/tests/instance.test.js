@@ -102,6 +102,11 @@ test('in a dungeon the position says where the minimap is on the window, and now
   addon.lua('MINIZOOM = 2');
   addon.run(2);
   assert.equal(positions(addon).at(-1).inst.mini.zoom, 2);
+  // How many yards it shows, where the game tells: it changes between under a roof and the open.
+  assert.equal(positions(addon).at(-1).inst.mini.r, undefined);
+  addon.lua('GAME.miniRadius = 233.3333');
+  addon.run(2);
+  assert.equal(positions(addon).at(-1).inst.mini.r, 233.3);
   addon.lua('ROTATES = "1"');
   addon.run(2);
   assert.equal(positions(addon).at(-1).inst.mini.turns, true);
