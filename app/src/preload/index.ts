@@ -36,6 +36,8 @@ contextBridge.exposeInMainWorld('twinmap', {
   search: (typed: string): Promise<Found[]> => ipcRenderer.invoke('search', typed),
   // Marks a point in the game. Gives back the number of the send, or what went wrong.
   sendPin: (pin: Pin): Promise<{ seq: number } | { error: string }> => ipcRenderer.invoke('send-pin', pin),
+  // My pins, all of them: the game draws the same points on its own map.
+  sendMarks: (pins: Pin[]): Promise<void> => ipcRenderer.invoke('send-marks', pins),
   // Sends the route to the game, or takes it away from it with false.
   sendRoute: (route: RouteNews | false): Promise<{ seq: number } | { error: string }> => ipcRenderer.invoke('send-route', route),
   // Moves the game on to a stop of the route it has.

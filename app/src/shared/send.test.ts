@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { inboxFrom, pinFrom, routeNewsFrom, sendState, stepFrom } from './send'
+import { goneFrom, markPart, marksNews, inboxFrom, pinFrom, routeNewsFrom, sendState, stepFrom } from './send'
 
 test('a pin is checked before it leaves: a real map, a place on it, a name of plain text', () => {
   expect(pinFrom({ m: 1429, x: 43.712, y: 65.8, name: 'Lion\'s Pride Inn' })).toEqual({ m: 1429, x: 43.71, y: 65.8, name: 'Lion\'s Pride Inn' })
@@ -37,4 +37,22 @@ test('a route and a step are checked before they leave', () => {
   expect(stepFrom({ t: 5, at: 3 })).toEqual({ t: 5, at: 3 })
   expect(stepFrom({ t: 5, at: 2.5 })).toBeNull()
   expect(sendState(true, { seq: 1, left: 30 }, false, 'A stop is').why).toBe('A stop is in no zone the game can mark.')
+})
+
+test('the marks sent are only what changed: a new or renamed point, and false for one no longer saved', () => {
+  const inn = { m: 1429, x: 43.71, y: 65.8, name: 'Inn' }, mine = { m: 1429, x: 10, y: 20, name: 'Mine' }
+  expect(markPart(inn)).toBe('mark1429x4371y6580')
+  expect(marksNews([inn, mine, { m: 0, x: 1, y: 1, name: 'no map' }], { pin: inn })).toEqual({ mark1429x4371y6580: inn, mark1429x1000y2000: mine })
+  const have = { mark1429x4371y6580: inn, mark1429x1000y2000: mine, route: { t: 1 } }
+  expect(marksNews([inn, mine], have), 'nothing changed, nothing to send').toEqual({})
+  expect(marksNews([{ ...inn, name: 'Lion|s Pride' }], have)).toEqual({ mark1429x4371y6580: { ...inn, name: 'Lion/s Pride' }, mark1429x1000y2000: false })
+  expect(marksNews([], have), 'the other parts are not the marks to take away').toEqual({ mark1429x4371y6580: false, mark1429x1000y2000: false })
+  expect(marksNews('pins', have)).toBeNull()
+})
+
+test('the marks removed in the game are read off the strip, and anything else is none', () => {
+  expect(goneFrom({ gone: ['mark1429x4371y6580', 7] })).toEqual(['mark1429x4371y6580'])
+  expect(goneFrom({ gone: [] })).toEqual([])
+  expect(goneFrom(undefined)).toEqual([])
+  expect(goneFrom({ gone: 'all' })).toEqual([])
 })

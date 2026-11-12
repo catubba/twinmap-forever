@@ -4,7 +4,7 @@
   // Inside a dungeon or a raid it shows that instead: its rooms, its bosses, its entrance.
   import L from 'leaflet'
   import 'leaflet/dist/leaflet.css'
-  import { onMount } from 'svelte'
+  import { onMount, untrack } from 'svelte'
   import { DUNGEON_PINS } from '../../shared/dungeon-pins'
   import type { Position } from '../../shared/game'
   import { unitsOfPlace, unitsOfRect, type Point } from '../../shared/geo'
@@ -24,12 +24,12 @@
   import PointLabel from './PointLabel.svelte'
   import { inRoute, noRoute, type Route, type Stop } from '../../shared/route'
   import { removePin, renamePin, savedAt, savedFrom, savePin } from '../../shared/saved'
-  import { sendState, type Inbox } from '../../shared/send'
+  import { markPart, sendState, type Inbox } from '../../shared/send'
   import { pin } from './marks'
 
   // at: when the position was read off the game, in milliseconds.
   // insideReady: the rooms of the buildings are converted, and their list can be asked for.
-  let { pos, at: readAt, insideReady, quests = [], fixed = [], side, live = false, inbox = null, route = noRoute(), onroute }: { pos: Position | undefined; at: number | undefined; insideReady: boolean; quests?: QuestPin[]; fixed?: FixedPin[]; side?: string; live?: boolean; inbox?: Inbox | null; route?: Route; onroute?: (stop: Stop) => void } = $props()
+  let { pos, at: readAt, insideReady, quests = [], fixed = [], side, live = false, inbox = null, removed = [], route = noRoute(), onroute }: { pos: Position | undefined; at: number | undefined; insideReady: boolean; quests?: QuestPin[]; fixed?: FixedPin[]; side?: string; live?: boolean; inbox?: Inbox | null; removed?: string[]; route?: Route; onroute?: (stop: Stop) => void } = $props()
 
   const TILES = 'twinmap://tiles'
   const TOP_ZOOM = 7 // the game's own detail: a block's picture is four tiles
@@ -73,6 +73,18 @@
   // My pins: the points the player saved, remembered from one run of the app to the next.
   let myPins = $state.raw(savedFrom(localStorage.getItem('pins')))
   $effect(() => localStorage.setItem('pins', JSON.stringify(myPins)))
+  // The game draws the same pins on its own map: it is told them all at every change. removed: the
+  // ones the player removed there, which are forgotten here too. Only when that list changes: a
+  // point saved again while the game still names it is kept.
+  $effect(() => void window.twinmap.sendMarks(myPins.flatMap((p) => (p.pin ? [{ ...p.pin, name: p.name }] : []))))
+  const goneNow = $derived(removed.join(' '))
+  $effect(() => {
+    const parts = new Set(goneNow.split(' '))
+    untrack(() => {
+      const left = myPins.filter((p) => !(p.pin && parts.has(markPart(p.pin))))
+      if (left.length < myPins.length) myPins = left
+    })
+  })
   // The labelled point as one of them, or -1; and the point under the name it goes by: a saved one has its own.
   const savedIndex = $derived(labelled ? savedAt(myPins, labelled.continent, labelled.units) : -1)
   const pointName = $derived(!labelled ? '' : savedIndex >= 0 ? myPins[savedIndex]!.name : labelled.plain ? `${labelled.title} ${labelled.where}` : labelled.title)

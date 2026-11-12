@@ -110,6 +110,19 @@ foreverchanges.pro, converted by One for All. Each dungeon in dungeon-pins.ts
 says which.
 
 ================================================================================
+MapUtils
+by D4KiR (an addon for World of Warcraft: Forever)
+Used in: addon/TwinmapForever/Marks.lua (how a frame is placed on the canvas of
+the game's world map and keeps its size at every zoom, adapted from
+libs/D4Lib/D4Waypoints.lua of MapUtils 1.6.1)
+================================================================================
+
+Copyright (c) 2026 D4KiR
+
+MapUtils is licensed under the GNU General Public License, version 3:
+https://www.gnu.org/licenses/gpl-3.0.html
+
+================================================================================
 Forever Simple World Map
 by Tarolg (CurseForge project 1728535)
 Used in: the app, through One for All: where the bosses and the entrance are on
