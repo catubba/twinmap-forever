@@ -11,7 +11,7 @@
   import qrcode from 'qrcode-generator'
   import { inApp } from './web'
 
-  let { setup, tiles, link, onback, onfirstrun }: { setup: SetupStatus; tiles: TilesStatus | null; link: LinkStatus | null; onback: () => void; onfirstrun: () => void } = $props()
+  let { setup, tiles, link, onback, onfirstrun, onfeedback }: { setup: SetupStatus; tiles: TilesStatus | null; link: LinkStatus | null; onback: () => void; onfirstrun: () => void; onfeedback: () => void } = $props()
 
   const parties = thirdParties(licences)
   // The licence of each, by its name where the text says it.
@@ -72,6 +72,8 @@
       </dd>
       <dt>Map</dt>
       <dd>{map}</dd>
+      <dt>Feedback</dt>
+      <dd><button class="btn" onclick={onfeedback}>Report a bug or an idea</button></dd>
       {#if inApp}
         <dt>First run</dt>
         <dd><button class="btn" onclick={onfirstrun}>Go through the steps again</button></dd>
