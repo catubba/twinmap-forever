@@ -157,7 +157,7 @@
     <p class="status" class:alone={onSetup !== false || onSettings || !mapReady}><i class={status.tone} title={status.word}></i><span class="word">{status.word}</span>{#if inbox && !inbox.off}<span class="left" class:low={inbox.left < 5}>{inbox.left} sends left</span>{/if}</p>
   {/if}
   {#if setup}
-    <button class="entry" onclick={() => (onFeedback = true)}>Feedback</button>
+    <button class="entry feedback" onclick={() => (onFeedback = true)}>Feedback</button>
   {/if}
   {#if onSetup === false}
     <button class="entry" aria-current={onSettings ? 'page' : undefined} onclick={() => (onSettings = !onSettings)}>Settings</button>
@@ -183,7 +183,7 @@
 {/if}
 {#if onSettings && setup && onSetup === false}
   <div class="over" in:fade={screen} out:fade={gone}>
-    <Settings {setup} {tiles} link={status} onback={() => (onSettings = false)} onfirstrun={() => ((onSettings = false), (onSetup = true))} />
+    <Settings {setup} {tiles} link={status} onback={() => (onSettings = false)} onfeedback={() => (onFeedback = true)} onfirstrun={() => ((onSettings = false), (onSetup = true))} />
   </div>
 {/if}
 {#if onSetup === false}
@@ -608,6 +608,10 @@
   }
   /* The top row of a narrow screen: the search between the section and the state of the link. */
   @media (max-width: 760px) {
+    /* Feedback leaves the row to the search: on a narrow screen it is reached from the settings. */
+    .entry.feedback {
+      display: none;
+    }
     .top {
       gap: 8px;
       padding-left: 8px;
