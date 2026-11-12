@@ -30,6 +30,8 @@ local function Num(v) if type(v) == "number" and not (issecretvalue and issecret
 
 -- The point followed: the stop of the route comes first.
 function ns.Target() return targets.route or targets.pin end
+-- The point chosen by itself, whether or not a route comes before it.
+function ns.PinFollowed() return targets.pin end
 
 -- kind: "route" for the stop the route is at, "pin" for a point chosen by itself. nil: none.
 function ns.SetTarget(kind, point)
@@ -162,6 +164,8 @@ local function Point()
     arrow:Hide()
     return ns.Forget()
   end
+  -- Shortest Path guides to this very point, with its own arrow and line: ours stays out of the way.
+  if ns.Guiding and ns.Guiding() then return arrow:Hide() end
   arrow.name:SetText(point.name)
   arrow.far:SetText(yards and ("%d yd"):format(math.floor(yards + 0.5)) or "no direction from here")
   Turn(turn)
