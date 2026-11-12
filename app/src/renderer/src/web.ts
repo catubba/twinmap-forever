@@ -2,6 +2,7 @@
 // there. In the browser of a phone on the home network nothing has: this file puts one there
 // that hears the app on /events and asks it things on /call/<name> (main/lan.ts answers both).
 import type { LinkSnapshot } from '../../shared/link'
+import { feedbackLink } from '../../shared/feedback'
 import { pageOf } from '../../shared/setup'
 
 /** The page runs in the app's own window, not in a browser on the home network. */
@@ -54,6 +55,11 @@ if (!inApp) {
     // What belongs to the computer stays on the computer.
     chooseGameFolder: () => Promise.resolve('Choose the game folder in Twinmap on the computer.'),
     openCurseForge: (addon?: string) => Promise.resolve(void window.open(pageOf(addon), '_blank', 'noopener')),
+    openFeedback: (way, details) => {
+      const link = feedbackLink(way, details)
+      if (link) window.open(link, '_blank', 'noopener')
+      return Promise.resolve()
+    },
     setOnTop: () => Promise.resolve(),
     setLan: () => Promise.resolve(),
     drawn: () => {},
