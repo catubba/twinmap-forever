@@ -20,6 +20,7 @@ declare global {
       chooseGameFolder: () => Promise<string | null>
       openCurseForge: (addon?: import('../../shared/setup').Optional) => Promise<void>
       openFeedback: (way: import('../../shared/feedback').FeedbackWay, details: string) => Promise<void>
+      readLog: () => Promise<string>
       retryTiles: () => Promise<void>
       drawn: () => void
       setOnTop: (on: boolean) => Promise<void>

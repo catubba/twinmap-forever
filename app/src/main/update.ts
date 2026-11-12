@@ -14,9 +14,10 @@ export type Updating = { version: string; percent: number }
 
 /**
  * Updates the app if there is a newer version, else calls `open`. TWINMAP_UPDATES, for trials, is
- * an address to look at instead of GitHub. An app run from the sources never updates.
+ * an address to look at instead of GitHub. An app run from the sources never updates. `say`: told
+ * what came of the look, for the app's record.
  */
-export function updateFirst(open: () => void): void {
+export function updateFirst(open: () => void, say: (line: string) => void): void {
   if (!app.isPackaged) return open()
   let opened = false
   let win: BrowserWindow | null = null
@@ -27,16 +28,26 @@ export function updateFirst(open: () => void): void {
     open() // before the small window goes: closing the last window closes the app
     win?.destroy()
   }
-  const late = setTimeout(go, ANSWER_WITHIN)
+  const late = setTimeout(() => {
+    if (!opened) say('no answer in time')
+    go()
+  }, ANSWER_WITHIN)
   try {
     if (process.env.TWINMAP_UPDATES) autoUpdater.setFeedURL({ provider: 'generic', url: process.env.TWINMAP_UPDATES })
     autoUpdater.autoDownload = false
-    autoUpdater.on('error', go)
+    autoUpdater.on('error', (e) => {
+      say(`failed, ${e.message.split('\n')[0]}`)
+      go()
+    })
     void autoUpdater
       .checkForUpdates()
       .then((found) => {
         clearTimeout(late)
-        if (opened || !found?.isUpdateAvailable) return go()
+        if (opened || !found?.isUpdateAvailable) {
+          say(opened ? 'the answer came too late' : 'none')
+          return go()
+        }
+        say(`found ${found.updateInfo.version}`)
         let told: Updating = { version: found.updateInfo.version, percent: 0 }
         const small = (win = new BrowserWindow({
           title: 'Twinmap',

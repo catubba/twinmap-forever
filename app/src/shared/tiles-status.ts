@@ -28,6 +28,14 @@ export interface InteriorsStatus {
 }
 
 /** One line for the window. */
+/** What the player can do about a map that is not there, or nothing when there is nothing to do. */
+export function tilesHelp(status: TilesStatus): string | null {
+  if (status.state === 'no-game') return 'Choose the folder where World of Warcraft: Forever is installed, the one that holds _forever_.'
+  if (status.state === 'failed')
+    return "Twinmap could not read the game's files. Close the game's launcher if it is updating or repairing the game, then try again. If it fails again, repair the game from the launcher and tell us with Feedback."
+  return null
+}
+
 export function tilesLine(status: TilesStatus): string {
   switch (status.state) {
     case 'looking':
