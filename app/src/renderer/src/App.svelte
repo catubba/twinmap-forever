@@ -8,7 +8,7 @@
   import type { FixedPin } from '../../shared/services'
   import { addStop, advance, followed, gameRouteFrom, moveStop, noRoute, removeStop, routeFrom } from '../../shared/route'
   import { followFrom, goneFrom, inboxFrom, setFrom } from '../../shared/send'
-  import { journeyFrom } from '../../shared/journey'
+  import { journeyFrom, legsAhead, wayFrom } from '../../shared/journey'
   import Now from './Now.svelte'
   import Search from './Search.svelte'
   import type { SetupStatus } from '../../shared/setup'
@@ -99,6 +99,9 @@
     if (route.sent) void window.twinmap.sendRoute(false)
     route = noRoute()
   }
+  // The journey Shortest Path guides in the game, and its legs as they lie on the map when the addon could read them.
+  const journey = $derived(live ? journeyFrom(link?.state.sections.journey) : null)
+  const ahead = $derived(live ? legsAhead(journey, wayFrom(link?.state.sections.line)) : null)
   const xp = $derived(char ? experience(char) : null)
   const mapReady = $derived(tiles?.state === 'ready')
   const insideReady = $derived(tiles?.state === 'ready' && !!tiles.interiors && !tiles.interiors.problem)
@@ -143,7 +146,7 @@
 <div class="work" in:fade={screen} inert={onSettings}>
   <div class="mapbox">
     {#if mapReady}
-      <Map {pos} at={link?.state.updatedAt.pos} bind:this={mapView} {insideReady} {quests} {fixed} side={char?.side} {live} {inbox} removed={live ? goneFrom(link?.state.sections.marks) : []} set={live ? setFrom(link?.state.sections.marks) : []} gameFollows={live ? followFrom(link?.state.sections.follow) : null} journey={live ? journeyFrom(link?.state.sections.journey) : null} {route} onroute={(stop) => (route = addStop(route, stop))} />
+      <Map {pos} at={link?.state.updatedAt.pos} bind:this={mapView} {insideReady} {quests} {fixed} side={char?.side} {live} {inbox} removed={live ? goneFrom(link?.state.sections.marks) : []} set={live ? setFrom(link?.state.sections.marks) : []} gameFollows={live ? followFrom(link?.state.sections.follow) : null} {journey} {ahead} {route} onroute={(stop) => (route = addStop(route, stop))} />
     {:else if tiles}
       <div class="making" class:failed={tiles.state === 'failed' || tiles.state === 'no-game'}>
         <p>{tilesLine(tiles)}</p>
@@ -180,7 +183,8 @@
       {inbox}
       {route}
       inGame={route.sent && gameRoute?.t === route.t}
-      journey={live ? journeyFrom(link?.state.sections.journey) : null}
+      {journey}
+      wayKnown={!!ahead}
       onsent={(t) => (route = { ...route, sent: true, t })}
       onskip={skip}
       onarrive={() => (route = advance(route))}

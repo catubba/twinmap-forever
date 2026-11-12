@@ -125,3 +125,85 @@ guide:SetScript("OnUpdate", function(_, elapsed)
   since = 0
   if not pcall(Sync) then live = false end
 end)
+
+---------------------------------------------------------------------------
+-- The whole way: where each leg of the journey starts and ends, and the points of a flight or a
+-- boat's crossing. Shortest Path's public API does not tell them (asked for: a stopgap until it
+-- does). While the game's world map is open, Shortest Path keeps the legs it draws, with their
+-- points in yards of the world, on the frame that paints its line there: a field named paths.
+-- That field is read, nothing of Shortest Path is called or changed. It is read only while the map
+-- is open, when it is fresh; the last reading is kept and told, and the app checks it still fits
+-- the journey. A Shortest Path that keeps its legs elsewhere gives no reading, and nothing is lost.
+---------------------------------------------------------------------------
+
+local MOST = 40    -- points told of a leg at most
+local FRAMES = 4000 -- frames under the world map looked at, at most
+local painters = {} -- the frames found holding paths: looked at first the next time
+local read          -- the last reading: { legs = { { mode = "flight", p = { continent, north, west, ... } } }, m, x, y = the goal }
+
+-- Every frame under `frame`, a few levels down, that holds a table named paths.
+local function Find(frame, depth, found, seen)
+  if depth > 7 or seen.n > FRAMES then return end
+  seen.n = seen.n + 1
+  if type(rawget(frame, "paths")) == "table" then found[#found + 1] = frame end
+  if type(frame.GetChildren) ~= "function" then return end
+  for _, child in ipairs({ frame:GetChildren() }) do
+    if type(child) == "table" then Find(child, depth + 1, found, seen) end
+  end
+end
+
+-- The legs a frame holds, when they are the journey's: as many at least, of the same modes in the same order.
+local function Legs(frame, journey)
+  local paths = rawget(frame, "paths")
+  if type(paths) ~= "table" or #journey.legs == 0 or #paths < #journey.legs then return end
+  local legs = {}
+  for i, leg in ipairs(journey.legs) do
+    local path = paths[i]
+    if type(path) ~= "table" or path.mode ~= leg.mode or type(path.points) ~= "table" or #path.points < 2 then return end
+    -- A walk is told by its two ends: the app finds the way between them itself, from where the character is now.
+    local points, p = path.points, {}
+    local every = path.mode == "walk" and #points - 1 or math.ceil(#points / MOST)
+    for at = 1, #points do
+      if at == 1 or at == #points or (at - 1) % every == 0 then
+        local point = points[at]
+        if type(point) ~= "table" or not (Num(point.map) and Num(point.x) and Num(point.y)) then return end
+        p[#p + 1], p[#p + 2], p[#p + 3] = point.map, math.floor(point.x + 0.5), math.floor(point.y + 0.5)
+      end
+    end
+    legs[i] = { mode = path.mode, p = p }
+  end
+  return legs
+end
+
+local function Read(journey)
+  for _, frame in ipairs(painters) do
+    local legs = Legs(frame, journey)
+    if legs then return legs end
+  end
+  local found = {}
+  Find(WorldMapFrame, 0, found, { n = 0 })
+  painters = found
+  for _, frame in ipairs(found) do
+    local legs = Legs(frame, journey)
+    if legs then return legs end
+  end
+end
+
+ns.sections[#ns.sections + 1] = { name = "line", period = 2, build = function()
+  local api = ShortestPathForever and ShortestPathForever.API
+  if not (ns.db and type(api) == "table" and type(api.Journey) == "function") then return end
+  local ok, journey, why = pcall(api.Journey)
+  if not ok then return end
+  if type(journey) ~= "table" or type(journey.legs) ~= "table" or type(journey.goal) ~= "table" then
+    -- No journey: the reading goes with it. While its plan is searched the last one stays.
+    if why ~= "loading" then read = nil end
+  elseif WorldMapFrame and WorldMapFrame:IsShown() then
+    local found, legs = pcall(Read, journey)
+    -- With the goal it leads to, as the journey itself is told: the app knows a reading of another journey by it.
+    local goal = journey.goal
+    if found and legs and Num(goal.map) and Num(goal.x) and Num(goal.y) then read = { legs = legs, m = goal.map, x = goal.x * 100, y = goal.y * 100 } end
+  end
+  if read then ns.db.lineTold = true end
+  if not ns.db.lineTold then return end
+  return read or {}
+end }

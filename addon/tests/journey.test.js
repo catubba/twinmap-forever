@@ -179,3 +179,54 @@ test('a journey cleared in Shortest Path is not asked again: our arrow takes ove
   addon.run(3);
   assert.equal(calls(addon).split(' | ').at(-1), 'cancel');
 });
+
+// The whole way: the legs with their points, read off the frame Shortest Path paints its line with
+// on the world map. The points are the ones read in the real game on 12 November 2026, cut short.
+const lineTold = (addon) => addon.strips().map(decodeStrip).filter((b) => b.section === 'line').map((b) => JSON.parse(b.text)).at(-1);
+const WITH_A_FLIGHT = `
+  JOURNEY = { owner = "Twinmap", goal = { map = 1415, x = 0.5, y = 0.35, title = "Menethil" }, secondsLeft = 400, legs = {
+    { mode = "walk", text = "Walk to Stormwind", seconds = 42 }, { mode = "flight", text = "Fly to Ironforge", seconds = 364 }, { mode = "walk", text = "Walk on", seconds = 36 } } }
+  local flight = {}
+  for i = 0, 99 do flight[#flight + 1] = { map = 0, x = -8833 + i * 50, y = 479 - i * 12 } end
+  PAINTER = { paths = {
+    { mode = "walk", points = { { map = 0, x = -8905.2, y = 632 }, { map = 0, x = -8870, y = 600, z = 104 }, { map = 0, x = -8833, y = 479 } } },
+    { mode = "flight", points = flight },
+    { mode = "walk", points = { { map = 0, x = -3883, y = -709 }, { map = 0, x = -3721, y = -585 } } },
+    { mode = "boat", stop = 2, points = { { map = 0, x = 1, y = 2 }, { map = 1, x = 3, y = 4 } } } } }
+  -- Another frame of Shortest Path holds paths too: the boats and zeppelins of the world, which are no journey.
+  OTHER = { paths = { { mode = "boat", points = { { map = 0, x = 1, y = 2 }, { map = 1, x = 3, y = 4 } } } } }
+  function WorldMapFrame:GetChildren() return { GetChildren = function() return OTHER, PAINTER end } end`;
+
+test('with the world map open the legs of the journey go out with their points; the reading stays when the map closes', () => {
+  const addon = enterWorld(SHORTEST_PATH + WITH_A_FLIGHT);
+  addon.run(10);
+  assert.equal(lineTold(addon), undefined, 'the map was never open: nothing is told');
+  addon.lua('GAME.mapOpen = true');
+  addon.run(6);
+  const told = lineTold(addon);
+  assert.deepEqual(told.legs.map((leg) => leg.mode), ['walk', 'flight', 'walk'], 'the legs of the journey only, not the stop after');
+  assert.deepEqual([told.m, told.x, told.y], [1415, 50, 35], 'with the goal of the journey it was read for');
+  assert.deepEqual(told.legs[0].p, [0, -8905, 632, 0, -8833, 479], 'a walk by its two ends, in whole yards');
+  assert.equal(told.legs[1].p.length / 3 <= 41, true, 'a long flight is thinned');
+  assert.deepEqual([told.legs[1].p.slice(0, 3), told.legs[1].p.slice(-3)], [[0, -8833, 479], [0, -3883, -709]], 'and keeps its two ends');
+
+  addon.lua('GAME.mapOpen = false; PAINTER.paths = {}');
+  addon.run(6);
+  assert.deepEqual(lineTold(addon), told, 'kept');
+  addon.lua('JOURNEY = nil');
+  addon.run(6);
+  assert.deepEqual(lineTold(addon), [], 'the journey is over: so is the reading');
+});
+
+test('legs that are not the journey, or do not read as legs, give no reading and break nothing', () => {
+  const addon = enterWorld(SHORTEST_PATH + WITH_A_FLIGHT + ' PAINTER.paths[2].mode = "boat"; GAME.mapOpen = true');
+  addon.run(10);
+  assert.equal(lineTold(addon), undefined);
+  addon.lua('PAINTER.paths[2].mode = "flight"; PAINTER.paths[1].points[1].x = "north"');
+  addon.run(6);
+  assert.equal(lineTold(addon), undefined);
+  addon.lua('PAINTER.paths = 7; function WorldMapFrame:GetChildren() error("no children") end');
+  addon.run(6);
+  assert.equal(lineTold(addon), undefined);
+  assert.equal(told(addon).at(-1).name, 'Menethil', 'the journey itself is still told');
+});
