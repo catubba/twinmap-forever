@@ -28,7 +28,7 @@ function world(...parts) {
   const seq = fs.existsSync(outbox) ? JSON.parse(fs.readFileSync(outbox, 'utf8')).seq : 0;
   fs.writeFileSync(outbox, JSON.stringify({ seq, parts: {} }));
   const addon = loadAddon(DIR, { addons });
-  addon.lua(`TwinmapForeverDB = { inbox = { seq = ${seq}, parts = {} } }`);
+  addon.lua(`TwinmapForeverDB.inbox = { seq = ${seq}, parts = {} }`);
   const enter = () => {
     addon.lua(`local ns = ...; GOT = GOT or {}
       for name in ("${parts.join(' ')}"):gmatch("%S+") do ns.receivers[name] = function(v) GOT[#GOT + 1] = name .. "=" .. tostring(type(v) == "table" and v.name or v) end end`);

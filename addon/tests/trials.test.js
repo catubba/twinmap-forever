@@ -26,7 +26,7 @@ test('each slider changes its setting, and one button puts the usual strip back'
   assert.deepEqual([...SLIDERS, 'idle'].map((k) => setting(addon, k)), ['7', '8', '9', '10', '11', '12', 'flat']);
 
   addon.click('TwinmapForeverTuneReset');
-  assert.deepEqual([...SLIDERS, 'idle'].map((k) => setting(addon, k)), ['50', '50', '0', '1', '0', '255', 'hide']);
+  assert.deepEqual([...SLIDERS, 'idle'].map((k) => setting(addon, k)), ['30', '30', '0', '1', '0', '100', 'flat']);
 });
 
 test('a block is shown as many times as asked, each time followed by its negative', () => {

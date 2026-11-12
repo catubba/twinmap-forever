@@ -9,15 +9,15 @@ local DEFAULTS = {
   paused = false,    -- true: nothing is drawn
   position = "TOP",  -- edge of the window the strip sits on: "TOP" or "BOTTOM"
   mode = "steady",   -- "steady": every block normal, then in negative. "fast": normal only
-  -- Temporary, for the camouflage trials (sliders in Options.lua). These defaults are the strip as
-  -- measured in M1-F5; once values are chosen they become constants in Strip.lua and the sliders go.
-  on = 50,           -- ms a block stays up; 0: one frame
-  neg = 50,          -- ms its negative stays up; 0: one frame
+  -- Temporary, for the camouflage trials (sliders in Options.lua). These defaults are the values
+  -- that hide the strip best on a real screen; the player can still move every one of them.
+  on = 30,           -- ms a block stays up; 0: one frame
+  neg = 30,          -- ms its negative stays up; 0: one frame
   gap = 0,           -- ms of rest after each showing
   cycles = 1,        -- times a block and its negative are shown
   base = 0,          -- a color channel that is off, of 255
-  amp = 255,         -- how much brighter a channel that is on
-  idle = "hide",     -- between blocks: "hide", "flat" (an even line), "repeat" (the last block again)
+  amp = 100,         -- how much brighter a channel that is on
+  idle = "flat",     -- between blocks: "hide", "flat" (an even line), "repeat" (the last block again)
 }
 ns.DEFAULTS = DEFAULTS
 
