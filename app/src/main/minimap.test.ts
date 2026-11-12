@@ -162,3 +162,45 @@ test('the open ground of a dungeon is laid on one picture, each block where the 
   expect(at(16700, 16700)).toBe(200)
   expect(mosaicOfGround([], () => null)).toBeNull()
 })
+
+// The minimap with things over it: a part of its pixels is something else.
+function covered(box: Box, share: number): Box {
+  const rgb = box.rgb.slice()
+  let seed = 3
+  for (let p = 0; p < box.size * box.size; p++) {
+    seed = (seed * 1103515245 + 12345) % 2147483648
+    if (seed / 2147483648 < share) rgb.fill((seed >> 8) % 256, p * 3, p * 3 + 3)
+  }
+  return { size: box.size, rgb }
+}
+
+test('a place being followed is kept with things over the minimap that a first look would not take', () => {
+  const only = { ...twoLevels()[0]!, level: undefined }
+  const pos = { inst: { id: 36, kind: 'party', mini: { x: 2408, y: 187, size: 238, zoom: 0 } } }
+  // A third of the minimap covered: too little alike to take as a place with nothing known.
+  const lost = startInside(() => 'anywhere', () => [only])
+  expect(lost.look(pos, () => covered(shown(only, 1300, 2300), 0.3), 3000)).toBeNull()
+  const score = lost.report()!.report.scores![0]!
+  expect(score).toBeGreaterThan(0.6)
+  expect(score).toBeLessThan(0.75)
+  // The same while following: taken, a step on from the place of a moment ago.
+  const inside = startInside(() => 'anywhere', () => [only])
+  expect(inside.look(pos, () => shown(only, 1300, 2300), 3000)).not.toBeNull()
+  const kept = inside.look(pos, () => covered(shown(only, 1303, 2300), 0.3), 3600)!
+  expect(Math.abs(kept.u - 1303)).toBeLessThanOrEqual(1.5)
+  expect(inside.report()!.report.why).toBeUndefined()
+})
+
+test('after losing the place, the level it was on is the first looked through', () => {
+  const levels = twoLevels(), inside = startInside(() => 'anywhere', () => levels)
+  const pos = { inst: { id: 36, kind: 'party', mini: { x: 2408, y: 187, size: 238, zoom: 0 } } }
+  const noise = { size: 238, rgb: Uint8Array.from({ length: 238 * 238 * 3 }, (_, i) => (Math.floor(i / 3) * 37) % 256) }
+  // Found on the lower level (at the second look through: the picture with every room comes first).
+  inside.look(pos, () => shown(levels[0]!, 1300, 2300), 3000)
+  expect(inside.look(pos, () => shown(levels[0]!, 1300, 2300), 6000)).toMatchObject({ level: 0 })
+  // Nothing of the minimap for a look, then the character is somewhere else on that level (a jump down, a door):
+  // found at the first look through, which is on the level it was on.
+  expect(inside.look(pos, () => noise, 7000)).not.toBeNull() // the place of a moment ago is still shown
+  expect(inside.look(pos, () => shown(levels[0]!, 1380, 2340), 9500)).toMatchObject({ level: 0 })
+  expect(inside.report()!.report.lostFor).toBe(0)
+})

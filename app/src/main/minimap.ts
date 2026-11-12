@@ -121,6 +121,7 @@ const EVERY = 500 // ms between two looks at the minimap
 const LOST_FOR = 2000 // ms between two looks through the whole dungeon while the place is not known
 const KEPT = 3000 // ms a place found is still shown without a newer one
 const RUNNING = 2 // yards between two looks that tell the character is running
+const FOLLOW = 0.6 // a place a step from the one of a moment ago is taken at this likeness: the dots of a party, a ping, a tooltip over the minimap lower it, and a wrong place cannot be more than a few yards off
 const CLEARLY = 0.01 // how much more like another picture the minimap must be before the character is said to be on it
 
 /** Where the character is inside, in yards of the dungeon's pieces, and which way it faces (degrees clockwise from north, when the arrow is seen). */
@@ -149,7 +150,7 @@ export interface InsideReport {
   picture?: number
   across?: number
   level?: number
-  /** Milliseconds since a place was last found. */
+  /** Milliseconds since a place was last found, or since the dungeon was entered when none was yet. */
   lostFor?: number
 }
 
@@ -168,7 +169,7 @@ export function startInside(tilesFolder: () => string | null, mosaics: (folder: 
   let dungeon = 0, floors: Levels[] = []
   let last: (Inside & { at: number; picture: number; across: number }) | null = null
   let lookedAt = 0, searchedAt = 0, lostTries = 0
-  let report: InsideReport | null = null, seen: Box | null = null, foundAt = 0
+  let report: InsideReport | null = null, seen: Box | null = null, foundAt = 0, enteredAt = 0
   return {
     report: () => report && { report, seen },
     look(pos, cut, now) {
@@ -190,11 +191,13 @@ export function startInside(tilesFolder: () => string | null, mosaics: (folder: 
       if (pos.inst.id !== dungeon) {
         dungeon = pos.inst.id
         last = null
+        foundAt = 0
+        enteredAt = now
         const folder = tilesFolder()
         floors = (folder ? mosaics(folder, dungeon) : []).map(levelsOf)
       }
       const widths = widthsOf(mini)
-      const said = { dungeon, pictures: floors.length, zoom: mini.zoom, size: mini.size, widths, lostFor: foundAt ? now - foundAt : undefined }
+      const said = { dungeon, pictures: floors.length, zoom: mini.zoom, size: mini.size, widths, lostFor: now - (foundAt || enteredAt) }
       if (!floors.length) return (report = { ...said, why: 'no rooms' }), null
       const known = last && now - last.at <= KEPT ? last : null
       if (!known && now - searchedAt < LOST_FOR) return null
@@ -209,7 +212,10 @@ export function startInside(tilesFolder: () => string | null, mosaics: (folder: 
       if (!around) {
         const turn = lostTries++ % (floors.length * widths.length), rooms = floors.filter((f) => !f.mosaic.open).length
         const order = [...floors.keys()].sort((a, b) => (a < rooms ? rooms - 1 - a : a) - (b < rooms ? rooms - 1 - b : b))
-        around = locate(floors[order[turn % floors.length]!]!, box, mini.zoom, undefined, widths[Math.floor(turn / floors.length)])
+        // The picture and the width the character was last found on before any other: it is most likely still there.
+        const was = last, first = was ? [was.picture, ...order.filter((i) => i !== was.picture)] : order
+        const wide = was && widths.includes(was.across) ? [was.across, ...widths.filter((w) => w !== was.across)] : widths
+        around = locate(floors[first[turn % floors.length]!]!, box, mini.zoom, undefined, wide[Math.floor(turn / floors.length)])
       }
       if (!around) return (report = { ...said, why: 'not sure' }), fresh()
       // Every picture at every width, around that place.
@@ -233,7 +239,7 @@ export function startInside(tilesFolder: () => string | null, mosaics: (folder: 
       })
       // The picture and the width of a moment ago stay unless another is clearly more like the minimap.
       if (known && before && found && (before as Found).score >= (found as Found).score - CLEARLY) (found = before), (picture = known.picture), (across = known.across)
-      if (!found || (found as Found).score < SURE) return (report = { ...said, why: 'not sure', scores }), fresh()
+      if (!found || (found as Found).score < (known ? FOLLOW : SURE)) return (report = { ...said, why: 'not sure', scores }), fresh()
       const place = found as Found
       // Running, the way the place moved is the surest facing; standing, the arrow of the minimap
       // says it (the dots of a party over the arrow can hide its point: then the last facing stays).

@@ -11,6 +11,8 @@ export interface LinkSnapshot {
   reads: number
   /** Processor time the main process used since it started, as a percent of one core. */
   cpu: number
+  /** Inside a dungeon or a raid: why the place is not known, when it is not, and for how many milliseconds. */
+  inside?: { why?: string; lostFor?: number } | null
 }
 
 /** How the link is, for the top row: a word, its colour, and a sentence for the map when the player has something to do. */
@@ -37,8 +39,25 @@ export function linkStatus(link: LinkSnapshot, now: number): LinkStatus {
   if (!heard && link.seconds * 1000 < LOST_AFTER) return { kind: 'waiting', word: 'Connecting', tone: 'dim' }
   if (now - heard > LOST_AFTER)
     return { kind: 'lost', word: 'Link lost', tone: 'objective', line: 'No signal from the game. Log in, and check that the Twinmap Forever addon is on and its strip is not paused.' }
-  if (state.sections.pos?.combat) return { kind: 'combat', word: 'In combat, position only', tone: 'gold' }
-  return { kind: 'connected', word: 'Connected', tone: 'done' }
+  const line = insideLine(link.inside)
+  if (state.sections.pos?.combat) return { kind: 'combat', word: 'In combat, position only', tone: 'gold', ...(line && { line }) }
+  return { kind: 'connected', word: 'Connected', tone: 'done', ...(line && { line }) }
+}
+
+// A place that is missing for this long inside a dungeon is said: shorter, the map is still looking.
+const LOOKING_FOR = 10_000
+
+/**
+ * What to tell the player inside a dungeon when the arrow is not there: the place is read from the
+ * game's minimap on the screen, and the link itself is well. Nothing while the place is known.
+ */
+function insideLine(inside: LinkSnapshot['inside']): string | undefined {
+  if (!inside?.why) return undefined
+  if (inside.why === 'minimap turns') return 'Your place in a dungeon is read from the minimap, and it cannot be while the minimap turns: turn off Rotate Minimap in the game.'
+  if (inside.why === 'no rooms') return 'Twinmap has no pictures of this dungeon: your place is not shown in here.'
+  if (inside.why === 'no minimap told' || inside.why === 'zoom not known') return 'Your place in a dungeon is read from the minimap, and the game tells none: update the Twinmap Forever addon and keep the minimap on screen.'
+  if ((inside.lostFor ?? 0) < LOOKING_FOR) return undefined
+  return 'Looking for your place. It is read from the minimap of the game: keep it on screen, with nothing over it.'
 }
 
 /** The experience bar: percent of the level done, and percent of it that rest will double. Null at the level cap. */

@@ -51,3 +51,19 @@ test('the experience bar: percent done, and the rested part never past the end o
   expect(experience({})).toBeNull()
   expect(experience({ xp: 0, max: 0 })).toBeNull()
 })
+
+test('inside a dungeon a missing place has its reason on the map, and the link stays connected', () => {
+  const inside = (why?: string, lostFor = 0): LinkSnapshot => ({ ...link('open', heard(1000)), inside: { why, lostFor } })
+  expect(linkStatus(inside(), NOW), 'the place is known').toEqual({ kind: 'connected', word: 'Connected', tone: 'done' })
+  expect(linkStatus(inside('minimap turns'), NOW)).toMatchObject({ kind: 'connected', word: 'Connected' })
+  expect(linkStatus(inside('minimap turns'), NOW).line).toContain('Rotate Minimap')
+  expect(linkStatus(inside('no rooms'), NOW).line).toContain('no pictures of this dungeon')
+  expect(linkStatus(inside('no minimap told'), NOW).line).toContain('update the Twinmap Forever addon')
+  // Still looking is said only once it lasts.
+  expect(linkStatus(inside('not sure', 4000), NOW).line).toBeUndefined()
+  expect(linkStatus(inside('not sure', 12000), NOW).line).toContain('Looking for your place')
+  expect(linkStatus(inside('screen not read', 12000), NOW).line).toContain('nothing over it')
+  // In a fight too, under its own word.
+  expect(linkStatus({ ...link('open', heard(1000, { combat: true })), inside: { why: 'minimap turns' } }, NOW)).toMatchObject({ kind: 'combat', line: expect.stringContaining('Rotate Minimap') })
+  expect(linkStatus({ ...link('open', heard(1000)), inside: null }, NOW).line).toBeUndefined()
+})
