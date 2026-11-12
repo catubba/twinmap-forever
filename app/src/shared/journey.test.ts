@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { journeyFrom, span, startedBy } from './journey'
+import { journeyFrom, legsAhead, span, startedBy, wayFrom } from './journey'
 
 test('a journey reads off the strip with its legs; what is none reads as none', () => {
   const told = { owner: 'AdventureGuideForever', name: 'Three Corners', m: 1415, x: 43.55, y: 68.7, left: 265, legs: [{ mode: 'walk', text: 'Walk to Deeprun Tram', s: 68 }, { mode: 'tram', text: 'Ride the tram', s: 202 }] }
@@ -23,4 +23,29 @@ test('who started a journey is named only when it is another addon', () => {
 
 test('a time is told in the unit that fits it', () => {
   expect([span(45), span(265), span(4320)]).toEqual(['45 s', '4 min', '1 h 12 min'])
+})
+
+test('a reading of the legs fits the journey while its goal and its legs are the same; legs done fall off its start', () => {
+  const told = { m: 1415, x: 50, y: 35, legs: [{ mode: 'walk', p: [0, -8905, 632, 0, -8833, 479] }, { mode: 'flight', p: [0, -8833, 479, 0, -6000, 0, 0, -3883, -709] }, { mode: 'walk', p: [0, -3883, -709, 1, -3721, -585] }] }
+  const way = wayFrom(told)!
+  expect(way.legs.map((leg) => [leg.mode, leg.points.length])).toEqual([['walk', 2], ['flight', 3], ['walk', 2]])
+  expect(way.legs[2]!.points.map((p) => p.continent)).toEqual([0, 1])
+  // A yard of the world is 3 / 400 of a map unit: 8905 yards south of the middle is 66.8 units down from it.
+  expect(way.legs[0]!.points[0]!.at.y).toBeCloseTo(128 + (8905 * 3) / 400, 5)
+
+  const journey = (modes: string[], x = 50) => journeyFrom({ name: 'Menethil', m: 1415, x, y: 35, left: 10, legs: modes.map((mode) => ({ mode, text: 'Go', s: 5 })) })
+  expect(legsAhead(journey(['walk', 'flight', 'walk']), way)).toEqual(way.legs)
+  expect(legsAhead(journey(['flight', 'walk']), way), 'the first walk is done').toEqual(way.legs.slice(1))
+  expect(legsAhead(journey(['walk', 'boat', 'walk']), way), 'planned anew').toBeNull()
+  expect(legsAhead(journey(['walk', 'flight', 'walk'], 51), way), 'another goal').toBeNull()
+  expect(legsAhead(journey(['walk', 'walk', 'flight', 'walk']), way), 'more legs than were read').toBeNull()
+  expect(legsAhead(null, way)).toBeNull()
+})
+
+test('a reading that is not one is none', () => {
+  expect(wayFrom([])).toBeNull()
+  expect(wayFrom({ legs: [] })).toBeNull()
+  expect(wayFrom({ legs: [{ mode: 'walk', p: [0, 1, 2] }] }), 'one point is no leg').toBeNull()
+  expect(wayFrom({ legs: [{ mode: 'walk', p: [2, 1, 2, 0, 3, 4] }] }), 'a continent the app does not draw').toBeNull()
+  expect(wayFrom({ legs: [{ mode: 'walk', p: [0, 1, 'west', 0, 3, 4] }] })).toBeNull()
 })

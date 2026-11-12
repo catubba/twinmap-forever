@@ -23,15 +23,15 @@
   import { drop, gone, still } from './motion'
   import PointLabel from './PointLabel.svelte'
   import { inRoute, noRoute, type Route, type Stop } from '../../shared/route'
-  import type { Journey } from '../../shared/journey'
-  import { ahead } from '../../shared/walk'
+  import type { Journey, WayLeg } from '../../shared/journey'
+  import { ahead as restOf } from '../../shared/walk'
   import { pinOfMark, removePin, renamePin, savedAt, savedFrom, savePin, type SavedPin } from '../../shared/saved'
   import { markPart, sendState, type GameMark, type Inbox, type Pin } from '../../shared/send'
   import { pin } from './marks'
 
   // at: when the position was read off the game, in milliseconds.
   // insideReady: the rooms of the buildings are converted, and their list can be asked for.
-  let { pos, at: readAt, insideReady, quests = [], fixed = [], side, live = false, inbox = null, removed = [], set = [], gameFollows = null, journey = null, route = noRoute(), onroute }: { journey?: Journey | null; pos: Position | undefined; at: number | undefined; insideReady: boolean; quests?: QuestPin[]; fixed?: FixedPin[]; side?: string; live?: boolean; inbox?: Inbox | null; removed?: string[]; set?: GameMark[]; gameFollows?: Pin | null; route?: Route; onroute?: (stop: Stop) => void } = $props()
+  let { pos, at: readAt, insideReady, quests = [], fixed = [], side, live = false, inbox = null, removed = [], set = [], gameFollows = null, journey = null, ahead = null, route = noRoute(), onroute }: { journey?: Journey | null; ahead?: WayLeg[] | null; pos: Position | undefined; at: number | undefined; insideReady: boolean; quests?: QuestPin[]; fixed?: FixedPin[]; side?: string; live?: boolean; inbox?: Inbox | null; removed?: string[]; set?: GameMark[]; gameFollows?: Pin | null; route?: Route; onroute?: (stop: Stop) => void } = $props()
 
   const TILES = 'twinmap://tiles'
   const TOP_ZOOM = 7 // the game's own detail: a block's picture is four tiles
@@ -814,10 +814,12 @@
     else myPinsLayer.remove()
   })
 
-  // The journey Shortest Path guides in the game: a ring on its goal, and, while all that is left
-  // of it is on foot, the way there as a dashed line. The game's API tells no points of its line,
-  // so the way is found here on the same grid (main/walk.ts): from the character to the goal,
-  // again when the goal changes or the character leaves it, and shortened as the character walks.
+  // The journey Shortest Path guides in the game: a ring on its goal, and the way there. A walk is a
+  // dashed gold line, found here on the same grid (main/walk.ts): from the character to where the
+  // walk ends, again when that changes or the character leaves it, and shortened as the character
+  // walks. The game's API tells no points: where the addon could read the legs off Shortest Path's
+  // own line (ahead), every leg is drawn, a flight or a boat in its own colour through its points;
+  // otherwise only a journey that is all on foot has a line, to its goal.
   const OFF_THE_WAY = 40 // yards
   const ASK_EVERY = 2000 // ms between two askings at least
   const journeyGoal = $derived.by(() => {
@@ -830,27 +832,69 @@
   let asking = false, askedAt = 0
   $effect(() => {
     const goal = journeyGoal
-    if (!goal?.walked || !me || me.continent !== goal.continent) return void (walked = null)
-    const key = `${goal.continent} ${goal.at.x} ${goal.at.y}`, from = me.units
-    if (walked?.key === key && ahead(walked.points, from).off <= OFF_THE_WAY) return
+    // Where the walk under way ends: where the first leg does when the legs are known and it is a walk, else at the goal of a journey all on foot.
+    const first = ahead?.[0], end = first ? (first.mode === 'walk' ? first.points.at(-1)! : null) : goal?.walked ? goal : null
+    if (!goal || !end || !me || me.continent !== end.continent) return void (walked = null)
+    const key = `${end.continent} ${end.at.x} ${end.at.y}`, from = me.units, to = end.at
+    if (walked?.key === key && restOf(walked.points, from).off <= OFF_THE_WAY) return
     if (asking || Date.now() - askedAt < ASK_EVERY) return
     asking = true
     askedAt = Date.now()
-    void window.twinmap.walk({ continent: goal.continent, from: { ...from }, to: { ...goal.at } }).then((path) => {
+    void window.twinmap.walk({ continent: end.continent, from: { ...from }, to: { ...to } }).then((path) => {
       asking = false
-      // No way found (a goal on a floor of a building, or too far): a straight line, as before.
-      walked = { key, continent: goal.continent, points: path?.points ?? [from, goal.at] }
+      // No way found (too far, or nothing to walk on there): a straight line.
+      walked = { key, continent: end.continent, points: path?.points ?? [from, to] }
     })
   })
+  // The walks further on, between the ends of their legs: asked once each, and kept while the legs are the same.
+  let laterWalks = $state<Record<string, Point[]>>({})
+  const laterAsked = new Set<string>()
+  const walkKey = (leg: WayLeg): string => `${leg.points[0]!.continent} ${leg.points[0]!.at.x} ${leg.points[0]!.at.y} ${leg.points.at(-1)!.at.x} ${leg.points.at(-1)!.at.y}`
+  $effect(() => {
+    for (const leg of ahead?.slice(1) ?? []) {
+      const a = leg.points[0]!, b = leg.points.at(-1)!, key = walkKey(leg)
+      if (leg.mode !== 'walk' || a.continent !== b.continent || laterAsked.has(key)) continue
+      laterAsked.add(key)
+      void window.twinmap.walk({ continent: a.continent, from: { ...a.at }, to: { ...b.at } }).then((path) => {
+        if (path) laterWalks = { ...laterWalks, [key]: path.points }
+      })
+    }
+  })
+  // The colours Shortest Path gives the legs in the game.
+  const LEG_COLOURS: Record<string, string> = { flight: '#33ff59', boat: '#00bfff', zeppelin: '#ff591a', tram: '#ff8000', lift: '#ff8000' }
   const journeyLayer = L.layerGroup()
   $effect(() => {
     journeyLayer.clearLayers()
     const goal = journeyGoal
-    if (!goal || goal.continent !== continent) return
+    const dashes = (line: L.LatLng[], colour: string, opacity = 1): void => {
+      for (const [color, weight] of [['#000', 7.5], [colour, 4.5]] as const) L.polyline(line, { color, weight, opacity, dashArray: '9 13', lineCap: 'round', lineJoin: 'round', interactive: false }).addTo(journeyLayer)
+    }
+    // The legs after the one under way, and the one under way when it is no walk: fainter than the walk the character is on.
+    ahead?.forEach((leg, i) => {
+      if (i === 0 && leg.mode === 'walk') return
+      if (leg.mode === 'walk') {
+        const found = laterWalks[walkKey(leg)]
+        if (leg.points[0]!.continent === continent && leg.points.at(-1)!.continent === continent) dashes((found ?? leg.points.map((p) => p.at)).map(at), '#ffd100', 0.75)
+        return
+      }
+      const colour = LEG_COLOURS[leg.mode]
+      if (!colour) return // a hearthstone, a portal: a jump, with nothing between its ends
+      // Only what lies on the continent shown: a boat that crosses the sea is cut where it leaves it.
+      let run: L.LatLng[] = []
+      for (const p of [...leg.points, null]) {
+        if (p && p.continent === continent) run.push(at(p.at))
+        else {
+          if (run.length > 1) dashes(run, colour, 0.85)
+          run = []
+        }
+      }
+    })
+    if (!goal) return
     if (walked && me && walked.continent === continent && me.continent === continent) {
-      const rest = ahead(walked.points, me.units).rest.map(at)
+      const rest = restOf(walked.points, me.units).rest.map(at)
       for (const [color, weight, dashArray] of [['#000', 7.5, '9 13'], ['#ffd100', 4.5, '9 13']] as const) L.polyline(rest, { color, weight, dashArray, lineCap: 'round', lineJoin: 'round', interactive: false }).addTo(journeyLayer)
     }
+    if (goal.continent !== continent) return
     L.circleMarker(at(goal.at), { radius: 7, color: '#000', weight: 4, fill: false, interactive: false }).addTo(journeyLayer)
     L.circleMarker(at(goal.at), { radius: 7, color: '#ffd100', weight: 2, fillColor: '#ffd100', fillOpacity: 0.35 })
       .bindTooltip(Object.assign(document.createElement('span'), { textContent: `${goal.name}, the journey in the game` }), { direction: 'top', offset: [0, -8], className: 'tip' })
