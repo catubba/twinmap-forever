@@ -62,6 +62,8 @@
       </dd>
       <dt>Questie</dt>
       <dd>{setup.questie ? 'Installed' : 'Not installed (optional)'}</dd>
+      <dt>Shortest Path</dt>
+      <dd>{setup.shortestPath ? 'Installed' : 'Not installed (optional)'}</dd>
       <dt>Map</dt>
       <dd>{map}</dd>
       {#if inApp}
