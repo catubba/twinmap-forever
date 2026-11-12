@@ -24,6 +24,16 @@ export interface SetupStatus {
 /** Where the addon is published. The app never installs it itself: every install is one CurseForge counts. */
 export const CURSEFORGE = 'https://www.curseforge.com/wow/addons/twinmap-forever'
 
+/** The optional addons the app points to, each with its name and its page on CurseForge. */
+export const OPTIONAL = {
+  questie: { name: 'Questie', page: 'https://www.curseforge.com/wow/addons/questie' },
+  shortestPath: { name: 'Shortest Path', page: 'https://www.curseforge.com/wow/addons/shortest-path-forever' },
+} as const
+export type Optional = keyof typeof OPTIONAL
+
+/** The page on CurseForge the window may open: the one of an optional addon it names, else the one of Twinmap Forever. */
+export const pageOf = (asked: unknown): string => (typeof asked === 'string' && Object.hasOwn(OPTIONAL, asked) ? OPTIONAL[asked as Optional].page : CURSEFORGE)
+
 export type PageState = 'done' | 'todo' | 'working' | 'problem'
 export interface Page {
   id: 'game' | 'map' | 'addon' | 'extras' | 'play'
@@ -36,6 +46,8 @@ export interface Page {
   /** Percent done, while the app is working on it. */
   progress?: number
   action?: 'choose-folder' | 'curseforge' | 'retry'
+  /** The optional addons that are not installed: each gets a button to its page on CurseForge. */
+  get?: Optional[]
   /** Said on the page whatever its state: it must be read before the thing it warns of is on. */
   warning?: string
 }
@@ -102,6 +114,7 @@ export function setupPages(setup: SetupStatus, tiles: TilesStatus | null, link: 
         ? 'Shortest Path: installed. The map will show its journey, and what you send to the game is reached along the roads.'
         : 'Shortest Path: not installed. With it, the map shows the journey it plans, and what you send to the game is reached along the roads.',
     ],
+    get: (['questie', 'shortestPath'] as const).filter((addon) => !setup[addon]),
   }
 
   const live = link?.kind === 'connected' || link?.kind === 'combat'

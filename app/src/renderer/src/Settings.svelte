@@ -61,9 +61,15 @@
         {#if !setup.addon}<button class="btn" onclick={() => window.twinmap.openCurseForge()}>Get it on CurseForge</button>{/if}
       </dd>
       <dt>Questie</dt>
-      <dd>{setup.questie ? 'Installed' : 'Not installed (optional)'}</dd>
+      <dd>
+        {setup.questie ? 'Installed' : 'Not installed (optional)'}
+        {#if !setup.questie}<button class="btn" onclick={() => window.twinmap.openCurseForge('questie')}>Get it on CurseForge</button>{/if}
+      </dd>
       <dt>Shortest Path</dt>
-      <dd>{setup.shortestPath ? 'Installed' : 'Not installed (optional)'}</dd>
+      <dd>
+        {setup.shortestPath ? 'Installed' : 'Not installed (optional)'}
+        {#if !setup.shortestPath}<button class="btn" onclick={() => window.twinmap.openCurseForge('shortestPath')}>Get it on CurseForge</button>{/if}
+      </dd>
       <dt>Map</dt>
       <dd>{map}</dd>
       {#if inApp}

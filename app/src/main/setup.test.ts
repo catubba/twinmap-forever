@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, test } from 'vitest'
 import type { LinkStatus } from '../shared/link'
-import { setupComplete, setupPages, timeLeft, type SetupStatus } from '../shared/setup'
+import { setupComplete, setupPages, timeLeft, type SetupStatus, pageOf } from '../shared/setup'
 import type { TilesStatus } from '../shared/tiles-status'
 import { addonVersion, readSettings, setupStatus, writeSettings } from './setup'
 
@@ -75,4 +75,15 @@ test('the time left is said once there is something to tell it from, in round nu
   expect(timeLeft(0, 20, 8000, 40)).toBe('about 25 seconds left')
   expect(timeLeft(0, 0, 30_000, 10)).toBe('about 5 min left')
   expect(timeLeft(0, 0, 30_000, 100)).toBe('')
+})
+
+test('an optional addon that is missing gets a button to its own page, and no other page can be asked for', () => {
+  const setup = { gameFolder: 'D:\WoW', addon: '0.1.0', questie: true, shortestPath: false, done: false, version: '0.1.0', onTop: false }
+  const extras = (s: typeof setup): unknown => setupPages(s, { state: 'looking' }, null).find((p) => p.id === 'extras')!.get
+  expect(extras(setup)).toEqual(['shortestPath'])
+  expect(extras({ ...setup, questie: false })).toEqual(['questie', 'shortestPath'])
+  expect(extras({ ...setup, shortestPath: true })).toEqual([])
+  expect(pageOf('questie')).toBe('https://www.curseforge.com/wow/addons/questie')
+  expect(pageOf('shortestPath')).toBe('https://www.curseforge.com/wow/addons/shortest-path-forever')
+  for (const other of [undefined, 'toString', 'https://example.com', 7]) expect(pageOf(other)).toBe('https://www.curseforge.com/wow/addons/twinmap-forever')
 })
