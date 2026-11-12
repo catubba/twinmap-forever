@@ -223,7 +223,7 @@
     background:
       linear-gradient(#000, var(--bronze-700) 18%, var(--bronze-300) 42%, var(--bronze-600) 62%, var(--bronze-900) 86%, #000) bottom / 100% 6px no-repeat,
       var(--grain),
-      linear-gradient(var(--stone-600), #1b140e 55%, var(--stone-950));
+      linear-gradient(var(--stone-600), var(--stone-900) 55%, var(--stone-950));
     white-space: nowrap;
     -webkit-app-region: drag;
   }
@@ -248,8 +248,8 @@
   }
   .tab[aria-current],
   .entry[aria-current] {
-    border-color: #a8843a;
-    background: linear-gradient(#6a5238, var(--stone-700));
+    border-color: var(--bronze-500);
+    background: linear-gradient(var(--stone-500), var(--stone-700));
     box-shadow:
       inset 0 1px 0 #fff4,
       0 0 0 1px #000;
@@ -353,9 +353,9 @@
       inset 0 0 0 15px #000,
       inset 0 0 90px 10px #000c;
   }
-  /* A lozenge stud on each corner: bronze, with a dark red heart. */
+  /* A round stud on each corner, a small brother of the mark: bronze ring with notches, blue disc. */
   .mapbox::before {
-    --stud: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3ClinearGradient id='g' x2='1' y2='1'%3E%3Cstop stop-color='%23f6e09a'/%3E%3Cstop offset='.55' stop-color='%238a6a2c'/%3E%3Cstop offset='1' stop-color='%233a2a10'/%3E%3C/linearGradient%3E%3Cpath d='M13 1 25 13 13 25 1 13Z' fill='url(%23g)' stroke='%23000'/%3E%3Cpath d='M13 8 18 13 13 18 8 13Z' fill='%23701008' stroke='%23000' stroke-width='.7'/%3E%3C/svg%3E");
+    --stud: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3ClinearGradient id='g' x2='1' y2='1'%3E%3Cstop stop-color='%23cfb08a'/%3E%3Cstop offset='.5' stop-color='%2385613f'/%3E%3Cstop offset='1' stop-color='%233a2819'/%3E%3C/linearGradient%3E%3CradialGradient id='b' cx='.4' cy='.35' r='.75'%3E%3Cstop stop-color='%232798ba'/%3E%3Cstop offset='.55' stop-color='%23105171'/%3E%3Cstop offset='1' stop-color='%23062235'/%3E%3C/radialGradient%3E%3Ccircle cx='13' cy='13' r='11.5' fill='url(%23g)' stroke='%23000'/%3E%3Ccircle cx='13' cy='13' r='9.2' fill='none' stroke='%23fff2dd' stroke-opacity='.5' stroke-dasharray='.8 2.09'/%3E%3Ccircle cx='13' cy='13' r='6.5' fill='url(%23b)' stroke='%23000' stroke-width='.8'/%3E%3C/svg%3E");
     content: '';
     position: absolute;
     inset: -3px;
@@ -376,9 +376,12 @@
     z-index: 1200;
     pointer-events: none;
     color: #fff;
+    /* A real edge under the letters, as on the names hung over the map: a blur alone gives way on snow. */
+    -webkit-text-stroke: 3px #000;
+    paint-order: stroke fill;
     text-shadow:
-      0 1px 3px #000,
-      0 0 2px #000;
+      0 1px 2px #000,
+      0 4px 12px #000c;
   }
   .readout b {
     display: block;
