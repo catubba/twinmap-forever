@@ -1,6 +1,7 @@
 <script lang="ts">
   // The search of the top row: zones from the game's own maps, NPCs, quests and items from the
   // player's QuestieDB. The results open under the field; one chosen takes the map to its place.
+  import { TILES } from './web'
   import { unitsOfPlace, type Point } from '../../shared/geo'
   import type { Continent, GameMap } from '../../shared/maps'
   import { wayOf, whereIs } from '../../shared/now'
@@ -22,7 +23,7 @@
   let zones = $state.raw<(GameMap & { lower: string })[]>([])
   $effect(() => {
     if (!ready || zones.length) return
-    void fetch('twinmap://tiles/maps.json')
+    void fetch(`${TILES}/maps.json`)
       .then((answer) => answer.json() as Promise<GameMap[]>)
       .then((list) => (zones = list.filter((m) => m.level === 'zone' && m.rect && m.continent !== null).map((m) => ({ ...m, lower: fold(m.name) }))))
       .catch(() => {})

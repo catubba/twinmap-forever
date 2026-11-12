@@ -2,6 +2,7 @@
   // The Now column: the next stop of the route, every quest of the log (the nearest first), and
   // who is near.
   // Nothing to click to make it work: it composes itself from where the character is.
+  import { TILES } from './web'
   import type { Position } from '../../shared/game'
   import type { GameMap } from '../../shared/maps'
   import { nearbyRows, nearest, questRows, steady, wayOf, whereIs, type NowRow, type PlacelessRow } from '../../shared/now'
@@ -80,7 +81,7 @@
   let maps = $state.raw<GameMap[]>([])
   $effect(() => {
     if (!ready || maps.length) return
-    void fetch('twinmap://tiles/maps.json')
+    void fetch(`${TILES}/maps.json`)
       .then((answer) => answer.json() as Promise<GameMap[]>)
       .then((list) => (maps = list))
       .catch(() => {})

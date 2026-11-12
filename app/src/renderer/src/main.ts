@@ -1,4 +1,5 @@
 import { mount } from 'svelte'
+import './web' // first: outside the app's own window it stands in for the preload script
 import './ui.css'
 import App from './App.svelte'
 import Kit from './Kit.svelte'
