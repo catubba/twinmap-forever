@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none">
+  <title>Twinmap</title>
+  <!-- The medallion redrawn for 16 px: flat colours, north and south points only, bigger arrow. -->
+  <path fill="#85613f" d="M8 0 9.500 1.700H6.500ZM8 16 9.500 14.300H6.500Z"/>
+  <circle cx="8" cy="8" r="6.250" fill="#105171" stroke="#a9845a" stroke-width="1.500"/>
+  <mask id="gap"><rect width="16" height="16" fill="#fff"/><rect x="5" y="5.500" width="8" height="7" fill="#000"/></mask>
+  <rect x="4.500" y="4.500" width="5.500" height="4" rx=".500" stroke="#eacba4" mask="url(#gap)"/>
+  <path fill="#fff2dd" fill-rule="evenodd" d="M5.750 6.250h6v4.750h-6ZM10.700 6.900 9.800 10.400 8.900 9.100 7.200 9.100Z"/>
+</svg>

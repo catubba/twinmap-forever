@@ -1,0 +1,607 @@
+/* twinmap.app: one page in the dress of the app. Colours and type are the app's own (app/src/renderer/src/ui.css). */
+
+@font-face {
+  font-family: Marcellus;
+  font-weight: 400;
+  font-display: swap;
+  src: url('Marcellus-Regular.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Barlow Semi Condensed';
+  font-weight: 400;
+  font-display: swap;
+  src: url('barlow-semi-condensed-latin-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Barlow Semi Condensed';
+  font-weight: 500;
+  font-display: swap;
+  src: url('barlow-semi-condensed-latin-500-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Barlow Semi Condensed';
+  font-weight: 600;
+  font-display: swap;
+  src: url('barlow-semi-condensed-latin-600-normal.woff2') format('woff2');
+}
+
+:root {
+  --stone-950: #0c0a08;
+  --stone-900: #15110e;
+  --stone-800: #211b16;
+  --stone-700: #2a221b;
+  --stone-600: #382e25;
+  --stone-500: #4e4033;
+  --bronze-900: #2a1c12;
+  --bronze-700: #583e2a;
+  --bronze-600: #85613f;
+  --bronze-500: #a37e4f;
+  --bronze-400: #cfb08a;
+  --bronze-300: #eacba4;
+  --gold: #eacba4;
+  --gold-pale: #fff2dd;
+  --text: #f3ead9;
+  --text-dim: #b9a88c;
+  --nav-rest: #c9b48a;
+  --done: #5fe35a;
+  --disc-top: #2798ba;
+  --disc-low: #0a3c5a;
+  --float: #06141df5;
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='.9' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 .85 0 0 0 0 .6 0 0 0 .24 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+  --out: cubic-bezier(0.16, 1, 0.3, 1);
+  --side: clamp(20px, 4.5vw, 72px); /* the page's margin at the sides */
+  --top: 52px;
+}
+
+* {
+  box-sizing: border-box;
+}
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: calc(var(--top) + 16px);
+  scrollbar-color: var(--bronze-600) var(--stone-950);
+  background: var(--stone-900);
+}
+body {
+  margin: 0;
+  background:
+    var(--grain),
+    linear-gradient(var(--stone-800), var(--stone-900) 900px);
+  color: var(--text);
+  font: 400 19px/1.5 Barlow Semi Condensed, Segoe UI, sans-serif;
+  font-variant-numeric: tabular-nums;
+  -webkit-text-size-adjust: 100%;
+}
+::selection {
+  background: var(--gold);
+  color: #1a1206;
+}
+img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+a {
+  color: var(--gold);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+a:hover {
+  color: var(--gold-pale);
+}
+:focus-visible {
+  outline: 2px solid var(--gold-pale);
+  outline-offset: 2px;
+}
+h1,
+h2 {
+  margin: 0;
+  font-family: Marcellus, Georgia, serif;
+  font-weight: 400;
+  color: var(--gold);
+  text-shadow: 0 1px 0 #000;
+  text-wrap: balance;
+}
+p {
+  margin: 0;
+}
+
+/* The top row: the app's own, with its bronze moulding under it. */
+.top {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  height: var(--top);
+  padding: 0 var(--side);
+  background:
+    var(--grain),
+    linear-gradient(var(--stone-600), var(--stone-800));
+  box-shadow:
+    0 1px 0 #000,
+    0 2px 0 var(--bronze-700),
+    0 4px 0 var(--bronze-300),
+    0 6px 0 var(--bronze-600),
+    0 7px 0 #000,
+    0 12px 24px #0008;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-right: auto;
+  font: 400 20px/1.3 Marcellus, Georgia, serif;
+  letter-spacing: 0.18em;
+  color: var(--gold);
+  text-decoration: none;
+  text-shadow: 0 1px 0 #000;
+}
+.state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 17px;
+}
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--done);
+}
+.entry {
+  font: 400 18px/1.3 Marcellus, Georgia, serif;
+  color: var(--nav-rest);
+  text-decoration: none;
+  text-shadow: 0 1px 0 #000;
+}
+.entry:hover {
+  color: var(--text);
+}
+
+/* The first screen: the steps on the left, the map on the right. */
+.first {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  grid-template-areas:
+    'head map'
+    'steps map';
+  grid-template-rows: auto auto;
+  align-content: center;
+  align-items: center;
+  column-gap: clamp(28px, 4vw, 64px);
+  min-height: calc(100svh - var(--top));
+  padding: clamp(36px, 6vh, 72px) var(--side);
+}
+.head {
+  grid-area: head;
+}
+.first .map {
+  grid-area: map;
+}
+.steps {
+  grid-area: steps;
+  align-self: start;
+}
+h1 {
+  font-size: clamp(38px, 3.9vw, 60px);
+  line-height: 1.08;
+}
+.lead {
+  max-width: 40ch;
+  text-wrap: balance;
+  margin-top: 16px;
+  font-size: clamp(20px, 1.6vw, 24px);
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+.steps {
+  margin: clamp(24px, 4vh, 40px) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.steps li + li {
+  margin-top: 22px;
+}
+.steps p {
+  max-width: 46ch;
+  margin: 12px 16px 0;
+}
+.steps .btn {
+  margin: 14px 16px 0;
+}
+
+/* A title band, as over each block of the app's panel: a blue disc, the title, a notched bronze foot. */
+.band {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  padding: 0 16px 3px 14px;
+  background:
+    repeating-linear-gradient(90deg, var(--bronze-600) 0 5px, var(--bronze-400) 5px 6px) bottom / 100% 3px no-repeat,
+    linear-gradient(var(--stone-500), var(--stone-700));
+  box-shadow:
+    inset 0 1px 0 #ffffff38,
+    0 1px 0 #000,
+    0 -1px 0 #000;
+  font-size: 19px;
+  line-height: 1.3;
+}
+.band::before {
+  content: '';
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: linear-gradient(160deg, var(--disc-top), var(--disc-low) 70%);
+  box-shadow:
+    0 0 0 2px var(--bronze-600),
+    0 0 0 3px #000;
+}
+
+/* The one thing that looks pressable. */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  min-height: 46px;
+  padding: 6px 22px;
+  border: 1px solid #120b05;
+  border-radius: 4px;
+  background: linear-gradient(#b3261a, #701008 55%, #520b06);
+  box-shadow:
+    inset 0 1px 0 #ffb09a66,
+    inset 0 0 0 1px var(--bronze-400),
+    inset 0 -6px 8px #0005,
+    0 2px 4px #000d;
+  font: 400 19px/1.3 Marcellus, Georgia, serif;
+  color: var(--gold);
+  text-decoration: none;
+  text-shadow: 0 1px 0 #000;
+  transition:
+    filter 120ms var(--out),
+    color 120ms var(--out);
+}
+.btn:hover {
+  filter: brightness(1.16);
+  color: var(--gold-pale);
+}
+.btn:active {
+  background: linear-gradient(#520b06, #701008 45%, #b3261a);
+  box-shadow: inset 0 0 0 1px var(--bronze-400);
+  padding-top: 7px;
+  padding-bottom: 5px;
+}
+.btn:focus-visible {
+  box-shadow:
+    inset 0 0 0 1px var(--bronze-400),
+    0 0 0 5px #000;
+}
+
+/* The map in its frame: a bronze moulding drawn over the picture's edge, a stud on each corner. */
+.map {
+  margin: 0;
+}
+.frame {
+  position: relative;
+  background: #000;
+}
+.frame img {
+  width: 100%;
+}
+.frame::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  box-shadow:
+    inset 0 0 0 1px #000,
+    inset 0 0 0 3px var(--bronze-700),
+    inset 0 0 0 5px var(--bronze-300),
+    inset 0 0 0 8px var(--bronze-600),
+    inset 0 0 0 10px var(--bronze-900),
+    inset 0 0 0 11px #000,
+    inset 0 0 70px 6px #0009;
+  pointer-events: none;
+}
+.stud {
+  position: absolute;
+  z-index: 1;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: repeating-conic-gradient(var(--bronze-400) 0 6deg, var(--bronze-600) 6deg 30deg);
+  box-shadow:
+    0 0 0 1px #000,
+    0 2px 5px #000c;
+}
+.stud::after {
+  content: '';
+  position: absolute;
+  inset: 5px;
+  border-radius: 50%;
+  background: linear-gradient(160deg, var(--disc-top), var(--disc-low) 70%);
+  box-shadow: 0 0 0 1px #000;
+}
+.stud.tl {
+  left: -8px;
+  top: -8px;
+}
+.stud.tr {
+  right: -8px;
+  top: -8px;
+}
+.stud.bl {
+  left: -8px;
+  bottom: -8px;
+}
+.stud.br {
+  right: -8px;
+  bottom: -8px;
+}
+/* The line at the foot of the map, as the app writes its state there. */
+figcaption {
+  margin-top: 16px;
+  font-size: 16px;
+  line-height: 1.4;
+  color: var(--text-dim);
+  text-align: center;
+}
+/* The one authored moment: the first map settles into its frame as the page opens. */
+@media (prefers-reduced-motion: no-preference) {
+  .first .frame {
+    animation: settle 900ms var(--out) both;
+  }
+  .first figcaption {
+    animation: rise 700ms 350ms var(--out) both;
+  }
+}
+@keyframes settle {
+  from {
+    opacity: 0;
+    transform: scale(0.975);
+    filter: blur(6px);
+  }
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* The proofs. */
+section {
+  padding: clamp(56px, 9vh, 112px) var(--side);
+}
+.first {
+  padding-bottom: clamp(36px, 6vh, 72px);
+}
+.proof {
+  display: grid;
+  grid-template-columns: minmax(0, 4fr) minmax(0, 7fr);
+  align-items: center;
+  gap: clamp(28px, 5vw, 80px);
+  box-shadow:
+    inset 0 1px 0 #000,
+    inset 0 2px 0 var(--bronze-700);
+}
+.proof.turned {
+  grid-template-columns: minmax(0, 7fr) minmax(0, 4fr);
+}
+.proof.turned .words {
+  order: 2;
+}
+.words h2 {
+  font-size: clamp(30px, 2.8vw, 42px);
+  line-height: 1.15;
+}
+.words p {
+  max-width: 46ch;
+  margin-top: 16px;
+  color: var(--text);
+}
+.words p + p {
+  color: var(--text-dim);
+}
+
+.screens {
+  box-shadow:
+    inset 0 1px 0 #000,
+    inset 0 2px 0 var(--bronze-700);
+  background: linear-gradient(#0000, #0006);
+}
+.screens .words p {
+  max-width: 52ch;
+}
+.devices {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: clamp(12px, 2.2vw, 36px);
+  margin-top: clamp(32px, 5vh, 56px);
+}
+.devices img {
+  width: 100%;
+  background: #000;
+}
+.laptop {
+  flex: 0 1 52%;
+}
+.laptop .lid {
+  width: 84%;
+  margin: 0 auto;
+  padding: 1.6% 1.6% 2%;
+  border-radius: 12px 12px 0 0;
+  background: linear-gradient(#2b2b2e, #18181a);
+  box-shadow:
+    0 0 0 1px #000,
+    inset 0 0 0 1px #48484d;
+}
+.laptop .deck {
+  height: clamp(8px, 1.3vw, 18px);
+  border-radius: 3px 3px 14px 14px;
+  background: linear-gradient(#56565b, #2a2a2d 30%, #151517);
+  box-shadow: 0 18px 30px #000c;
+}
+.tablet {
+  flex: 0 1 31%;
+  padding: 0.9%;
+  border-radius: clamp(8px, 1.4vw, 18px);
+  background: linear-gradient(135deg, #303034, #131315);
+  box-shadow:
+    0 0 0 1px #000,
+    inset 0 0 0 1px #4a4a50,
+    0 18px 30px #000b;
+}
+.tablet img {
+  border-radius: clamp(3px, 0.5vw, 6px);
+}
+.phone {
+  flex: 0 1 11.5%;
+  padding: 0.45%;
+  border-radius: clamp(8px, 1.5vw, 20px);
+  background: linear-gradient(135deg, #34343a, #111113);
+  box-shadow:
+    0 0 0 1px #000,
+    inset 0 0 0 1px #50505a,
+    0 18px 30px #000b;
+}
+.phone img {
+  border-radius: clamp(6px, 1.2vw, 16px);
+}
+
+/* What it is made of: a name, then what is true about it, as the app's settings list things. */
+.facts {
+  max-width: calc(820px + 2 * var(--side));
+  margin: 0 auto;
+}
+.facts .band {
+  margin-top: 56px;
+}
+.facts .band:first-child {
+  margin-top: 0;
+}
+dl {
+  display: grid;
+  grid-template-columns: 230px minmax(0, 1fr);
+  margin: 6px 0 0;
+}
+dt,
+dd {
+  margin: 0;
+  padding: 12px 16px;
+  border-bottom: 1px solid #ffffff12;
+}
+dt {
+  color: var(--text-dim);
+}
+dl > :nth-last-child(-n + 2) {
+  border-bottom: 0;
+}
+.get dt {
+  padding-top: 22px;
+  color: var(--gold);
+  font-family: Marcellus, Georgia, serif;
+}
+.badges {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+.scan {
+  display: block;
+  margin-top: 10px;
+  color: var(--text-dim);
+}
+
+footer {
+  padding: 28px var(--side) 40px;
+  background: var(--stone-950);
+  box-shadow:
+    0 -1px 0 #000,
+    0 -3px 0 var(--bronze-600),
+    0 -4px 0 #000;
+  font-size: 16px;
+  color: var(--text-dim);
+}
+footer p {
+  max-width: 56ch;
+}
+footer p + p {
+  margin-top: 8px;
+}
+
+/* A narrow screen: one column, the steps first, the map under them. */
+@media (max-width: 900px) {
+  .first,
+  .proof,
+  .proof.turned {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .first {
+    grid-template-areas:
+      'head'
+      'map'
+      'steps';
+    row-gap: 28px;
+    min-height: 0;
+  }
+  .steps {
+    margin-top: 0;
+  }
+  .lead {
+    max-width: none;
+  }
+  .proof.turned .words {
+    order: 0;
+  }
+  dl {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  dt {
+    padding-bottom: 0;
+    border-bottom: 0;
+    color: var(--gold);
+  }
+  dd {
+    padding-top: 4px;
+  }
+  dl > :nth-last-child(2) {
+    border-bottom: 0;
+  }
+}
+@media (max-width: 560px) {
+  body {
+    font-size: 18px;
+  }
+  .state {
+    display: none;
+  }
+  .steps .btn,
+  .get .btn {
+    display: flex;
+    justify-content: center;
+  }
+  .steps p,
+  .steps .btn {
+    margin-left: 0;
+    margin-right: 0;
+  }
+  .devices {
+    flex-wrap: wrap;
+  }
+  .laptop {
+    flex-basis: 100%;
+  }
+  .tablet {
+    flex-basis: 62%;
+  }
+  .phone {
+    flex-basis: 24%;
+  }
+  .stud {
+    width: 20px;
+    height: 20px;
+  }
+}
