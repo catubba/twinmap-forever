@@ -1,0 +1,34 @@
+name: Bug report
+description: Something does not work as it should
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for taking the time. The quickest way to fill this in is the **Feedback** entry in the app: it opens this page with the details already written.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you saw, and what you expected to see instead.
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: Details
+      description: In the app, open Feedback, press "Copy details" and paste here.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: In the app, open Feedback, press "Copy log" and paste here. It is the app's own record of what happened to it. It holds no character names, and the name of your Windows account is left out.
+      render: text
+  - type: textarea
+    id: pictures
+    attributes:
+      label: Pictures
+      description: A screenshot of Twinmap, and of the game if it helps. Hide anything you do not want to show, such as chat.
