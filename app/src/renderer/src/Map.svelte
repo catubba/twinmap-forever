@@ -27,6 +27,7 @@
   import type { Journey, WayLeg } from '../../shared/journey'
   import { ahead as restOf } from '../../shared/walk'
   import { feet } from './feet.svelte'
+  import { kept as keptByApp } from './kept.svelte'
   import { pinOfMark, removePin, renamePin, savedAt, savedFrom, savePin, type SavedPin } from '../../shared/saved'
   import { markPart, sendState, type GameMark, type Inbox, type Pin } from '../../shared/send'
   import { pin } from './marks'
@@ -75,35 +76,42 @@
   // The yards and the time are those of the way on foot, where one is found: asked for the one point, again every few dozen yards.
   const toLabel = feet(() => (labelled && me && me.continent === labelled.continent ? { continent: me.continent, from: me.units, to: [labelled.units], reach: 20_000 } : null), 40)
   const way = $derived(labelled && me && me.continent === labelled.continent ? wayTo(me.units, labelled.units, toLabel.yards(labelled.units)) : null)
-  // My pins: the points the player saved, remembered from one run of the app to the next.
-  let myPins = $state.raw(savedFrom(localStorage.getItem('pins')))
-  $effect(() => localStorage.setItem('pins', JSON.stringify(myPins)))
+  // My pins: the points the player saved, kept by the app from one run to the next and for every screen that shows it.
+  const keptPins = keptByApp('pins', savedFrom)
+  const myPins = $derived(keptPins.value)
+  const setPins = (to: SavedPin[]): void => {
+    keptPins.value = to
+  }
   // The game draws the same pins on its own map: it is told them all at every change. removed: the
   // ones the player removed there, which are forgotten here too. Only when that list changes: a
   // point saved again while the game still names it is kept. set: the ones the player set there
   // with Alt and a click, which become pins here; the game is told they were taken, with the pins.
+  // Nothing of this before the app has said which pins it keeps: no pins yet is not the player's word.
   let taken = $state.raw<string[]>([])
-  $effect(() => void window.twinmap.sendMarks(myPins.flatMap((p) => (p.pin ? [{ ...p.pin, name: p.name }] : [])), taken))
+  $effect(() => {
+    if (keptPins.heard) void window.twinmap.sendMarks(myPins.flatMap((p) => (p.pin ? [{ ...p.pin, name: p.name }] : [])), taken)
+  })
   const setNow = $derived(JSON.stringify(set))
   $effect(() => {
     const marks = JSON.parse(setNow) as GameMark[]
-    if (maps.length === 0) return // the maps say where a mark of the game is on ours
+    if (maps.length === 0 || !keptPins.heard) return // the maps say where a mark of the game is on ours
     untrack(() => {
       let pins = myPins
       for (const mark of marks) {
         const pin = pinOfMark(maps, mark)
         if (pin) pins = savePin(pins, pin)
       }
-      myPins = pins
+      setPins(pins)
       taken = marks.map((mark) => mark.id)
     })
   })
   const goneNow = $derived(removed.join(' '))
   $effect(() => {
     const parts = new Set(goneNow.split(' '))
+    if (!keptPins.heard) return
     untrack(() => {
       const left = myPins.filter((p) => !(p.pin && parts.has(markPart(p.pin))))
-      if (left.length < myPins.length) myPins = left
+      if (left.length < myPins.length) setPins(left)
     })
   })
   // The labelled point as one of them, or -1; and the point under the name it goes by: a saved one has its own.
@@ -1014,10 +1022,10 @@
       saved={savedIndex >= 0}
       onsave={() => {
         const pin = asStop()
-        if (pin) myPins = savePin(myPins, pin)
+        if (pin) setPins(savePin(myPins, pin))
       }}
-      onrename={(name) => (myPins = renamePin(myPins, savedIndex, name))}
-      onremove={() => (myPins = removePin(myPins, savedIndex))}
+      onrename={(name) => setPins(renamePin(myPins, savedIndex, name))}
+      onremove={() => setPins(removePin(myPins, savedIndex))}
       onclose={() => (labelled = null)}
     />
   {/key}

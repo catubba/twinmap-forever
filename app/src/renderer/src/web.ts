@@ -49,6 +49,8 @@ if (!inApp) {
     onTiles: on('tiles'),
     onSetup: on('setup'),
     onQuests: on('quests'),
+    onKept: on('kept'),
+    keep: call('keep', undefined),
     // What belongs to the computer stays on the computer.
     chooseGameFolder: () => Promise.resolve('Choose the game folder in Twinmap on the computer.'),
     openCurseForge: () => Promise.resolve(void window.open(CURSEFORGE, '_blank', 'noopener')),
@@ -60,9 +62,7 @@ if (!inApp) {
     walk: call('walk', null),
     walkFar: call('walk-far', []),
     sendPin: call('send-pin', unsent),
-    // My pins are kept by each browser for now, and the game is to have the computer's: a phone
-    // that told its own would take the computer's off the game's map.
-    sendMarks: () => Promise.resolve(),
+    sendMarks: call('send-marks', undefined),
     sendUnfollow: call('send-unfollow', unsent),
     sendRoute: call('send-route', unsent),
     sendStep: call('send-step', unsent),
