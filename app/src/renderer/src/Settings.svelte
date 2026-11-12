@@ -50,7 +50,8 @@
       <dd>
         {setup.gameFolder ?? 'Not found'}
         {#if wrong}<span class="wrong">{wrong}</span>{/if}
-        <button class="btn" onclick={choose}>{setup.gameFolder ? 'Change folder' : 'Choose the game folder'}</button>
+        <!-- The folder is chosen on the computer it is on. -->
+        {#if inApp}<button class="btn" onclick={choose}>{setup.gameFolder ? 'Change folder' : 'Choose the game folder'}</button>{/if}
       </dd>
       <dt>Link with the game</dt>
       <dd>{link?.word ?? 'Starting'}</dd>
@@ -63,10 +64,14 @@
       <dd>{setup.questie ? 'Installed' : 'Not installed (optional)'}</dd>
       <dt>Map</dt>
       <dd>{map}</dd>
-      <dt>First run</dt>
-      <dd><button class="btn" onclick={onfirstrun}>Go through the steps again</button></dd>
+      {#if inApp}
+        <dt>First run</dt>
+        <dd><button class="btn" onclick={onfirstrun}>Go through the steps again</button></dd>
+      {/if}
     </dl>
 
+    <!-- The window is the computer's: a phone on the home network has none to set. -->
+    {#if inApp}
     <h2 class="band">Window</h2>
     <dl>
       <dt>Over other windows</dt>
@@ -78,6 +83,7 @@
       <dt>Full screen</dt>
       <dd>F11 turns it on and off.</dd>
     </dl>
+    {/if}
 
     {#if inApp}
       <h2 class="band">Phone and tablet</h2>
@@ -100,8 +106,8 @@
       </dl>
     {/if}
 
-    <h2 class="band">Shortcuts</h2>
-    <dl>
+    <h2 class="band keys">Shortcuts</h2>
+    <dl class="keys">
       <dt>L</dt>
       <dd>Opens and closes Layers.</dd>
       <dt>F</dt>
@@ -112,8 +118,10 @@
       <dd>Move and zoom the map, with the keyboard on it.</dd>
       <dt>Space</dt>
       <dd>Puts the label on the middle of the map, with the keyboard on it.</dd>
-      <dt>F11</dt>
-      <dd>Full screen.</dd>
+      {#if inApp}
+        <dt>F11</dt>
+        <dd>Full screen.</dd>
+      {/if}
     </dl>
 
     <h2 class="band">Updates</h2>
@@ -215,6 +223,33 @@
 
   .about {
     padding: 18px 16px 0;
+  }
+
+  /* On a narrow screen a name stands over its value: side by side, neither would have room. */
+  @media (max-width: 600px) {
+    .column {
+      padding-top: 12px;
+    }
+    dl {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 0;
+    }
+    dt {
+      min-height: 0;
+      padding-bottom: 0;
+    }
+    dd {
+      padding-bottom: 12px;
+    }
+  }
+  /* The keys are for a keyboard: a screen that is touched has none. */
+  @media (pointer: coarse) {
+    .keys {
+      display: none;
+    }
+    summary {
+      min-height: 44px;
+    }
   }
   .mark {
     display: block;
