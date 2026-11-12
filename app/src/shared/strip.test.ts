@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { expect, test } from 'vitest'
 import { createGame } from './game'
-import { decodeRow, PROTOCOL, type Block } from './strip'
+import { decodeRow, PROTOCOL, readStrip, type Block } from './strip'
 
 // Strips the addon really drew, recorded in the simulated game by addon/tests/record.js.
 // Each is a string of cells, one digit 0 to 7 (R*4 + G*2 + B) per pixel.
@@ -149,4 +149,41 @@ test('an addon with an older protocol: the app says to update the addon', () => 
   for (let i = 0; i < 3; i++) game.feed({ kind: 'protocol', protocol: 0 })
   expect(game.state.protocol).toMatchObject({ addon: 0, update: 'addon' })
   expect(game.state.protocol?.message).toMatch(/Update the addon from CurseForge\.$/)
+})
+
+// A game at 1920 pixels stretched over a monitor of 2560, as the screen does it: each pixel the
+// blend of the two cells it lies between.
+function stretched(row: Uint8Array, wide: number): Uint8Array {
+  const cells = row.length >> 2, out = new Uint8Array(wide * 4)
+  for (let x = 0; x < wide; x++) {
+    const u = Math.max(0, Math.min(cells - 1, ((x + 0.5) * cells) / wide - 0.5)), a = Math.floor(u), b = Math.min(cells - 1, a + 1), t = u - a
+    for (let c = 0; c < 3; c++) out[x * 4 + c] = Math.round(row[a * 4 + c]! * (1 - t) + row[b * 4 + c]! * t)
+  }
+  return out
+}
+
+test('a strip stretched to fill a wider monitor reads as the one the game drew, also at low contrast', () => {
+  for (const s of strips.session) {
+    const usual = decodeRow(pixels(s))
+    expect(readStrip(stretched(pixels(s, 101, 0), 2560))).toEqual({ reading: usual, drew: 1920 })
+    expect(readStrip(stretched(pixels(s), 3840), 1920)).toEqual({ reading: usual, drew: 1920 })
+  }
+  expect(readStrip(pixels(strips.session[0]!), 1280), 'not stretched any more').toEqual({ reading: decodeRow(pixels(strips.session[0]!)), drew: 1920 })
+  expect(readStrip(new Uint8Array(2560 * 4).fill(50))).toEqual({ reading: { kind: 'none' } })
+  expect(readStrip(Uint8Array.from({ length: 2560 * 4 }, (_, i) => (i * 37) % 256))).toEqual({ reading: { kind: 'none' } })
+})
+
+test('rows read off the real game at 1920 by 1080 on a monitor of 2560 hold a strip', () => {
+  const real = JSON.parse(readFileSync(join(__dirname, 'strip-stretched.fixture.json'), 'utf8')) as { rows: { first: number[] }[] }
+  // Only the start of each row was kept: enough for the bytes that say it is a strip of ours.
+  for (const { first } of real.rows) {
+    const row = new Uint8Array(2560 * 4)
+    row.set(first)
+    expect(decodeRow(row).kind, 'as it is, no strip').toBe('none')
+    const head = readStrip(row, 1920).reading
+    expect(head.kind).toBe('none') // a row cut short is no block; its start is checked below
+    const cells = [...Array(19).keys()].map((i) => Math.round(((i + 0.5) * 2560) / 1920 - 0.5)).map((x) => (first[x * 4 + 2]! > 50 ? 4 : 0) | (first[x * 4 + 1]! > 50 ? 2 : 0) | (first[x * 4]! > 50 ? 1 : 0))
+    const bits = cells.map((v) => v.toString(2).padStart(3, '0')).join('')
+    expect(['c71b01', '38e4fe']).toContain(parseInt(bits.slice(0, 24), 2).toString(16))
+  }
 })
