@@ -413,7 +413,7 @@ test('Alt and a right click removes a flag: the strip tells the app, until the a
   addon.lua('(...).db.mode = "fast"; GAME.mapOpen, GAME.shown = true, 1429');
   app.send(addons, { mark1429x4371y6580: INN, mark1429x1000y2000: MINE });
   addon.run(8);
-  assert.deepEqual(marksTold(addon), { gone: [] });
+  assert.deepEqual(marksTold(addon), { gone: [], new: [] });
 
   addon.flagClick('Inn', 'RightButton');
   assert.equal(addon.flags(), 'Inn 437 395; Mine 100 120', 'a right click alone is the map\'s own');
@@ -424,7 +424,7 @@ test('Alt and a right click removes a flag: the strip tells the app, until the a
   assert.equal(addon.flags(), 'Mine 100 120');
   assert.equal(addon.printed(), 'Twinmap Forever: Inn is no longer among your pins.');
   addon.run(3);
-  assert.deepEqual(marksTold(addon), { gone: ['mark1429x4371y6580'] });
+  assert.deepEqual(marksTold(addon), { gone: ['mark1429x4371y6580'], new: [] });
 
   addon.reload();
   addon.fire('PLAYER_LOGIN');
@@ -433,7 +433,7 @@ test('Alt and a right click removes a flag: the strip tells the app, until the a
 
   app.send(addons, { mark1429x4371y6580: false });
   addon.run(8);
-  assert.deepEqual(marksTold(addon), { gone: [] });
+  assert.deepEqual(marksTold(addon), { gone: [], new: [] });
   app.send(addons, { mark1429x4371y6580: INN });
   addon.run(8);
   assert.equal(addon.flags(), 'Inn 437 395; Mine 100 120', 'saved again in the app, it is back');
@@ -454,4 +454,46 @@ test('more pins than a font holds come by a slot, and one taken away in a send t
   assert.equal(addon.slots(), 2);
   assert.equal(addon.flags().split('; ').length, 38);
   assert.ok(!addon.flags().includes('Pin number 00') && !addon.flags().includes('Pin number 01'));
+});
+
+test('Alt and a click on the game\'s map sets a flag there: the strip tells the app, and once the app has taken it the pin is the app\'s own', () => {
+  const { addon } = world();
+  addon.lua('(...).db.mode = "fast"; GAME.mapOpen, GAME.shown = true, 1429');
+  addon.run(8);
+  assert.equal(addon.mapClick('LeftButton', 0.25, 0.5), false, 'a click alone is the map\'s own');
+  addon.lua('GAME.alt = true');
+  assert.equal(addon.mapClick('RightButton', 0.25, 0.5), false);
+  assert.equal(addon.flags(), '');
+  assert.equal(addon.mapClick('LeftButton', 0.25, 0.5), true);
+  assert.equal(addon.flags(), 'Elwynn Forest 25.0, 50.0 250 300');
+  assert.equal(addon.printed(), 'Twinmap Forever: Elwynn Forest 25.0, 50.0 is among your pins.');
+  addon.run(3);
+  const set = { id: '1429x2500y5000', m: 1429, x: 25, y: 50, name: 'Elwynn Forest 25.0, 50.0' };
+  assert.deepEqual(marksTold(addon), { gone: [], new: [set] });
+
+  addon.reload();
+  addon.fire('PLAYER_LOGIN');
+  addon.fire('PLAYER_ENTERING_WORLD');
+  assert.equal(addon.flags(), 'Elwynn Forest 25.0, 50.0 250 300', 'kept while the app has not taken it');
+
+  // A second one, removed here before the app ever heard of it.
+  assert.equal(addon.mapClick('LeftButton', 0.6, 0.1), true);
+  assert.equal(addon.flags(), 'Elwynn Forest 25.0, 50.0 250 300; Elwynn Forest 60.0, 10.0 600 60');
+  addon.flagClick('Elwynn Forest 60.0, 10.0', 'RightButton');
+  assert.equal(addon.flags(), 'Elwynn Forest 25.0, 50.0 250 300');
+
+  app.send(addons, { mark1429x2500y5000: { m: 1429, x: 25, y: 50, name: 'Elwynn Forest 25.0, 50.0' }, taken: ['1429x2500y5000'] });
+  addon.lua('(...).db.mode = "fast"');
+  addon.run(8);
+  assert.equal(addon.flags(), 'Elwynn Forest 25.0, 50.0 250 300', 'one flag, not two');
+  assert.deepEqual(marksTold(addon), { gone: [], new: [] });
+});
+
+test('no more than twenty pins set in the game wait for the app', () => {
+  const { addon } = world();
+  addon.lua('GAME.mapOpen, GAME.shown, GAME.alt = true, 1429, true');
+  addon.run(8);
+  for (let i = 0; i < 21; i++) assert.equal(addon.mapClick('LeftButton', 0.1 + i * 0.01, 0.5), true);
+  assert.equal(addon.flags().split('; ').length, 20);
+  assert.match(addon.printed().split('\n').at(-1), /open Twinmap before setting more pins/);
 });

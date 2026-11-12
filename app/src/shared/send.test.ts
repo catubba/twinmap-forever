@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { goneFrom, markPart, marksNews, inboxFrom, pinFrom, routeNewsFrom, sendState, stepFrom } from './send'
+import { setFrom, takenFrom, goneFrom, markPart, marksNews, inboxFrom, pinFrom, routeNewsFrom, sendState, stepFrom } from './send'
 
 test('a pin is checked before it leaves: a real map, a place on it, a name of plain text', () => {
   expect(pinFrom({ m: 1429, x: 43.712, y: 65.8, name: 'Lion\'s Pride Inn' })).toEqual({ m: 1429, x: 43.71, y: 65.8, name: 'Lion\'s Pride Inn' })
@@ -55,4 +55,13 @@ test('the marks removed in the game are read off the strip, and anything else is
   expect(goneFrom({ gone: [] })).toEqual([])
   expect(goneFrom(undefined)).toEqual([])
   expect(goneFrom({ gone: 'all' })).toEqual([])
+})
+
+test('the marks set in the game are read off the strip, each with the name the addon knows it by', () => {
+  const set = { id: '1429x2500y5000', m: 1429, x: 25, y: 50, name: 'Elwynn Forest 25.0, 50.0' }
+  expect(setFrom({ gone: [], new: [set, { ...set, id: 7 }, { ...set, x: 101 }, 'pin'] })).toEqual([set])
+  expect(setFrom({ gone: [] })).toEqual([])
+  expect(setFrom(null)).toEqual([])
+  expect(takenFrom(['1429x2500y5000', 7, ''])).toEqual(['1429x2500y5000'])
+  expect(takenFrom('all')).toEqual([])
 })

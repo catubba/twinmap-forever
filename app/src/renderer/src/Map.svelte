@@ -23,13 +23,13 @@
   import { drop, gone, still } from './motion'
   import PointLabel from './PointLabel.svelte'
   import { inRoute, noRoute, type Route, type Stop } from '../../shared/route'
-  import { removePin, renamePin, savedAt, savedFrom, savePin } from '../../shared/saved'
-  import { markPart, sendState, type Inbox } from '../../shared/send'
+  import { pinOfMark, removePin, renamePin, savedAt, savedFrom, savePin } from '../../shared/saved'
+  import { markPart, sendState, type GameMark, type Inbox } from '../../shared/send'
   import { pin } from './marks'
 
   // at: when the position was read off the game, in milliseconds.
   // insideReady: the rooms of the buildings are converted, and their list can be asked for.
-  let { pos, at: readAt, insideReady, quests = [], fixed = [], side, live = false, inbox = null, removed = [], route = noRoute(), onroute }: { pos: Position | undefined; at: number | undefined; insideReady: boolean; quests?: QuestPin[]; fixed?: FixedPin[]; side?: string; live?: boolean; inbox?: Inbox | null; removed?: string[]; route?: Route; onroute?: (stop: Stop) => void } = $props()
+  let { pos, at: readAt, insideReady, quests = [], fixed = [], side, live = false, inbox = null, removed = [], set = [], route = noRoute(), onroute }: { pos: Position | undefined; at: number | undefined; insideReady: boolean; quests?: QuestPin[]; fixed?: FixedPin[]; side?: string; live?: boolean; inbox?: Inbox | null; removed?: string[]; set?: GameMark[]; route?: Route; onroute?: (stop: Stop) => void } = $props()
 
   const TILES = 'twinmap://tiles'
   const TOP_ZOOM = 7 // the game's own detail: a block's picture is four tiles
@@ -75,8 +75,24 @@
   $effect(() => localStorage.setItem('pins', JSON.stringify(myPins)))
   // The game draws the same pins on its own map: it is told them all at every change. removed: the
   // ones the player removed there, which are forgotten here too. Only when that list changes: a
-  // point saved again while the game still names it is kept.
-  $effect(() => void window.twinmap.sendMarks(myPins.flatMap((p) => (p.pin ? [{ ...p.pin, name: p.name }] : []))))
+  // point saved again while the game still names it is kept. set: the ones the player set there
+  // with Alt and a click, which become pins here; the game is told they were taken, with the pins.
+  let taken = $state.raw<string[]>([])
+  $effect(() => void window.twinmap.sendMarks(myPins.flatMap((p) => (p.pin ? [{ ...p.pin, name: p.name }] : [])), taken))
+  const setNow = $derived(JSON.stringify(set))
+  $effect(() => {
+    const marks = JSON.parse(setNow) as GameMark[]
+    if (maps.length === 0) return // the maps say where a mark of the game is on ours
+    untrack(() => {
+      let pins = myPins
+      for (const mark of marks) {
+        const pin = pinOfMark(maps, mark)
+        if (pin) pins = savePin(pins, pin)
+      }
+      myPins = pins
+      taken = marks.map((mark) => mark.id)
+    })
+  })
   const goneNow = $derived(removed.join(' '))
   $effect(() => {
     const parts = new Set(goneNow.split(' '))

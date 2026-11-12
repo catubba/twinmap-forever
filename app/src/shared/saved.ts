@@ -1,7 +1,8 @@
 // My pins: points the player saved, each with a name. They are kept from one run of the app to the
 // next, and shown on the map as a layer of their own.
-import type { Point } from './geo'
-import type { Continent } from './maps'
+import { unitsOfPlace, type Point } from './geo'
+import type { Continent, GameMap } from './maps'
+import { zoneAt } from './point-label'
 import { stopFrom, type Stop } from './route'
 
 /** A saved pin is a point as a stop of the route is: a name, a place, and the same place as the game names it. */
@@ -41,3 +42,19 @@ export function renamePin(pins: SavedPin[], index: number, name: string): SavedP
 }
 
 export const removePin = (pins: SavedPin[], index: number): SavedPin[] => (pins[index] ? pins.filter((_, i) => i !== index) : pins)
+
+/**
+ * A mark set in the game as a pin to save: the same point on Twinmap's map, named as a bare point
+ * of the map is, by its zone and its place there. null where it was set on a map Twinmap does not draw.
+ */
+export function pinOfMark(maps: GameMap[], mark: { m: number; x: number; y: number; name: string }): SavedPin | null {
+  const on = maps.find((map) => map.id === mark.m)
+  if (!on || on.continent === null || !on.rect) return null
+  const at = unitsOfPlace(on.rect, mark.x, mark.y), found = zoneAt(maps, on.continent, at)
+  return {
+    name: found ? `${found.zone.name} ${found.place.x.toFixed(1)}, ${found.place.y.toFixed(1)}` : mark.name,
+    continent: on.continent,
+    at,
+    pin: found ? { m: found.zone.id, x: found.place.x, y: found.place.y } : null,
+  }
+}
