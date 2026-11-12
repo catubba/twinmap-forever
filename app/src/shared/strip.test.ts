@@ -136,7 +136,7 @@ test('an addon with a newer protocol is not read, and the app says to update the
     addon: 2,
     app: PROTOCOL,
     update: 'app',
-    message: 'The Twinmap Forever addon is newer than this app (protocol 2, this app speaks 1). Update Twinmap.',
+    message: 'The Twinmap Forever addon is newer than this app (protocol 2, this app speaks 1). Close Twinmap and open it again: it updates itself when it starts.',
   })
   expect(game.state.sections.pos?.zone, 'what was known stays').toBe('Elwynn Forest')
 
@@ -148,7 +148,7 @@ test('an addon with an older protocol: the app says to update the addon', () => 
   const game = createGame()
   for (let i = 0; i < 3; i++) game.feed({ kind: 'protocol', protocol: 0 })
   expect(game.state.protocol).toMatchObject({ addon: 0, update: 'addon' })
-  expect(game.state.protocol?.message).toMatch(/Update the addon from CurseForge\.$/)
+  expect(game.state.protocol?.message).toMatch(/Update the addon from CurseForge, then restart the game\.$/)
 })
 
 // A game at 1920 pixels stretched over a monitor of 2560, as the screen does it: each pixel the

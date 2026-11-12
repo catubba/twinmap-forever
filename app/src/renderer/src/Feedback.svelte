@@ -13,10 +13,10 @@
   const open = (way: FeedbackWay): void => void window.twinmap.openFeedback(way, details)
   // Copying asks for a page the browser trusts: the app's window is one, a phone on the home network is not.
   const canCopy = !!navigator.clipboard
-  let copied = $state(false)
-  async function copy(): Promise<void> {
-    await navigator.clipboard.writeText(details)
-    copied = true
+  let copied = $state<'details' | 'log' | null>(null)
+  async function copy(what: 'details' | 'log'): Promise<void> {
+    await navigator.clipboard.writeText(what === 'details' ? details : await window.twinmap.readLog())
+    copied = what
   }
 </script>
 
@@ -30,8 +30,12 @@
   <p class="dim">No GitHub account? Write to {FEEDBACK.email}, in English or in Italian.</p>
   <h2>What Twinmap adds to your message</h2>
   <pre>{details}</pre>
+  {#if canCopy}<p class="dim log">For a bug, the log helps: it is Twinmap's own record of what happened to it (started, game found, map, link). Copy it and paste it into your message.</p>{/if}
   <div class="foot">
-    {#if canCopy}<button class="btn" onclick={copy}>{copied ? 'Copied' : 'Copy details'}</button>{/if}
+    {#if canCopy}
+      <button class="btn" onclick={() => copy('details')}>{copied === 'details' ? 'Copied' : 'Copy details'}</button>
+      <button class="btn" onclick={() => copy('log')}>{copied === 'log' ? 'Copied' : 'Copy log'}</button>
+    {/if}
     <button class="btn" onclick={() => dialog.close()}>Close</button>
   </div>
 </dialog>
@@ -64,6 +68,9 @@
   }
   .dim {
     color: var(--text-dim);
+  }
+  .log {
+    margin: 12px 0 0;
   }
   .ways,
   .foot {

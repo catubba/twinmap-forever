@@ -10,12 +10,13 @@ import type { Found } from '../shared/search'
 import { marksNews, pinFrom, routeNewsFrom, stepFrom, takenFrom } from '../shared/send'
 import { feedbackLink } from '../shared/feedback'
 import { pageOf, setupComplete, setupPages, type SetupStatus } from '../shared/setup'
-import type { TilesStatus } from '../shared/tiles-status'
+import { tilesLine, type TilesStatus } from '../shared/tiles-status'
 import { placeWindow, WINDOW } from '../shared/window'
 import { findGameWindow, programOf } from './capture'
 import { gameFolderFrom, registryInstallPath } from './client-files'
 import { homeAddress, LAN_PORT, startLan, type Lan, type Served } from './lan'
 import { startLink } from './link'
+import { startLog } from './log'
 import type { Answer, Asked } from './questie-worker'
 import startQuestieWorker from './questie-worker?nodeWorker'
 import { addonsFolder, readSettings, setupStatus, writeSettings } from './setup'
@@ -117,6 +118,9 @@ function startWalks(gameFolder: string | null): { find: (ask: WalkAsk) => Promis
     stop: () => void worker.terminate(),
   }
 }
+
+// The app's record of what happened to it, for the player to copy into a report.
+const record = startLog(join(app.getPath('userData'), 'twinmap.log'))
 
 function createWindow(): void {
   // The window opens where it was closed: monitor, place, size, and maximized if it was.
@@ -272,6 +276,8 @@ function createWindow(): void {
     const link = feedbackLink(way, details)
     if (link) void shell.openExternal(link)
   })
+  // The latest lines of the app's record, for the player to copy.
+  asks('read-log', (): string => record.read())
   // A conversion that failed is started again, from where it stopped: the cause may be gone (a full disk, a folder in use).
   asks('retry-tiles', () => {
     if (tiles.status().state !== 'failed') return
@@ -393,6 +399,13 @@ function createWindow(): void {
     if (!gameFolder && (gameFolder = findGameFolder(settings.gameFolder))) quests = startQuests(gameFolder, tellQuests) // the game may be started after the app
     if (gameFolder && tiles.status().state === 'no-game') tiles = startTiles(gameFolder)
     setup = lookSetup()
+    // The record: each of these is written when it changes, not every two seconds.
+    const made = tiles.status(), heard = linkStatus(link.snapshot(), Date.now())
+    record.note('game folder', gameFolder ? 'found' : 'not found')
+    record.note('addon', setup.addon ?? 'not installed')
+    record.note('optional addons', `Questie ${setup.questie ? 'yes' : 'no'}, Shortest Path ${setup.shortestPath ? 'yes' : 'no'}`)
+    record.note('map', made.state === 'converting' ? 'being built' : tilesLine(made))
+    record.note('link', heard.kind === 'update-app' || heard.kind === 'update-addon' ? `${heard.word}: ${heard.line}` : heard.word)
     readyChannel()
     void lanUrl() // the address of this computer may change while the app is open
     if (!settings.setupDone && setupComplete(setupPages(setup, tiles.status(), linkStatus(link.snapshot(), Date.now())))) {
@@ -468,7 +481,10 @@ function createWindow(): void {
 if (app.isPackaged) Menu.setApplicationMenu(null)
 
 // A newer version of the app, if there is one, comes first: see update.ts.
-void app.whenReady().then(() => updateFirst(createWindow))
+void app.whenReady().then(() => {
+  record.say(`started: Twinmap ${app.getVersion()}`)
+  updateFirst(createWindow, (line) => record.say(`update: ${line}`))
+})
 
 // Windows only: closing the last window closes the app.
 app.on('window-all-closed', () => app.quit())

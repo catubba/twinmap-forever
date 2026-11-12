@@ -2,7 +2,7 @@
   // The main screen: the top row with the state of the link, the map in its frame, and the Now panel.
   import { experience, linkStatus, type LinkSnapshot } from '../../shared/link'
   import { feedbackDetails } from '../../shared/feedback'
-  import { tilesLine, type TilesStatus } from '../../shared/tiles-status'
+  import { tilesHelp, tilesLine, type TilesStatus } from '../../shared/tiles-status'
   import { onMount } from 'svelte'
   import { fade, fly } from 'svelte/transition'
   import type { LogQuest, QuestPin } from '../../shared/quests'
@@ -14,7 +14,7 @@
   import { journeyFrom, legsAhead, wayFrom } from '../../shared/journey'
   import Now from './Now.svelte'
   import Search from './Search.svelte'
-  import type { SetupStatus } from '../../shared/setup'
+  import { ADDON_MISSING, type SetupStatus } from '../../shared/setup'
   import Feedback from './Feedback.svelte'
   import FirstRun from './FirstRun.svelte'
   import Glyph from './Glyph.svelte'
@@ -194,6 +194,7 @@
     {:else if tiles}
       <div class="making" class:failed={tiles.state === 'failed' || tiles.state === 'no-game'}>
         <p>{tilesLine(tiles)}</p>
+        {#if tilesHelp(tiles)}<p class="help">{tilesHelp(tiles)}</p>{/if}
         {#if tiles.state === 'no-game' && inApp}
           {#if wrong}<p>{wrong}</p>{/if}
           <button class="btn" onclick={choose}>Choose the game folder</button>
@@ -210,7 +211,9 @@
         {pos.x !== undefined && pos.y !== undefined ? `${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}` : ''}
       </div>
     {/if}
-    {#if status?.line && mapReady}
+    {#if setup?.gameFolder && !setup.addon}
+      <p class="map-note with-button" role="status">{ADDON_MISSING} <button class="btn" onclick={() => window.twinmap.openCurseForge()}>Get it on CurseForge</button></p>
+    {:else if status?.line && mapReady}
       {#key status.line}<p class="map-note" role="status" in:fly={drop(8)} out:fade={gone}>{status.line}</p>{/key}
     {/if}
   </div>
@@ -454,10 +457,26 @@
     color: var(--text-dim);
   }
   .making p {
+    max-width: min(60ch, 100% - 32px);
     margin: 0;
+    overflow-wrap: anywhere;
+    text-align: center;
   }
   .making.failed p {
     color: var(--objective);
+  }
+  /* A note that carries a button takes the pointer, which a plain note lets through to the map. */
+  .mapbox :global(.map-note.with-button) {
+    pointer-events: auto;
+  }
+  .mapbox :global(.map-note.with-button .btn) {
+    margin-left: 8px;
+  }
+  .making p.help {
+    max-width: 46ch;
+    padding: 0 16px;
+    color: var(--text-dim);
+    text-align: center;
   }
 
   .panel {

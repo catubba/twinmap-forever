@@ -65,6 +65,7 @@ if (!inApp) {
     drawn: () => {},
     onUpdate: () => {}, // the app updates itself on its computer, never from here
     retryTiles: call('retry-tiles', undefined),
+    readLog: call('read-log', ''),
     search: call('search', []),
     walk: call('walk', null),
     walkFar: call('walk-far', []),

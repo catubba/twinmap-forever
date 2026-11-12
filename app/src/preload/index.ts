@@ -43,6 +43,8 @@ contextBridge.exposeInMainWorld('twinmap', {
   openCurseForge: (addon?: Optional): Promise<void> => ipcRenderer.invoke('open-curseforge', addon),
   // Opens the player's feedback where they chose to write it, with the details the app adds.
   openFeedback: (way: FeedbackWay, details: string): Promise<void> => ipcRenderer.invoke('open-feedback', way, details),
+  // The latest lines of the app's record of what happened to it.
+  readLog: (): Promise<string> => ipcRenderer.invoke('read-log'),
   // Builds the map again after a failure.
   retryTiles: (): Promise<void> => ipcRenderer.invoke('retry-tiles'),
   // The opening screen is drawn: the window can show itself.

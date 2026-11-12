@@ -1,6 +1,6 @@
 // The first run: its pages, one thing each, and what each says.
 import type { LinkStatus } from './link'
-import type { TilesStatus } from './tiles-status'
+import { tilesHelp, type TilesStatus } from './tiles-status'
 
 /** What the main process tells the window about the game folder and the addons in it. */
 export interface SetupStatus {
@@ -23,6 +23,9 @@ export interface SetupStatus {
 
 /** Where the addon is published. The app never installs it itself: every install is one CurseForge counts. */
 export const CURSEFORGE = 'https://www.curseforge.com/wow/addons/twinmap-forever'
+
+/** Said on the map when the game is found and the addon is not in it: without it no position ever comes. */
+export const ADDON_MISSING = 'The Twinmap Forever addon is not in your game, so no position can come. Get it on CurseForge, then restart the game.'
 
 /** The optional addons the app points to, each with its name and its page on CurseForge. */
 export const OPTIONAL = {
@@ -81,7 +84,7 @@ export function setupPages(setup: SetupStatus, tiles: TilesStatus | null, link: 
         : tiles.state === 'converting'
           ? { state: 'working', lines: ["Reading the game's own pictures of the world."], progress: tiles.percent }
           : tiles.state === 'failed'
-            ? { state: 'problem', lines: ['The map could not be built.', tiles.message], action: 'retry' }
+            ? { state: 'problem', lines: ['The map could not be built.', tiles.message, tilesHelp(tiles)!], action: 'retry' }
             : { state: 'done', lines: ['The map is ready.', `${count(tiles.tiles)} tiles from game version ${tiles.version}.`] }),
   }
 
