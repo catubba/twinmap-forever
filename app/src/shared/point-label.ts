@@ -25,13 +25,17 @@ export function zoneAt(maps: GameMap[], continent: Continent, p: Point): { zone:
 }
 
 const WAYS = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west']
-// ponytail: a straight line at a runner's pace. The real speed, mounts and roads come with the travel times (M7-F3).
+// ponytail: a runner's pace all the way. The real speed and mounts come with the travel times (M7-F3).
 const RUN = 7 // yards a second on foot
 
-/** From one point of the map to another, as the label says it: "260 yd north-east", "0:37 on foot". */
-export function wayTo(from: Point, to: Point): { far: string; time: string } {
+/**
+ * From one point of the map to another, as the label says it: "260 yd north-east", "0:37 on foot".
+ * walked: the yards of the way on foot, where one is known; without it, the yards as the crow
+ * flies. The direction is always the crow's: where the point lies, not where the way starts.
+ */
+export function wayTo(from: Point, to: Point, walked?: number): { far: string; time: string } {
   const dx = to.x - from.x, dy = to.y - from.y // y grows to the south
-  const yards = Math.round(Math.hypot(dx, dy) * YARDS_PER_UNIT)
+  const yards = Math.round(walked ?? Math.hypot(dx, dy) * YARDS_PER_UNIT)
   const way = WAYS[((Math.round(Math.atan2(dx, -dy) / (Math.PI / 4)) % 8) + 8) % 8]!
   const seconds = Math.round(yards / RUN)
   return { far: `${yards.toLocaleString('en-US')} yd ${way}`, time: `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')} on foot` }

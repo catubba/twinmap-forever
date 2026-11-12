@@ -6,6 +6,7 @@
   import { wayOf, whereIs } from '../../shared/now'
   import { best, fold } from '../../shared/search'
   import { serves } from '../../shared/services'
+  import { nearestOnFoot } from '../../shared/walk'
   import Glyph from './Glyph.svelte'
 
   export interface Place { continent: Continent; at: Point; title: string; where?: string; whole?: GameMap }
@@ -14,6 +15,8 @@
   const MOST = 14 // results under the field
   const DOERS = 8 // of which found by what they do, the nearest, at most
   const ZONES = 4 // of which zones, at most
+  const REACH = 2500 // the yards the search for the ways on foot walks at most, as it prices them: a quarter of a second, after the results are shown
+  const ENDS = 200 // the places it is asked the way to, at most: the nearest as the crow flies
 
   // The maps of the game, from the folder of the tiles: there once the map is made.
   let zones = $state.raw<(GameMap & { lower: string })[]>([])
@@ -53,12 +56,23 @@
       ;(f.does ? doers : named).push({ continent: zone.continent!, at, title: f.name, where: `${zone.name} ${f.x.toFixed(1)}, ${f.y.toFixed(1)}`, note: `${f.note}, ${zone.name}`, yards })
     }
     // Who does what was typed comes first, the nearest first; then what is called so, unless it is one of them.
-    doers.sort((a, b) => (a.yards ?? Infinity) - (b.yards ?? Infinity))
-    const first = doers.slice(0, DOERS)
-    results = [...places, ...first, ...named.filter((n) => !first.some((d) => d.title === n.title && d.where === n.where))].slice(0, MOST)
+    // A result with a way on foot known tells its yards, the others those of the crow.
+    const foot = new Map<Result, number>()
+    const show = (): void => {
+      const first = nearestOnFoot(doers, (d) => foot.get(d), (d) => d.yards ?? Infinity).slice(0, DOERS)
+      results = [...places, ...first, ...named.filter((n) => !first.some((d) => d.title === n.title && d.where === n.where))].slice(0, MOST).map((r) => (foot.has(r) ? { ...r, yards: foot.get(r) } : r))
+    }
+    show()
     chosen = 0
     open = true
     took = performance.now() - started
+    // The results are there as the crow flies; the ways on foot come a moment later, and put the nearest by them first.
+    const near = [...doers, ...named].filter((r) => r.yards !== undefined).sort((a, b) => a.yards! - b.yards!).slice(0, ENDS)
+    if (!me || !near.length) return
+    const far = await window.twinmap.walkFar({ continent: me.continent, from: { ...me.at }, to: near.map((r) => ({ ...r.at })), reach: REACH }).catch(() => [])
+    if (mine !== asked) return
+    near.forEach((r, i) => typeof far[i] === 'number' && foot.set(r, far[i]))
+    show()
   }
 
   function pick(result: Result | undefined): void {

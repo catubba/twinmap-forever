@@ -20,7 +20,7 @@ import { servedFile } from './tiles'
 import startTilesWorker from './tiles-worker?nodeWorker'
 import startWalkWorker from './walk-worker?nodeWorker'
 import { navFolder } from './nav'
-import { walkAskFrom, type WalkAsk, type WalkPath } from '../shared/walk'
+import { farAskFrom, walkAskFrom, type Far, type FarAsk, type WalkAsk, type WalkPath } from '../shared/walk'
 
 const SHOW_EVERY = 50 // ms between updates of the window: a position must be there well before the arrow needs it (BEHIND in glide.ts)
 const LOG_EVERY = 5000 // ms between writes of the measures
@@ -88,24 +88,26 @@ function startQuests(gameFolder: string | null, tell: (status: QuestsStatus) => 
 }
 
 // The ways on foot: found on a thread of its own, each asking answered under its number.
-function startWalks(gameFolder: string | null): { find: (ask: WalkAsk) => Promise<WalkPath>; stop: () => void } {
+function startWalks(gameFolder: string | null): { find: (ask: WalkAsk) => Promise<WalkPath>; far: (ask: FarAsk) => Promise<Far>; stop: () => void } {
   const worker = startWalkWorker({ workerData: { gameFolder, shipped: navFolder() } })
-  const asked = new Map<number, (path: WalkPath) => void>()
+  const asked = new Map<number, (path: WalkPath | Far) => void>()
   let asks = 0
-  worker.on('message', (told: { id: number; path: WalkPath }) => {
+  worker.on('message', (told: { id: number; path: WalkPath | Far }) => {
     asked.get(told.id)?.(told.path)
     asked.delete(told.id)
   })
   worker.on('error', () => {
-    for (const answer of asked.values()) answer(null) // no line on the map; the rest of the app goes on
+    for (const answer of asked.values()) answer(null) // no line on the map, distances as the crow flies; the rest of the app goes on
     asked.clear()
   })
+  const ask = <T extends WalkPath | Far>(what: WalkAsk | FarAsk): Promise<T | null> =>
+    new Promise((answer) => {
+      asked.set(++asks, answer as (path: WalkPath | Far) => void)
+      worker.postMessage({ id: asks, ask: what })
+    })
   return {
-    find: (ask) =>
-      new Promise((answer) => {
-        asked.set(++asks, answer)
-        worker.postMessage({ id: asks, ask })
-      }),
+    find: (what) => ask<WalkPath>(what),
+    far: async (what) => (await ask<Far>(what)) ?? what.to.map(() => null),
     stop: () => void worker.terminate(),
   }
 }
@@ -207,6 +209,11 @@ function createWindow(): void {
   ipcMain.handle('walk', (_event, asked: unknown): Promise<WalkPath> => {
     const ask = walkAskFrom(asked)
     return ask ? walks.find(ask) : Promise.resolve(null)
+  })
+  // How far on foot from one point to many: for Nearby, the search, the label of a point.
+  ipcMain.handle('walk-far', (_event, asked: unknown): Promise<Far> => {
+    const ask = farAskFrom(asked)
+    return ask ? walks.far(ask) : Promise.resolve([])
   })
   ipcMain.handle('open-curseforge', () => shell.openExternal(CURSEFORGE))
   // A conversion that failed is started again, from where it stopped: the cause may be gone (a full disk, a folder in use).
@@ -363,6 +370,7 @@ function createWindow(): void {
     quests.stop()
     walks.stop()
     ipcMain.removeHandler('walk')
+    ipcMain.removeHandler('walk-far')
     protocol.unhandle('twinmap')
   })
 }

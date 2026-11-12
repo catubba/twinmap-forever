@@ -7,15 +7,14 @@ import { join } from 'node:path'
 import { parentPort, workerData } from 'node:worker_threads'
 import { UNITS_PER_BLOCK, unitsOfWorld } from '../shared/geo'
 import { navFrom } from '../shared/nav-data'
-import type { WalkAsk, WalkPath } from '../shared/walk'
+import type { Far, FarAsk, WalkAsk, WalkPath } from '../shared/walk'
 import { BLOCK_YARDS, BLOCKS } from '../shared/world'
-import { readAddonNav, shortestPathFolder, walker, type Walk, type Yards } from './walk'
+import { readAddonNav, shortestPathFolder, walker, type Walker, type Yards } from './walk'
 
 const { gameFolder, shipped } = workerData as { gameFolder: string | null; shipped: string }
-type Finder = (from: Yards, to: Yards) => Walk | null
-const finders = new Map<number, Finder | null>()
+const finders = new Map<number, Walker | null>()
 
-function finder(continent: number): Finder | null {
+function finder(continent: number): Walker | null {
   if (!finders.has(continent)) {
     let nav = gameFolder ? readAddonNav(shortestPathFolder(gameFolder), continent) : null
     try {
@@ -31,11 +30,17 @@ function finder(continent: number): Finder | null {
 // Map units to yards of the world: the other way of unitsOfWorld (shared/geo.ts).
 const yardsOf = (p: { x: number; y: number }): Yards => [(BLOCKS / 2 - p.y / UNITS_PER_BLOCK) * BLOCK_YARDS, (BLOCKS / 2 - p.x / UNITS_PER_BLOCK) * BLOCK_YARDS]
 
-parentPort?.on('message', ({ id, ask }: { id: number; ask: WalkAsk }) => {
-  let path: WalkPath = null
+// An asking with a reach is for the yards to many ends; any other for the way to one.
+parentPort?.on('message', ({ id, ask }: { id: number; ask: WalkAsk | FarAsk }) => {
+  const many = 'reach' in ask
+  let path: WalkPath | Far = many ? ask.to.map(() => null) : null
   try {
-    const walk = finder(ask.continent)?.(yardsOf(ask.from), yardsOf(ask.to))
-    if (walk) path = { points: walk.points.map(([x, y]) => unitsOfWorld(x, y)), yards: walk.yards }
+    const find = finder(ask.continent)
+    if (find && many) path = find.far(yardsOf(ask.from), ask.to.map(yardsOf), ask.reach)
+    else if (find && !many) {
+      const walk = find(yardsOf(ask.from), yardsOf(ask.to))
+      if (walk) path = { points: walk.points.map(([x, y]) => unitsOfWorld(x, y)), yards: walk.yards }
+    }
   } catch {
     // a grid that does not read as it should: no way, rather than a thread that dies
   }

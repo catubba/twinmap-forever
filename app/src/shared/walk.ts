@@ -24,6 +24,43 @@ export function walkAskFrom(asked: unknown): WalkAsk | null {
   return (continent === 0 || continent === 1) && point(from) && point(to) ? { continent, from: { x: from.x, y: from.y }, to: { x: to.x, y: to.y } } : null
 }
 
+/**
+ * From one point to many of the same continent, in map units. reach: how many yards the search
+ * walks at most, as it prices them (a yard off the road counts for one and a half). With one end
+ * alone the search is steered towards it, and a long reach costs little.
+ */
+export interface FarAsk {
+  continent: Continent
+  from: Point
+  to: Point[]
+  reach: number
+}
+
+/** By end, the yards on foot; null where no way was found within the reach. */
+export type Far = (number | null)[]
+
+const MOST_ENDS = 200
+
+/** What the window asked, checked. */
+export function farAskFrom(asked: unknown): FarAsk | null {
+  if (typeof asked !== 'object' || !asked) return null
+  const { continent, from, to, reach } = asked as Record<string, unknown>
+  if ((continent !== 0 && continent !== 1) || !point(from) || !Array.isArray(to) || to.length > MOST_ENDS || !to.every(point) || !number(reach) || reach <= 0) return null
+  return { continent, from: { x: from.x, y: from.y }, to: to.map((p: Point) => ({ x: p.x, y: p.y })), reach }
+}
+
+/**
+ * The nearest first. Those a way on foot is known to come first, by its yards; the others after
+ * them as the crow flies: they are past the reach of the search, or where no way leads. With no
+ * way known at all (the answer has not come, there is no grid) that is the order of the crow.
+ */
+export function nearestOnFoot<T>(items: T[], foot: (item: T) => number | undefined, crow: (item: T) => number): T[] {
+  return items
+    .map((item) => ({ item, foot: foot(item), crow: crow(item) }))
+    .sort((a, b) => (a.foot === undefined ? (b.foot === undefined ? a.crow - b.crow : 1) : b.foot === undefined ? -1 : a.foot - b.foot))
+    .map((entry) => entry.item)
+}
+
 export const YARDS_PER_UNIT = BLOCK_YARDS / UNITS_PER_BLOCK
 
 /**

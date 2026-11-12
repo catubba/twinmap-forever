@@ -126,11 +126,15 @@ export type Band =
   | { state: 'complete' }
   // The name and number of the stop alone: the game is closed, or the character is where no way can be told (another continent, a dungeon).
   | { state: 'closed' | 'elsewhere'; name: string; n: number; of: number }
-  // far: "410 yd south-west". turn: degrees clockwise from north, which is up on the map. minutes: on foot, in a straight line.
+  // far: "410 yd south-west". turn: degrees clockwise from north, which is up on the map. minutes: on foot.
   | { state: 'going' | 'arrived'; name: string; n: number; of: number; far: string; turn: number; minutes: number }
 
-/** me: where the character is on the continents, or null (in a dungeon, or not known). live: the strip is being read. */
-export function bandOf(route: Route, me: { continent: Continent; at: Point } | null, live: boolean): Band {
+/**
+ * me: where the character is on the continents, or null (in a dungeon, or not known). live: the
+ * strip is being read. walked: the yards of the way on foot to the next stop, where one is known:
+ * the band tells those, and the minutes they take. Being there is still told as the crow flies.
+ */
+export function bandOf(route: Route, me: { continent: Continent; at: Point } | null, live: boolean, walked?: number): Band {
   if (!route.stops.length) return { state: 'none' }
   const stop = route.stops[route.next]
   if (!stop) return { state: 'complete' }
@@ -138,5 +142,5 @@ export function bandOf(route: Route, me: { continent: Continent; at: Point } | n
   if (!live) return { state: 'closed', ...said }
   if (!me || me.continent !== stop.continent) return { state: 'elsewhere', ...said }
   const { yards, turn } = wayOf(me.at, stop.at)
-  return { state: yards <= ARRIVE ? 'arrived' : 'going', ...said, far: wayTo(me.at, stop.at).far, turn, minutes: Math.max(1, Math.round(yards / RUN / 60)) }
+  return { state: yards <= ARRIVE ? 'arrived' : 'going', ...said, far: wayTo(me.at, stop.at, walked).far, turn, minutes: Math.max(1, Math.round((walked ?? yards) / RUN / 60)) }
 }

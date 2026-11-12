@@ -27,6 +27,18 @@ test('out of Northshire Valley the way goes through the gate, not over the wall'
   expect(find(from, to)!.yards).toBeGreaterThan(crow(from, to) * 1.15)
 })
 
+test('from one point to many in one search: past the wall of Northshire Valley is further on foot than inside it', () => {
+  // The character by the gate of the valley; Dane Winslow in the abbey, Herbalist Pomeroy in her house west of the wall.
+  const find = walker(shipped), me = elwynn(45.5, 48.2), inside = elwynn(50.0, 42.7), past = elwynn(40.0, 48.4), goldshire = elwynn(42.1, 65.9)
+  expect(crow(me, past), 'nearer as the crow flies').toBeLessThan(crow(me, inside))
+  const [toInside, toPast, toGoldshire, atSea] = find.far(me, [inside, past, goldshire, [0, 30000]], 1200)
+  expect(toPast!, 'further on foot').toBeGreaterThan(toInside!)
+  expect(toInside!).toBeGreaterThanOrEqual(Math.round(crow(me, inside)))
+  expect(toGoldshire, 'the same way the search for one end finds').toBe(find(me, goldshire)!.yards)
+  expect(atSea).toBeNull()
+  expect(find.far(me, [inside, goldshire], 400), 'not past the reach').toEqual([toInside, null])
+})
+
 test('where nothing can be walked there is no way', () => {
   const find = walker(shipped)
   expect(find(elwynn(42.1, 65.9), [0, 30000])).toBeNull() // far out at sea
