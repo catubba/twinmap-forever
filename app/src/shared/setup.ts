@@ -9,6 +9,8 @@ export interface SetupStatus {
   /** The version of the Twinmap Forever addon found in it, or null. */
   addon: string | null
   questie: boolean
+  /** Shortest Path Forever is among the addons. */
+  shortestPath: boolean
   /** The first run was gone through once, in this run or an earlier one. */
   done: boolean
   /** The version of this app. */
@@ -94,7 +96,12 @@ export function setupPages(setup: SetupStatus, tiles: TilesStatus | null, link: 
     title: 'Optional addons',
     intro: 'None of these is needed. When one is installed, Twinmap shows more.',
     state: 'done',
-    lines: [setup.questie ? 'Questie: installed. The map will show the quests it shows.' : 'Questie: not installed. With it, the map shows the same quests Questie shows in the game.'],
+    lines: [
+      setup.questie ? 'Questie: installed. The map will show the quests it shows.' : 'Questie: not installed. With it, the map shows the same quests Questie shows in the game.',
+      setup.shortestPath
+        ? 'Shortest Path: installed. The map will show its journey, and what you send to the game is reached along the roads.'
+        : 'Shortest Path: not installed. With it, the map shows the journey it plans, and what you send to the game is reached along the roads.',
+    ],
   }
 
   const live = link?.kind === 'connected' || link?.kind === 'combat'

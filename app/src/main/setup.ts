@@ -4,6 +4,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { SetupStatus } from '../shared/setup'
 import { questieFile } from './questie'
+import { shortestPathFolder } from './walk'
 
 const ADDONS = ['_forever_', 'Interface', 'AddOns']
 
@@ -65,6 +66,7 @@ export function setupStatus(gameFolder: string | null, settings: Settings, versi
     gameFolder,
     addon: gameFolder ? addonVersion(gameFolder) : null,
     questie: gameFolder ? existsSync(questieFile(gameFolder)) : false, // its data, which is what the app reads
+    shortestPath: gameFolder ? existsSync(shortestPathFolder(gameFolder)) : false,
     done: settings.setupDone === true,
     version,
     onTop: settings.onTop === true,
