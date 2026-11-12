@@ -18,7 +18,11 @@ export interface Mosaic {
   v0: number
   width: number
   height: number
-  grey: Float32Array
+  grey: Float32Array | Uint8Array
+  /** The level it shows the rooms up to, from 0, in a dungeon with rooms over rooms. */
+  level?: number
+  /** True for the picture of the open ground: what the minimap shows under no roof. */
+  open?: boolean
 }
 
 /**
@@ -27,6 +31,8 @@ export interface Mosaic {
 // ponytail: only the first is measured (300, in The Hall of Thanes); the rest are the figures known
 // for the game's minimap indoors. Measure each with a recorded run before trusting it.
 export const INDOOR_YARDS = [300, 240, 180, 120, 80, 50]
+/** The same in the open, where the minimap shows more: the figures known for the game, as the addon has them for its own flags. */
+export const OUTDOOR_YARDS = [466.67, 400, 333.33, 266.67, 200, 133.33]
 
 const KEEP = 0.8 // of the radius: the rim has buttons over it
 const ARROW = 0.1 // of the radius, around the middle: the arrow of the character and the dots of the party
@@ -37,7 +43,7 @@ const NEAR = 12 // yards around the last place where the next is looked for: mor
 const grey = (rgb: Uint8Array, i: number): number => rgb[i]! * 0.299 + rgb[i + 1]! * 0.587 + rgb[i + 2]! * 0.114
 
 /** A picture at fewer pixels: each the mean of a square of `step`. */
-function shrunk(from: { width: number; height: number; grey: Float32Array }, step: number): { width: number; height: number; grey: Float32Array } {
+function shrunk(from: { width: number; height: number; grey: Float32Array | Uint8Array }, step: number): { width: number; height: number; grey: Float32Array | Uint8Array } {
   if (step === 1) return from
   const width = Math.floor(from.width / step), height = Math.floor(from.height / step), out = new Float32Array(width * height)
   for (let y = 0; y < height; y++) {
@@ -53,7 +59,7 @@ function shrunk(from: { width: number; height: number; grey: Float32Array }, ste
 /** The rooms at each of the steps, made once for a dungeon. */
 export interface Levels {
   mosaic: Mosaic
-  at: { step: number; width: number; height: number; grey: Float32Array }[]
+  at: { step: number; width: number; height: number; grey: Float32Array | Uint8Array }[]
 }
 export const levelsOf = (mosaic: Mosaic): Levels => ({ mosaic, at: STEPS.map((step) => ({ step, ...shrunk(mosaic, step) })) })
 
@@ -96,7 +102,7 @@ function templateOf(box: Box, across: number, step: number, thin: number): Templ
 }
 
 /** How alike the template and the rooms are with the template's corner on (x, y): 1 the same picture, 0 nothing in common. */
-function likeness(level: { width: number; height: number; grey: Float32Array }, t: Template, x: number, y: number): number {
+function likeness(level: { width: number; height: number; grey: Float32Array | Uint8Array }, t: Template, x: number, y: number): number {
   let cross = 0, sum = 0, squares = 0
   const n = t.value.length, g = level.grey, w = level.width
   for (let i = 0; i < n; i++) {
@@ -110,7 +116,7 @@ function likeness(level: { width: number; height: number; grey: Float32Array }, 
 }
 
 /** The best corner for the template in a rectangle of corners, both ends counted. */
-function best(level: { width: number; height: number; grey: Float32Array }, t: Template, x0: number, y0: number, x1: number, y1: number): { x: number; y: number; score: number } {
+function best(level: { width: number; height: number; grey: Float32Array | Uint8Array }, t: Template, x0: number, y0: number, x1: number, y1: number): { x: number; y: number; score: number } {
   let found = { x: -1, y: -1, score: -1 }
   for (let y = Math.max(0, y0); y <= Math.min(level.height - t.size, y1); y++) {
     for (let x = Math.max(0, x0); x <= Math.min(level.width - t.size, x1); x++) {
@@ -133,8 +139,8 @@ export interface Found {
  * near: the place found a moment ago, to look only around it; without it the whole dungeon is
  * looked through, which costs a hundred times more. Null when the zoom is not known.
  */
-export function locate(levels: Levels, box: Box, zoom: number, near?: { u: number; v: number }): Found | null {
-  const across = INDOOR_YARDS[zoom]
+export function locate(levels: Levels, box: Box, zoom: number, near?: { u: number; v: number }, width?: number): Found | null {
+  const across = width ?? INDOOR_YARDS[zoom]
   if (!across || box.size < 32) return null
   const { u0, v0 } = levels.mosaic
   let at: { x: number; y: number; score: number } | null = null, yards = 0
@@ -215,6 +221,8 @@ export interface MinimapPlace {
   zoom: number
   /** True when the minimap turns with the character: its picture cannot be looked for as it is. */
   turns?: boolean
+  /** How many yards it shows from its middle to its edge, as the game tells the addon; missing from an addon that does not ask. */
+  r?: number
 }
 
 /**
@@ -224,6 +232,18 @@ export interface MinimapPlace {
 export function readsMinimap(pos: { inst?: { kind?: string; mini?: MinimapPlace } } | undefined): MinimapPlace | null {
   const inst = pos?.inst, mini = inst?.mini
   if (!inst || !mini || (inst.kind !== 'party' && inst.kind !== 'raid')) return null
-  if (mini.turns || !(mini.size >= 32 && mini.size <= 1024) || !Number.isFinite(mini.x) || !Number.isFinite(mini.y) || INDOOR_YARDS[mini.zoom] === undefined) return null
+  if (mini.turns || !(mini.size >= 32 && mini.size <= 1024) || !Number.isFinite(mini.x) || !Number.isFinite(mini.y) || widthsOf(mini).length === 0) return null
   return mini
+}
+
+/**
+ * The yards the minimap may show across, the likeliest first: what the game tells the addon, then
+ * the figures of its zoom under a roof and in the open. The game keeps one zoom for each of the
+ * two and swaps as the character goes in and out, so neither figure can be ruled out from here.
+ */
+export function widthsOf(mini: MinimapPlace): number[] {
+  const told = typeof mini.r === 'number' && mini.r >= 15 && mini.r <= 400 ? [mini.r * 2] : []
+  const out: number[] = []
+  for (const width of [...told, INDOOR_YARDS[mini.zoom], OUTDOOR_YARDS[mini.zoom]]) if (width !== undefined && !out.some((w) => Math.abs(w - width) < width * 0.03)) out.push(width)
+  return out
 }

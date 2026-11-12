@@ -126,6 +126,9 @@ local function BuildPos()
         local pixel = scale * physH / 768
         inst.mini = { x = Round(cx * pixel, 1), y = Round(physH - cy * pixel, 1), size = Round(width * pixel, 1), zoom = Num(Try(Minimap.GetZoom, Minimap)) or 0 }
         if Try(GetCVar, "rotateMinimap") == "1" then inst.mini.turns = true end
+        -- How many yards it shows from its middle to its edge: it changes with the zoom, and between under a roof and the open.
+        local radius = C_Minimap and Num(Try(C_Minimap.GetViewRadius))
+        if radius and radius > 0 then inst.mini.r = Round(radius, 0.1) end
       end
     end
     out.inst = inst

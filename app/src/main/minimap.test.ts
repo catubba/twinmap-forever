@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest'
 import type { Piece } from '../shared/inside'
-import type { Box, Mosaic } from '../shared/minimap'
-import { mosaicOfPieces, startInside } from './minimap'
+import { widthsOf, type Box, type Mosaic } from '../shared/minimap'
+import { mosaicOfGround, mosaicOfPieces, startInside } from './minimap'
 
 test('outside dungeons and raids the screen is never read', () => {
   const inside = startInside(() => 'C:\nowhere')
@@ -49,14 +49,14 @@ function twoLevels(): Mosaic[] {
   }
   const lower = blocks(7), over = blocks(99), upper = lower.slice()
   for (let y = 200; y < 400; y++) for (let x = 200; x < 400; x++) upper[y * width + x] = over[y * width + x]!
-  return [lower, upper].map((grey) => ({ u0: 1000, v0: 2000, width, height, grey }))
+  return [lower, upper].map((grey, level) => ({ u0: 1000, v0: 2000, width, height, grey, level }))
 }
-// The minimap as the screen shows it with the character at (u, v) on a level: 300 yards on 238 pixels.
-function shown(m: Mosaic, u: number, v: number): Box {
+// The minimap as the screen shows it with the character at (u, v) on a picture: so many yards across on 238 pixels.
+function shown(m: Mosaic, u: number, v: number, across = 300): Box {
   const size = 238, rgb = new Uint8Array(size * size * 3)
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
-      const mu = Math.floor(u - m.u0 - 150 + ((x + 0.5) * 300) / size), mv = Math.floor(v - m.v0 - 150 + ((y + 0.5) * 300) / size)
+      const mu = Math.floor(u - m.u0 - across / 2 + ((x + 0.5) * across) / size), mv = Math.floor(v - m.v0 - across / 2 + ((y + 0.5) * across) / size)
       rgb.fill(mu >= 0 && mv >= 0 && mu < m.width && mv < m.height ? m.grey[mv * m.width + mu]! : 0, (y * size + x) * 3, (y * size + x) * 3 + 3)
     }
   }
@@ -80,9 +80,9 @@ test('in a dungeon with rooms over rooms the minimap tells the level the charact
 })
 
 test('a dungeon with one level tells none', () => {
-  const [only] = twoLevels(), inside = startInside(() => 'anywhere', () => [only!])
+  const only = { ...twoLevels()[0]!, level: undefined }, inside = startInside(() => 'anywhere', () => [only])
   const pos = { inst: { id: 36, kind: 'party', mini: { x: 2408, y: 187, size: 238, zoom: 0 } } }
-  const found = inside.look(pos, () => shown(only!, 1300, 2300), 3000)!
+  const found = inside.look(pos, () => shown(only, 1300, 2300), 3000)!
   expect(found.level).toBeUndefined()
   expect(Math.abs(found.u - 1300)).toBeLessThanOrEqual(1.5)
 })
@@ -100,7 +100,7 @@ test('why the arrow is not there is told: no minimap, a zoom not known, nothing 
   const noise = { size: 238, rgb: Uint8Array.from({ length: 238 * 238 * 3 }, (_, i) => (Math.floor(i / 3) * 37) % 256) }
   expect(inside.look({ inst: { id: 36, kind: 'party', mini } }, () => noise, 9000)).toBeNull()
   const said = inside.report()!
-  expect(said.report).toMatchObject({ why: 'not sure', levels: 2, zoom: 0, size: 238 })
+  expect(said.report).toMatchObject({ why: 'not sure', pictures: 2, zoom: 0, size: 238, widths: [300, 466.67] })
   expect(said.report.scores).toHaveLength(2)
   expect(said.seen).toBe(noise)
   // Found: no reason, the level and how sure. Outside again: nothing to tell.
@@ -109,4 +109,56 @@ test('why the arrow is not there is told: no minimap, a zoom not known, nothing 
   expect(inside.report()!.report.why).toBeUndefined()
   inside.look({ zone: 'Elwynn Forest' }, () => null, 13000)
   expect(inside.report()).toBeNull()
+})
+
+test('out from under a roof the minimap shows the open ground, and more of it: the place is still found', () => {
+  // The rooms, and the ground of the same dungeon, which looks nothing like them.
+  const [rooms, other] = twoLevels(), ground: Mosaic = { ...other!, open: true, level: undefined }
+  const inside = startInside(() => 'anywhere', () => [{ ...rooms!, level: undefined }, ground])
+  const mini = { x: 2408, y: 187, size: 238, zoom: 0 }
+  let now = 3000
+  const look = (m: Mosaic, u: number, v: number, across: number, r?: number): ReturnType<typeof inside.look> => inside.look({ inst: { id: 36, kind: 'party', mini: { ...mini, r } } }, () => shown(m, u, v, across), (now += 600))
+  // Under a roof: 300 yards across, as the addon tells.
+  expect(Math.abs(look(rooms!, 1300, 2300, 300, 150)!.u - 1300)).toBeLessThanOrEqual(1.5)
+  expect(inside.report()!.report).toMatchObject({ picture: 0, across: 300 })
+  // A step on, in the open: the ground, 467 yards across. Found at once, around the place of a moment ago.
+  const out = look(ground, 1302, 2300, 466.67, 233.3)!
+  expect(Math.abs(out.u - 1302)).toBeLessThanOrEqual(2.5)
+  expect(inside.report()!.report).toMatchObject({ picture: 1, across: 466.6 })
+  // An addon that tells no width changes nothing while the picture still fits: the width of a moment ago stays.
+  const old = look(ground, 1304, 2300, 466.67)!
+  expect(Math.abs(old.u - 1304)).toBeLessThanOrEqual(2.5)
+  expect(inside.report()!.report.across).toBe(466.6)
+})
+
+test('with an addon that tells no width, both figures of the zoom are tried', () => {
+  const [, other] = twoLevels(), ground: Mosaic = { ...other!, open: true, level: undefined }
+  const inside = startInside(() => 'anywhere', () => [ground])
+  const pos = { inst: { id: 36, kind: 'party', mini: { x: 2408, y: 187, size: 238, zoom: 0 } } }
+  // The first look through the dungeon is at the width of under a roof, the next at the one of the open.
+  expect(inside.look(pos, () => shown(ground, 1300, 2300, 466.67), 3000)).toBeNull()
+  expect(Math.abs(inside.look(pos, () => shown(ground, 1300, 2300, 466.67), 6000)!.u - 1300)).toBeLessThanOrEqual(2.5)
+  expect(inside.report()!.report.across).toBe(466.67)
+})
+
+test('the widths the minimap may show: what the game tells first, then the two figures of its zoom', () => {
+  const mini = { x: 0, y: 0, size: 238, zoom: 1 }
+  expect(widthsOf(mini)).toEqual([240, 400])
+  expect(widthsOf({ ...mini, r: 150 })).toEqual([300, 240, 400])
+  expect(widthsOf({ ...mini, r: 121 }), 'told what the table has: once').toEqual([242, 400])
+  expect(widthsOf({ ...mini, r: 9000 }), 'a radius that cannot be').toEqual([240, 400])
+  expect(widthsOf({ ...mini, zoom: 9 })).toEqual([])
+  expect(widthsOf({ ...mini, zoom: 9, r: 100 })).toEqual([200])
+})
+
+test('the open ground of a dungeon is laid on one picture, each block where the map has it', () => {
+  // Two blocks side by side, of 4 pixels a side: the left one dark, the right one light.
+  const flat = (v: number): Uint8Array => new Uint8Array(4 * 4 * 3).fill(v)
+  const ground = mosaicOfGround([[30, 31], [31, 31]], (column) => flat(column === 30 ? 40 : 200))!
+  const at = (u: number, v: number): number => ground.grey[(v - ground.v0) * ground.width + (u - ground.u0)]!
+  expect([ground.u0, ground.v0]).toEqual([16000, 16533])
+  expect(ground.width).toBeGreaterThanOrEqual(1066)
+  expect(at(16100, 16700)).toBe(40)
+  expect(at(16700, 16700)).toBe(200)
+  expect(mosaicOfGround([], () => null)).toBeNull()
 })
