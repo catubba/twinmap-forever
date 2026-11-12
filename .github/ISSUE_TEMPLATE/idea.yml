@@ -1,0 +1,16 @@
+name: Idea
+description: Something you would like Twinmap to do
+labels: [idea]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What you would like
+      description: Say it in your own words. A picture or a rough sketch helps.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: When you would use it
+      description: What you were doing in the game when you wished for it.

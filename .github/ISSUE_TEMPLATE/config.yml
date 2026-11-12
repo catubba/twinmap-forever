@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: No GitHub account, or something private to tell us?
+    url: mailto:dev@twinmap.app
+    about: Write to dev@twinmap.app, in English or in Italian.
