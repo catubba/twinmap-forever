@@ -1097,12 +1097,18 @@
     gap: 8px;
   }
   .corner.bottom {
-    bottom: 22px;
+    bottom: calc(22px + var(--lift, 0px)); /* above what lies over the foot of the map on a small screen */
     gap: 4px;
   }
   .corner .btn {
     min-width: 32px;
     height: 32px;
+  }
+  @media (pointer: coarse) {
+    .corner .btn {
+      min-width: 44px;
+      height: 44px;
+    }
   }
   .line {
     display: flex;

@@ -107,6 +107,9 @@ html,
 body {
   height: 100%;
   margin: 0;
+  /* The page itself never moves: on a phone the fingers move the map, not the page under it. */
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 
 body {
@@ -164,7 +167,7 @@ body {
   position: absolute;
   left: 110px;
   right: 110px;
-  bottom: 24px;
+  bottom: calc(24px + var(--lift, 0px)); /* --lift: what lies over the foot of the map on a small screen */
   z-index: 1200;
   width: fit-content;
   margin: 0 auto;
@@ -610,4 +613,18 @@ body {
 }
 .bar::-moz-progress-bar {
   background: var(--bronze-400);
+}
+
+/* Under a finger: everything that is pressed is at least 44 px tall. */
+@media (pointer: coarse) {
+  .btn {
+    min-width: 44px;
+    height: 44px;
+  }
+  .row {
+    height: 44px;
+  }
+  .menu .item {
+    min-height: 44px;
+  }
 }

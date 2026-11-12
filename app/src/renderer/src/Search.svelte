@@ -184,4 +184,32 @@
     padding: 4px 12px;
     color: var(--text-dim);
   }
+  /* On a narrow screen the field takes what the top row has left, and the results the width of the screen. */
+  @media (max-width: 760px) {
+    .search {
+      flex: 1;
+      min-width: 0;
+      margin-left: 0;
+    }
+    .field {
+      width: 100%;
+    }
+    .menu {
+      position: fixed;
+      left: 8px;
+      right: 8px;
+      top: 44px;
+      width: auto;
+    }
+  }
+  /* Under a finger: as tall as the top row lets it be. Letters of 16 px, or a phone zooms the page in on the field. */
+  @media (pointer: coarse) {
+    .field {
+      height: 36px;
+      font-size: 16px;
+    }
+    .glass {
+      top: 10px;
+    }
+  }
 </style>
