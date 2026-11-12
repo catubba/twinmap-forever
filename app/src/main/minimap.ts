@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { inflateSync } from 'node:zlib'
 import type { Position } from '../shared/game'
 import { inPiece, roomPixels, type Interiors, type Piece } from '../shared/inside'
-import { facingOf, levelsOf, locate, readsMinimap, SURE, type Box, type Levels, type Mosaic } from '../shared/minimap'
+import { facingOf, levelsOf, locate, readsMinimap, SURE, type Box, type Found, type Levels, type Mosaic } from '../shared/minimap'
 import { INTERIORS_FILE } from './interiors'
 
 const AROUND = 160 // yards of nothing kept around the rooms: the minimap sees that far past the last wall
@@ -36,31 +36,50 @@ export function mosaicOfPieces(pieces: Piece[], pictureOf: (file: number) => Uin
   return { u0, v0, width, height, grey }
 }
 
-/** The same for a dungeon by its number, from the folder of the build; null when the converter kept none of it. */
-export function mosaicOf(folder: string, id: number): Mosaic | null {
+/**
+ * The same for a dungeon by its number, from the folder of the build: one picture for each of its
+ * levels, the rooms up to that level laid on it (a room is a level up when it lies over another).
+ * The minimap of the game shows the rooms of the level the character is on, so the picture it is
+ * most like tells the level. None when the converter kept nothing of the dungeon.
+ */
+export function mosaicsOf(folder: string, id: number): Mosaic[] {
   const file = join(folder, INTERIORS_FILE)
-  if (!existsSync(file)) return null
+  if (!existsSync(file)) return []
   const map = (JSON.parse(readFileSync(file, 'utf8')) as Interiors).maps.find((m) => m.id === id && m.kind !== 'world')
-  if (!map) return null
-  return mosaicOfPieces(map.pieces, (picture) => {
-    try {
-      return inflateSync(readFileSync(join(folder, 'rooms', `${picture}.dxt`)))
-    } catch {
-      return null // a picture that is not there leaves its room empty
+  if (!map) return []
+  const pictures = new Map<number, Uint8Array | null>()
+  const pictureOf = (picture: number): Uint8Array | null => {
+    if (!pictures.has(picture)) {
+      try {
+        pictures.set(picture, inflateSync(readFileSync(join(folder, 'rooms', `${picture}.dxt`))))
+      } catch {
+        pictures.set(picture, null) // a picture that is not there leaves its room empty
+      }
     }
-  })
+    return pictures.get(picture)!
+  }
+  const top = Math.max(0, ...map.pieces.map((p) => p.level)), out: Mosaic[] = []
+  for (let level = 0; level <= top; level++) {
+    const mosaic = mosaicOfPieces(map.pieces.filter((p) => p.level <= level), pictureOf)
+    if (!mosaic) return []
+    out.push(mosaic)
+  }
+  return out
 }
 
 const EVERY = 500 // ms between two looks at the minimap
 const LOST_FOR = 2000 // ms between two looks through the whole dungeon while the place is not known
 const KEPT = 3000 // ms a place found is still shown without a newer one
 const RUNNING = 2 // yards between two looks that tell the character is running
+const CLEARLY = 0.01 // how much more like another level the minimap must be before the character is said to have changed level
 
 /** Where the character is inside, in yards of the dungeon's pieces, and which way it faces (degrees clockwise from north, when the arrow is seen). */
 export interface Inside {
   u: number
   v: number
   facing?: number
+  /** The level the character is on, from 0, in a dungeon with rooms over rooms; missing in one with a single level. */
+  level?: number
 }
 
 /**
@@ -68,41 +87,59 @@ export interface Inside {
  * and a way to cut a square from the game's window; it reads the screen only while the addon says
  * the character is inside (readsMinimap), and gives the place found, or null.
  */
-export function startInside(tilesFolder: () => string | null): { look: (pos: Position | undefined, cut: (x: number, y: number, size: number) => Box | null, now: number) => Inside | null } {
-  let dungeon = 0, levels: Levels | null = null
+export function startInside(tilesFolder: () => string | null, mosaics: (folder: string, id: number) => Mosaic[] = mosaicsOf): { look: (pos: Position | undefined, cut: (x: number, y: number, size: number) => Box | null, now: number) => Inside | null } {
+  let dungeon = 0, floors: Levels[] = []
   let last: (Inside & { at: number }) | null = null
-  let lookedAt = 0, searchedAt = 0
+  let lookedAt = 0, searchedAt = 0, lostTries = 0
   return {
     look(pos, cut, now) {
       const mini = readsMinimap(pos)
       if (!mini || !pos?.inst) {
         // Outside: nothing is read, and what was known of the last dungeon is let go.
         dungeon = 0
-        levels = last = null
+        floors = []
+        last = null
         return null
       }
-      const fresh = (): Inside | null => (last && now - last.at <= KEPT ? { u: last.u, v: last.v, facing: last.facing } : null)
+      const fresh = (): Inside | null => (last && now - last.at <= KEPT ? { u: last.u, v: last.v, facing: last.facing, level: last.level } : null)
       if (now - lookedAt < EVERY) return fresh()
       lookedAt = now
       if (pos.inst.id !== dungeon) {
         dungeon = pos.inst.id
         last = null
-        const folder = tilesFolder(), mosaic = folder ? mosaicOf(folder, dungeon) : null
-        levels = mosaic && levelsOf(mosaic)
+        const folder = tilesFolder()
+        floors = (folder ? mosaics(folder, dungeon) : []).map(levelsOf)
       }
-      if (!levels) return null
+      if (!floors.length) return null
       const known = last && now - last.at <= KEPT ? last : null
       if (!known && now - searchedAt < LOST_FOR) return null
       const half = Math.round(mini.size / 2), box = cut(Math.round(mini.x) - half, Math.round(mini.y) - half, half * 2)
       if (!box) return fresh()
       if (!known) searchedAt = now
-      const found = locate(levels, box, mini.zoom, known ?? undefined)
+      // Each level is tried: the one the minimap is most like is the one the character is on. Where no room
+      // lies over another the levels look the same, and the one of a moment ago stays.
+      // With no place known the whole dungeon is looked through on one level only (half a second of work on each
+      // would stop the reading of the strip): the picture with every room first, the next level down at the next
+      // try. The levels are then tried around what it finds.
+      const around = known ?? locate(floors[floors.length - 1 - (lostTries++ % floors.length)]!, box, mini.zoom)
+      if (!around) return fresh()
+      const tries = floors.map((levels) => locate(levels, box, mini.zoom, around))
+      let level = -1
+      // Alike on every level: the top one, with every room on show.
+      tries.forEach((t, i) => {
+        if (t && (level < 0 || t.score >= tries[level]!.score)) level = i
+      })
+      // The level of a moment ago stays unless another is clearly more like the minimap.
+      const before = known?.level
+      if (before !== undefined && level >= 0 && tries[before] && tries[before].score >= tries[level]!.score - CLEARLY) level = before
+      const found: Found | null = level < 0 ? null : tries[level]!
       if (!found || found.score < SURE) return fresh()
       // Running, the way the place moved is the surest facing; standing, the arrow of the minimap
       // says it (the dots of a party over the arrow can hide its point: then the last facing stays).
       const du = known ? found.u - known.u : 0, dv = known ? found.v - known.v : 0
       const facing = Math.hypot(du, dv) >= RUNNING ? ((Math.atan2(du, -dv) * 180) / Math.PI + 360) % 360 : (facingOf(box) ?? last?.facing)
-      last = { u: found.u, v: found.v, facing, at: now }
+      last = { u: found.u, v: found.v, facing, at: now, level: floors.length > 1 ? level : undefined }
+      lostTries = 0
       return fresh()
     },
   }

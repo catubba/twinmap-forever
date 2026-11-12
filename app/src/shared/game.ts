@@ -44,6 +44,8 @@ export interface Instance {
   /** Where the character is, in yards of the world: x to the north, y to the west. Missing when the game does not tell addons. */
   x?: number
   y?: number
+  /** The level the character is on, from 0, where rooms lie over rooms: found by the app from the minimap, not sent by the game. */
+  level?: number
   /** Where the minimap is on the game's window: sent inside dungeons and raids only, where the app finds the place from it (minimap.ts). */
   mini?: MinimapPlace
 }
