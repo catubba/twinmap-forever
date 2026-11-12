@@ -11,6 +11,8 @@ export const inApp = 'twinmap' in window
 export const TILES = inApp ? 'twinmap://tiles' : '/tiles'
 
 if (!inApp) {
+  // The code that let this browser in is kept by it now: off the address bar, and out of what gets shared or saved.
+  if (location.search) history.replaceState(null, '', location.pathname + location.hash)
   const events = new EventSource('/events')
   const on =
     <T>(channel: string) =>

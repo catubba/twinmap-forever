@@ -34,11 +34,11 @@ test('nothing is given without the code, the page with it', async () => {
   expect((await fetch(`${at}/events`)).status).toBe(403)
   expect((await fetch(`${at}/call/search`, { method: 'POST', body: '["x"]' })).status).toBe(403)
 
-  // The address with the code hands the code to the browser and sends it to the plain address.
+  // The address with the code gives the page at once, and the code to the browser to keep. Lax: a
+  // visit that began in another app (the camera of a phone) must carry it too.
   const first = await fetch(`${at}/?k=right-code`, { redirect: 'manual' })
-  expect(first.status).toBe(302)
-  expect(first.headers.get('location')).toBe('/')
-  expect(first.headers.get('set-cookie')).toMatch(/^k=right-code; .*HttpOnly; SameSite=Strict$/)
+  expect(await first.text()).toBe('<p>the map</p>')
+  expect(first.headers.get('set-cookie')).toMatch(/^k=right-code; .*HttpOnly; SameSite=Lax$/)
   expect(await (await fetch(at, { headers: held })).text()).toBe('<p>the map</p>')
 })
 
