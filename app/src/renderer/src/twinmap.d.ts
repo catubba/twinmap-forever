@@ -18,7 +18,7 @@ declare global {
       keep: (key: import('../../shared/kept').KeptKey, value: unknown) => Promise<void>
       onUpdate: (listener: (updating: import('../../main/update').Updating) => void) => void
       chooseGameFolder: () => Promise<string | null>
-      openCurseForge: () => Promise<void>
+      openCurseForge: (addon?: import('../../shared/setup').Optional) => Promise<void>
       retryTiles: () => Promise<void>
       drawn: () => void
       setOnTop: (on: boolean) => Promise<void>

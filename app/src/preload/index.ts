@@ -10,7 +10,7 @@ import type { QuestsStatus } from '../shared/quests'
 import type { RouteNews } from '../shared/route'
 import type { Found } from '../shared/search'
 import type { Pin } from '../shared/send'
-import type { SetupStatus } from '../shared/setup'
+import type { Optional, SetupStatus } from '../shared/setup'
 import type { TilesStatus } from '../shared/tiles-status'
 import type { Far, FarAsk, WalkAsk, WalkPath } from '../shared/walk'
 
@@ -38,7 +38,8 @@ contextBridge.exposeInMainWorld('twinmap', {
   },
   // Opens the folder picker. Gives back what is wrong with the folder picked, or null.
   chooseGameFolder: (): Promise<string | null> => ipcRenderer.invoke('choose-game-folder'),
-  openCurseForge: (): Promise<void> => ipcRenderer.invoke('open-curseforge'),
+  // The page of Twinmap Forever on CurseForge, or the one of an optional addon when it is named.
+  openCurseForge: (addon?: Optional): Promise<void> => ipcRenderer.invoke('open-curseforge', addon),
   // Builds the map again after a failure.
   retryTiles: (): Promise<void> => ipcRenderer.invoke('retry-tiles'),
   // The opening screen is drawn: the window can show itself.

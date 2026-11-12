@@ -8,7 +8,7 @@ import { linkStatus, lostPercent } from '../shared/link'
 import { shownFrom, type QuestsStatus } from '../shared/quests'
 import type { Found } from '../shared/search'
 import { marksNews, pinFrom, routeNewsFrom, stepFrom, takenFrom } from '../shared/send'
-import { CURSEFORGE, setupComplete, setupPages, type SetupStatus } from '../shared/setup'
+import { pageOf, setupComplete, setupPages, type SetupStatus } from '../shared/setup'
 import type { TilesStatus } from '../shared/tiles-status'
 import { placeWindow, WINDOW } from '../shared/window'
 import { findGameWindow, programOf } from './capture'
@@ -265,7 +265,7 @@ function createWindow(): void {
     const ask = farAskFrom(asked)
     return ask ? walks.far(ask) : Promise.resolve([])
   })
-  ipcMain.handle('open-curseforge', () => shell.openExternal(CURSEFORGE))
+  ipcMain.handle('open-curseforge', (_event, addon: unknown) => shell.openExternal(pageOf(addon)))
   // A conversion that failed is started again, from where it stopped: the cause may be gone (a full disk, a folder in use).
   asks('retry-tiles', () => {
     if (tiles.status().state !== 'failed') return

@@ -3,7 +3,7 @@
   // the addon comes from CurseForge, never from here.
   import { fly } from 'svelte/transition'
   import type { LinkStatus } from '../../shared/link'
-  import { setupPages, timeLeft, type SetupStatus } from '../../shared/setup'
+  import { OPTIONAL, setupPages, timeLeft, type SetupStatus } from '../../shared/setup'
   import type { TilesStatus } from '../../shared/tiles-status'
   import Glyph from './Glyph.svelte'
   import Logo from './Logo.svelte'
@@ -78,6 +78,9 @@
           {:else if page.action === 'retry'}
             <button class="btn" onclick={() => window.twinmap.retryTiles()}>Try again</button>
           {/if}
+          {#each page.get ?? [] as addon (addon)}
+            <button class="btn" onclick={() => window.twinmap.openCurseForge(addon)}>Get {OPTIONAL[addon].name} on CurseForge</button>
+          {/each}
         </div>
       </section>
     {/key}
@@ -196,6 +199,9 @@
   }
   .now .btn {
     margin-top: 8px;
+  }
+  .now .btn + .btn {
+    margin-left: 8px;
   }
   .now .bar {
     height: 10px;
