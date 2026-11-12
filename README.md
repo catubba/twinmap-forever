@@ -4,6 +4,7 @@
 [![Release](https://img.shields.io/github/v/release/catubba/twinmap-forever)](https://github.com/catubba/twinmap-forever/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/catubba/twinmap-forever/total)](https://github.com/catubba/twinmap-forever/releases)
 [![License](https://img.shields.io/github/license/catubba/twinmap-forever)](LICENSE)
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-buy%20me%20a%20coffee-ff5e5b?logo=kofi&logoColor=white)](https://ko-fi.com/catubba)
 
 **Your position on the map, in real time. Even inside dungeons.**
 
@@ -21,7 +22,7 @@ Twinmap is an interactive map of World of Warcraft: Forever for your second scre
 - **From the map to the game.** Mark a point or build a route on Twinmap, and it appears in the game.
 - **Phone and tablet.** No second monitor? Open the same map in the browser of a phone, a tablet or a laptop on your home network.
 
-No Overwolf, no ads, no account. Nothing leaves your computer.
+**Twinmap is free and open source.** No Overwolf, no ads, no account, no paid features. Nothing leaves your computer.
 
 ![The game on one monitor, Twinmap on the other](docs/images/second-monitor.png)
 
@@ -73,6 +74,25 @@ In the app, open **Settings**, turn on **Phone and tablet**, and scan the code w
 
 ![Twinmap on a phone](docs/images/phone.png)
 
+## In active development
+
+Twinmap is young and it is being worked on all the time. New versions come out often, and the app updates itself.
+
+Here is what is planned, in no particular order. These are plans, not promises: what you ask for can change them.
+
+- **Group**: your party on the map, quests you share, pins everyone sees
+- **Travel**: time to arrive, flight paths, boats and zeppelins, your hearthstone
+- **More on the map**: zones colored by level, the places you have explored, your corpse and the graveyard, rares and treasures
+- **Quests**: your whole quest log, chains, rewards, and a plan for the session
+- **Character**: experience per hour, professions, reputations, a reminder when your trainer has something new
+- **Alerts**: full bags, broken gear, a disconnected game, and why you died
+- **Items**: bags, bank and gear, readable with the game closed, and a shopping list
+- **Tools**: a macro builder, your action bars, a talent calculator, a screenshot gallery
+- **Guides**: leveling guides that turn into routes on the map
+- **Global shortcuts** and a **signed installer**
+
+Something missing? [Tell us](https://github.com/catubba/twinmap-forever/issues/new/choose).
+
 ## Privacy
 
 - The app sends nothing to anyone. There is no account and no tracking.
@@ -91,6 +111,16 @@ Found a bug, or have an idea? In the app, **Feedback** opens an issue here or an
 
 - [Open an issue](https://github.com/catubba/twinmap-forever/issues/new/choose)
 - No GitHub account? Write to dev@twinmap.app, in English or in Italian.
+
+## Free and open source
+
+Twinmap is free software, and it is open source: all of its code is in this repository, under the GNU General Public License, version 3. It is free to use, with no ads and no paid features, and it will stay that way.
+
+**Anyone can contribute.** Report a bug, propose an idea, improve a text, or send a pull request with code. If you plan something large, open an issue first so we can talk about it before you spend your time.
+
+## Support the project
+
+Twinmap is made in spare time and costs nothing. If it is useful to you and you feel like it, you can [buy me a coffee on Ko-fi](https://ko-fi.com/catubba). It is never needed, and it unlocks nothing.
 
 ## Build it yourself
 
