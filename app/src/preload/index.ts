@@ -10,7 +10,7 @@ import type { Found } from '../shared/search'
 import type { Pin } from '../shared/send'
 import type { SetupStatus } from '../shared/setup'
 import type { TilesStatus } from '../shared/tiles-status'
-import type { WalkAsk, WalkPath } from '../shared/walk'
+import type { Far, FarAsk, WalkAsk, WalkPath } from '../shared/walk'
 
 contextBridge.exposeInMainWorld('twinmap', {
   onLink: (listener: (snapshot: LinkSnapshot) => void) => {
@@ -37,6 +37,8 @@ contextBridge.exposeInMainWorld('twinmap', {
   search: (typed: string): Promise<Found[]> => ipcRenderer.invoke('search', typed),
   // The way on foot between two points of a continent; null where there is none.
   walk: (ask: WalkAsk): Promise<WalkPath> => ipcRenderer.invoke('walk', ask),
+  // How many yards on foot from one point to each of many; null for those no way was found to.
+  walkFar: (ask: FarAsk): Promise<Far> => ipcRenderer.invoke('walk-far', ask),
   // Marks a point in the game. Gives back the number of the send, or what went wrong.
   sendPin: (pin: Pin): Promise<{ seq: number } | { error: string }> => ipcRenderer.invoke('send-pin', pin),
   // My pins, all of them: the game draws the same points on its own map. taken: the marks set in

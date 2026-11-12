@@ -99,8 +99,15 @@ interface Link { dx: number; dy: number; layer: number; cost: number }
 const DX = [1, -1, 0, 0, 1, 1, -1, -1], DY = [0, 0, 1, -1, 1, -1, 1, -1]
 const KEY = 65536 // a node of the continent: its cluster times this, plus its number there
 
-/** A finder of ways on one continent's grid. Clusters are unpacked as searches cross them, and kept. */
-export function walker(nav: NavData): (from: Yards, to: Yards) => Walk | null {
+/**
+ * A finder of ways on one continent's grid: the way between two points, and with `far` how many
+ * yards it is on foot from one point to each of many, in one search that spreads from the first
+ * (null for those not reached within `reach` yards, or with nowhere to stand).
+ */
+export type Walker = ((from: Yards, to: Yards) => Walk | null) & { far: (from: Yards, tos: Yards[], reach: number) => (number | null)[] }
+
+/** Clusters are unpacked as searches cross them, and kept. */
+export function walker(nav: NavData): Walker {
   const C = nav.cells, N = C * C, GX = nav.nx * C, GY = nav.ny * C, cell = BLOCK_YARDS / C
   const clusters = new Map<number, Cluster | null>()
   // Steps both ways take from a floor into the next cluster are written on that floor only: the way back is kept here, by the node it leaves from.
@@ -331,12 +338,22 @@ export function walker(nav: NavData): (from: Yards, to: Yards) => Walk | null {
   }
   const middle = (gx: number, gy: number): Yards => [nav.cx0 * BLOCK_YARDS + (gx + 0.5) * cell, nav.cy0 * BLOCK_YARDS + (gy + 0.5) * cell]
 
-  return (from, to) => {
-    const starts = snap(from), ends = new Set(snap(to))
-    if (!starts.length || !ends.size) return null
-    const [bx, by] = placeOf(ends.values().next().value!)
+  // One search from a point. To one end it is steered towards it; to many it spreads evenly, until
+  // each is reached or the yards walked (as the search prices them) pass `reach`. goals: by end, the
+  // place to stand the way arrives at, or -1.
+  function search(from: Yards, tos: Yards[], reach: number): { came: Map<number, number>; goals: number[] } {
     const cost = new Map<number, number>(), came = new Map<number, number>(), done = new Set<number>()
-    // A binary heap on the first number: the yards walked plus the yards still to go as the crow flies.
+    const starts = snap(from), ends = new Map<number, number[]>(), goals = tos.map(() => -1)
+    let left = 0
+    tos.forEach((to, i) => {
+      // An end farther than the reach as the crow flies would only keep the search going to its edge.
+      const nodes = Math.hypot(to[0] - from[0], to[1] - from[1]) > reach ? [] : snap(to)
+      if (nodes.length) left++
+      for (const node of nodes) (ends.get(node) ?? ends.set(node, []).get(node)!).push(i)
+    })
+    if (!starts.length || !left) return { came, goals }
+    const aim = tos.length === 1 ? placeOf(ends.keys().next().value!) : null
+    // A binary heap on the first number: the yards walked plus, to one end, the yards still to go as the crow flies.
     const heap: [number, number][] = []
     const push = (e: [number, number]): void => {
       let i = heap.push(e) - 1
@@ -367,16 +384,15 @@ export function walker(nav: NavData): (from: Yards, to: Yards) => Walk | null {
       cost.set(start, 0)
       push([0, start])
     }
-    let goal = -1
     while (heap.length && done.size < LIMIT) {
       const here = pop()[1]
       if (done.has(here)) continue
       done.add(here)
-      if (ends.has(here)) {
-        goal = here
-        break
-      }
-      const [gx, gy, c, node] = placeOf(here), k = Math.floor(here / KEY), walked = cost.get(here)!
+      const walked = cost.get(here)!
+      if (walked > reach) break
+      for (const i of ends.get(here) ?? []) if (goals[i]! < 0) (goals[i] = here), left--
+      if (!left) break
+      const [gx, gy, c, node] = placeOf(here), k = Math.floor(here / KEY)
       const lx = gx % C, ly = gy % C
       const relax = (next: number, tx: number, ty: number, into: Cluster, target: number, drop: number): void => {
         if (done.has(next)) return
@@ -385,7 +401,7 @@ export function walker(nav: NavData): (from: Yards, to: Yards) => Walk | null {
         if (walked + step >= (cost.get(next) ?? Infinity)) return
         cost.set(next, walked + step)
         came.set(next, here)
-        push([walked + step + cell * Math.hypot(tx - bx, ty - by), next])
+        push([walked + step + (aim ? cell * Math.hypot(tx - aim[0], ty - aim[1]) : 0), next])
       }
       if (node < N) {
         for (const [dx, dy] of DIRS) {
@@ -410,7 +426,11 @@ export function walker(nav: NavData): (from: Yards, to: Yards) => Walk | null {
         }
       }
     }
-    if (goal < 0) return null
+    return { came, goals }
+  }
+  // The way a search found to one of its goals: the middles of its cells, and its yards. Never
+  // fewer than the crow flies: the two ends are somewhere in their cells, not at the middles.
+  function wayBack(came: Map<number, number>, goal: number, from: Yards, to: Yards): { cells: Yards[]; yards: number } {
     const cells: Yards[] = []
     for (let at: number | undefined = goal; at !== undefined; at = came.get(at)) {
       const [gx, gy] = placeOf(at)
@@ -419,9 +439,21 @@ export function walker(nav: NavData): (from: Yards, to: Yards) => Walk | null {
     cells.reverse()
     let yards = 0
     for (let i = 1; i < cells.length; i++) yards += Math.hypot(cells[i]![0] - cells[i - 1]![0], cells[i]![1] - cells[i - 1]![1])
-    // The line starts and ends at the very points asked for, not at the middles of their cells.
-    return { points: [from, ...thin(cells, cell / 2), to], yards: Math.round(yards) }
+    return { cells, yards: Math.round(Math.max(yards, Math.hypot(to[0] - from[0], to[1] - from[1]))) }
   }
+
+  const find = (from: Yards, to: Yards): Walk | null => {
+    const { came, goals } = search(from, [to], Infinity)
+    if (goals[0]! < 0) return null
+    const { cells, yards } = wayBack(came, goals[0]!, from, to)
+    // The line starts and ends at the very points asked for, not at the middles of their cells.
+    return { points: [from, ...thin(cells, cell / 2), to], yards }
+  }
+  const far = (from: Yards, tos: Yards[], reach: number): (number | null)[] => {
+    const { came, goals } = search(from, tos, reach)
+    return goals.map((goal, i) => (goal < 0 ? null : wayBack(came, goal, from, tos[i]!).yards))
+  }
+  return Object.assign(find, { far })
 }
 
 

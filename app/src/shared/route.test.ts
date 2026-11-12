@@ -52,6 +52,8 @@ test('the band tells every state of the stop ahead', () => {
   expect(going.state === 'going' && going.far).toMatch(/^[\d,]+ yd north$/)
   expect(going.state === 'going' && going.minutes).toBeGreaterThan(1)
   expect(bandOf(route, { continent: 0, at: { x: 1.001, y: 0 } }, true)).toMatchObject({ state: 'arrived', minutes: 1 })
+  // A way on foot known to the stop: its yards and its minutes, not the crow's.
+  expect(bandOf(route, { continent: 0, at: { x: 1, y: 3 } }, true, 2100)).toMatchObject({ state: 'going', far: '2,100 yd north', minutes: 5 })
   let walked = route
   for (let i = 0; i < 4; i++) walked = advance(walked)
   expect(bandOf(walked, null, true)).toEqual({ state: 'complete' })

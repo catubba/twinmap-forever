@@ -12,6 +12,8 @@
   import Glyph from './Glyph.svelte'
   import NextStop from './NextStop.svelte'
   import { span, startedBy, type Journey } from '../../shared/journey'
+  import { nearestOnFoot } from '../../shared/walk'
+  import { feet } from './feet.svelte'
 
   // onpick: a row was chosen, the map should go there. onpoint: the pointer or the keyboard is on
   // a row (or on none: null), the map should show which pin it is.
@@ -66,6 +68,13 @@
   } = $props()
 
   const NEAR = 8 // rows of Nearby
+  // ponytail: Nearby is chosen among this many of the nearest as the crow flies, each name on its
+  // nearest place so; someone further than all of them as the crow flies and yet nearer on foot is missed.
+  const AROUND = 24
+  // The yards the one search for the rows walks at most, as it prices them (one and a half off the
+  // road): measured at 40 to 60 ms on the thread from Northshire Valley, 80 at 1,500 and 250 at 2,500.
+  const REACH = 1200
+  const FAR = 20_000 // to the one stop of the band the search is steered, and may go as far as it can
 
   // The maps of the game, from the folder of the tiles: there once the map is made.
   let maps = $state.raw<GameMap[]>([])
@@ -81,16 +90,28 @@
   const me = $derived(pos?.inst ? null : whereIs(maps, pos))
   const around = $derived(nearbyRows(maps, quests, fixed, side))
 
+  // The rows are ordered by the way on foot, and tell its yards: asked for all of them at once,
+  // the quests of this continent and the nearest around as the crow flies.
+  const journal = $derived(me ? questRows(log, quests, maps, me.continent, me.at) : { placed: [], placeless: [] as PlacelessRow[] })
+  const crowd = $derived(me ? nearest(around, me.continent, me.at, AROUND) : [])
+  const walked = feet(() => (me ? { continent: me.continent, from: me.at, to: [...journal.placed.filter((row) => row.continent === me.continent), ...crowd].map((row) => row.at), reach: REACH } : null))
   // The order of the rows holds for a few seconds; how far and which way follow every reading.
   let here: { rows: NowRow[]; at: number } | null = null
   let near: { rows: NowRow[]; at: number } | null = null
+  let knew = false
   const lists = $derived.by(() => {
     if (!me) return ((here = near = null), { here: [], placeless: [] as PlacelessRow[], near: [] })
-    const now = Date.now(), all = questRows(log, quests, maps, me.continent, me.at)
-    here = steady(here, all.placed, now)
-    near = steady(near, nearest(around, me.continent, me.at, NEAR), now)
-    return { here: here.rows, placeless: all.placeless, near: near.rows }
+    // The first answer puts the rows in their order at once, not at the next turn of the few seconds.
+    if (walked.known !== knew) (here = near = null), (knew = walked.known)
+    const now = Date.now(), from = me.at, continent = me.continent
+    const onFoot = (rows: NowRow[]): NowRow[] => nearestOnFoot(rows, (row) => walked.yards(row.at), (row) => wayOf(from, row.at).yards)
+    here = steady(here, [...onFoot(journal.placed.filter((row) => row.continent === continent)), ...journal.placed.filter((row) => row.continent !== continent)], now)
+    near = steady(near, onFoot(crowd).slice(0, NEAR), now)
+    return { here: here.rows, placeless: journal.placeless, near: near.rows }
   })
+  // The next stop of the route: the way to it alone, asked again every few dozen yards.
+  const stop = $derived(route.stops[route.next])
+  const toStop = feet(() => (me && stop && stop.continent === me.continent ? { continent: me.continent, from: me.at, to: [stop.at], reach: FAR } : null), 40)
   // The route as the game takes it: none while a stop lies in no zone, or nothing is left to walk.
   const news = $derived(routeNews(route, maps, 1))
   async function sendRoute(): Promise<string> {
@@ -131,7 +152,8 @@
   <div class="rows">
     {#each list as row (row.key)}
       <!-- A place on the other continent has no distance to walk: the row still takes the map there. -->
-      {@const way = row.continent === me!.continent ? wayOf(me!.at, row.at) : null}
+      <!-- The yards are those on foot where a way is known; the arrow points at the place itself. -->
+      {@const way = row.continent === me!.continent ? { ...wayOf(me!.at, row.at), ...(walked.yards(row.at) === undefined ? {} : { yards: walked.yards(row.at)! }) } : null}
       <button class="row" title={way ? undefined : 'On the other continent'} aria-current={row.key === chosen} onclick={() => pick(row)} onpointerenter={() => (over = row)} onpointerleave={() => (over = null)} onfocus={() => (over = row)} onblur={() => (over = null)}>
         <span>{row.name}</span>
         <span class="t-{row.tone}">{row.kind}</span>
@@ -142,8 +164,8 @@
   </div>
 {/snippet}
 
-<div class="now">
-  <NextStop {route} band={bandOf(route, me, live)} sending={sendState(live, inbox, news !== null, 'A stop is')} {inGame} onsend={sendRoute} {onskip} {onarrive} {onclear} {onend} {onremove} {onmove} onpick={onstop} />
+<div class="now" data-took={walked.took.toFixed(1)}>
+  <NextStop {route} band={bandOf(route, me, live, stop && toStop.yards(stop.at))} sending={sendState(live, inbox, news !== null, 'A stop is')} {inGame} onsend={sendRoute} {onskip} {onarrive} {onclear} {onend} {onremove} {onmove} onpick={onstop} />
   {#if journey}
     <!-- What Shortest Path guides in the game now: its goal and the legs still ahead, as its tracker words them. -->
     <h2 class="band">In game {#if !journey.loading}<span class="count">{span(journey.left)}</span>{/if}</h2>

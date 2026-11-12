@@ -25,6 +25,7 @@
   import { inRoute, noRoute, type Route, type Stop } from '../../shared/route'
   import type { Journey, WayLeg } from '../../shared/journey'
   import { ahead as restOf } from '../../shared/walk'
+  import { feet } from './feet.svelte'
   import { pinOfMark, removePin, renamePin, savedAt, savedFrom, savePin, type SavedPin } from '../../shared/saved'
   import { markPart, sendState, type GameMark, type Inbox, type Pin } from '../../shared/send'
   import { pin } from './marks'
@@ -71,7 +72,9 @@
   let labelled = $state<{ units: Point; continent: Continent; title: string; where: string; spot: Point; box: Size; pin: { m: number; x: number; y: number } | null; plain?: boolean } | null>(null)
   // Where the character is on the world map, for the distance on the label.
   let me = $state<{ units: Point; continent: Continent } | null>(null)
-  const way = $derived(labelled && me && me.continent === labelled.continent ? wayTo(me.units, labelled.units) : null)
+  // The yards and the time are those of the way on foot, where one is found: asked for the one point, again every few dozen yards.
+  const toLabel = feet(() => (labelled && me && me.continent === labelled.continent ? { continent: me.continent, from: me.units, to: [labelled.units], reach: 20_000 } : null), 40)
+  const way = $derived(labelled && me && me.continent === labelled.continent ? wayTo(me.units, labelled.units, toLabel.yards(labelled.units)) : null)
   // My pins: the points the player saved, remembered from one run of the app to the next.
   let myPins = $state.raw(savedFrom(localStorage.getItem('pins')))
   $effect(() => localStorage.setItem('pins', JSON.stringify(myPins)))

@@ -30,6 +30,8 @@ test('distance, direction in words and time on foot', () => {
   expect(wayTo({ x: 100, y: 100 }, { x: 102, y: 102 }).far).toBe('377 yd south-east')
   expect(wayTo({ x: 100, y: 100 }, { x: 90, y: 100.5 })).toEqual({ far: '1,335 yd west', time: '3:11 on foot' })
   expect(wayTo({ x: 100, y: 100 }, { x: 99, y: 99 }).far).toContain('north-west')
+  // With a way on foot known the yards and the time are its own; the direction stays where the point lies.
+  expect(wayTo({ x: 100, y: 100 }, { x: 100, y: 97 }, 700)).toEqual({ far: '700 yd north', time: '1:40 on foot' })
 })
 
 test('the label opens on the side with the most room, at each of the four edges', () => {
