@@ -78,3 +78,36 @@ export function sendState(live: boolean, inbox: Inbox | null, pin: boolean, what
   if (inbox.off) return { can: false, why: 'Restart the game once: its way back from Twinmap opens at the next start.' }
   return { can: true, why: '' }
 }
+
+const MAX_MARKS = 200 // as many as My pins can be (saved.ts)
+
+/** The name a saved point travels under, one part each: "mark" and its place, to a hundredth of a percent. */
+export const markPart = (pin: { m: number; x: number; y: number }): string => `mark${pin.m}x${Math.round(pin.x * 100)}y${Math.round(pin.y * 100)}`
+
+/**
+ * What a send must change for the game to have these points as its marks, and no other: by part,
+ * false for one to take away. want: the points as the window asked for them. have: the parts the
+ * game has now. Nothing to change is an empty answer; null when what was asked is no list.
+ */
+export function marksNews(want: unknown, have: Record<string, unknown>): Record<string, Pin | false> | null {
+  if (!Array.isArray(want)) return null
+  const marks: Record<string, Pin> = {}
+  for (const asked of want.slice(0, MAX_MARKS)) {
+    const pin = pinFrom(asked)
+    if (pin) marks[markPart(pin)] = pin
+  }
+  const changed: Record<string, Pin | false> = {}
+  for (const [part, pin] of Object.entries(marks)) {
+    if (JSON.stringify(have[part]) !== JSON.stringify(pin)) changed[part] = pin
+  }
+  for (const part of Object.keys(have)) {
+    if (/^mark\d/.test(part) && !(part in marks)) changed[part] = false
+  }
+  return changed
+}
+
+/** The marks the player removed in the game, by part, as the strip tells them. */
+export function goneFrom(section: unknown): string[] {
+  const gone = typeof section === 'object' && section ? (section as { gone?: unknown }).gone : null
+  return Array.isArray(gone) ? gone.filter((part): part is string => typeof part === 'string') : []
+}

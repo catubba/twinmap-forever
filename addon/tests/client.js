@@ -58,6 +58,23 @@ const STUB = `
   UiMapPoint = { CreateFromCoordinates = function(map, x, y) return { m = map, x = x, y = y } end }
   C_SuperTrack = { SetSuperTrackedUserWaypoint = function(on) TRACKED = on end }
   LEVELS = {} -- every channel value a texture was given, as a key
+  -- The game's world map: GAME.mapOpen, and GAME.shown the map on it. Its canvas is 1000 by 600.
+  function hooksecurefunc() end
+  function IsAltKeyDown() return GAME.alt == true end
+  WorldMapFrame = { OnMapChanged = true }
+  function WorldMapFrame:HookScript() end
+  function WorldMapFrame:IsShown() return GAME.mapOpen == true end
+  function WorldMapFrame:GetMapID() return GAME.shown end
+  function WorldMapFrame:GetCanvasScale() return GAME.canvasScale or 1 end
+  function WorldMapFrame:GetCanvas()
+    if not CANVAS then
+      CANVAS = CreateFrame("Frame")
+      function CANVAS:GetWidth() return 1000 end
+      function CANVAS:GetHeight() return 600 end
+      function CANVAS:GetFrameLevel() return 1 end
+    end
+    return CANVAS
+  end
 
   -- Frames and textures answer every method; only what a test looks at does something.
   local function noop() end
@@ -110,7 +127,8 @@ const STUB = `
     if name then _G[name] = f end
     function f:RegisterEvent(e) self.events[e] = true end
     function f:SetScript(kind, fn) self[kind] = fn end
-    function f:SetPoint(point) self.point = point end
+    function f:SetPoint(point, _, _, x, y) self.point, self.x, self.y = point, x, y end
+    function f:Hide() self.shown = false end
     function f:SetScale(scale) self.scale = scale end
     function f:SetText(text) self.text = text end
     function f:CreateFontString() return setmetatable({}, Widget) end
@@ -129,9 +147,10 @@ const STUB = `
     end
     -- A frame with textures is a strip: showing it records the row of cells on screen.
     function f:Show()
+      self.shown = true
       local row = {}
       for _, t in ipairs(cells) do
-        if t.shown then row[#row + 1] = t.v end
+        if t.shown == true then row[#row + 1] = t.v end -- only a cell that was shown: a texture never shown answers anything
       end
       if #row > 0 then strips[#strips + 1] = table.concat(row) end
     end
@@ -172,6 +191,22 @@ const STUB = `
       end
     end
     error("no such slash command: " .. text)
+  end
+  -- The flags of ours on the world map, in order of name: "name x y", in pixels of the canvas from its top left.
+  function T_flags()
+    local out = {}
+    for _, f in ipairs(frames) do
+      if rawget(f, "part") and f.shown then out[#out + 1] = ("%s %.0f %.0f"):format(f.name, f.x * (f.scale or 1), -f.y * (f.scale or 1)) end
+    end
+    table.sort(out)
+    return table.concat(out, "; ")
+  end
+  -- A click on the flag of that name, with a button of the mouse.
+  function T_flagClick(name, button)
+    for _, f in ipairs(frames) do
+      if rawget(f, "part") and f.shown and f.name == name then return rawget(f, "OnMouseUp")(f, button) end
+    end
+    error("no flag on the map: " .. name)
   end
   function T_click(name) return rawget(_G[name], "OnClick")(_G[name]) end
   function T_slide(name, value) return rawget(_G[name], "OnValueChanged")(_G[name], tonumber(value)) end
@@ -254,6 +289,8 @@ function loadAddon(dir, { addons } = {}) {
     ns: (key) => call('T_ns', key),
     lua: (code) => call('T_lua', code),
     click: (name) => call('T_click', name),
+    flags: () => call('T_flags') || '',
+    flagClick: (name, button) => call('T_flagClick', name, button),
     // Drags a slider to a value.
     slide: (name, value) => call('T_slide', name, String(value)),
     run: (seconds) => call('T_run', String(seconds)),

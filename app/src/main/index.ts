@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { linkStatus, lostPercent } from '../shared/link'
 import { shownFrom, type QuestsStatus } from '../shared/quests'
 import type { Found } from '../shared/search'
-import { pinFrom, routeNewsFrom, stepFrom } from '../shared/send'
+import { marksNews, pinFrom, routeNewsFrom, stepFrom } from '../shared/send'
 import { CURSEFORGE, setupComplete, setupPages } from '../shared/setup'
 import type { TilesStatus } from '../shared/tiles-status'
 import { placeWindow, WINDOW } from '../shared/window'
@@ -15,7 +15,7 @@ import { startLink } from './link'
 import type { Answer, Asked } from './questie-worker'
 import startQuestieWorker from './questie-worker?nodeWorker'
 import { addonsFolder, readSettings, setupStatus, writeSettings } from './setup'
-import { installChannel, send } from './signal'
+import { installChannel, send, sentParts } from './signal'
 import { servedFile } from './tiles'
 import startTilesWorker from './tiles-worker?nodeWorker'
 
@@ -186,6 +186,24 @@ function createWindow(): void {
   // The way back to the game: once the addon is there, the bank of font names and the slots go next
   // to it, by themselves and once. Where that fails (a folder that cannot be written) the map works all the same.
   let channel: Promise<unknown> | null = null
+  // My pins: the game draws them on its own map, so it is to have the points saved here and no
+  // other. The window tells them at every change and when it loads; only what changed is sent.
+  // A send the addon has not read yet when the next one leaves costs one of its slots, and it reads
+  // every 5 seconds: so the changes of a few seconds go out together, and never right behind the send before.
+  const MARKS_WAIT = 8000
+  let marksAsked: unknown = null
+  let marksTimer: ReturnType<typeof setTimeout> | null = null
+  const sendMarks = (): void => {
+    marksTimer = null
+    if (!gameFolder) return
+    try {
+      const addons = addonsFolder(gameFolder)
+      const changed = marksNews(marksAsked, sentParts(addons))
+      if (changed && Object.keys(changed).length > 0) send(addons, changed)
+    } catch {
+      // the way to the game is not there yet: they go once it is
+    }
+  }
   const readyChannel = (): void => {
     if (!gameFolder || setup.addon === null || channel) return
     const addons = addonsFolder(gameFolder)
@@ -193,6 +211,7 @@ function createWindow(): void {
     // a game already running then sends everything again at once. Small enough to ride the font.
     channel = installChannel(addons)
       .then(() => void send(addons, { sync: Date.now() }))
+      .then(() => (marksTimer ??= setTimeout(sendMarks, MARKS_WAIT)))
       .catch(() => {})
   }
   readyChannel()
@@ -210,6 +229,10 @@ function createWindow(): void {
   ipcMain.handle('send-pin', (_event, asked: unknown): Sent => {
     const pin = pinFrom(asked)
     return sendParts(pin && { pin: { ...pin, t: Date.now() } })
+  })
+  ipcMain.handle('send-marks', (_event, asked: unknown): void => {
+    marksAsked = asked
+    marksTimer ??= setTimeout(sendMarks, MARKS_WAIT)
   })
   // The route, whole, or false to take it away from the game; and a step ahead on the route the game has.
   ipcMain.handle('send-route', (_event, asked: unknown): Sent => {
@@ -289,6 +312,8 @@ function createWindow(): void {
     ipcMain.removeHandler('retry-tiles')
     ipcMain.removeHandler('set-on-top')
     ipcMain.removeHandler('send-pin')
+    ipcMain.removeHandler('send-marks')
+    if (marksTimer) clearTimeout(marksTimer)
     ipcMain.removeHandler('send-route')
     ipcMain.removeHandler('send-step')
     link.stop()

@@ -177,6 +177,9 @@ function readOutbox(addons: string): Outbox {
   return { seq: 0, parts: {} }
 }
 
+/** The parts the game has, or will have once it reads: everything sent so far and not taken away. */
+export const sentParts = (addons: string): Record<string, unknown> => readOutbox(addons).parts
+
 /** Whether the bank and the slots are all in this AddOns folder. */
 export const channelInstalled = (addons: string): boolean => existsSync(join(addons, SIGNAL, nameOf(BANK - 1))) && existsSync(slotFile(addons, SLOTS))
 

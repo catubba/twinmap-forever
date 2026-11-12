@@ -378,3 +378,80 @@ test('the addon and the app agree on the numbers of the channel', () => {
   assert.ok(lua.includes('DATA_FIRST, DATA_LETTERS = 0xE000, 1024') && ts.includes('DATA_FIRST = 0xe000') && ts.includes('DATA_LETTERS = 1024'));
   assert.ok(lua.includes(`AddOns\\\\${SIGNAL}\\\\`) && ts.includes(`'${SIGNAL}'`));
 });
+
+// My pins, whole: every point saved in the app is a flag of ours on the game's world map, and one
+// removed on either side goes on the other.
+const INN = { m: 1429, x: 43.71, y: 65.8, name: 'Inn' }, MINE = { m: 1429, x: 10, y: 20, name: 'Mine' };
+const marksTold = (addon) => addon.strips().map(decodeStrip).filter((b) => b.section === 'marks').map((b) => JSON.parse(b.text)).at(-1);
+
+test('the pins saved in the app are flags on the game\'s map, each on its point; one taken away goes, the rest stay through a /reload', () => {
+  const { addon, enter } = world();
+  addon.lua('GAME.mapOpen, GAME.shown = true, 1429');
+  addon.run(8);
+  assert.equal(addon.flags(), '');
+  const sent = app.send(addons, { mark1429x4371y6580: INN, mark1429x1000y2000: MINE, mark1433x5000y5000: { m: 1433, x: 50, y: 50, name: 'Elsewhere' } });
+  assert.equal(sent.inFont, true);
+  addon.run(8);
+  assert.equal(addon.flags(), 'Inn 437 395; Mine 100 120', 'on a canvas 1000 by 600; the one of another map is not on this one');
+  assert.equal(part(addon, 'parts.pin'), null, 'the game\'s own pin is not touched');
+
+  app.send(addons, { mark1429x1000y2000: false });
+  addon.run(8);
+  assert.equal(addon.flags(), 'Inn 437 395');
+
+  addon.reload();
+  enter();
+  assert.equal(addon.flags(), 'Inn 437 395');
+  addon.lua('GAME.mapOpen = false');
+  app.send(addons, { mark1429x1000y2000: MINE });
+  addon.run(8);
+  assert.equal(addon.flags(), '', 'with the map closed nothing is drawn');
+});
+
+test('Alt and a right click removes a flag: the strip tells the app, until the app takes the pin away itself', () => {
+  const { addon } = world();
+  addon.lua('(...).db.mode = "fast"; GAME.mapOpen, GAME.shown = true, 1429');
+  app.send(addons, { mark1429x4371y6580: INN, mark1429x1000y2000: MINE });
+  addon.run(8);
+  assert.deepEqual(marksTold(addon), { gone: [] });
+
+  addon.flagClick('Inn', 'RightButton');
+  assert.equal(addon.flags(), 'Inn 437 395; Mine 100 120', 'a right click alone is the map\'s own');
+  addon.lua('GAME.alt = true');
+  addon.flagClick('Inn', 'LeftButton');
+  assert.equal(addon.flags(), 'Inn 437 395; Mine 100 120');
+  addon.flagClick('Inn', 'RightButton');
+  assert.equal(addon.flags(), 'Mine 100 120');
+  assert.equal(addon.printed(), 'Twinmap Forever: Inn is no longer among your pins.');
+  addon.run(3);
+  assert.deepEqual(marksTold(addon), { gone: ['mark1429x4371y6580'] });
+
+  addon.reload();
+  addon.fire('PLAYER_LOGIN');
+  addon.fire('PLAYER_ENTERING_WORLD');
+  assert.equal(addon.flags(), 'Mine 100 120', 'removed stays removed while the app has not heard');
+
+  app.send(addons, { mark1429x4371y6580: false });
+  addon.run(8);
+  assert.deepEqual(marksTold(addon), { gone: [] });
+  app.send(addons, { mark1429x4371y6580: INN });
+  addon.run(8);
+  assert.equal(addon.flags(), 'Inn 437 395; Mine 100 120', 'saved again in the app, it is back');
+});
+
+test('more pins than a font holds come by a slot, and one taken away in a send that was missed goes all the same', () => {
+  const { addon } = world();
+  addon.lua('GAME.mapOpen, GAME.shown = true, 1429');
+  const many = Object.fromEntries(Array.from({ length: 40 }, (_, i) => [`mark1429x${1000 + i * 100}y5000`, { m: 1429, x: 10 + i, y: 50, name: `Pin number ${String(i).padStart(2, '0')}` }]));
+  assert.equal(app.send(addons, many).inFont, false);
+  addon.run(8);
+  assert.equal(addon.flags().split('; ').length, 40);
+  assert.equal(addon.slots(), 1);
+
+  app.send(addons, { mark1429x1000y5000: false });
+  app.send(addons, { mark1429x1100y5000: false });
+  addon.run(8);
+  assert.equal(addon.slots(), 2);
+  assert.equal(addon.flags().split('; ').length, 38);
+  assert.ok(!addon.flags().includes('Pin number 00') && !addon.flags().includes('Pin number 01'));
+});

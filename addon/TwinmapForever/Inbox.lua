@@ -22,20 +22,31 @@ local POLL = 5              -- seconds between reads, so the bank lasts about 11
 local RETRY, GIVE_UP = 1, 8 -- a font loads late, and only when asked again
 local MAX_FAILS = 3
 
--- Who takes each part of the news: ns.receivers.name = function(value), value nil for a part taken
--- away. Called at login with what was last received, and it may be called again with the same value.
+-- Who takes each part of the news: ns.receivers.name = function(value, part), value nil for a part
+-- taken away. Called at login with what was last received, and it may be called again with the same
+-- value. A part named with letters and then more ("mark" and a place) goes to the receiver of the
+-- letters: one receiver for as many parts as the app cares to send.
 ns.receivers = {}
 ns.signal = "waiting" -- "waiting", "reading", or why nothing can arrive in this session
 
 local function Num(v) if type(v) == "number" and not (issecretvalue and issecretvalue(v)) then return v end end
 
 local function Tell(part)
-  local fn = ns.receivers[part]
-  if fn then pcall(fn, ns.db.inbox.parts[part]) end
+  local fn = ns.receivers[part] or ns.receivers[part:match("^%a+") or ""]
+  if fn then pcall(fn, ns.db.inbox.parts[part], part) end
 end
 
-local function TellAll()
+-- before: the parts held until now, when a slot has just replaced them all: one of them that is no
+-- longer there is told as taken away.
+local function TellAll(before)
+  local parts = ns.db.inbox.parts
   for part in pairs(ns.receivers) do Tell(part) end
+  for part in pairs(parts) do
+    if not ns.receivers[part] then Tell(part) end
+  end
+  for part in pairs(before or {}) do
+    if parts[part] == nil and not ns.receivers[part] then Tell(part) end
+  end
 end
 
 local function Stop(why, line)
@@ -58,8 +69,9 @@ local function LoadNextSlot()
         return Stop("slot " .. tostring(reason or "empty"), "what Twinmap sent cannot be loaded. Keep the Twinmap Forever slot addons enabled; after Twinmap's first run, restart the game.")
       end
       used = i
+      local before = ns.db.inbox.parts
       ns.db.inbox = { seq = got.seq, parts = got.parts }
-      return TellAll()
+      return TellAll(before)
     end
   end
   used = SLOTS
