@@ -41,7 +41,7 @@ function withInside(state: GameState, found: (Inside & { at: number }) | null): 
   return { ...state, sections: { ...state.sections, pos: { ...pos, facing, inst: { ...pos.inst, ...worldOfYards(found), level: found.level } } }, updatedAt: { ...state.updatedAt, pos: Math.max(state.updatedAt.pos ?? 0, found.at) } }
 }
 
-export function startLink(tilesFolder: () => string | null = () => null): { snapshot: () => LinkSnapshot; stop: () => void } {
+export function startLink(tilesFolder: () => string | null = () => null): { snapshot: () => LinkSnapshot; inside: () => ReturnType<ReturnType<typeof startInside>['report']>; stop: () => void } {
   const game = createGame()
   // Inside a dungeon the game tells addons no place: there, and only there, it is found from the minimap on the screen.
   const inside = startInside(tilesFolder)
@@ -109,6 +109,7 @@ export function startLink(tilesFolder: () => string | null = () => null): { snap
         cpu: elapsed ? ((cpu.user + cpu.system) / 1000 / elapsed) * 100 : 0,
       }
     },
+    inside: () => inside.report(),
     stop: () => clearInterval(timer),
   }
 }

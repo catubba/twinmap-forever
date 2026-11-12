@@ -20,6 +20,7 @@ import { servedFile } from './tiles'
 import startTilesWorker from './tiles-worker?nodeWorker'
 import startWalkWorker from './walk-worker?nodeWorker'
 import { navFolder } from './nav'
+import { encodePng } from './png'
 import { farAskFrom, walkAskFrom, type Far, type FarAsk, type WalkAsk, type WalkPath } from '../shared/walk'
 
 const SHOW_EVERY = 50 // ms between updates of the window: a position must be there well before the arrow needs it (BEHIND in glide.ts)
@@ -333,7 +334,7 @@ function createWindow(): void {
   // The measures of a live session, for whoever tunes the link: read, lost, processor.
   const logFile = join(app.getPath('userData'), 'link-measures.json')
   const log = setInterval(() => {
-    const s = link.snapshot()
+    const s = link.snapshot(), seen = link.inside()
     const measures = {
       at: new Date().toISOString(),
       game: s.game,
@@ -347,8 +348,11 @@ function createWindow(): void {
       protocol: s.state.protocol?.message ?? null,
       pos: s.state.sections.pos ?? null,
       tiles: tiles.status(),
+      // Inside a dungeon: what the last look at the minimap came to, and beside this file the square of the screen it looked at.
+      inside: seen?.report ?? null,
     }
     void writeFile(logFile, JSON.stringify(measures, null, 1)).catch(() => {})
+    if (seen?.seen) void writeFile(join(app.getPath('userData'), 'minimap-seen.png'), encodePng(seen.seen.rgb, seen.seen.size, seen.seen.size)).catch(() => {})
   }, LOG_EVERY)
 
   win.on('closed', () => {

@@ -82,18 +82,40 @@ export interface Inside {
   level?: number
 }
 
+/** What the last look at the minimap came to, for whoever has to find out why the arrow is not there: written with the measures of the link. */
+export interface InsideReport {
+  dungeon: number
+  /** Pictures of the dungeon the app has: one a level, none when the converter kept no rooms of it. */
+  levels: number
+  /** Why no place is told, when none is: the addon tells no minimap, it turns with the character, its zoom is not one known, no rooms, or no picture is like it enough. */
+  why?: 'no minimap told' | 'minimap turns' | 'zoom not known' | 'no rooms' | 'screen not read' | 'not sure'
+  zoom?: number
+  size?: number
+  /** How like the minimap each level is, 0 to 1, where they were tried; a place is told from `SURE` up. */
+  scores?: (number | null)[]
+  level?: number
+  /** Milliseconds since a place was last found. */
+  lostFor?: number
+}
+
 /**
  * Follows the character inside dungeons. look() is called with the latest position the addon sent
  * and a way to cut a square from the game's window; it reads the screen only while the addon says
  * the character is inside (readsMinimap), and gives the place found, or null.
  */
-export function startInside(tilesFolder: () => string | null, mosaics: (folder: string, id: number) => Mosaic[] = mosaicsOf): { look: (pos: Position | undefined, cut: (x: number, y: number, size: number) => Box | null, now: number) => Inside | null } {
+export function startInside(tilesFolder: () => string | null, mosaics: (folder: string, id: number) => Mosaic[] = mosaicsOf): { report: () => { report: InsideReport; seen: Box | null } | null; look: (pos: Position | undefined, cut: (x: number, y: number, size: number) => Box | null, now: number) => Inside | null } {
   let dungeon = 0, floors: Levels[] = []
   let last: (Inside & { at: number }) | null = null
   let lookedAt = 0, searchedAt = 0, lostTries = 0
+  let report: InsideReport | null = null, seen: Box | null = null, foundAt = 0
   return {
+    report: () => report && { report, seen },
     look(pos, cut, now) {
       const mini = readsMinimap(pos)
+      // Inside a dungeon or a raid with no minimap to read: said, so that a missing arrow has its reason.
+      const told = pos?.inst?.mini
+      if (!mini && pos?.inst && (pos.inst.kind === 'party' || pos.inst.kind === 'raid')) report = { dungeon: pos.inst.id, levels: floors.length, why: !told ? 'no minimap told' : told.turns ? 'minimap turns' : 'zoom not known', zoom: told?.zoom, size: told?.size }
+      else if (!mini) report = null
       if (!mini || !pos?.inst) {
         // Outside: nothing is read, and what was known of the last dungeon is let go.
         dungeon = 0
@@ -110,11 +132,13 @@ export function startInside(tilesFolder: () => string | null, mosaics: (folder: 
         const folder = tilesFolder()
         floors = (folder ? mosaics(folder, dungeon) : []).map(levelsOf)
       }
-      if (!floors.length) return null
+      const said = { dungeon, levels: floors.length, zoom: mini.zoom, size: mini.size, lostFor: foundAt ? now - foundAt : undefined }
+      if (!floors.length) return (report = { ...said, why: 'no rooms' }), null
       const known = last && now - last.at <= KEPT ? last : null
       if (!known && now - searchedAt < LOST_FOR) return null
       const half = Math.round(mini.size / 2), box = cut(Math.round(mini.x) - half, Math.round(mini.y) - half, half * 2)
-      if (!box) return fresh()
+      if (!box) return (report = { ...said, why: 'screen not read' }), fresh()
+      seen = box
       if (!known) searchedAt = now
       // Each level is tried: the one the minimap is most like is the one the character is on. Where no room
       // lies over another the levels look the same, and the one of a moment ago stays.
@@ -122,7 +146,7 @@ export function startInside(tilesFolder: () => string | null, mosaics: (folder: 
       // would stop the reading of the strip): the picture with every room first, the next level down at the next
       // try. The levels are then tried around what it finds.
       const around = known ?? locate(floors[floors.length - 1 - (lostTries++ % floors.length)]!, box, mini.zoom)
-      if (!around) return fresh()
+      if (!around) return (report = { ...said, why: 'not sure' }), fresh()
       const tries = floors.map((levels) => locate(levels, box, mini.zoom, around))
       let level = -1
       // Alike on every level: the top one, with every room on show.
@@ -133,7 +157,10 @@ export function startInside(tilesFolder: () => string | null, mosaics: (folder: 
       const before = known?.level
       if (before !== undefined && level >= 0 && tries[before] && tries[before].score >= tries[level]!.score - CLEARLY) level = before
       const found: Found | null = level < 0 ? null : tries[level]!
-      if (!found || found.score < SURE) return fresh()
+      const scores = tries.map((t) => (t ? Math.round(t.score * 1000) / 1000 : null))
+      if (!found || found.score < SURE) return (report = { ...said, why: 'not sure', scores }), fresh()
+      foundAt = now
+      report = { ...said, scores, level, lostFor: 0 }
       // Running, the way the place moved is the surest facing; standing, the arrow of the minimap
       // says it (the dots of a party over the arrow can hide its point: then the last facing stays).
       const du = known ? found.u - known.u : 0, dv = known ? found.v - known.v : 0

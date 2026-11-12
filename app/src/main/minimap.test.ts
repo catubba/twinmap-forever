@@ -86,3 +86,27 @@ test('a dungeon with one level tells none', () => {
   expect(found.level).toBeUndefined()
   expect(Math.abs(found.u - 1300)).toBeLessThanOrEqual(1.5)
 })
+
+test('why the arrow is not there is told: no minimap, a zoom not known, nothing like enough', () => {
+  const levels = twoLevels(), inside = startInside(() => 'anywhere', () => levels)
+  const mini = { x: 2408, y: 187, size: 238, zoom: 0 }
+  inside.look({ inst: { id: 36, kind: 'party' } }, () => null, 3000)
+  expect(inside.report()!.report).toMatchObject({ dungeon: 36, why: 'no minimap told' })
+  inside.look({ inst: { id: 36, kind: 'party', mini: { ...mini, turns: true } } }, () => null, 4000)
+  expect(inside.report()!.report.why).toBe('minimap turns')
+  inside.look({ inst: { id: 36, kind: 'party', mini: { ...mini, zoom: 7 } } }, () => null, 5000)
+  expect(inside.report()!.report).toMatchObject({ why: 'zoom not known', zoom: 7 })
+  // A square of the screen that is no minimap of this dungeon: every level tried, none sure.
+  const noise = { size: 238, rgb: Uint8Array.from({ length: 238 * 238 * 3 }, (_, i) => (Math.floor(i / 3) * 37) % 256) }
+  expect(inside.look({ inst: { id: 36, kind: 'party', mini } }, () => noise, 9000)).toBeNull()
+  const said = inside.report()!
+  expect(said.report).toMatchObject({ why: 'not sure', levels: 2, zoom: 0, size: 238 })
+  expect(said.report.scores).toHaveLength(2)
+  expect(said.seen).toBe(noise)
+  // Found: no reason, the level and how sure. Outside again: nothing to tell.
+  inside.look({ inst: { id: 36, kind: 'party', mini } }, () => shown(levels[1]!, 1300, 2300), 12000)
+  expect(inside.report()!.report).toMatchObject({ level: 1, lostFor: 0 })
+  expect(inside.report()!.report.why).toBeUndefined()
+  inside.look({ zone: 'Elwynn Forest' }, () => null, 13000)
+  expect(inside.report()).toBeNull()
+})
