@@ -23,13 +23,13 @@
   import { drop, gone, still } from './motion'
   import PointLabel from './PointLabel.svelte'
   import { inRoute, noRoute, type Route, type Stop } from '../../shared/route'
-  import { pinOfMark, removePin, renamePin, savedAt, savedFrom, savePin } from '../../shared/saved'
-  import { markPart, sendState, type GameMark, type Inbox } from '../../shared/send'
+  import { pinOfMark, removePin, renamePin, savedAt, savedFrom, savePin, type SavedPin } from '../../shared/saved'
+  import { markPart, sendState, type GameMark, type Inbox, type Pin } from '../../shared/send'
   import { pin } from './marks'
 
   // at: when the position was read off the game, in milliseconds.
   // insideReady: the rooms of the buildings are converted, and their list can be asked for.
-  let { pos, at: readAt, insideReady, quests = [], fixed = [], side, live = false, inbox = null, removed = [], set = [], route = noRoute(), onroute }: { pos: Position | undefined; at: number | undefined; insideReady: boolean; quests?: QuestPin[]; fixed?: FixedPin[]; side?: string; live?: boolean; inbox?: Inbox | null; removed?: string[]; set?: GameMark[]; route?: Route; onroute?: (stop: Stop) => void } = $props()
+  let { pos, at: readAt, insideReady, quests = [], fixed = [], side, live = false, inbox = null, removed = [], set = [], gameFollows = null, route = noRoute(), onroute }: { pos: Position | undefined; at: number | undefined; insideReady: boolean; quests?: QuestPin[]; fixed?: FixedPin[]; side?: string; live?: boolean; inbox?: Inbox | null; removed?: string[]; set?: GameMark[]; gameFollows?: Pin | null; route?: Route; onroute?: (stop: Stop) => void } = $props()
 
   const TILES = 'twinmap://tiles'
   const TOP_ZOOM = 7 // the game's own detail: a block's picture is four tiles
@@ -772,14 +772,16 @@
     }
   })
 
-  // My pins: a small flag on each saved point of this continent. A click opens its label.
+  // My pins: a small flag on each saved point of this continent. A click opens its label. The
+  // point the game's arrow follows has a gold flag, as in the game, whether it is saved or not.
+  const followedPart = $derived(gameFollows ? markPart(gameFollows) : '')
   const myPinsLayer = L.layerGroup()
   $effect(() => {
     myPinsLayer.clearLayers()
-    for (const saved of myPins) {
-      if (saved.continent !== continent) continue
-      L.marker(at(saved.at), { keyboard: false, zIndexOffset: 400, icon: L.divIcon({ className: 'door mine', iconSize: [16, 16], html: pin('flag') }) })
-        .bindTooltip(Object.assign(document.createElement('span'), { textContent: saved.name }), { direction: 'top', offset: [0, -8], className: 'tip' })
+    const flag = (saved: SavedPin, gold: boolean): void => {
+      if (saved.continent !== continent) return
+      L.marker(at(saved.at), { keyboard: false, zIndexOffset: gold ? 450 : 400, icon: L.divIcon({ className: 'door mine', iconSize: [16, 16], html: gold ? pin('flag').replaceAll('#f3ead9', '#ffd100') : pin('flag') }) })
+        .bindTooltip(Object.assign(document.createElement('span'), { textContent: gold ? `${saved.name}, followed in the game` : saved.name }), { direction: 'top', offset: [0, -8], className: 'tip' })
         .on('click', () => {
           if (!map) return
           const found = zoneAt(maps, saved.continent, saved.at)
@@ -795,6 +797,15 @@
         })
         .addTo(myPinsLayer)
     }
+    let met = false
+    for (const saved of myPins) {
+      const gold = !!saved.pin && markPart(saved.pin) === followedPart
+      met ||= gold
+      flag(saved, gold)
+    }
+    // Followed but not saved: a point sent with Send to game. Named as the game names it.
+    const loose = gameFollows && !met && maps.length > 0 ? pinOfMark(maps, gameFollows) : null
+    if (loose && gameFollows) flag({ ...loose, name: gameFollows.name }, true)
   })
   $effect(() => {
     if (map && layers.mypins && !inside) myPinsLayer.addTo(map)
@@ -884,6 +895,8 @@
       sending={sendState(live, inbox, !!labelled.pin)}
       acked={inbox?.seq}
       onsend={() => (labelled?.pin ? window.twinmap.sendPin({ ...labelled.pin, name: pointName }) : Promise.resolve({ error: 'There is nothing to send.' }))}
+      following={!!labelled.pin && markPart(labelled.pin) === followedPart}
+      onunfollow={() => window.twinmap.sendUnfollow()}
       routed={inRoute(route, labelled.continent, labelled.units)}
       onroute={() => {
         const stop = asStop()

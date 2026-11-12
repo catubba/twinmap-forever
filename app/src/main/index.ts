@@ -239,6 +239,8 @@ function createWindow(): void {
     takenAsked = takenFrom(taken)
     marksTimer ??= setTimeout(sendMarks, MARKS_WAIT)
   })
+  // The point the game's arrow follows by itself is let go: a number new each time, so the addon acts once.
+  ipcMain.handle('send-unfollow', (): Sent => sendParts({ unfollow: Date.now() }))
   // The route, whole, or false to take it away from the game; and a step ahead on the route the game has.
   ipcMain.handle('send-route', (_event, asked: unknown): Sent => {
     const route = routeNewsFrom(asked)
@@ -318,6 +320,7 @@ function createWindow(): void {
     ipcMain.removeHandler('set-on-top')
     ipcMain.removeHandler('send-pin')
     ipcMain.removeHandler('send-marks')
+    ipcMain.removeHandler('send-unfollow')
     if (marksTimer) clearTimeout(marksTimer)
     ipcMain.removeHandler('send-route')
     ipcMain.removeHandler('send-step')

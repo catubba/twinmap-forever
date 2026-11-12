@@ -241,7 +241,7 @@ const STUB = `
     local a = TwinmapForeverArrow
     if not (a and a.shown) then return nil end
     local tip = a.lines[4]
-    return ("%s | %s | %s"):format(a.name.text, a.far.text, tip.on and ("%.0f %.0f"):format(tip.ex, tip.ey) or "no tip")
+    return ("%s | %s | %s"):format(a.name.text, a.far.text, tip.on and ("%d %d"):format(math.floor(tip.ex + 0.5), math.floor(tip.ey + 0.5)) or "no tip")
   end
   function T_arrowClick(button) return rawget(TwinmapForeverArrow, "OnMouseUp")(TwinmapForeverArrow, button) end
   -- A click on the world map, at a place 0 to 1 from its top left: gives back whether an addon took it.

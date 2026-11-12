@@ -22,6 +22,7 @@ declare global {
       search: (typed: string) => Promise<Found[]>
       sendPin: (pin: Pin) => Promise<{ seq: number } | { error: string }>
       sendMarks: (pins: Pin[], taken: string[]) => Promise<void>
+      sendUnfollow: () => Promise<{ seq: number } | { error: string }>
       sendRoute: (route: RouteNews | false) => Promise<{ seq: number } | { error: string }>
       sendStep: (step: { t: number; at: number }) => Promise<{ seq: number } | { error: string }>
     }
