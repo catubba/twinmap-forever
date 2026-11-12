@@ -108,10 +108,16 @@
   const insideReady = $derived(tiles?.state === 'ready' && !!tiles.interiors && !tiles.interiors.problem)
   const count = (n: number): string => n.toLocaleString('en-US')
   let wrong = $state('') // what was wrong with the folder the player picked
-  // On a small screen (a phone, either way up) the panel lies over the map and is closed until asked
-  // for: closed, it shows the next stop and nothing else. In an upright screen it lies along the
-  // foot, and what stands at the foot of the map is lifted by its closed height.
-  let panelOpen = $state(false)
+  // The panel closes at any size: closed, it lies over a corner of the map and shows the next stop
+  // and nothing else, and what stands at the foot of the map is lifted by its closed height. On a
+  // small screen (a phone, either way up) it lies over the map open too, and starts closed; on a
+  // larger one it starts as it was left.
+  const SMALL = '(max-width: 760px), (max-height: 500px)'
+  let panelOpen = $state(!matchMedia(SMALL).matches && localStorage.getItem('panel') !== 'closed')
+  function togglePanel(): void {
+    panelOpen = !panelOpen
+    if (!matchMedia(SMALL).matches) localStorage.setItem('panel', panelOpen ? 'open' : 'closed')
+  }
   let panelHeight = $state(0)
   let peek = $state(0)
   $effect(() => {
@@ -153,7 +159,7 @@
   </div>
 {/if}
 {#if onSetup === false}
-<div class="work" in:fade={screen} inert={onSettings} style:--peek="{peek}px">
+<div class="work" class:shut={!panelOpen} in:fade={screen} inert={onSettings} style:--peek="{peek}px">
   <div class="mapbox">
     {#if mapReady}
       <Map {pos} at={link?.state.updatedAt.pos} bind:this={mapView} {insideReady} {quests} {fixed} side={char?.side} {live} {inbox} removed={live ? goneFrom(link?.state.sections.marks) : []} set={live ? setFrom(link?.state.sections.marks) : []} gameFollows={live ? followFrom(link?.state.sections.follow) : null} {journey} {ahead} {route} onroute={(stop) => (route = addStop(route, stop))} />
@@ -182,7 +188,7 @@
   </div>
 
   <aside class="panel surface" class:closed={!panelOpen} aria-label="Now" bind:clientHeight={panelHeight}>
-    <button class="grip" aria-expanded={panelOpen} onclick={() => (panelOpen = !panelOpen)}><Glyph name="menu" turn={panelOpen ? 0 : 180} />{panelOpen ? 'Close' : 'Quests and nearby'}</button>
+    <button class="grip" aria-expanded={panelOpen} onclick={togglePanel}><Glyph name="menu" turn={panelOpen ? 0 : 180} />{panelOpen ? 'Close' : 'Quests and nearby'}</button>
     <Now
       {pos}
       {quests}
@@ -450,55 +456,80 @@
   :global(html.web) .top {
     padding-right: 16px;
   }
+  /* What opens and closes the panel, along its top. */
   .grip {
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 28px;
+    border: 0;
+    background: linear-gradient(var(--stone-600), var(--stone-800));
+    box-shadow: inset 0 -1px 0 #000;
+    font: var(--t-label);
+    color: var(--gold);
+    text-shadow: 0 1px 0 #000;
+    cursor: pointer;
+  }
+  .grip:hover {
+    color: var(--gold-pale);
+  }
+  /* Closed, at any size: the map takes the width, and the panel is a sign over its corner. */
+  .work.shut {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .work.shut .mapbox {
+    --lift: var(--peek, 0px);
+  }
+  .panel.closed {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    z-index: 1300;
+    width: 340px;
+    box-shadow:
+      0 -1px 0 #000,
+      0 -3px 0 var(--bronze-600),
+      0 -4px 0 #000,
+      -1px 0 0 #000,
+      -3px 0 0 var(--bronze-600),
+      -4px 0 0 #000,
+      0 -10px 24px #000a;
+  }
+  /* Closed: the next stop, as a sign reads it, and nothing to press but the way to open. */
+  .panel.closed footer,
+  .panel.closed :global(.now > :not(.plate, .none)),
+  .panel.closed :global(.plate > :not(h2, .sign, .sheen)) {
     display: none;
+  }
+  .panel.closed :global(.now) {
+    overflow: hidden;
   }
 
   /* A small screen: a phone upright (narrow) or on its side (low). The map takes it all, and the
-     panel lies over it, closed until asked for. */
+     panel lies over it open too, along the foot of the screen. */
   @media (max-width: 760px), (max-height: 500px) {
     .work {
       grid-template-columns: minmax(0, 1fr);
     }
-    .mapbox {
+    .work .mapbox {
       --lift: var(--peek, 0px);
     }
-    .panel {
+    .panel,
+    .panel.closed {
       position: absolute;
       left: 0;
       right: 0;
       bottom: 0;
       z-index: 1300;
+      width: auto;
       max-height: min(62dvh, 100%);
       box-shadow:
         0 -1px 0 #000,
         0 -3px 0 var(--bronze-600),
         0 -4px 0 #000,
         0 -10px 24px #000a;
-    }
-    .grip {
-      flex: none;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      height: 44px;
-      border: 0;
-      background: linear-gradient(var(--stone-600), var(--stone-800));
-      box-shadow: inset 0 -1px 0 #000;
-      font: var(--t-label);
-      color: var(--gold);
-      text-shadow: 0 1px 0 #000;
-      cursor: pointer;
-    }
-    /* Closed: the next stop, as a sign reads it, and nothing to press but the way to open. */
-    .panel.closed footer,
-    .panel.closed :global(.now > :not(.plate, .none)),
-    .panel.closed :global(.plate > :not(h2, .sign, .sheen)) {
-      display: none;
-    }
-    .panel.closed :global(.now) {
-      overflow: hidden;
     }
   }
   /* The top row of a narrow screen: the search between the section and the state of the link. */
@@ -532,10 +563,12 @@
   }
   /* A phone on its side: the panel stands on the left, as wide as on a desk, and nothing is lifted. */
   @media (max-height: 500px) and (min-width: 560px) {
-    .mapbox {
+    .work .mapbox,
+    .work.shut .mapbox {
       --lift: 0px;
     }
-    .panel {
+    .panel,
+    .panel.closed {
       right: auto;
       width: 340px;
       max-height: 100%;
@@ -550,6 +583,9 @@
   }
   /* Under a finger the entries of the top row are pressed on the whole height of the row. */
   @media (pointer: coarse) {
+    .grip {
+      height: 44px;
+    }
     .tab,
     .entry {
       position: relative;
