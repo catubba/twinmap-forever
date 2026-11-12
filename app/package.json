@@ -20,6 +20,12 @@
     "files": [
       "out/**"
     ],
+    "extraResources": [
+      {
+        "from": "resources/nav",
+        "to": "nav"
+      }
+    ],
     "win": {
       "target": "portable"
     },

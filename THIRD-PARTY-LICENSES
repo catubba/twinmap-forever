@@ -110,6 +110,24 @@ foreverchanges.pro, converted by One for All. Each dungeon in dungeon-pins.ts
 says which.
 
 ================================================================================
+Shortest Path Forever
+https://github.com/cjber/shortest-path-forever
+by cjber (an addon for World of Warcraft: Forever)
+Used in: the app, which ships its walking grid of the two continents as it is
+(app/resources/nav, brought in by app/scripts/import-nav.js from Nav/*.lua,
+Data/RoadCells.lua and Data/RoadEdges.lua), and reads it with the format and the
+step rules of its Routing/PathGrid.lua
+================================================================================
+
+Shortest Path Forever is licensed under the GNU General Public License, version
+3 or (at your option) any later version: https://www.gnu.org/licenses/gpl-3.0.html
+
+The walking grid is data its author derived from the terrain of the game client
+with the tools of TrinityCore (GPL-2.0-or-later), which vendor Recast/Detour
+(zlib licence) and CascLib (MIT). The game's own files are Blizzard
+Entertainment's, and its End User License Agreement applies to them.
+
+================================================================================
 MapUtils
 by D4KiR (an addon for World of Warcraft: Forever)
 Used in: addon/TwinmapForever/Marks.lua (how a frame is placed on the canvas of
