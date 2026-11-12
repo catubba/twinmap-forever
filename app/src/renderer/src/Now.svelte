@@ -11,6 +11,7 @@
   import type { FixedPin } from '../../shared/services'
   import Glyph from './Glyph.svelte'
   import NextStop from './NextStop.svelte'
+  import { span, startedBy, type Journey } from '../../shared/journey'
 
   // onpick: a row was chosen, the map should go there. onpoint: the pointer or the keyboard is on
   // a row (or on none: null), the map should show which pin it is.
@@ -27,6 +28,7 @@
     inbox,
     route,
     inGame,
+    journey, // the journey Shortest Path guides in the game, whoever started it
     onpick,
     onpoint,
     onsent,
@@ -48,6 +50,7 @@
     inbox: Inbox | null
     route: Route
     inGame: boolean
+    journey: Journey | null
     onsent: (t: number) => void
     onarrive: () => void
     onend: () => void
@@ -139,6 +142,20 @@
 
 <div class="now">
   <NextStop {route} band={bandOf(route, me, live)} sending={sendState(live, inbox, news !== null, 'A stop is')} {inGame} onsend={sendRoute} {onskip} {onarrive} {onclear} {onend} {onremove} {onmove} onpick={onstop} />
+  {#if journey}
+    <!-- What Shortest Path guides in the game now: its goal and the legs still ahead, as its tracker words them. -->
+    <h2 class="band">In game {#if !journey.loading}<span class="count">{span(journey.left)}</span>{/if}</h2>
+    <div class="rows placeless legs" role="status">
+      {#if journey.loading}
+        <div class="row"><span>Finding the way</span></div>
+      {:else}
+        <div class="row"><span><b>{journey.name}</b></span>{#if startedBy(journey.owner)}<span>{startedBy(journey.owner)}</span>{/if}</div>
+        {#each journey.legs as leg, i (i)}
+          <div class="row"><span>{leg.text}</span><span class="num">{span(leg.seconds)}</span></div>
+        {/each}
+      {/if}
+    </div>
+  {/if}
   {#if lists.here.length + lists.placeless.length}
     <h2 class="band">Quests <span class="count">{lists.here.length + lists.placeless.length}</span></h2>
     {@render rows(lists.here)}
@@ -174,6 +191,14 @@
   }
   .placeless .row {
     cursor: default;
+  }
+  /* A leg of the journey: its words, and its time at the right edge. */
+  .legs .row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .legs .row > :last-child:not(:first-child) {
+    color: var(--text-dim);
+    white-space: nowrap;
   }
   .placeless .row:hover {
     background: none;
