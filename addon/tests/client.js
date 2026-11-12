@@ -13,6 +13,9 @@ const STUB = `
     printed[#printed + 1] = table.concat(parts, " ")
   end
   SlashCmdList = {}
+  -- The tests read the strip at full contrast with nothing between blocks, as a player may set it;
+  -- the values a new install starts with are checked in trials.test.js.
+  TwinmapForeverDB = { on = 50, neg = 50, amp = 255, idle = "hide" }
 
   -- The world the addon reads. A test changes it with lua().
   GAME = { width = 1920, height = 1080, zone = "Elwynn Forest", sub = "Goldshire", map = 1429, x = 0.4234, y = 0.6571, facing = 1.5708 }

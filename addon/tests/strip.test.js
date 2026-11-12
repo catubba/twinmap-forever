@@ -154,7 +154,7 @@ test('paused, nothing is drawn; back on, the position is sent again even if unch
 });
 
 test('the pause survives a login: a paused addon stays silent', () => {
-  const addon = enterWorld('TwinmapForeverDB = { paused = true }');
+  const addon = enterWorld('TwinmapForeverDB.paused = true');
   addon.run(30);
   assert.equal(addon.strips().length, 0);
 });
