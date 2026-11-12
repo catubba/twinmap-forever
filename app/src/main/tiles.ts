@@ -13,7 +13,7 @@
 //                                         at a third of the size of a PNG.
 //   <folder>/<zoom>/<column>/<row>.png   the tiles of zoom 5 and below, each the four under it halved.
 // A picture the game stores some other way is kept as PNG tiles at zoom 7 and 6 instead.
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join as joinPath } from 'node:path'
 import { deflateSync } from 'node:zlib'
 import { decodeBlp, decodeDxt, dxt1Of } from '../shared/blp'
@@ -158,4 +158,30 @@ export function convertWorld(
   mkdirSync(folder, { recursive: true })
   writeFileSync(joinPath(folder, MARKER), JSON.stringify({ tiles, missing, format: FORMAT }))
   return { converted: true, tiles, missing }
+}
+
+/**
+ * Takes away the tiles of every other build: a new build of the game gets a new folder of some
+ * 260 MB, and the ones before it would stay for ever. Called once the folder of this build is
+ * whole, so a conversion that fails halfway leaves the map of before to be used. Only folders
+ * named as a build is (32 hex digits) are touched: nothing else that may lie there. Gives back how
+ * many went.
+ */
+export function dropOtherBuilds(base: string, buildKey: string): number {
+  const root = joinPath(base, 'tiles')
+  let gone = 0
+  try {
+    for (const name of readdirSync(root)) {
+      if (name === buildKey || !/^[0-9a-f]{32}$/.test(name)) continue
+      try {
+        rmSync(joinPath(root, name), { recursive: true, force: true })
+        gone++
+      } catch {
+        // a file in use: it goes at the next start
+      }
+    }
+  } catch {
+    // no folder of tiles: nothing to take away
+  }
+  return gone
 }

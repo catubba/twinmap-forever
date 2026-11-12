@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { inflateSync } from 'node:zlib'
@@ -6,7 +6,7 @@ import { expect, test } from 'vitest'
 import { decodeBlp } from '../shared/blp'
 import { tileOfBlock } from '../shared/pixels'
 import { minimapTiles } from '../shared/world'
-import { blockFile, convertWorld, servedFile, tileFile } from './tiles'
+import { blockFile, convertWorld, dropOtherBuilds, servedFile, tileFile, tilesFolder } from './tiles'
 
 type Color = [number, number, number]
 
@@ -165,4 +165,25 @@ test('the window is given only the files the converter writes', () => {
   for (const path of ['/azeroth/done.json', '/../secret.png', '/azeroth/../../5/1/1.png', '/azeroth/blocks/1/1.dxt/..', '/azeroth/5/1/1.PNG', '/AZEROTH/5/1/1.png', '', '/rooms/../maps.json', '/rooms/x.dxt', '/rooms/1.png', '/i36/done.json', '/36/5/1/1.png', '/other.json']) {
     expect(servedFile(base, path), path).toBeNull()
   }
+})
+
+test('once the map of a build is whole, the folders of the builds before it are taken away, and nothing else', () => {
+  const base = mkdtempSync(join(tmpdir(), 'twinmap-builds-'))
+  const now = 'a'.repeat(32), before = '0597e74b01a3f779d849ffe9b3270196', older = 'b'.repeat(32)
+  for (const key of [now, before, older]) {
+    mkdirSync(join(tilesFolder(base, key), 'azeroth', '5'), { recursive: true })
+    writeFileSync(join(tilesFolder(base, key), 'azeroth', '5', '1.png'), 'tile')
+  }
+  // What is no folder of a build stays: a file, a folder under another name, the settings beside the tiles.
+  mkdirSync(join(base, 'tiles', 'notes'))
+  writeFileSync(join(base, 'tiles', 'readme.txt'), 'mine')
+  writeFileSync(join(base, 'settings.json'), '{}')
+  expect(dropOtherBuilds(base, now)).toBe(2)
+  expect(readdirSync(join(base, 'tiles')).sort()).toEqual([now, 'notes', 'readme.txt'])
+  expect(readFileSync(join(tilesFolder(base, now), 'azeroth', '5', '1.png'), 'utf8')).toBe('tile')
+  expect(existsSync(join(base, 'settings.json'))).toBe(true)
+  // Nothing more to take, and no folder of tiles at all: no harm.
+  expect(dropOtherBuilds(base, now)).toBe(0)
+  expect(dropOtherBuilds(join(base, 'nowhere'), now)).toBe(0)
+  rmSync(base, { recursive: true, force: true })
 })

@@ -12,7 +12,7 @@ import { WORLDS } from '../shared/world'
 import { installedBuild, openClientFiles, type ClientFiles } from './client-files'
 import { convertInteriors, ENCOUNTERS_FILE, finishedInteriors, MAP_FILE, mapEntries, ROOM_PICTURES_FILE, roomPictures } from './interiors'
 import { writeIcons } from './icons'
-import { convertWorld, finished, ICONS_FOLDER, MAPS_FILE, PLACES_FILE, tilesFolder, TRAVEL_FILE } from './tiles'
+import { convertWorld, dropOtherBuilds, finished, ICONS_FOLDER, MAPS_FILE, PLACES_FILE, tilesFolder, TRAVEL_FILE } from './tiles'
 
 const { gameFolder, base } = workerData as { gameFolder: string; base: string }
 const tell = (status: TilesStatus): void => parentPort?.postMessage(status)
@@ -85,6 +85,8 @@ try {
       inside = convertInteriors(mapEntries(readTable(maps), readTable(fights)), roomPictures(readTable(rooms)), (id) => files.read(id), folder)
     }
     interiors({ maps: inside.maps.length, pieces: inside.maps.reduce((n, m) => n + m.pieces.length, 0), dropped: inside.dropped, converted: insideConverted })
+    // The map of this build is whole, rooms and all: the ones of the builds before it only take room on the disk.
+    dropOtherBuilds(base, build.buildKey)
   } catch (e) {
     // The map of the continents is there all the same.
     interiors({ maps: 0, pieces: 0, dropped: 0, converted: false, problem: e instanceof Error ? e.message : String(e) })
