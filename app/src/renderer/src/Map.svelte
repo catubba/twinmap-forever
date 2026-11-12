@@ -1015,7 +1015,7 @@
     box-sizing: border-box;
     border: 2px solid var(--gold);
     border-radius: 50%;
-    box-shadow: 0 0 0 1.5px #000, inset 0 0 0 1.5px #000, 0 0 10px 2px #ffd10099;
+    box-shadow: 0 0 0 1.5px #000, inset 0 0 0 1.5px #000, 0 0 10px 2px var(--on-glow);
     animation: ring 1.1s ease-in-out infinite alternate;
   }
   @keyframes -global-ring {

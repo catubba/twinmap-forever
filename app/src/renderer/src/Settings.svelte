@@ -224,7 +224,7 @@
     padding: 10px 12px;
     overflow: auto;
     background: var(--stone-950);
-    border: 1px solid #5a4526;
+    border: 1px solid var(--bronze-700);
     font: 12px/17px Consolas, monospace;
     color: var(--text-dim);
     white-space: pre-wrap;

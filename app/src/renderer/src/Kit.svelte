@@ -48,6 +48,7 @@
     ['sign', '1:05'],
   ]
   let follow = $state(true)
+
 </script>
 
 {#snippet arrow(turn: number)}
@@ -92,8 +93,8 @@
   <h2 class="band">Logo and wordmark</h2>
   <div class="grounds">
     <div class="dark"><Logo /></div>
-    <div class="paper"><Logo /></div>
-    <div class="plate"><Logo /></div>
+    <div class="paper"><Logo flat /></div>
+    <div class="plate"><Logo flat /></div>
     <div class="stone"><Logo forever /></div>
     <div class="dark"><Logo stacked size={96} /></div>
     <div class="dark sizes">
