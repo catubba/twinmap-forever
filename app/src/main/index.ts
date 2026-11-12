@@ -1,8 +1,9 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, protocol, screen, shell } from 'electron'
 import { randomBytes } from 'node:crypto'
-import { readFileSync, writeFileSync } from 'node:fs'
+import { readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { keep, keptFrom } from '../shared/kept'
 import { linkStatus, lostPercent } from '../shared/link'
 import { shownFrom, type QuestsStatus } from '../shared/quests'
 import type { Found } from '../shared/search'
@@ -202,6 +203,33 @@ function createWindow(): void {
     calls[name] = answer
     ipcMain.handle(name, (_event, ...args: unknown[]) => answer(...args))
   }
+  // The route and My pins: one copy for every screen, in a file beside the settings. A screen that
+  // changes one tells it here, and every screen is told. Written whole to a file of its own and
+  // then put in place of the old one: a write cut short never leaves half of the pins.
+  const keptFile = join(app.getPath('userData'), 'kept.json')
+  let kept = keptFrom(null)
+  try {
+    kept = keptFrom(JSON.parse(readFileSync(keptFile, 'utf8')))
+  } catch {
+    // never kept: the window hands over what it kept by itself before this was shared
+  }
+  const tellKept = (): void => {
+    if (!win.isDestroyed()) win.webContents.send('kept', kept)
+    lan?.tell('kept', kept)
+  }
+  win.webContents.on('did-finish-load', tellKept)
+  asks('keep', (key: unknown, value: unknown): void => {
+    const now = keep(kept, key, value)
+    if (JSON.stringify(now) === JSON.stringify(kept)) return
+    kept = now
+    try {
+      writeFileSync(`${keptFile}.new`, JSON.stringify(kept))
+      renameSync(`${keptFile}.new`, keptFile)
+    } catch {
+      // kept for this run only
+    }
+    tellKept()
+  })
   // What the window may ask for, and only this: to let the player pick the game folder, to open the
   // addon's page on CurseForge in the browser, and (further down) to keep the window over the others.
   ipcMain.handle('choose-game-folder', async (): Promise<string | null> => {
@@ -246,7 +274,6 @@ function createWindow(): void {
   // Where the first run stands, looked at every couple of seconds: an addon installed meanwhile shows by itself.
   // The map on the home network, for a phone or a tablet as the second screen: off until the player
   // turns it on in the settings. The same page, the same map files, and what a page may ask for above.
-  // My pins are not among it: each browser keeps its own for now, and the game is to have the computer's.
   let lan: Lan | null = null
   let lanWord: SetupStatus['lan'] = null
   const lookSetup = (): SetupStatus => ({ ...setupStatus(gameFolder, settings, app.getVersion()), lan: lanWord })
@@ -270,6 +297,7 @@ function createWindow(): void {
     })
     lan = started
     lan.tell('quests', questsNow)
+    lan.tell('kept', kept)
     void lanUrl()
   }
   ipcMain.handle('set-lan', (_event, on: unknown) => {
@@ -330,7 +358,7 @@ function createWindow(): void {
     const pin = pinFrom(asked)
     return sendParts(pin && { pin: { ...pin, t: Date.now() } })
   })
-  ipcMain.handle('send-marks', (_event, asked: unknown, taken: unknown): void => {
+  asks('send-marks', (asked: unknown, taken: unknown): void => {
     marksAsked = asked
     takenAsked = takenFrom(taken)
     marksTimer ??= setTimeout(sendMarks, MARKS_WAIT)
@@ -419,7 +447,6 @@ function createWindow(): void {
     ipcMain.removeHandler('set-lan')
     for (const name of Object.keys(calls)) ipcMain.removeHandler(name)
     lan?.stop()
-    ipcMain.removeHandler('send-marks')
     if (marksTimer) clearTimeout(marksTimer)
     link.stop()
     tiles.stop()

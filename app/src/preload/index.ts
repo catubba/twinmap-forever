@@ -3,6 +3,7 @@
 // failure, to stay over other windows, to show the map on the home network, to search the player's QuestieDB, to mark a point in the
 // game, to send it a route, and to step ahead on that route. It says one: that its opening screen is drawn.
 import { contextBridge, ipcRenderer } from 'electron'
+import type { Kept, KeptKey } from '../shared/kept'
 import type { LinkSnapshot } from '../shared/link'
 import type { QuestsStatus } from '../shared/quests'
 import type { RouteNews } from '../shared/route'
@@ -22,6 +23,11 @@ contextBridge.exposeInMainWorld('twinmap', {
   onSetup: (listener: (status: SetupStatus) => void) => {
     ipcRenderer.on('setup', (_event, status: SetupStatus) => listener(status))
   },
+  // The route and My pins, kept by the app for every screen: told when a screen changes one.
+  onKept: (listener: (kept: Kept) => void) => {
+    ipcRenderer.on('kept', (_event, kept: Kept) => listener(kept))
+  },
+  keep: (key: KeptKey, value: unknown): Promise<void> => ipcRenderer.invoke('keep', key, value),
   onQuests: (listener: (status: QuestsStatus) => void) => {
     ipcRenderer.on('quests', (_event, status: QuestsStatus) => listener(status))
   },

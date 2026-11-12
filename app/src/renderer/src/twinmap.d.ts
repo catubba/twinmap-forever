@@ -14,6 +14,8 @@ declare global {
       onTiles: (listener: (status: TilesStatus) => void) => void
       onSetup: (listener: (status: SetupStatus) => void) => void
       onQuests: (listener: (status: QuestsStatus) => void) => void
+      onKept: (listener: (kept: import('../../shared/kept').Kept) => void) => void
+      keep: (key: import('../../shared/kept').KeptKey, value: unknown) => Promise<void>
       chooseGameFolder: () => Promise<string | null>
       openCurseForge: () => Promise<void>
       retryTiles: () => Promise<void>

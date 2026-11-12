@@ -6,7 +6,8 @@
   import { fade, fly } from 'svelte/transition'
   import type { LogQuest, QuestPin } from '../../shared/quests'
   import type { FixedPin } from '../../shared/services'
-  import { addStop, advance, followed, gameRouteFrom, moveStop, noRoute, removeStop, routeFrom } from '../../shared/route'
+  import { addStop, advance, followed, gameRouteFrom, moveStop, noRoute, removeStop, routeFrom, type Route } from '../../shared/route'
+  import { kept } from './kept.svelte'
   import { followFrom, goneFrom, inboxFrom, setFrom } from '../../shared/send'
   import { journeyFrom, legsAhead, wayFrom } from '../../shared/journey'
   import Now from './Now.svelte'
@@ -39,9 +40,12 @@
     if (status.log) log = status.log
     if (status.fixed) fixed = status.fixed
   })
-  // The route: kept from one run of the app to the next.
-  let route = $state.raw(routeFrom(localStorage.getItem('route')))
-  $effect(() => localStorage.setItem('route', JSON.stringify(route)))
+  // The route: kept by the app, from one run to the next and for every screen that shows it.
+  const keptRoute = kept('route', routeFrom)
+  const route = $derived(keptRoute.value)
+  const setRoute = (to: Route): void => {
+    keptRoute.value = to
+  }
   let tiles = $state<TilesStatus | null>(null)
   window.twinmap.onTiles((status) => {
     tiles = status
@@ -90,15 +94,15 @@
   // Where the game is on the route it has: the app's route follows it, and a skip here is told to it.
   const gameRoute = $derived(live ? gameRouteFrom(link?.state.sections.route) : null)
   $effect(() => {
-    route = followed(route, gameRoute)
+    setRoute(followed(route, gameRoute))
   })
   function skip(): void {
-    route = advance(route)
+    setRoute(advance(route))
     if (route.sent && route.t) void window.twinmap.sendStep({ t: route.t, at: route.next + 1 })
   }
   function clear(): void {
     if (route.sent) void window.twinmap.sendRoute(false)
-    route = noRoute()
+    setRoute(noRoute())
   }
   // The journey Shortest Path guides in the game, and its legs as they lie on the map when the addon could read them.
   const journey = $derived(live ? journeyFrom(link?.state.sections.journey) : null)
@@ -162,7 +166,7 @@
 <div class="work" class:shut={!panelOpen} in:fade={screen} inert={onSettings} style:--peek="{peek}px">
   <div class="mapbox">
     {#if mapReady}
-      <Map {pos} at={link?.state.updatedAt.pos} bind:this={mapView} {insideReady} {quests} {fixed} side={char?.side} {live} {inbox} removed={live ? goneFrom(link?.state.sections.marks) : []} set={live ? setFrom(link?.state.sections.marks) : []} gameFollows={live ? followFrom(link?.state.sections.follow) : null} {journey} {ahead} {route} onroute={(stop) => (route = addStop(route, stop))} />
+      <Map {pos} at={link?.state.updatedAt.pos} bind:this={mapView} {insideReady} {quests} {fixed} side={char?.side} {live} {inbox} removed={live ? goneFrom(link?.state.sections.marks) : []} set={live ? setFrom(link?.state.sections.marks) : []} gameFollows={live ? followFrom(link?.state.sections.follow) : null} {journey} {ahead} {route} onroute={(stop) => setRoute(addStop(route, stop))} />
     {:else if tiles}
       <div class="making" class:failed={tiles.state === 'failed' || tiles.state === 'no-game'}>
         <p>{tilesLine(tiles)}</p>
@@ -202,13 +206,13 @@
       inGame={route.sent && gameRoute?.t === route.t}
       {journey}
       wayKnown={!!ahead}
-      onsent={(t) => (route = { ...route, sent: true, t })}
+      onsent={(t) => setRoute({ ...route, sent: true, t })}
       onskip={skip}
-      onarrive={() => (route = advance(route))}
+      onarrive={() => setRoute(advance(route))}
       onclear={clear}
-      onend={() => (route = noRoute())}
-      onremove={(index) => (route = removeStop(route, index))}
-      onmove={(from, to) => (route = moveStop(route, from, to))}
+      onend={() => setRoute(noRoute())}
+      onremove={(index) => setRoute(removeStop(route, index))}
+      onmove={(from, to) => setRoute(moveStop(route, from, to))}
       onstop={(stop) => mapView?.goTo({ continent: stop.continent, at: stop.at, title: stop.name })}
       onpick={(row) => mapView?.goTo({ continent: row.continent, at: row.at, title: row.name })} onpoint={(row) => mapView?.pointAt(row)} />
     {#if char}
