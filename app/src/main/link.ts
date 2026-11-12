@@ -104,6 +104,7 @@ export function startLink(tilesFolder: () => string | null = () => null): { snap
       return {
         game: status,
         state: withInside(game.state, found),
+        inside: ((said) => said && { why: said.why, lostFor: said.lostFor })(inside.report()?.report),
         seconds: elapsed / 1000,
         reads,
         cpu: elapsed ? ((cpu.user + cpu.system) / 1000 / elapsed) * 100 : 0,
