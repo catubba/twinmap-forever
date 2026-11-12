@@ -192,11 +192,15 @@ test('slots that cannot be loaded: it says so, and the news comes once they can'
   assert.deepEqual(got(), ['pin=nil', 'pin=Two']);
 });
 
-// Send to game, whole: the pin the app sends becomes the game's own map pin, and the strip tells the app it arrived.
+// Send to game, whole: the arrow of ours follows the pin the app sends, and the strip tells the app it arrived.
 const told = (addon) => addon.strips().map(decodeStrip).filter((b) => b.section === 'inbox').map((b) => JSON.parse(b.text));
-const waypoint = (addon) => addon.lua('return WAYPOINT and (WAYPOINT.m .. " " .. WAYPOINT.x .. " " .. WAYPOINT.y .. " " .. tostring(TRACKED))');
+// The point the arrow follows: its map and its place on it, 0 to 1. The game's own map pin is never set.
+const waypoint = (addon) => {
+  assert.equal(addon.lua('return WAYPOINT ~= nil or TRACKED ~= nil'), 'false', 'the game\'s own pin is left alone');
+  return addon.lua('local t = (...).Target(); return t and (t.m .. " " .. t.x .. " " .. t.y .. " true")');
+};
 
-test('a pin sent from the app is marked in the game and followed, and the strip says which send arrived', () => {
+test('a pin sent from the app is followed by the arrow, and the strip says which send arrived', () => {
   const { addon } = world();
   addon.lua('(...).db.mode = "fast"');
   addon.run(8);
@@ -207,15 +211,15 @@ test('a pin sent from the app is marked in the game and followed, and the strip 
   assert.equal(seq, before.seq % 60 + 1);
   addon.run(8);
   assert.equal(waypoint(addon), '1429 0.4371 0.658 true');
-  assert.equal(addon.printed(), 'Twinmap Forever: Lion\'s Pride Inn is marked on your map.');
+  assert.equal(addon.printed(), 'Twinmap Forever: Lion\'s Pride Inn is followed: the arrow points to it.');
   assert.deepEqual(told(addon).at(-1), { seq, left: 30 });
 });
 
-test('a pin the player removed does not come back at the next login, and a new one does', () => {
+test('a pin the player let go does not come back at the next login, and a new one does', () => {
   const { addon, enter } = world();
   app.send(addons, { pin: { m: 1429, x: 10, y: 20, name: 'Old', t: 1 } });
   addon.run(7);
-  addon.lua('C_Map.ClearUserWaypoint()');
+  addon.lua('(...).Forget()');
   addon.reload();
   enter();
   addon.run(7);
@@ -225,19 +229,20 @@ test('a pin the player removed does not come back at the next login, and a new o
   assert.equal(waypoint(addon), '1429 0.3 0.4 true');
 });
 
-test('a map the game allows no pin on: it says so and marks nothing; a pin that is not one is left alone', () => {
+test('a point on a map the game tells no place of is followed with no direction; a pin that is not one is left alone', () => {
   const { addon } = world();
-  addon.lua('GAME.noPinMap = 1455');
+  addon.lua('GAME.noWorld, GAME.north, GAME.west = 1455, 0, 0');
   app.send(addons, { pin: { m: 1455, x: 50, y: 50, name: 'The Great Forge', t: 3 } });
   addon.run(7);
-  assert.equal(waypoint(addon), null);
-  assert.equal(addon.printed(), 'Twinmap Forever: The Great Forge cannot be marked: the game allows no pin on that map.');
+  assert.equal(waypoint(addon), '1455 0.5 0.5 true');
+  assert.equal(addon.arrow(), 'The Great Forge | no direction from here | no tip');
+  addon.lua('(...).Forget()');
   app.send(addons, { pin: { m: 1429, x: 500, y: 'north', t: 4 } });
   addon.run(7);
   assert.equal(waypoint(addon), null);
 });
 
-// The route in the game: the next stop is the game's pin, and reaching it, skipping it and the end of the route all tell the app.
+// The route in the game: the arrow follows the next stop, and reaching it, skipping it and the end of the route all tell the app.
 const onStrip = (addon) => addon.strips().map(decodeStrip).filter((b) => b.section === 'route').map((b) => JSON.parse(b.text)).at(-1);
 const threeStops = (t) => ({ t, at: 1, stops: [
   { m: 1432, x: 40, y: 50, rx: 0.5, ry: 0.75, name: 'First' },
@@ -496,4 +501,92 @@ test('no more than twenty pins set in the game wait for the app', () => {
   for (let i = 0; i < 21; i++) assert.equal(addon.mapClick('LeftButton', 0.1 + i * 0.01, 0.5), true);
   assert.equal(addon.flags().split('; ').length, 20);
   assert.match(addon.printed().split('\n').at(-1), /open Twinmap before setting more pins/);
+});
+
+// The arrow of ours: where it points, how far it says, and when it goes.
+// The stand-in world: Elwynn (1429) is 2000 yards a side around the middle of the world; the character at its middle.
+test('the arrow turns to the point followed and tells how far; arriving ends it, and so does a right click on it', () => {
+  const { addon, enter } = world();
+  addon.lua('GAME.north, GAME.west, GAME.facing = 0, 0, 0'); // at the middle of Elwynn, facing north
+  assert.equal(addon.arrow(), null);
+  app.send(addons, { pin: { m: 1429, x: 50, y: 25, name: 'North Gate', t: 21 } });
+  addon.run(8);
+  assert.equal(addon.arrow(), 'North Gate | 500 yd | 0 26', 'straight ahead: the tip is up');
+  addon.lua('GAME.facing = math.pi / 2'); // now facing west: the point is to the right
+  addon.run(1);
+  assert.equal(addon.arrow(), 'North Gate | 500 yd | 26 0');
+  addon.lua('GAME.north, GAME.facing = 250, math.pi'); // closer, and with the back to it
+  addon.run(1);
+  assert.equal(addon.arrow(), 'North Gate | 250 yd | 0 -26');
+
+  addon.reload();
+  enter();
+  addon.run(1);
+  assert.equal(addon.arrow(), 'North Gate | 250 yd | 0 -26', 'followed again after a /reload');
+
+  addon.lua('GAME.north = 490'); // ten yards from it
+  addon.run(1);
+  assert.equal(addon.arrow(), null);
+  assert.equal(addon.printed().split('\n').at(-1), 'Twinmap Forever: you are at North Gate.');
+  addon.reload();
+  enter();
+  addon.run(8);
+  assert.equal(addon.arrow(), null, 'a point reached does not come back');
+
+  app.send(addons, { pin: { m: 1429, x: 50, y: 25, name: 'North Gate', t: 22 } });
+  addon.lua('GAME.north = 0');
+  addon.run(8);
+  assert.equal(addon.arrow(), 'North Gate | 500 yd | 0 -26');
+  addon.arrowClick('LeftButton');
+  assert.equal(addon.arrow(), 'North Gate | 500 yd | 0 -26');
+  addon.arrowClick('RightButton');
+  addon.run(1);
+  assert.equal(addon.arrow(), null);
+  assert.equal(addon.printed().split('\n').at(-1), 'Twinmap Forever: North Gate is no longer followed.');
+});
+
+test('with a route the arrow follows its next stop, and a right click on it does not end the route', () => {
+  const { addon } = onRoute(31);
+  addon.lua('GAME.north, GAME.west, GAME.facing = 15000, 0, 0'); // the middle of Loch Modan (1432) in the stand-in world
+  addon.run(1);
+  assert.equal(addon.arrow(), 'First | 200 yd | -26 0', 'the first stop is at 40, 50: 200 yards west, to the left of one who faces north');
+  addon.arrowClick('RightButton');
+  addon.run(1);
+  assert.equal(addon.arrow(), 'First | 200 yd | -26 0');
+  assert.equal(addon.printed().split('\n').at(-1), 'Twinmap Forever: the arrow follows the route: /twinmap skip moves on.');
+  addon.slash('/twinmap skip');
+  addon.run(1);
+  assert.equal(addon.arrow(), 'Second | 200 yd | 26 0');
+  addon.slash('/twinmap skip');
+  addon.run(1);
+  assert.equal(addon.arrow(), 'Third | 14412 yd | -1 -26', 'the third stop is in Elwynn, far to the south: behind one who faces north');
+});
+
+test('a click on a flag of the map has the arrow follow it, in gold; another click lets it go; the flags near are on the minimap', () => {
+  const { addon } = world();
+  addon.lua('GAME.mapOpen, GAME.shown, GAME.north, GAME.west, GAME.facing, GAME.miniRadius = true, 1429, 0, 0, 0, 200');
+  addon.lua('Minimap = CreateFrame("Frame"); function Minimap:GetWidth() return 140 end; function Minimap:GetFrameLevel() return 1 end; function Minimap:GetZoom() return 0 end');
+  app.send(addons, { mark1429x4371y6580: INN, mark1429x1000y2000: MINE });
+  addon.run(8);
+  assert.equal(addon.arrow(), null);
+  // The inn is 316 yards south and 126 west: off a minimap that shows 200 yards around.
+  assert.equal(addon.miniFlags(), '');
+  addon.flagClick('Inn', 'LeftButton');
+  assert.equal(addon.printed().split('\n').at(-1), 'Twinmap Forever: Inn is followed: the arrow points to it.');
+  addon.run(1);
+  assert.match(addon.arrow(), /^Inn \| 340 yd \| /);
+  assert.equal(addon.flags(), 'Inn 437 395; Mine 100 120', 'no second flag for the point followed');
+
+  addon.lua('GAME.north, GAME.west = -216, 125.8'); // a hundred yards north of the inn
+  addon.run(1);
+  assert.equal(addon.miniFlags(), 'Inn 0 -35', 'a hundred yards south on a minimap 140 wide that shows 200 around');
+  addon.lua('GAME.cvars = { rotateMinimap = "1" }; GAME.facing = math.pi'); // the minimap turns: facing south, the inn is up
+  addon.run(1);
+  assert.equal(addon.miniFlags(), 'Inn 0 35');
+
+  addon.flagClick('Inn', 'LeftButton');
+  addon.run(1);
+  assert.equal(addon.arrow(), null);
+  assert.equal(addon.printed().split('\n').at(-1), 'Twinmap Forever: Inn is no longer followed.');
+  assert.equal(addon.miniFlags(), 'Inn 0 35', 'the flag stays: only the arrow goes');
 });

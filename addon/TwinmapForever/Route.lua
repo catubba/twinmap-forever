@@ -1,6 +1,6 @@
--- The route: stops chosen on Twinmap's map, walked in order. The next stop is marked with the game's
--- own map pin, followed on screen; when the character is at it, the one after takes its place. The
--- strip tells the app how far along the route is. Only places are read, and only the pin is set.
+-- The route: stops chosen on Twinmap's map, walked in order. The arrow of ours follows the next
+-- stop (Arrow.lua); when the character is at it, the one after takes its place. The strip tells the
+-- app how far along the route is. Only places are read, and the game's own map pin is left alone.
 -- value: { t = when it was sent, at = the stop to start from, stops = { { m = map, x, y = 0 to 100,
 -- rx, ry = how near counts as there, in percent of that map, name = text } } }.
 local _, ns = ...
@@ -14,11 +14,7 @@ local acc = 0
 local function Say(line) print("Twinmap Forever: " .. line) end
 
 local function Mark(stop)
-  if not (C_Map and C_Map.SetUserWaypoint and UiMapPoint) then return end
-  if not stop then return C_Map.ClearUserWaypoint() end
-  if not C_Map.CanSetUserWaypointOnMap(stop.m) then return Say(stop.name .. " cannot be marked: the game allows no pin on that map.") end
-  C_Map.SetUserWaypoint(UiMapPoint.CreateFromCoordinates(stop.m, stop.x / 100, stop.y / 100))
-  if C_SuperTrack and C_SuperTrack.SetSuperTrackedUserWaypoint then C_SuperTrack.SetSuperTrackedUserWaypoint(true) end
+  ns.SetTarget("route", stop and { m = stop.m, x = stop.x / 100, y = stop.y / 100, name = stop.name } or nil)
 end
 
 -- quiet: the place on the route is being taken up again after a login, not reached.

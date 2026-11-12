@@ -3,16 +3,18 @@
 -- a part taken away takes its flag away. Alt and a right click on a flag removes it here: the strip
 -- tells the app, which forgets the point and takes the part away. Alt and a left click on the map
 -- sets a new one: it is drawn at once, told on the strip, and kept here until the app says it has
--- taken it among its pins. Only frames of ours are drawn, and nothing of the game's own map is touched.
+-- taken it among its pins. A click on a flag has the arrow follow it (Arrow.lua), and the point
+-- followed is a flag too, in gold. Only frames of ours are drawn, and nothing of the game's own map is touched.
 -- value: { m = map, x = 0 to 100, y = 0 to 100, name = text }.
 -- Placing a frame on the map's canvas and taking a click on it adapted from MapUtils, Copyright (c) 2026 D4KiR, GPL-3.0: see THIRD-PARTY-LICENSES.
 local _, ns = ...
 
 local SIZE = 16
 local IVORY = { 0.953, 0.918, 0.851 } -- the flag of the app's map (marks.ts)
+local GOLD = { 1, 0.82, 0 }           -- the one the arrow follows
 local WAITING = 20 -- marks set here that the app has not taken yet: more than these are not set
 
-local marks = {} -- part -> { m, x, y (0 to 1), name, continent, world }: the app's pins
+local marks = {} -- part -> { m, x, y (0 to 1), name }: the app's pins
 local fresh = {} -- id -> the same, for the marks set here that the app has not taken yet
 local flags = {} -- the frames, used again from one drawing to the next
 local hooked = false
@@ -37,15 +39,34 @@ local function Mark(value)
   end
 end
 
+-- Every point there is a flag for: the app's pins not removed here, the ones set here, and the
+-- point the arrow follows when it is none of them. fn(point, followed, part, id).
+function ns.EachMark(fn)
+  local target = ns.Target and ns.Target()
+  local met = false
+  local function Followed(mark)
+    local same = target and mark.m == target.m and math.abs(mark.x - target.x) < 1e-4 and math.abs(mark.y - target.y) < 1e-4 or false
+    met = met or same
+    return same
+  end
+  local gone = Gone()
+  for part, mark in pairs(marks) do
+    if not gone[part] then fn(mark, Followed(mark), part, false) end
+  end
+  for id, mark in pairs(fresh) do fn(mark, Followed(mark), false, id) end
+  if target and not met then fn(target, true, false, false) end
+end
+
 local function Remove(flag)
   if flag.id then
     New()[flag.id], fresh[flag.id] = nil, nil
   elseif flag.part and marks[flag.part] then
     Gone()[flag.part] = true
-  else
+  elseif not flag.followed then
     return
   end
-  Say(flag.name .. " is no longer among your pins.")
+  if flag.followed and ns.Forget then ns.Forget() end
+  Say(flag.name .. ((flag.id or flag.part) and " is no longer among your pins." or " is no longer followed."))
   Redraw()
 end
 
@@ -54,46 +75,65 @@ local function Rect(frame, layer, color, x, y, w, h)
   t:SetColorTexture(color[1], color[2], color[3], 1)
   t:SetPoint("TOPLEFT", frame, "TOPLEFT", x, -y)
   t:SetSize(w, h)
+  return t
 end
 
--- A pole and its cloth in ivory, on a black edge: the flag of the app's map.
-local function NewFlag(canvas)
-  local flag = CreateFrame("Frame", nil, canvas)
+-- A pole and its cloth on a black edge: the flag of the app's map. mouse: it takes clicks.
+function ns.NewFlag(parent, mouse)
+  local flag = CreateFrame("Frame", nil, parent)
   flag:SetSize(SIZE, SIZE)
   local black = { 0, 0, 0 }
   Rect(flag, "BACKGROUND", black, 2, 0, 4, 16)
   Rect(flag, "BACKGROUND", black, 2, 0, 13, 9)
-  Rect(flag, "ARTWORK", IVORY, 3, 1, 2, 14)
-  Rect(flag, "ARTWORK", IVORY, 5, 1, 9, 7)
+  flag.ink = { Rect(flag, "ARTWORK", IVORY, 3, 1, 2, 14), Rect(flag, "ARTWORK", IVORY, 5, 1, 9, 7) }
+  if not mouse then return flag end
   flag:EnableMouse(true)
-  -- A left click goes through to the map under it, where the game allows saying so.
-  if flag.SetPassThroughButtons then pcall(flag.SetPassThroughButtons, flag, "LeftButton") end
   flag:SetScript("OnEnter", function(self)
     if not GameTooltip then return end
     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
     GameTooltip:SetText(self.name)
-    GameTooltip:AddLine("Twinmap pin. Alt and right click removes it.", 1, 1, 1)
+    GameTooltip:AddLine(self.followed and "Twinmap pin, followed. Click stops following it." or "Twinmap pin. Click follows it.", 1, 1, 1)
+    GameTooltip:AddLine("Alt and right click removes it.", 1, 1, 1)
     GameTooltip:Show()
   end)
   flag:SetScript("OnLeave", function() if GameTooltip then GameTooltip:Hide() end end)
   flag:SetScript("OnMouseUp", function(self, button)
-    if button == "RightButton" and IsAltKeyDown() then Remove(self) end
+    if button == "RightButton" and IsAltKeyDown() then
+      Remove(self)
+    elseif button == "LeftButton" and not IsAltKeyDown() and ns.FollowClick then
+      ns.FollowClick(self.mark, self.followed)
+    end
   end)
   return flag
 end
 
--- Where a mark lies on the map on show, 0 to 1: on its own map as it was sent, on another (the
--- continent, a zone next to it) through its place in the world, where the game tells that.
-local function Where(mark, map)
-  if mark.m == map then return mark.x, mark.y end
+-- Ivory, or gold for the point the arrow follows.
+function ns.TintFlag(flag, followed)
+  local color = followed and GOLD or IVORY
+  for _, t in ipairs(flag.ink) do t:SetColorTexture(color[1], color[2], color[3], 1) end
+end
+
+-- The place of a point in the world, where the game tells it: the continent, and yards north and
+-- west. Found once and kept with the point.
+function ns.WorldOf(mark)
   if mark.world == nil then
     mark.world = false
     if C_Map.GetWorldPosFromMapPos and CreateVector2D then
       local continent, world = C_Map.GetWorldPosFromMapPos(mark.m, CreateVector2D(mark.x, mark.y))
-      if continent and world then mark.continent, mark.world = continent, world end
+      if continent and world then
+        mark.continent, mark.world = continent, world
+        mark.north, mark.west = world:GetXY()
+      end
     end
   end
-  if not (mark.world and C_Map.GetMapPosFromWorldPos) then return end
+  if mark.world then return mark.continent, mark.north, mark.west end
+end
+
+-- Where a mark lies on the map on show, 0 to 1: on its own map as it was sent, on another (the
+-- continent, a zone next to it) through its place in the world.
+local function Where(mark, map)
+  if mark.m == map then return mark.x, mark.y end
+  if not (ns.WorldOf(mark) and C_Map.GetMapPosFromWorldPos) then return end
   local _, pos = C_Map.GetMapPosFromWorldPos(mark.continent, mark.world, map)
   if not pos then return end
   local x, y = pos:GetXY()
@@ -140,33 +180,30 @@ local function Draw()
   end
   local n = 0
   local map = world:IsShown() and world:GetMapID()
-  local canvas = map and world:GetCanvas()
-  -- The canvas grows with the zoom: the flag is scaled back, so it keeps its size on the screen.
-  local scale = 1 / math.max(world.GetCanvasScale and world:GetCanvasScale() or 1, 0.01)
-  local function Put(mark, part, id)
-    local x, y = Where(mark, map)
-    if not x then return end
-    n = n + 1
-    local flag = flags[n] or NewFlag(canvas)
-    flags[n] = flag
-    flag.part, flag.id, flag.name = part or false, id or false, mark.name
-    flag:SetScale(scale)
-    flag:ClearAllPoints()
-    flag:SetPoint("CENTER", canvas, "TOPLEFT", canvas:GetWidth() * x / scale, -canvas:GetHeight() * y / scale)
-    flag:SetFrameLevel(canvas:GetFrameLevel() + 2400)
-    flag:Show()
-  end
   if map then
-    local gone = Gone()
-    for part, mark in pairs(marks) do
-      if not gone[part] then Put(mark, part, nil) end
-    end
-    for id, mark in pairs(fresh) do Put(mark, nil, id) end
+    local canvas = world:GetCanvas()
+    -- The canvas grows with the zoom: the flag is scaled back, so it keeps its size on the screen.
+    local scale = 1 / math.max(world.GetCanvasScale and world:GetCanvasScale() or 1, 0.01)
+    ns.EachMark(function(mark, followed, part, id)
+      local x, y = Where(mark, map)
+      if not x then return end
+      n = n + 1
+      local flag = flags[n] or ns.NewFlag(canvas, true)
+      flags[n] = flag
+      flag.part, flag.id, flag.name, flag.mark, flag.followed = part, id, mark.name, mark, followed
+      ns.TintFlag(flag, followed)
+      flag:SetScale(scale)
+      flag:ClearAllPoints()
+      flag:SetPoint("CENTER", canvas, "TOPLEFT", canvas:GetWidth() * x / scale, -canvas:GetHeight() * y / scale)
+      flag:SetFrameLevel(canvas:GetFrameLevel() + (followed and 2401 or 2400))
+      flag:Show()
+    end)
   end
   for i = n + 1, #flags do flags[i]:Hide() end
 end
 
 Redraw = function() pcall(Draw) end
+ns.MarksChanged = Redraw -- the point followed changed: its flag turns gold, the old one ivory
 
 -- Every part named "mark" and a place comes here, with its name: one point each.
 ns.receivers.mark = function(value, part)

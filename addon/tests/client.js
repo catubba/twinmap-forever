@@ -50,12 +50,24 @@ const STUB = `
   C_Map = {
     GetBestMapForUnit = function() return GAME.map end,
     GetMapInfo = function(map) return { mapID = map, name = GAME.zone } end,
+    -- The world of the stand-in: every zone map is 2000 yards a side, its middle (map - 1429) times
+    -- 5000 yards north of Elwynn's and as far west as it. GAME.noWorld: a map the game tells no place of.
+    GetWorldPosFromMapPos = function(map, at)
+      if map == GAME.noWorld then return end
+      return 0, CreateVector2D((map - 1429) * 5000 + (0.5 - at.y) * 2000, (0.5 - at.x) * 2000)
+    end,
+    GetMapPosFromWorldPos = function(_, world, map)
+      return map, CreateVector2D(0.5 - world.y / 2000, 0.5 - (world.x - (map - 1429) * 5000) / 2000)
+    end,
     -- The place on a map is told only for the map the character is on.
     GetPlayerMapPosition = function(map) return GAME.x and (map == nil or map == GAME.map) and { x = GAME.x, y = GAME.y } or nil end,
     CanSetUserWaypointOnMap = function(map) return map ~= GAME.noPinMap end,
     SetUserWaypoint = function(point) WAYPOINT = point end,
     ClearUserWaypoint = function() WAYPOINT, TRACKED = nil, nil end,
   }
+  function CreateVector2D(x, y) return { x = x, y = y, GetXY = function(self) return self.x, self.y end } end
+  C_Minimap = { GetViewRadius = function() return GAME.miniRadius end }
+  function GetCVar(name) return GAME.cvars and GAME.cvars[name] end
   UiMapPoint = { CreateFromCoordinates = function(map, x, y) return { m = map, x = x, y = y } end }
   C_SuperTrack = { SetSuperTrackedUserWaypoint = function(on) TRACKED = on end }
   LEVELS = {} -- every channel value a texture was given, as a key
@@ -133,7 +145,19 @@ const STUB = `
     function f:Hide() self.shown = false end
     function f:SetScale(scale) self.scale = scale end
     function f:SetText(text) self.text = text end
-    function f:CreateFontString() return setmetatable({}, Widget) end
+    function f:CreateFontString()
+      local s = setmetatable({}, Widget)
+      function s:SetText(text) self.text = text end
+      return s
+    end
+    -- A line keeps where it starts and ends, and whether it is shown.
+    function f:CreateLine()
+      local line = setmetatable({}, Widget)
+      function line:SetStartPoint(_, _, x, y) self.sx, self.sy = x, y end
+      function line:SetEndPoint(_, _, x, y) self.ex, self.ey = x, y end
+      function line:SetShown(on) self.on = on end
+      return line
+    end
     function f:CreateTexture()
       local t = setmetatable({}, Widget)
       -- A channel is on above GAME.threshold: half, unless a test draws the strip with other levels.
@@ -164,7 +188,7 @@ const STUB = `
   local ns = {}
   function T_load(name, source, chunk) return assert(load(source, "@" .. chunk))(name, ns) end
   -- /reload: the interface starts over, the saved variables and the fonts already read stay.
-  function T_reload() frames, slots, ns, SlashCmdList = {}, {}, {}, {} end
+  function T_reload() frames, slots, ns, SlashCmdList, TwinmapForeverArrow = {}, {}, {}, {}, nil end
   function T_fire(event)
     for _, f in ipairs(frames) do
       local fn = rawget(f, "OnEvent")
@@ -203,6 +227,23 @@ const STUB = `
     table.sort(out)
     return table.concat(out, "; ")
   end
+  -- The flags of ours on the minimap, in order of name: "name x y", in pixels right and up from its middle.
+  function T_miniFlags()
+    local out = {}
+    for _, f in ipairs(frames) do
+      if rawget(f, "mini") and f.shown then out[#out + 1] = ("%s %d %d"):format(f.name, math.floor(f.x * (f.scale or 1) + 0.5), math.floor(f.y * (f.scale or 1) + 0.5)) end
+    end
+    table.sort(out)
+    return table.concat(out, "; ")
+  end
+  -- The arrow of ours: "name | how far | where its tip is, in pixels right and up from its middle", or nothing when it is not shown.
+  function T_arrow()
+    local a = TwinmapForeverArrow
+    if not (a and a.shown) then return nil end
+    local tip = a.lines[4]
+    return ("%s | %s | %s"):format(a.name.text, a.far.text, tip.on and ("%.0f %.0f"):format(tip.ex, tip.ey) or "no tip")
+  end
+  function T_arrowClick(button) return rawget(TwinmapForeverArrow, "OnMouseUp")(TwinmapForeverArrow, button) end
   -- A click on the world map, at a place 0 to 1 from its top left: gives back whether an addon took it.
   function T_mapClick(button, x, y) return tostring(MAP_CLICK ~= nil and MAP_CLICK(WorldMapFrame, button, tonumber(x), tonumber(y))) end
   -- A click on the flag of that name, with a button of the mouse.
@@ -295,6 +336,9 @@ function loadAddon(dir, { addons } = {}) {
     click: (name) => call('T_click', name),
     flags: () => call('T_flags') || '',
     flagClick: (name, button) => call('T_flagClick', name, button),
+    miniFlags: () => call('T_miniFlags') || '',
+    arrow: () => call('T_arrow'),
+    arrowClick: (button) => call('T_arrowClick', button),
     mapClick: (button, x, y) => call('T_mapClick', button, String(x), String(y)) === 'true',
     // Drags a slider to a value.
     slide: (name, value) => call('T_slide', name, String(value)),
