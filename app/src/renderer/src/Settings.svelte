@@ -8,6 +8,8 @@
   import type { TilesStatus } from '../../shared/tiles-status'
   import Glyph from './Glyph.svelte'
   import Logo from './Logo.svelte'
+  import qrcode from 'qrcode-generator'
+  import { inApp } from './web'
 
   let { setup, tiles, link, onback, onfirstrun }: { setup: SetupStatus; tiles: TilesStatus | null; link: LinkStatus | null; onback: () => void; onfirstrun: () => void } = $props()
 
@@ -18,6 +20,18 @@
   async function choose(): Promise<void> {
     wrong = (await window.twinmap.chooseGameFolder()) ?? ''
   }
+  // The address a phone opens, as a code its camera reads: one square of the path for each dark one of the code.
+  const lanUrl = $derived(setup.lan && 'url' in setup.lan ? setup.lan.url : null)
+  const code = $derived.by(() => {
+    if (!lanUrl) return null
+    const made = qrcode(0, 'M')
+    made.addData(lanUrl)
+    made.make()
+    const side = made.getModuleCount()
+    let path = ''
+    for (let row = 0; row < side; row++) for (let column = 0; column < side; column++) if (made.isDark(row, column)) path += `M${column} ${row}h1v1h-1z`
+    return { side, path }
+  })
   const map = $derived(
     !tiles || tiles.state === 'looking' ? 'Looking' : tiles.state === 'no-game' ? 'Waiting for the game folder' : tiles.state === 'converting' ? `Being built, ${tiles.percent}%` : tiles.state === 'failed' ? `Not built: ${tiles.message}` : `${tiles.tiles.toLocaleString('en-US')} tiles, from game version ${tiles.version}`,
   )
@@ -64,6 +78,27 @@
       <dt>Full screen</dt>
       <dd>F11 turns it on and off.</dd>
     </dl>
+
+    {#if inApp}
+      <h2 class="band">Phone and tablet</h2>
+      <dl>
+        <dt>On the home network</dt>
+        <dd>
+          <label class="choice"><input type="checkbox" class="check" checked={!!setup.lan} onchange={(e) => window.twinmap.setLan(e.currentTarget.checked)} />Show the map to my other devices</label>
+          {#if setup.lan && 'error' in setup.lan}<span class="wrong">{setup.lan.error}</span>{/if}
+        </dd>
+        {#if lanUrl && code}
+          <dt>Code to scan</dt>
+          <dd>
+            <svg class="code" viewBox="-4 -4 {code.side + 8} {code.side + 8}" role="img" aria-label="The address below, as a code for the camera of a phone"><path d={code.path} /></svg>
+          </dd>
+          <dt>Address</dt>
+          <dd class="address">{lanUrl}</dd>
+        {/if}
+        <dt>Who can open it</dt>
+        <dd>A device on the same network as this computer that has this address, and no one from outside. The first time, Windows may ask whether Twinmap can be reached on private networks: allow it.</dd>
+      </dl>
+    {/if}
 
     <h2 class="band">Shortcuts</h2>
     <dl>
@@ -164,6 +199,18 @@
     flex-basis: 100%;
     color: var(--objective);
     line-height: 21px;
+  }
+
+  /* Dark on white with a clear edge around, whatever the app's own colors: that is what a camera reads. */
+  .code {
+    width: 176px;
+    height: 176px;
+    background: #fff;
+    fill: #000;
+    shape-rendering: crispEdges;
+  }
+  .address {
+    user-select: text;
   }
 
   .about {

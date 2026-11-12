@@ -1,5 +1,6 @@
 <script lang="ts">
   // Trial page: every basic control in every state, side by side. Opened with TWINMAP_KIT=1, never from the app's own screens.
+  import { TILES } from './web'
   import { onMount } from 'svelte'
   import { unitsOfRect } from '../../shared/geo'
   import type { GameMap } from '../../shared/maps'
@@ -18,7 +19,7 @@
   onMount(() => {
     let tries = 0
     const look = (): void => {
-      fetch('twinmap://tiles/maps.json')
+      fetch(`${TILES}/maps.json`)
         .then((answer) => answer.json() as Promise<GameMap[]>)
         .then((maps) => {
           grounds = grounds.map((g) => {
@@ -26,7 +27,7 @@
             if (!m) return g
             const [a, b] = unitsOfRect(m.rect!), world = WORLDS.find((w) => w.continent === m.continent)!.name
             // Zoom 5: a tile is 8 units of the map wide.
-            return { ...g, tile: `twinmap://tiles/${world}/5/${Math.floor((a.x + b.x) / 16)}/${Math.floor((a.y + b.y) / 16)}.png` }
+            return { ...g, tile: `${TILES}/${world}/5/${Math.floor((a.x + b.x) / 16)}/${Math.floor((a.y + b.y) / 16)}.png` }
           })
         })
         .catch(() => void (++tries < 8 && setTimeout(look, 1000))) // the tiles are not ready in the first moments

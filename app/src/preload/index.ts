@@ -1,6 +1,6 @@
-// The door between the window and the main process. The window listens; it can ask for eight things
+// The door between the window and the main process. The window listens; it can ask for nine things
 // only: to pick the game folder, to open the addon's page on CurseForge, to build the map again after a
-// failure, to stay over other windows, to search the player's QuestieDB, to mark a point in the
+// failure, to stay over other windows, to show the map on the home network, to search the player's QuestieDB, to mark a point in the
 // game, to send it a route, and to step ahead on that route. It says one: that its opening screen is drawn.
 import { contextBridge, ipcRenderer } from 'electron'
 import type { LinkSnapshot } from '../shared/link'
@@ -33,6 +33,8 @@ contextBridge.exposeInMainWorld('twinmap', {
   // The opening screen is drawn: the window can show itself.
   drawn: (): void => ipcRenderer.send('drawn'),
   setOnTop: (on: boolean): Promise<void> => ipcRenderer.invoke('set-on-top', on),
+  // Shows the map to the other devices of the home network, or stops showing it.
+  setLan: (on: boolean): Promise<void> => ipcRenderer.invoke('set-lan', on),
   // NPCs, quests and items whose name answers what was typed.
   search: (typed: string): Promise<Found[]> => ipcRenderer.invoke('search', typed),
   // The way on foot between two points of a continent; null where there is none.

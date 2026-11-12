@@ -19,6 +19,7 @@ declare global {
       retryTiles: () => Promise<void>
       drawn: () => void
       setOnTop: (on: boolean) => Promise<void>
+      setLan: (on: boolean) => Promise<void>
       search: (typed: string) => Promise<Found[]>
       walk: (ask: import('../../shared/walk').WalkAsk) => Promise<import('../../shared/walk').WalkPath>
       walkFar: (ask: import('../../shared/walk').FarAsk) => Promise<import('../../shared/walk').Far>

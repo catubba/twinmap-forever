@@ -18,6 +18,10 @@ export interface Settings {
   setupDone?: boolean
   /** The window stays over the others. */
   onTop?: boolean
+  /** The map is shown to the other devices of the home network. */
+  lan?: boolean
+  /** The code those devices must hold. Made once, so an address saved on a phone keeps working. */
+  lanCode?: string
 }
 
 /** The settings as they were saved; nothing where the file is missing or is not ours. */
@@ -25,8 +29,14 @@ export function readSettings(file: string): Settings {
   try {
     const read: unknown = JSON.parse(readFileSync(file, 'utf8'))
     if (typeof read !== 'object' || !read) return {}
-    const { gameFolder, setupDone, onTop } = read as Record<string, unknown>
-    return { ...(typeof gameFolder === 'string' ? { gameFolder } : {}), ...(setupDone === true ? { setupDone } : {}), ...(onTop === true ? { onTop } : {}) }
+    const { gameFolder, setupDone, onTop, lan, lanCode } = read as Record<string, unknown>
+    return {
+      ...(typeof gameFolder === 'string' ? { gameFolder } : {}),
+      ...(setupDone === true ? { setupDone } : {}),
+      ...(onTop === true ? { onTop } : {}),
+      ...(lan === true ? { lan } : {}),
+      ...(typeof lanCode === 'string' && /^[\w-]{8,64}$/.test(lanCode) ? { lanCode } : {}),
+    }
   } catch {
     return {}
   }

@@ -15,6 +15,8 @@ export interface SetupStatus {
   version: string
   /** The player asked for the window to stay over the others. */
   onTop: boolean
+  /** The map on the home network: the address a phone opens, or why it cannot be had. Absent or null while it is off. */
+  lan?: { url: string } | { error: string } | null
 }
 
 /** Where the addon is published. The app never installs it itself: every install is one CurseForge counts. */

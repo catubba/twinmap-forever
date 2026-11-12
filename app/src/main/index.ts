@@ -1,4 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, protocol, screen, shell } from 'electron'
+import { randomBytes } from 'node:crypto'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -6,11 +7,12 @@ import { linkStatus, lostPercent } from '../shared/link'
 import { shownFrom, type QuestsStatus } from '../shared/quests'
 import type { Found } from '../shared/search'
 import { marksNews, pinFrom, routeNewsFrom, stepFrom, takenFrom } from '../shared/send'
-import { CURSEFORGE, setupComplete, setupPages } from '../shared/setup'
+import { CURSEFORGE, setupComplete, setupPages, type SetupStatus } from '../shared/setup'
 import type { TilesStatus } from '../shared/tiles-status'
 import { placeWindow, WINDOW } from '../shared/window'
 import { findGameWindow, programOf } from './capture'
 import { gameFolderFrom, registryInstallPath } from './client-files'
+import { homeAddress, LAN_PORT, startLan, type Lan, type Served } from './lan'
 import { startLink } from './link'
 import type { Answer, Asked } from './questie-worker'
 import startQuestieWorker from './questie-worker?nodeWorker'
@@ -177,11 +179,29 @@ function createWindow(): void {
   const tellQuests = (status: QuestsStatus): void => {
     questsNow = { ...status, fixed: status.fixed ?? questsNow.fixed } // the fixed pins come once: kept for a page that loads later
     if (!win.isDestroyed()) win.webContents.send('quests', status)
+    lan?.tell('quests', questsNow)
   }
   let quests = startQuests(gameFolder, tellQuests)
   let walks = startWalks(gameFolder)
+  // A file of the map, for the window and for a phone on the home network alike.
+  const served = async (path: string): Promise<Served> => {
+    const status = tiles.status()
+    const file = status.state === 'ready' ? servedFile(status.folder, path) : null
+    const bytes = file ? await readFile(file).catch(() => null) : null
+    // Where the game has no picture there is no file. That is the sea, not a fault: an empty picture for
+    // a tile and an empty answer for a block, so the page logs no error for it.
+    if (!bytes) return file?.endsWith('.png') ? { status: 200, type: 'image/gif', bytes: BLANK } : { status: file ? 204 : 404 }
+    return { status: 200, type: file!.endsWith('.png') ? 'image/png' : file!.endsWith('.json') ? 'application/json' : 'application/octet-stream', bytes }
+  }
   win.webContents.on('did-finish-load', () => win.webContents.send('quests', questsNow))
 
+  // What a page may ask for from either place, the app's own window or a phone on the home network.
+  // Each checks what it is given.
+  const calls: Record<string, (...args: unknown[]) => unknown> = {}
+  const asks = (name: string, answer: (...args: unknown[]) => unknown): void => {
+    calls[name] = answer
+    ipcMain.handle(name, (_event, ...args: unknown[]) => answer(...args))
+  }
   // What the window may ask for, and only this: to let the player pick the game folder, to open the
   // addon's page on CurseForge in the browser, and (further down) to keep the window over the others.
   ipcMain.handle('choose-game-folder', async (): Promise<string | null> => {
@@ -205,26 +225,60 @@ function createWindow(): void {
     return null
   })
   // The search of the top row: what was typed, cut to a sane length.
-  ipcMain.handle('search', (_event, typed: unknown): Promise<Found[]> => (typeof typed === 'string' ? quests.search(typed.slice(0, 80)) : Promise.resolve([])))
+  asks('search', (typed: unknown): Promise<Found[]> => (typeof typed === 'string' ? quests.search(typed.slice(0, 80)) : Promise.resolve([])))
   // The way on foot between two points of a continent, for the line of the journey.
-  ipcMain.handle('walk', (_event, asked: unknown): Promise<WalkPath> => {
+  asks('walk', (asked: unknown): Promise<WalkPath> => {
     const ask = walkAskFrom(asked)
     return ask ? walks.find(ask) : Promise.resolve(null)
   })
   // How far on foot from one point to many: for Nearby, the search, the label of a point.
-  ipcMain.handle('walk-far', (_event, asked: unknown): Promise<Far> => {
+  asks('walk-far', (asked: unknown): Promise<Far> => {
     const ask = farAskFrom(asked)
     return ask ? walks.far(ask) : Promise.resolve([])
   })
   ipcMain.handle('open-curseforge', () => shell.openExternal(CURSEFORGE))
   // A conversion that failed is started again, from where it stopped: the cause may be gone (a full disk, a folder in use).
-  ipcMain.handle('retry-tiles', () => {
+  asks('retry-tiles', () => {
     if (tiles.status().state !== 'failed') return
     tiles.stop()
     tiles = startTiles(gameFolder)
   })
   // Where the first run stands, looked at every couple of seconds: an addon installed meanwhile shows by itself.
-  let setup = setupStatus(gameFolder, settings, app.getVersion())
+  // The map on the home network, for a phone or a tablet as the second screen: off until the player
+  // turns it on in the settings. The same page, the same map files, and what a page may ask for above.
+  // My pins are not among it: each browser keeps its own for now, and the game is to have the computer's.
+  let lan: Lan | null = null
+  let lanWord: SetupStatus['lan'] = null
+  const lookSetup = (): SetupStatus => ({ ...setupStatus(gameFolder, settings, app.getVersion()), lan: lanWord })
+  const lanUrl = async (): Promise<void> => {
+    const address = await homeAddress()
+    if (lan) lanWord = address ? { url: `http://${address}:${LAN_PORT}/?k=${settings.lanCode}` } : { error: 'This computer is on no home network.' }
+  }
+  const turnLan = (on: boolean): void => {
+    lan?.stop()
+    lan = null
+    lanWord = null
+    if (!on) return
+    if (!settings.lanCode) {
+      settings.lanCode = randomBytes(9).toString('base64url')
+      writeSettings(settingsFile, settings)
+    }
+    const started = startLan(LAN_PORT, { code: settings.lanCode, page: join(__dirname, '../renderer'), tile: served, calls }, (message) => {
+      if (lan !== started) return
+      lan = null
+      lanWord = { error: message }
+    })
+    lan = started
+    lan.tell('quests', questsNow)
+    void lanUrl()
+  }
+  ipcMain.handle('set-lan', (_event, on: unknown) => {
+    settings.lan = on === true
+    writeSettings(settingsFile, settings)
+    turnLan(settings.lan)
+    setup = lookSetup()
+  })
+  let setup = lookSetup()
   // The way back to the game: once the addon is there, the bank of font names and the slots go next
   // to it, by themselves and once. Where that fails (a folder that cannot be written) the map works all the same.
   let channel: Promise<unknown> | null = null
@@ -272,7 +326,7 @@ function createWindow(): void {
       return { error: 'Twinmap could not write next to the addon in the game folder.' }
     }
   }
-  ipcMain.handle('send-pin', (_event, asked: unknown): Sent => {
+  asks('send-pin', (asked: unknown): Sent => {
     const pin = pinFrom(asked)
     return sendParts(pin && { pin: { ...pin, t: Date.now() } })
   })
@@ -282,13 +336,13 @@ function createWindow(): void {
     marksTimer ??= setTimeout(sendMarks, MARKS_WAIT)
   })
   // The point the game's arrow follows by itself is let go: a number new each time, so the addon acts once.
-  ipcMain.handle('send-unfollow', (): Sent => sendParts({ unfollow: Date.now() }))
+  asks('send-unfollow', (): Sent => sendParts({ unfollow: Date.now() }))
   // The route, whole, or false to take it away from the game; and a step ahead on the route the game has.
-  ipcMain.handle('send-route', (_event, asked: unknown): Sent => {
+  asks('send-route', (asked: unknown): Sent => {
     const route = routeNewsFrom(asked)
     return sendParts(route === null ? null : { route })
   })
-  ipcMain.handle('send-step', (_event, asked: unknown): Sent => {
+  asks('send-step', (asked: unknown): Sent => {
     const step = stepFrom(asked)
     return sendParts(step && { step })
   })
@@ -298,37 +352,37 @@ function createWindow(): void {
     settings.onTop = on === true
     writeSettings(settingsFile, settings)
     win.setAlwaysOnTop(settings.onTop)
-    setup = setupStatus(gameFolder, settings, app.getVersion())
+    setup = lookSetup()
   })
   const look = setInterval(() => {
     if (!gameFolder && (gameFolder = findGameFolder(settings.gameFolder))) quests = startQuests(gameFolder, tellQuests) // the game may be started after the app
     if (gameFolder && tiles.status().state === 'no-game') tiles = startTiles(gameFolder)
-    setup = setupStatus(gameFolder, settings, app.getVersion())
+    setup = lookSetup()
     readyChannel()
+    void lanUrl() // the address of this computer may change while the app is open
     if (!settings.setupDone && setupComplete(setupPages(setup, tiles.status(), linkStatus(link.snapshot(), Date.now())))) {
       settings.setupDone = true
       writeSettings(settingsFile, settings)
     }
   }, 2000)
   protocol.handle('twinmap', async (request) => {
-    const status = tiles.status(), url = new URL(request.url)
-    const file = status.state === 'ready' && url.host === 'tiles' ? servedFile(status.folder, url.pathname) : null
-    const bytes = file ? await readFile(file).catch(() => null) : null
-    // Where the game has no picture there is no file. That is the sea, not a fault: an empty picture for
-    // a tile and an empty answer for a block, so the window logs no error for it.
-    if (!bytes) {
-      if (file?.endsWith('.png')) return new Response(new Uint8Array(BLANK), { headers: { 'content-type': 'image/gif', 'access-control-allow-origin': '*' } })
-      return new Response(null, { status: file ? 204 : 404, headers: { 'access-control-allow-origin': '*' } })
-    }
-    const type = file!.endsWith('.png') ? 'image/png' : file!.endsWith('.json') ? 'application/json' : 'application/octet-stream'
-    return new Response(new Uint8Array(bytes), { headers: { 'content-type': type, 'access-control-allow-origin': '*', 'cache-control': 'max-age=3600' } })
+    const url = new URL(request.url)
+    const { status, type, bytes } = url.host === 'tiles' ? await served(url.pathname) : ({ status: 404 } as Served)
+    return new Response(bytes ? new Uint8Array(bytes) : null, { status, headers: { ...(type ? { 'content-type': type } : {}), 'access-control-allow-origin': '*', ...(bytes && bytes !== BLANK ? { 'cache-control': 'max-age=3600' } : {}) } })
   })
+  turnLan(settings.lan === true)
+  let lanTick = false
   const show = setInterval(() => {
     const snapshot = link.snapshot()
     quests.show(snapshot.state.sections.questie)
     win.webContents.send('link', snapshot)
     win.webContents.send('tiles', tiles.status())
     win.webContents.send('setup', setup)
+    if (!lan) return
+    // ponytail: the whole snapshot ten times a second; only what changed, if a phone's battery or the wifi says so (M11-F6)
+    if ((lanTick = !lanTick)) lan.tell('link', snapshot)
+    lan.tell('tiles', tiles.status())
+    lan.tell('setup', setup)
   }, SHOW_EVERY)
 
   // The measures of a live session, for whoever tunes the link: read, lost, processor.
@@ -361,20 +415,16 @@ function createWindow(): void {
     clearInterval(look)
     ipcMain.removeHandler('choose-game-folder')
     ipcMain.removeHandler('open-curseforge')
-    ipcMain.removeHandler('retry-tiles')
     ipcMain.removeHandler('set-on-top')
-    ipcMain.removeHandler('send-pin')
+    ipcMain.removeHandler('set-lan')
+    for (const name of Object.keys(calls)) ipcMain.removeHandler(name)
+    lan?.stop()
     ipcMain.removeHandler('send-marks')
-    ipcMain.removeHandler('send-unfollow')
     if (marksTimer) clearTimeout(marksTimer)
-    ipcMain.removeHandler('send-route')
-    ipcMain.removeHandler('send-step')
     link.stop()
     tiles.stop()
     quests.stop()
     walks.stop()
-    ipcMain.removeHandler('walk')
-    ipcMain.removeHandler('walk-far')
     protocol.unhandle('twinmap')
   })
 }
