@@ -849,7 +849,7 @@
     if (!goal || goal.continent !== continent) return
     if (walked && me && walked.continent === continent && me.continent === continent) {
       const rest = ahead(walked.points, me.units).rest.map(at)
-      for (const [color, weight, dashArray] of [['#000', 5, '1 10'], ['#ffd100', 2.5, '1 10']] as const) L.polyline(rest, { color, weight, dashArray, lineCap: 'round', lineJoin: 'round', interactive: false }).addTo(journeyLayer)
+      for (const [color, weight, dashArray] of [['#000', 7.5, '9 13'], ['#ffd100', 4.5, '9 13']] as const) L.polyline(rest, { color, weight, dashArray, lineCap: 'round', lineJoin: 'round', interactive: false }).addTo(journeyLayer)
     }
     L.circleMarker(at(goal.at), { radius: 7, color: '#000', weight: 4, fill: false, interactive: false }).addTo(journeyLayer)
     L.circleMarker(at(goal.at), { radius: 7, color: '#ffd100', weight: 2, fillColor: '#ffd100', fillOpacity: 0.35 })
