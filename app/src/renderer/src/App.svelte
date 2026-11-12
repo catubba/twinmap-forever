@@ -143,7 +143,7 @@
 <div class="work" in:fade={screen} inert={onSettings}>
   <div class="mapbox">
     {#if mapReady}
-      <Map {pos} at={link?.state.updatedAt.pos} bind:this={mapView} {insideReady} {quests} {fixed} side={char?.side} {live} {inbox} removed={live ? goneFrom(link?.state.sections.marks) : []} set={live ? setFrom(link?.state.sections.marks) : []} gameFollows={live ? followFrom(link?.state.sections.follow) : null} {route} onroute={(stop) => (route = addStop(route, stop))} />
+      <Map {pos} at={link?.state.updatedAt.pos} bind:this={mapView} {insideReady} {quests} {fixed} side={char?.side} {live} {inbox} removed={live ? goneFrom(link?.state.sections.marks) : []} set={live ? setFrom(link?.state.sections.marks) : []} gameFollows={live ? followFrom(link?.state.sections.follow) : null} journey={live ? journeyFrom(link?.state.sections.journey) : null} {route} onroute={(stop) => (route = addStop(route, stop))} />
     {:else if tiles}
       <div class="making" class:failed={tiles.state === 'failed' || tiles.state === 'no-game'}>
         <p>{tilesLine(tiles)}</p>

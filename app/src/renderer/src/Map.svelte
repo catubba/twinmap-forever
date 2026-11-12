@@ -23,13 +23,15 @@
   import { drop, gone, still } from './motion'
   import PointLabel from './PointLabel.svelte'
   import { inRoute, noRoute, type Route, type Stop } from '../../shared/route'
+  import type { Journey } from '../../shared/journey'
+  import { ahead } from '../../shared/walk'
   import { pinOfMark, removePin, renamePin, savedAt, savedFrom, savePin, type SavedPin } from '../../shared/saved'
   import { markPart, sendState, type GameMark, type Inbox, type Pin } from '../../shared/send'
   import { pin } from './marks'
 
   // at: when the position was read off the game, in milliseconds.
   // insideReady: the rooms of the buildings are converted, and their list can be asked for.
-  let { pos, at: readAt, insideReady, quests = [], fixed = [], side, live = false, inbox = null, removed = [], set = [], gameFollows = null, route = noRoute(), onroute }: { pos: Position | undefined; at: number | undefined; insideReady: boolean; quests?: QuestPin[]; fixed?: FixedPin[]; side?: string; live?: boolean; inbox?: Inbox | null; removed?: string[]; set?: GameMark[]; gameFollows?: Pin | null; route?: Route; onroute?: (stop: Stop) => void } = $props()
+  let { pos, at: readAt, insideReady, quests = [], fixed = [], side, live = false, inbox = null, removed = [], set = [], gameFollows = null, journey = null, route = noRoute(), onroute }: { journey?: Journey | null; pos: Position | undefined; at: number | undefined; insideReady: boolean; quests?: QuestPin[]; fixed?: FixedPin[]; side?: string; live?: boolean; inbox?: Inbox | null; removed?: string[]; set?: GameMark[]; gameFollows?: Pin | null; route?: Route; onroute?: (stop: Stop) => void } = $props()
 
   const TILES = 'twinmap://tiles'
   const TOP_ZOOM = 7 // the game's own detail: a block's picture is four tiles
@@ -810,6 +812,53 @@
   $effect(() => {
     if (map && layers.mypins && !inside) myPinsLayer.addTo(map)
     else myPinsLayer.remove()
+  })
+
+  // The journey Shortest Path guides in the game: a ring on its goal, and, while all that is left
+  // of it is on foot, the way there as a dashed line. The game's API tells no points of its line,
+  // so the way is found here on the same grid (main/walk.ts): from the character to the goal,
+  // again when the goal changes or the character leaves it, and shortened as the character walks.
+  const OFF_THE_WAY = 40 // yards
+  const ASK_EVERY = 2000 // ms between two askings at least
+  const journeyGoal = $derived.by(() => {
+    if (!journey || journey.loading || !journey.goal) return null
+    const goal = journey.goal, on = maps.find((m) => m.id === goal.m)
+    if (!on?.rect || on.continent === null) return null
+    return { continent: on.continent, at: unitsOfPlace(on.rect, goal.x, goal.y), name: journey.name, walked: journey.legs.every((leg) => leg.mode === 'walk') }
+  })
+  let walked = $state<{ key: string; continent: Continent; points: Point[] } | null>(null)
+  let asking = false, askedAt = 0
+  $effect(() => {
+    const goal = journeyGoal
+    if (!goal?.walked || !me || me.continent !== goal.continent) return void (walked = null)
+    const key = `${goal.continent} ${goal.at.x} ${goal.at.y}`, from = me.units
+    if (walked?.key === key && ahead(walked.points, from).off <= OFF_THE_WAY) return
+    if (asking || Date.now() - askedAt < ASK_EVERY) return
+    asking = true
+    askedAt = Date.now()
+    void window.twinmap.walk({ continent: goal.continent, from: { ...from }, to: { ...goal.at } }).then((path) => {
+      asking = false
+      // No way found (a goal on a floor of a building, or too far): a straight line, as before.
+      walked = { key, continent: goal.continent, points: path?.points ?? [from, goal.at] }
+    })
+  })
+  const journeyLayer = L.layerGroup()
+  $effect(() => {
+    journeyLayer.clearLayers()
+    const goal = journeyGoal
+    if (!goal || goal.continent !== continent) return
+    if (walked && me && walked.continent === continent && me.continent === continent) {
+      const rest = ahead(walked.points, me.units).rest.map(at)
+      for (const [color, weight, dashArray] of [['#000', 5, '1 10'], ['#ffd100', 2.5, '1 10']] as const) L.polyline(rest, { color, weight, dashArray, lineCap: 'round', lineJoin: 'round', interactive: false }).addTo(journeyLayer)
+    }
+    L.circleMarker(at(goal.at), { radius: 7, color: '#000', weight: 4, fill: false, interactive: false }).addTo(journeyLayer)
+    L.circleMarker(at(goal.at), { radius: 7, color: '#ffd100', weight: 2, fillColor: '#ffd100', fillOpacity: 0.35 })
+      .bindTooltip(Object.assign(document.createElement('span'), { textContent: `${goal.name}, the journey in the game` }), { direction: 'top', offset: [0, -8], className: 'tip' })
+      .addTo(journeyLayer)
+  })
+  $effect(() => {
+    if (map && !inside) journeyLayer.addTo(map)
+    else journeyLayer.remove()
   })
 
   // The route: a white line through its stops on this continent, and a disc on each. A stop done is
