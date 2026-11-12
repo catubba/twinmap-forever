@@ -129,7 +129,7 @@
       <dt>Twinmap</dt>
       <dd>Version {setup.version}</dd>
       <dt>Checking for updates</dt>
-      <dd>Not yet in this version. The addon updates through CurseForge.</dd>
+      <dd>Every time Twinmap starts. A newer version installs itself before the map opens. The addon updates through CurseForge.</dd>
     </dl>
 
     <h2 class="band">About</h2>

@@ -57,6 +57,7 @@ if (!inApp) {
     setOnTop: () => Promise.resolve(),
     setLan: () => Promise.resolve(),
     drawn: () => {},
+    onUpdate: () => {}, // the app updates itself on its computer, never from here
     retryTiles: call('retry-tiles', undefined),
     search: call('search', []),
     walk: call('walk', null),
