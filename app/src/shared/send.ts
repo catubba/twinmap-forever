@@ -132,3 +132,8 @@ export function setFrom(section: unknown): GameMark[] {
 export function takenFrom(asked: unknown): string[] {
   return Array.isArray(asked) ? asked.filter((id): id is string => typeof id === 'string' && id.length > 0 && id.length <= 40).slice(0, 50) : []
 }
+
+/** The point the game's arrow follows by itself (not a stop of the route), as the strip tells it; null when there is none. */
+export function followFrom(section: unknown): Pin | null {
+  return Array.isArray(section) ? null : pinFrom(section)
+}

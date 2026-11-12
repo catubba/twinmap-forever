@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { setFrom, takenFrom, goneFrom, markPart, marksNews, inboxFrom, pinFrom, routeNewsFrom, sendState, stepFrom } from './send'
+import { followFrom, setFrom, takenFrom, goneFrom, markPart, marksNews, inboxFrom, pinFrom, routeNewsFrom, sendState, stepFrom } from './send'
 
 test('a pin is checked before it leaves: a real map, a place on it, a name of plain text', () => {
   expect(pinFrom({ m: 1429, x: 43.712, y: 65.8, name: 'Lion\'s Pride Inn' })).toEqual({ m: 1429, x: 43.71, y: 65.8, name: 'Lion\'s Pride Inn' })
@@ -64,4 +64,11 @@ test('the marks set in the game are read off the strip, each with the name the a
   expect(setFrom(null)).toEqual([])
   expect(takenFrom(['1429x2500y5000', 7, ''])).toEqual(['1429x2500y5000'])
   expect(takenFrom('all')).toEqual([])
+})
+
+test('the point the game follows is read off the strip; an empty answer is none', () => {
+  expect(followFrom({ m: 1429, x: 50, y: 25, name: 'North Gate' })).toEqual({ m: 1429, x: 50, y: 25, name: 'North Gate' })
+  expect(followFrom([])).toBeNull()
+  expect(followFrom({})).toBeNull()
+  expect(followFrom(undefined)).toBeNull()
 })

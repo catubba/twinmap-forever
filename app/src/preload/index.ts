@@ -39,6 +39,8 @@ contextBridge.exposeInMainWorld('twinmap', {
   // My pins, all of them: the game draws the same points on its own map. taken: the marks set in
   // the game that are now among them, by the name the addon knows them by.
   sendMarks: (pins: Pin[], taken: string[]): Promise<void> => ipcRenderer.invoke('send-marks', pins, taken),
+  // Has the game's arrow let go of the point it follows by itself.
+  sendUnfollow: (): Promise<{ seq: number } | { error: string }> => ipcRenderer.invoke('send-unfollow'),
   // Sends the route to the game, or takes it away from it with false.
   sendRoute: (route: RouteNews | false): Promise<{ seq: number } | { error: string }> => ipcRenderer.invoke('send-route', route),
   // Moves the game on to a stop of the route it has.

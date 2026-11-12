@@ -4,7 +4,8 @@
 -- flags of ours that are near show on the minimap too. All of it is frames of ours: the game's own
 -- map pin and its arrow are never touched. Where the game tells no place (inside a dungeon, or the
 -- point is on another continent) the arrow says so and points nowhere.
--- The arrow is dragged where the player wants it; a right click on it stops following.
+-- The arrow is dragged where the player wants it; a right click on it stops following. The strip
+-- tells the app which point is followed by itself, and the app can ask to let it go.
 -- How far and which way from the character's place in the world, and how many yards the minimap
 -- shows, adapted from MapUtils, Copyright (c) 2026 D4KiR, GPL-3.0: see THIRD-PARTY-LICENSES.
 local _, ns = ...
@@ -51,6 +52,27 @@ function ns.FollowClick(mark, followed)
   ns.SetTarget("pin", { m = mark.m, x = mark.x, y = mark.y, name = mark.name })
   Say(mark.name .. (targets.route and " is followed once the route is done." or " is followed: the arrow points to it."))
 end
+
+-- The app asks to let go of the point followed by itself: a number new each time, so that the same
+-- asking told again at a login lets go of nothing.
+ns.receivers.unfollow = function(asked)
+  if asked == nil or asked == ns.db.unfollowSeen then return end
+  ns.db.unfollowSeen = asked
+  if targets.pin then
+    Say(targets.pin.name .. " is no longer followed.")
+    ns.Forget()
+  end
+end
+
+-- What the app must know: the point followed by itself, in percent of its map, or that there is
+-- none. Told from the first time a point is followed on, also when there is none: the app must hear it go.
+ns.sections[#ns.sections + 1] = { name = "follow", period = 1, build = function()
+  if not ns.db then return end
+  local point = targets.pin
+  if point then ns.db.followTold = true end
+  if not ns.db.followTold then return end
+  return point and { m = point.m, x = point.x * 100, y = point.y * 100, name = point.name } or {}
+end }
 
 -- The character's place in the world: the continent, yards north and west, and the way it faces.
 local function Here()

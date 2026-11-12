@@ -1,7 +1,8 @@
 <script lang="ts">
   // The label on a point of the map: its name, where it is, how far and how long on foot. It opens
-  // on the side with the most room and a thin line ties it to the point. Send to game marks the point
-  // in the game, and says Sent once the addon tells it has it; Add to route puts it at the end of the route. Save keeps the point among My pins; a saved one is
+  // on the side with the most room and a thin line ties it to the point. Send to game has the game's
+  // arrow follow the point, and says Sent once the addon tells it has it; on the point the game
+  // follows the same button is Stop following. Add to route puts it at the end of the route. Save keeps the point among My pins; a saved one is
   // renamed by writing over its name, and Remove takes it away.
   import type { Point } from '../../shared/geo'
   import { labelPlace, type Size } from '../../shared/point-label'
@@ -18,6 +19,8 @@
     sending, // whether the point can be sent to the game now, and why not
     acked, // the number of the last send the game has, as the addon tells it
     onsend, // sends the point: gives back the number of the send, or what went wrong
+    following = false, // the game's arrow follows this very point
+    onunfollow, // asks the game to let it go: answers as onsend does
     routed, // the point is already a stop of the route
     onroute, // adds the point to the route
     saved, // the point is one of My pins
@@ -34,6 +37,8 @@
     sending: { can: boolean; why: string }
     acked: number | undefined
     onsend: () => Promise<{ seq: number } | { error: string }>
+    following?: boolean
+    onunfollow?: () => Promise<{ seq: number } | { error: string }>
     routed: boolean
     onroute: () => void
     saved: boolean
@@ -52,7 +57,7 @@
     if (phase !== 'rest') return
     phase = 'sending'
     note = ''
-    const answer = await onsend()
+    const answer = await (following && onunfollow ? onunfollow() : onsend())
     if ('error' in answer) {
       phase = 'rest'
       note = answer.error
@@ -92,7 +97,7 @@
   {#if where}<p class="dim">{where}</p>{/if}
   {#if way}<p>{way.far}, {way.time}</p>{/if}
   <div class="go">
-    <button class="btn" disabled={!sending.can} aria-busy={phase === 'sending'} onclick={go}>{phase === 'sending' ? 'Sending' : phase === 'sent' ? 'Sent' : 'Send to game'}</button>
+    <button class="btn" disabled={!sending.can} aria-busy={phase === 'sending'} onclick={go}>{phase === 'sending' ? 'Sending' : phase === 'sent' ? 'Sent' : following ? 'Stop following' : 'Send to game'}</button>
     <button class="btn" disabled={routed} onclick={onroute}>{routed ? 'In route' : 'Add to route'}</button>
     {#if saved}<button class="btn" onclick={onremove}>Remove</button>{:else}<button class="btn" onclick={onsave}>Save</button>{/if}
   </div>

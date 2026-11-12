@@ -590,3 +590,30 @@ test('a click on a flag of the map has the arrow follow it, in gold; another cli
   assert.equal(addon.printed().split('\n').at(-1), 'Twinmap Forever: Inn is no longer followed.');
   assert.equal(addon.miniFlags(), 'Inn 0 35', 'the flag stays: only the arrow goes');
 });
+
+test('the strip tells the app which point is followed, and the app can ask to let it go', () => {
+  const { addon, enter } = world();
+  const followTold = () => addon.strips().map(decodeStrip).filter((b) => b.section === 'follow').map((b) => JSON.parse(b.text)).at(-1);
+  addon.lua('(...).db.mode = "fast"; GAME.north, GAME.west, GAME.facing = 0, 0, 0');
+  addon.run(8);
+  assert.equal(followTold(), undefined, 'nothing was ever followed: nothing is told');
+  app.send(addons, { pin: { m: 1429, x: 50, y: 25, name: 'North Gate', t: 41 } });
+  addon.run(8);
+  assert.deepEqual(followTold(), { m: 1429, x: 50, y: 25, name: 'North Gate' });
+
+  app.send(addons, { unfollow: 7001 });
+  addon.run(8);
+  assert.equal(addon.arrow(), null);
+  assert.equal(addon.printed().split('\n').at(-1), 'Twinmap Forever: North Gate is no longer followed.');
+  assert.deepEqual(followTold(), [], 'told that there is none');
+
+  // The same asking, told again at a login, lets go of nothing.
+  app.send(addons, { pin: { m: 1429, x: 50, y: 75, name: 'South Gate', t: 42 } });
+  addon.run(8);
+  addon.reload();
+  enter();
+  addon.lua('(...).db.mode = "fast"');
+  addon.run(8);
+  assert.equal(addon.arrow(), 'South Gate | 500 yd | 0 -26');
+  assert.deepEqual(followTold(), { m: 1429, x: 50, y: 75, name: 'South Gate' });
+});
