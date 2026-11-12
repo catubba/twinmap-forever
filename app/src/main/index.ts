@@ -18,6 +18,9 @@ import { addonsFolder, readSettings, setupStatus, writeSettings } from './setup'
 import { installChannel, send, sentParts } from './signal'
 import { servedFile } from './tiles'
 import startTilesWorker from './tiles-worker?nodeWorker'
+import startWalkWorker from './walk-worker?nodeWorker'
+import { navFolder } from './nav'
+import { walkAskFrom, type WalkAsk, type WalkPath } from '../shared/walk'
 
 const SHOW_EVERY = 50 // ms between updates of the window: a position must be there well before the arrow needs it (BEHIND in glide.ts)
 const LOG_EVERY = 5000 // ms between writes of the measures
@@ -79,6 +82,29 @@ function startQuests(gameFolder: string | null, tell: (status: QuestsStatus) => 
       new Promise((answer) => {
         asked.set(++searches, answer)
         post({ search: typed, id: searches })
+      }),
+    stop: () => void worker.terminate(),
+  }
+}
+
+// The ways on foot: found on a thread of its own, each asking answered under its number.
+function startWalks(gameFolder: string | null): { find: (ask: WalkAsk) => Promise<WalkPath>; stop: () => void } {
+  const worker = startWalkWorker({ workerData: { gameFolder, shipped: navFolder() } })
+  const asked = new Map<number, (path: WalkPath) => void>()
+  let asks = 0
+  worker.on('message', (told: { id: number; path: WalkPath }) => {
+    asked.get(told.id)?.(told.path)
+    asked.delete(told.id)
+  })
+  worker.on('error', () => {
+    for (const answer of asked.values()) answer(null) // no line on the map; the rest of the app goes on
+    asked.clear()
+  })
+  return {
+    find: (ask) =>
+      new Promise((answer) => {
+        asked.set(++asks, answer)
+        worker.postMessage({ id: asks, ask })
       }),
     stop: () => void worker.terminate(),
   }
@@ -150,6 +176,7 @@ function createWindow(): void {
     if (!win.isDestroyed()) win.webContents.send('quests', status)
   }
   let quests = startQuests(gameFolder, tellQuests)
+  let walks = startWalks(gameFolder)
   win.webContents.on('did-finish-load', () => win.webContents.send('quests', questsNow))
 
   // What the window may ask for, and only this: to let the player pick the game folder, to open the
@@ -169,11 +196,18 @@ function createWindow(): void {
       tiles = startTiles(found)
       quests.stop()
       quests = startQuests(found, tellQuests)
+      walks.stop()
+      walks = startWalks(found)
     }
     return null
   })
   // The search of the top row: what was typed, cut to a sane length.
   ipcMain.handle('search', (_event, typed: unknown): Promise<Found[]> => (typeof typed === 'string' ? quests.search(typed.slice(0, 80)) : Promise.resolve([])))
+  // The way on foot between two points of a continent, for the line of the journey.
+  ipcMain.handle('walk', (_event, asked: unknown): Promise<WalkPath> => {
+    const ask = walkAskFrom(asked)
+    return ask ? walks.find(ask) : Promise.resolve(null)
+  })
   ipcMain.handle('open-curseforge', () => shell.openExternal(CURSEFORGE))
   // A conversion that failed is started again, from where it stopped: the cause may be gone (a full disk, a folder in use).
   ipcMain.handle('retry-tiles', () => {
@@ -327,6 +361,8 @@ function createWindow(): void {
     link.stop()
     tiles.stop()
     quests.stop()
+    walks.stop()
+    ipcMain.removeHandler('walk')
     protocol.unhandle('twinmap')
   })
 }

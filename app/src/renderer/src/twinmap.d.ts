@@ -20,6 +20,7 @@ declare global {
       drawn: () => void
       setOnTop: (on: boolean) => Promise<void>
       search: (typed: string) => Promise<Found[]>
+      walk: (ask: import('../../shared/walk').WalkAsk) => Promise<import('../../shared/walk').WalkPath>
       sendPin: (pin: Pin) => Promise<{ seq: number } | { error: string }>
       sendMarks: (pins: Pin[], taken: string[]) => Promise<void>
       sendUnfollow: () => Promise<{ seq: number } | { error: string }>
