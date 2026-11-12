@@ -2,7 +2,7 @@
 // keeps the character's state up to date.
 import { createGame, type GameState } from '../shared/game'
 import type { LinkSnapshot } from '../shared/link'
-import { decodeRow } from '../shared/strip'
+import { decodeRow, readStrip } from '../shared/strip'
 import { readFileSync } from 'node:fs'
 import { worldOfYards } from '../shared/inside'
 import { findGameWindow, readBox, readRow, windowState, type WindowHandle } from './capture'
@@ -52,6 +52,7 @@ export function startLink(tilesFolder: () => string | null = () => null): { snap
   let lookAgainAt = 0, reads = 0
   // The player chooses the edge in the game. Until a strip shows which, both are read in turn.
   let edge: 'top' | 'bottom' = 'top', edgeSeenAt = 0
+  let drew: number | undefined // how wide the game drew the last strip read
 
   const replay = process.env.TWINMAP_REPLAY ? replayed(process.env.TWINMAP_REPLAY) : null
 
@@ -84,7 +85,10 @@ export function startLink(tilesFolder: () => string | null = () => null): { snap
     const row = readRow(hwnd, edge)
     if (!row) return
     reads++
-    const reading = decodeRow(row)
+    // A game stretched to fill its monitor: the width it drew at is found once and kept.
+    const read = readStrip(row, drew)
+    const reading = read.reading
+    if (read.drew) drew = read.drew
     if (reading.kind !== 'none') edgeSeenAt = now
     game.feed(reading, now)
     const window = hwnd, place = inside.look(game.state.sections.pos, (x, y, size) => readBox(window, x, y, size), now)
