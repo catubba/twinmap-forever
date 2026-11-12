@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest'
 import type { Piece } from '../shared/inside'
+import type { Box, Mosaic } from '../shared/minimap'
 import { mosaicOfPieces, startInside } from './minimap'
 
 test('outside dungeons and raids the screen is never read', () => {
@@ -29,4 +30,59 @@ test('the rooms of a dungeon are laid on one picture, each where its piece says'
   expect(at(505, 300)).toBe(0) // past its wall
   expect(at(500, 303)).toBe(0)
   expect(mosaicOfPieces([], () => dxt)).toBeNull()
+})
+
+// Two levels of a dungeon: the lower one, and the same with a room laid over its middle.
+function twoLevels(): Mosaic[] {
+  const width = 600, height = 600
+  const blocks = (seed: number): Float32Array => {
+    const grey = new Float32Array(width * height), kept = new Map<string, number>()
+    const next = (): number => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const key = `${Math.floor(x / 9)}:${Math.floor(y / 9)}`
+        if (!kept.has(key)) kept.set(key, next() < 0.33 ? 0 : 40 + next() * 200)
+        grey[y * width + x] = kept.get(key)!
+      }
+    }
+    return grey
+  }
+  const lower = blocks(7), over = blocks(99), upper = lower.slice()
+  for (let y = 200; y < 400; y++) for (let x = 200; x < 400; x++) upper[y * width + x] = over[y * width + x]!
+  return [lower, upper].map((grey) => ({ u0: 1000, v0: 2000, width, height, grey }))
+}
+// The minimap as the screen shows it with the character at (u, v) on a level: 300 yards on 238 pixels.
+function shown(m: Mosaic, u: number, v: number): Box {
+  const size = 238, rgb = new Uint8Array(size * size * 3)
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const mu = Math.floor(u - m.u0 - 150 + ((x + 0.5) * 300) / size), mv = Math.floor(v - m.v0 - 150 + ((y + 0.5) * 300) / size)
+      rgb.fill(mu >= 0 && mv >= 0 && mu < m.width && mv < m.height ? m.grey[mv * m.width + mu]! : 0, (y * size + x) * 3, (y * size + x) * 3 + 3)
+    }
+  }
+  return { size, rgb }
+}
+
+test('in a dungeon with rooms over rooms the minimap tells the level the character is on', () => {
+  const levels = twoLevels(), inside = startInside(() => 'anywhere', () => levels)
+  const pos = { inst: { id: 36, kind: 'party', mini: { x: 2408, y: 187, size: 238, zoom: 0 } } }
+  let now = 3000
+  const look = (level: number, u: number, v: number): ReturnType<typeof inside.look> => inside.look(pos, () => shown(levels[level]!, u, v), (now += 600))
+  // Under the upper room, then up on it, at the same place of the map.
+  // The first look through the whole dungeon is on the picture with every room, which is not what shows down here: the next one finds it.
+  expect(look(0, 1300, 2300)).toBeNull()
+  now += 2000
+  expect(look(0, 1300, 2300)).toMatchObject({ level: 0 })
+  expect(look(0, 1302, 2300)).toMatchObject({ level: 0 })
+  expect(look(1, 1302, 2301)).toMatchObject({ level: 1 })
+  expect(Math.abs(look(1, 1304, 2301)!.u - 1304)).toBeLessThanOrEqual(1.5)
+  expect(look(0, 1304, 2302)).toMatchObject({ level: 0 })
+})
+
+test('a dungeon with one level tells none', () => {
+  const [only] = twoLevels(), inside = startInside(() => 'anywhere', () => [only!])
+  const pos = { inst: { id: 36, kind: 'party', mini: { x: 2408, y: 187, size: 238, zoom: 0 } } }
+  const found = inside.look(pos, () => shown(only!, 1300, 2300), 3000)!
+  expect(found.level).toBeUndefined()
+  expect(Math.abs(found.u - 1300)).toBeLessThanOrEqual(1.5)
 })

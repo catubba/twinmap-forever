@@ -38,7 +38,7 @@ function withInside(state: GameState, found: (Inside & { at: number }) | null): 
   if (!found || !pos?.inst) return state
   // The app counts a facing anticlockwise from north, as the game does.
   const facing = found.facing === undefined ? pos.facing : (360 - found.facing) % 360
-  return { ...state, sections: { ...state.sections, pos: { ...pos, facing, inst: { ...pos.inst, ...worldOfYards(found) } } }, updatedAt: { ...state.updatedAt, pos: Math.max(state.updatedAt.pos ?? 0, found.at) } }
+  return { ...state, sections: { ...state.sections, pos: { ...pos, facing, inst: { ...pos.inst, ...worldOfYards(found), level: found.level } } }, updatedAt: { ...state.updatedAt, pos: Math.max(state.updatedAt.pos ?? 0, found.at) } }
 }
 
 export function startLink(tilesFolder: () => string | null = () => null): { snapshot: () => LinkSnapshot; stop: () => void } {
@@ -94,7 +94,7 @@ export function startLink(tilesFolder: () => string | null = () => null): { snap
     // The addon tells where the minimap is in pixels of the game: on a stretched game the square is as much further and bigger on screen.
     const window = hwnd, stretch = drew ? (row.length >> 2) / drew : 1
     const place = inside.look(game.state.sections.pos, (x, y, size) => readBox(window, Math.round(x * stretch), Math.round(y * stretch), Math.round(size * stretch)), now)
-    found = place && (found && found.u === place.u && found.v === place.v && found.facing === place.facing ? found : { ...place, at: now })
+    found = place && (found && found.u === place.u && found.v === place.v && found.facing === place.facing && found.level === place.level ? found : { ...place, at: now })
   }, READ_EVERY)
 
   return {

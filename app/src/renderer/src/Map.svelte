@@ -387,6 +387,15 @@
     if (box) map.fitBounds(boundsOfBox(box), { animate: false }) // at once: the arrow is placed against this view
   }
 
+  // The level the character is on shows by itself each time it changes; a level picked by hand stays until then.
+  let onLevel: number | undefined
+  $effect(() => {
+    const level = pos?.inst?.level
+    if (level === onLevel) return
+    onLevel = level
+    if (inside && level !== undefined && level <= levels && level !== upTo) showUpTo(level)
+  })
+
   // Shows the rooms up to a level: the ones above are taken off, to see what they cover.
   function showUpTo(level: number): void {
     if (!inside) return
