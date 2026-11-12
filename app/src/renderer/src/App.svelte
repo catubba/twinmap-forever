@@ -8,6 +8,7 @@
   import type { FixedPin } from '../../shared/services'
   import { addStop, advance, followed, gameRouteFrom, moveStop, noRoute, removeStop, routeFrom, type Route } from '../../shared/route'
   import { kept } from './kept.svelte'
+  import { inApp } from './web'
   import { followFrom, goneFrom, inboxFrom, setFrom } from '../../shared/send'
   import { journeyFrom, legsAhead, wayFrom } from '../../shared/journey'
   import Now from './Now.svelte'
@@ -58,7 +59,9 @@
   let onSettings = $state(false)
   window.twinmap.onSetup((told) => {
     setup = told
-    onSetup ??= !told.done
+    // On a phone there are no steps to go through, only the wait for them to be done on the computer: it ends by itself.
+    if (inApp) onSetup ??= !told.done
+    else onSetup = !told.done
   })
 
   // The opening screen: the mark on the ground of the app, until the first screen is known and drawn
@@ -155,7 +158,18 @@
 </header>
 
 {#if onSetup && setup}
-  <div class="whole" out:fade={gone}><FirstRun {setup} {tiles} link={status} onclose={() => (onSetup = false)} /></div>
+  <div class="whole" out:fade={gone}>
+    {#if inApp}
+      <FirstRun {setup} {tiles} link={status} onclose={() => (onSetup = false)} />
+    {:else}
+      <!-- The game folder, the map and the addon are the computer's to set up: here there is only the wait. -->
+      <main class="elsewhere surface">
+        <span class="mark"><Logo size={72} /></span>
+        <h1>Finish the setup on your computer</h1>
+        <p>Twinmap on the computer is still being set up: it shows what is left to do. The map opens here by itself when it is done.</p>
+      </main>
+    {/if}
+  </div>
 {/if}
 {#if onSettings && setup && onSetup === false}
   <div class="over" in:fade={screen} out:fade={gone}>
@@ -170,7 +184,7 @@
     {:else if tiles}
       <div class="making" class:failed={tiles.state === 'failed' || tiles.state === 'no-game'}>
         <p>{tilesLine(tiles)}</p>
-        {#if tiles.state === 'no-game'}
+        {#if tiles.state === 'no-game' && inApp}
           {#if wrong}<p>{wrong}</p>{/if}
           <button class="btn" onclick={choose}>Choose the game folder</button>
         {/if}
@@ -453,6 +467,33 @@
     margin: 0 0 7px;
   }
   .dim {
+    color: var(--text-dim);
+  }
+
+  /* In place of the first run, in a browser: one thing said, in the middle of the screen. */
+  .elsewhere {
+    position: absolute;
+    inset: 46px 0 0;
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: 12px;
+    padding: 24px;
+    text-align: center;
+  }
+  .elsewhere .mark {
+    color: var(--gold);
+  }
+  .elsewhere h1 {
+    margin: 0;
+    font: var(--t-zone);
+    color: var(--gold);
+    text-shadow: 0 1px 0 #000;
+  }
+  .elsewhere p {
+    max-width: 44ch;
+    margin: 0;
+    text-wrap: pretty;
     color: var(--text-dim);
   }
 
