@@ -7,7 +7,7 @@ import { keep, keptFrom } from '../shared/kept'
 import { linkStatus, lostPercent } from '../shared/link'
 import { shownFrom, type QuestsStatus } from '../shared/quests'
 import type { Found } from '../shared/search'
-import { marksNews, pinFrom, routeNewsFrom, stepFrom, takenFrom } from '../shared/send'
+import { inboxFrom, marksNews, pinFrom, routeNewsFrom, stepFrom, takenFrom } from '../shared/send'
 import { feedbackLink } from '../shared/feedback'
 import { pageOf, setupComplete, setupPages, type SetupStatus } from '../shared/setup'
 import { tilesLine, type TilesStatus } from '../shared/tiles-status'
@@ -20,7 +20,7 @@ import { startLog } from './log'
 import type { Answer, Asked } from './questie-worker'
 import startQuestieWorker from './questie-worker?nodeWorker'
 import { addonsFolder, readSettings, setupStatus, writeSettings } from './setup'
-import { installChannel, send, sentParts } from './signal'
+import { installChannel, send as sendSignal, sentParts } from './signal'
 import { servedFile } from './tiles'
 import startTilesWorker from './tiles-worker?nodeWorker'
 import { updateFirst } from './update'
@@ -121,6 +121,14 @@ function startWalks(gameFolder: string | null): { find: (ask: WalkAsk) => Promis
 
 // The app's record of what happened to it, for the player to copy into a report.
 const record = startLog(join(app.getPath('userData'), 'twinmap.log'))
+// Every send to the game goes in the record: its number, the parts it changes by kind (the name of
+// a mark holds its place, which the record does not keep), and whether it rode the font or needs a slot.
+const send: typeof sendSignal = (addons, changed) => {
+  const sent = sendSignal(addons, changed)
+  const kinds = [...new Set(Object.keys(changed).map((part) => /^[a-z]*/i.exec(part)![0]))].join(' ')
+  record.say(`sent ${sent.seq}: ${kinds}, ${sent.bytes} bytes, ${sent.inFont ? 'in the font' : 'in a slot'}`)
+  return sent
+}
 
 function createWindow(): void {
   // The window opens where it was closed: monitor, place, size, and maximized if it was.
@@ -406,6 +414,9 @@ function createWindow(): void {
     record.note('optional addons', `Questie ${setup.questie ? 'yes' : 'no'}, Shortest Path ${setup.shortestPath ? 'yes' : 'no'}`)
     record.note('map', made.state === 'converting' ? 'being built' : tilesLine(made))
     record.note('link', heard.kind === 'update-app' || heard.kind === 'update-addon' ? `${heard.word}: ${heard.line}` : heard.word)
+    // What the game says it has of the sends: a slot gone with no send beside it is a read that went wrong.
+    const inbox = inboxFrom(link.snapshot().state.sections.inbox)
+    if (inbox) record.note('game has', `send ${inbox.seq}, ${inbox.left} slots left${inbox.off ? `, ${inbox.off}` : ''}`)
     readyChannel()
     void lanUrl() // the address of this computer may change while the app is open
     if (!settings.setupDone && setupComplete(setupPages(setup, tiles.status(), linkStatus(link.snapshot(), Date.now())))) {
