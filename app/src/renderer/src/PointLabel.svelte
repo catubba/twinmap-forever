@@ -12,6 +12,7 @@
 
   let {
     title,
+    notes = [], // what the point is, when it is a pin of the map: whose quest, what service
     where, // zone coordinates, or nothing
     way, // distance, direction and time from the character, when it is on this map
     spot, // the point, in pixels of the map's box
@@ -30,6 +31,7 @@
     onclose,
   }: {
     title: string
+    notes?: string[]
     where: string
     way: { far: string; time: string } | null
     spot: Point
@@ -94,6 +96,7 @@
   {:else}
     <h3>{title}</h3>
   {/if}
+  {#each notes as note}<p>{note}</p>{/each}
   {#if where}<p class="dim">{where}</p>{/if}
   {#if way}<p>{way.far}, {way.time}</p>{/if}
   <div class="go">

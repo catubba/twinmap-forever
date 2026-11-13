@@ -70,7 +70,7 @@
   let layersOpen = $state(false)
   // The point the player clicked, with its label: in map units, and where that is in the map's box now.
   // pin: the same point as the game names it, a zone map and a place on it; none where no zone is.
-  let labelled = $state<{ units: Point; continent: Continent; title: string; where: string; spot: Point; box: Size; pin: { m: number; x: number; y: number } | null; plain?: boolean } | null>(null)
+  let labelled = $state<{ units: Point; continent: Continent; title: string; where: string; spot: Point; box: Size; pin: { m: number; x: number; y: number } | null; plain?: boolean; notes?: string[] } | null>(null)
   // Where the character is on the world map, for the distance on the label.
   let me = $state<{ units: Point; continent: Continent } | null>(null)
   // The yards and the time are those of the way on foot, where one is found: asked for the one point, again every few dozen yards.
@@ -441,6 +441,23 @@
     }
   }
 
+  // A click on a pin opens the label on it, as on any point of the map: its name, and under it what
+  // the pin is. on: the zone the pin was placed by, since where two maps overlap the point alone does not tell.
+  function labelPin(units: Point, title: string, notes: string[], on = zoneAt(maps, continent, units)): void {
+    if (!map) return
+    if (holder.clientWidth < 640) layersOpen = false // on a narrow map the menu would lie over the label
+    labelled = {
+      units,
+      continent,
+      title,
+      notes,
+      where: on ? `${on.zone.name} ${on.place.x.toFixed(1)}, ${on.place.y.toFixed(1)}` : '',
+      spot: map.latLngToContainerPoint(at(units)),
+      box: { width: holder.clientWidth, height: holder.clientHeight },
+      pin: on ? { m: on.zone.id, ...on.place } : null,
+    }
+  }
+
   // A ring around one pin: the one whose row in the Now panel is under the pointer. The map does
   // not move for it: a pin out of view stays out of view.
   const ring = L.marker([0, 0], { interactive: false, keyboard: false, zIndexOffset: 2000, icon: L.divIcon({ className: 'ring', iconSize: [34, 34] }) })
@@ -638,6 +655,7 @@
   // The quests Questie shows, on the zones of the continent in view: where to take one, where to hand
   // one in, where what is still to find is. Each kind is a layer of its own.
   const questLayers = { available: L.layerGroup(), turnin: L.layerGroup(), objectives: L.layerGroup() }
+  const QUEST_SAYS = { available: 'Quest to take', turnin: 'Quest to hand in', objective: 'Quest objective' } as const
   const QUEST_PINS = { available: ['quest', 'available', 500], turnin: ['turnin', 'turnin', 1000], objective: ['objective', 'objectives', 0] } as const
   $effect(() => {
     for (const group of Object.values(questLayers)) group.clearLayers()
@@ -651,8 +669,10 @@
       tip.append(Object.assign(document.createElement('b'), { textContent: p.name }))
       for (const quest of p.quests) if (quest !== p.name) tip.append(document.createElement('br'), quest)
       const size = drawing === 'objective' ? 9 : 20
-      L.marker(at(unitsOfPlace(zone.rect, p.x, p.y)), { keyboard: false, zIndexOffset: above, icon: L.divIcon({ className: 'door', iconSize: [size, size], html: pin(drawing) }) })
+      const units = unitsOfPlace(zone.rect, p.x, p.y)
+      L.marker(at(units), { keyboard: false, zIndexOffset: above, icon: L.divIcon({ className: 'door', iconSize: [size, size], html: pin(drawing) }) })
         .bindTooltip(tip, { direction: 'top', offset: [0, -size / 2], className: 'tip' })
+        .on('click', () => labelPin(units, p.name, [QUEST_SAYS[p.type], ...p.quests.filter((quest) => quest !== p.name)], { zone, place: { x: p.x, y: p.y } }))
         .addTo(questLayers[layer])
     }
   })
@@ -724,7 +744,7 @@
     },
   }) as unknown as new (at: L.LatLng, options: L.CircleMarkerOptions & { lozenge: boolean; picture: HTMLImageElement }) => L.CircleMarker
   const fixedGroup = L.layerGroup()
-  let laid: { pin: FixedPin; at: L.LatLng }[] = []
+  let laid: { pin: FixedPin; at: L.LatLng; zone: GameMap }[] = []
   // What is drawn now: more than the view, so that the map can move a little (it does all the time
   // while it follows the character) without the pins being made again.
   let drawnFor: { view: L.LatLngBounds; far: number } | null = null
@@ -740,7 +760,7 @@
     drawnFor = { view, far }
     // Ore and herbs first, so that who offers a service is painted over them.
     for (const service of [false, true]) {
-      for (const { pin: p, at: where } of laid) {
+      for (const { pin: p, at: where, zone } of laid) {
         const shown = (layer: FixedLayer): boolean => layers[layer] && far >= FIXED_ZOOM[layer]
         if ((p.side !== undefined) !== service || !p.layers.some(shown) || !view.contains(where)) continue
         // The radius is what the pointer feels, smaller than the picture: two people a few yards apart both answer.
@@ -757,6 +777,7 @@
             },
             { direction: 'top', offset: [0, -9], className: 'tip' },
           )
+          .on('click', () => labelPin({ x: where.lng, y: -where.lat }, p.name, [...(p.sub ? [p.sub] : []), p.layers.map((layer) => LAYER_NAMES[layer]).join(', ')], { zone, place: { x: p.x, y: p.y } }))
           .addTo(fixedGroup)
       }
     }
@@ -765,7 +786,7 @@
     const zones = new Map(maps.filter((m) => m.level === 'zone' && m.rect && m.area && m.continent === continent).map((m) => [m.area, m]))
     laid = fixed.flatMap((p) => {
       const zone = zones.get(p.area)
-      return zone?.rect && serves(p, side) ? [{ pin: p, at: at(unitsOfPlace(zone.rect, p.x, p.y)) }] : []
+      return zone?.rect && serves(p, side) ? [{ pin: p, at: at(unitsOfPlace(zone.rect, p.x, p.y)), zone }] : []
     })
     drawFixed()
   })
@@ -783,6 +804,7 @@
       if (door.continent !== continent) continue
       L.marker(at(door), { keyboard: false, zIndexOffset: 200, icon: L.divIcon({ className: 'door', iconSize: [16, 16], html: pin('dungeon') }) })
         .bindTooltip(door.names.join(', '), { direction: 'top', offset: [0, -8], className: 'tip' })
+        .on('click', () => labelPin({ x: door.x, y: door.y }, door.names.join(', '), ['Entrance']))
         .addTo(travelLayers.dungeons)
     }
     for (const [a, b] of travel.routes) {
@@ -1005,6 +1027,7 @@
   {#key labelled.units}
     <PointLabel
       title={savedIndex >= 0 ? pointName : labelled.title}
+      notes={labelled.notes}
       where={labelled.where}
       {way}
       spot={labelled.spot}
