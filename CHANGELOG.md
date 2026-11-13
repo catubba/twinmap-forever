@@ -2,6 +2,16 @@
 
 What changed in each version of Twinmap, newest first. The section of a version is also the text of its release on GitHub and of the addon's file on CurseForge.
 
+## 0.1.1 - 2026-11-13
+
+### New
+
+- **Click a pin to open it.** A click on a quest, a service, ore, an herb or the entrance of a dungeon now opens its label: who or what is there, where it is and how far on foot, with Send to game, Add to route and Save. Until now these pins only showed a name under the pointer.
+
+### Changed
+
+- **A fuller record for bug reports.** The record that Feedback copies now lists what the app sent to the game and how many sends the game can still take before a /reload. It holds no positions.
+
 ## 0.1.0 - 2026-11-13
 
 The first public version of Twinmap: an interactive map of World of Warcraft: Forever for your second screen, which follows your character in real time.
