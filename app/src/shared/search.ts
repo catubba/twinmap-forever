@@ -10,7 +10,7 @@ export interface Found {
   area: number
   x: number
   y: number
-  /** Found by what it does, not by its name: "first aid" finds who teaches it. */
+  /** One of many: found by what it does, not by its name ("first aid" finds who teaches it), or one of the sellers of an item. The window shows the nearest. */
   does?: true
   /** Whom an NPC found so serves: "A", "H" or "AH". */
   side?: string

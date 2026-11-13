@@ -210,7 +210,8 @@ const DOERS_FROM = 3 // letters typed before the search looks at what people do
  * What the search finds for what was typed: the best names that have a place on the map, and after
  * them everyone who does what was typed ("first aid", "repair", "gryphon master"), each marked so. An NPC is
  * where it stands, in its own zone first; a quest where it is taken; an item on who sells it, or
- * drops it, or on what holds it.
+ * drops it, or on what holds it. An item with more than one seller is on each of them, marked as
+ * those who do something are: the window shows the nearest that serve the character's side.
  */
 export function search(db: Questie, index: SearchIndex[], typed: string, most = 12, doers: Doer[] = []): Found[] {
   const text = (v: unknown): string => (typeof v === 'string' ? v : '')
@@ -229,10 +230,11 @@ export function search(db: Questie, index: SearchIndex[], typed: string, most = 
     }
     return null
   }
-  const found: Found[] = []
+  const found: Found[] = [], shops: Found[] = []
+  let items = 0 // found on their many sellers: each counts once among the names
   // Many more than asked are looked at: plenty of names (quest items, creatures of an event) have no place.
   for (const entry of best(index, typed, most * 6)) {
-    if (found.length >= most) break
+    if (found.length + items >= most) break
     for (const id of entry.ids) {
       let hit: Found | null = null
       if (entry.kind === 'npc') {
@@ -243,6 +245,15 @@ export function search(db: Questie, index: SearchIndex[], typed: string, most = 
         const level = db.get('Quest', id, QUEST.level)
         if (giver) hit = { kind: 'quest', name: entry.name, note: `Quest${typeof level === 'number' && level > 0 ? `, level ${level}` : ''}, from ${giver.name}`, ...giver.where }
       } else {
+        const sellers = numbers(db.get('Item', id, ITEM.vendors)).flatMap((npc): Found[] => {
+          const where = spot('Npc', npc), side = db.get('Npc', npc, NPC.friendly)
+          return where ? [{ kind: 'item', name: entry.name, note: `Sold by ${text(db.get('Npc', npc, NPC.name))}`, ...where, does: true, ...(typeof side === 'string' ? { side } : {}) }] : []
+        })
+        if (sellers.length > 1) {
+          shops.push(...sellers.slice(0, DOERS_MOST - shops.length))
+          items++
+          break
+        }
         const seller = firstOf('Npc', numbers(db.get('Item', id, ITEM.vendors))), dropper = seller ? null : firstOf('Npc', numbers(db.get('Item', id, ITEM.npcDrops)))
         const holder = seller || dropper ? null : firstOf('Object', numbers(db.get('Item', id, ITEM.objectDrops)))
         const who = seller ?? dropper ?? holder
@@ -254,6 +265,7 @@ export function search(db: Questie, index: SearchIndex[], typed: string, most = 
       }
     }
   }
+  found.push(...shops)
   const wanted = fold(typed)
   if (wanted.length >= DOERS_FROM) {
     let more = DOERS_MOST

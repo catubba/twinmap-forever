@@ -140,6 +140,11 @@ test('the search finds NPCs, quests and items by name, each on a place of the ma
     `## X-Item-57-S: ${b64({ [ITEM.name]: 'Mill Notice' })}`,
     `## X-Item-57-${ITEM.objectDrops}: ${b64([900])}`,
     `## X-Item-58-S: ${b64({ [ITEM.name]: 'Key to Nowhere' })}`,
+    // Sold by two, one of whom has no place: three have it on the list.
+    `## X-Npc-108-S: ${b64({ [NPC.name]: 'Fletcher Ann', [NPC.friendly]: 'H' })}`,
+    `## X-Npc-108-${NPC.spawns}: ${b64({ 40: [[70, 30]] })}`,
+    `## X-Item-59-S: ${b64({ [ITEM.name]: 'Rough Arrow' })}`,
+    `## X-Item-59-${ITEM.vendors}: ${b64([105, 106, 108])}`,
   ]))!
   const index = searchIndex(db)
   const told = (typed: string): string[] => search(db, index, typed).map((f) => `${f.kind} ${f.name} (${f.note}) ${f.area} ${f.x},${f.y}`)
@@ -153,6 +158,8 @@ test('the search finds NPCs, quests and items by name, each on a place of the ma
   expect(told('smithing')).toEqual(['item Smithing Hammer (Sold by Smith Hale) 40 55,45'])
   expect(told('strange key')).toEqual(['item Strange Key (Dropped by Cellar Rat) 12 10.5,20.25'])
   expect(told('mill n')).toEqual(['item Mill Notice (Found in Mill Notice Board) 12 50,50'])
+  // An item with more than one seller is on each of them, for the window to show the nearest that serve the character.
+  expect(search(db, index, 'rough').map((f) => `${f.name} (${f.note}) ${f.does} ${f.side} ${f.area} ${f.x},${f.y}`)).toEqual(['Rough Arrow (Sold by Smith Hale) true undefined 40 55,45', 'Rough Arrow (Sold by Fletcher Ann) true H 40 70,30'])
   expect(told('nowhere')).toEqual([])
   expect(told('  ')).toEqual([])
   expect(search(db, index, 'e', 3)).toHaveLength(3)
