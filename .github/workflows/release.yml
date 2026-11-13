@@ -1,8 +1,9 @@
 name: Release
 
 # A tag like v0.1.0 makes a release: the installer is built with that version, published with the
-# two files the app needs to update itself, and sent to VirusTotal. A version with a dash in it
-# (v0.1.0-rc.1) is published as a pre-release, which the app does not update to.
+# two files the app needs to update itself, and sent to VirusTotal; the addon goes to CurseForge.
+# A version with a dash in it (v0.1.0-rc.1) is published as a pre-release, which the app does not
+# update to and CurseForge does not get.
 on:
   push:
     tags: ['v*']
@@ -76,3 +77,25 @@ jobs:
           git add virustotal.json
           git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -q -m "VirusTotal result of $GITHUB_REF_NAME"
           git push -q --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" badges
+
+      # The addon goes to CurseForge with the same version, in the same zip a player would unpack into
+      # AddOns, the two license files inside. A pre-release stays on GitHub. An upload that fails does
+      # not take the release back.
+      - name: Upload the addon to CurseForge
+        continue-on-error: true
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CF_PROJECT_ID: ${{ vars.CF_PROJECT_ID }}
+        run: |
+          case "$VERSION" in *-*) exit 0 ;; esac
+          if [ -z "$CF_API_TOKEN" ] || [ -z "$CF_PROJECT_ID" ]; then
+            echo "::warning::CF_API_TOKEN or CF_PROJECT_ID is not set: the addon was not uploaded to CurseForge"
+            exit 0
+          fi
+          mkdir -p dist/addon/TwinmapForever
+          cp ../addon/TwinmapForever/* dist/addon/TwinmapForever/
+          cp ../LICENSE dist/addon/TwinmapForever/LICENSE.txt
+          cp ../THIRD-PARTY-LICENSES dist/addon/TwinmapForever/THIRD-PARTY-LICENSES.txt
+          (cd dist/addon && 7z a -tzip "TwinmapForever-$VERSION.zip" TwinmapForever > /dev/null)
+          gh release view "$GITHUB_REF_NAME" --json body -q .body > dist/addon/notes.md
+          node scripts/curseforge.js "dist/addon/TwinmapForever-$VERSION.zip" ../addon/TwinmapForever/TwinmapForever.toc "$VERSION" dist/addon/notes.md
