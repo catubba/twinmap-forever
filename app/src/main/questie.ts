@@ -3,7 +3,7 @@
 // QuestieDB keeps every entity in its .toc, as base64 CBOR, one metadata line per field.
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import type { LogQuest, QuestieShown, QuestPin } from '../shared/quests'
+import type { GameQuest, LogQuest, QuestIcon, QuestieShown, QuestPin } from '../shared/quests'
 import { best, fold, wordsMatch, type Found } from '../shared/search'
 import { resourceOf, servicesOf, type FixedPin, type ServiceLayer } from '../shared/services'
 
@@ -11,7 +11,7 @@ import { resourceOf, servicesOf, type FixedPin, type ServiceLayer } from '../sha
 export const questieFile = (gameFolder: string): string => join(gameFolder, '_forever_', 'Interface', 'AddOns', 'QuestieDB', 'QuestieDB_Forever.toc')
 
 // Field numbers, from QuestieDB's src/meta/*Meta.lua.
-export const QUEST = { name: 1, startedBy: 2, finishedBy: 3, reqLevel: 4, level: 5 } as const
+export const QUEST = { name: 1, startedBy: 2, finishedBy: 3, reqLevel: 4, level: 5, triggerEnd: 9, objectives: 10 } as const
 export const NPC = { name: 1, spawns: 7, waypoints: 8, zone: 9, friendly: 13, sub: 14, flags: 15 } as const
 export const OBJECT = { name: 1, spawns: 4 } as const
 export const ITEM = { name: 1, npcDrops: 2, objectDrops: 3, vendors: 14 } as const
@@ -301,6 +301,63 @@ export function fixedPins(db: Questie): FixedPin[] {
     if (layer) add('Object', id, { name: name as string, layers: [layer] })
   }
   return pins
+}
+
+const SPREAD = 4 // percent of a zone's map: two places of one target closer than this are one icon
+const ICONS_A_QUEST = 40
+
+/**
+ * What Questie would show of the quests of the log, made here for a player without it: where a
+ * quest that is done is handed in, and where what an open one still asks for is found. The quests
+ * to take are not here: which ones a character may take is Questie's own knowledge.
+ */
+// ponytail: an objective of the game is matched to QuestieDB's by its kind and its place among
+// those of that kind, and the places of a target are thinned by distance, not gathered as Questie
+// does. Kill credits and spells have no icon. Take Questie's own matching if these show wrong.
+export function shownFromLog(db: Questie, log: GameQuest[]): QuestieShown {
+  type Who = ['Npc' | 'Object', number]
+  const numbers = (t: unknown): number[] => list(t).filter((n): n is number => typeof n === 'number')
+  const icons: QuestieShown['icons'] = { available: [], turnin: [], objective: [] }
+  const active: QuestieShown['active'] = []
+  for (const quest of log) {
+    const spots: QuestIcon[] = []
+    const put = (area: number, x: number, y: number): void => {
+      if (spots.length < ICONS_A_QUEST && !spots.some((s) => s.area === area && Math.hypot(s.x - x, s.y - y) < SPREAD)) spots.push({ quest: quest.id, area, x, y })
+    }
+    const stand = (who: Who[]): void => {
+      for (const [kind, id] of who) for (const [area, places] of Object.entries(db.places(kind, id))) for (const [x, y] of places) put(+area, x, y)
+    }
+    const targets: Who[] = []
+    if (quest.done) {
+      const by = db.get('Quest', quest.id, QUEST.finishedBy)
+      stand([...numbers(at(by, 1)).map((id): Who => ['Npc', id]), ...numbers(at(by, 2)).map((id): Who => ['Object', id])])
+      icons.turnin.push(...spots)
+    } else {
+      const groups = db.get('Quest', quest.id, QUEST.objectives)
+      const entry = (kind: number, nth: number): number | undefined => numbers([at(list(at(groups, kind))[nth], 1)])[0]
+      const of = (kind: number, id: number): Who[] =>
+        kind === 1 ? [['Npc', id]] : kind === 2 ? [['Object', id]] : [...numbers(db.get('Item', id, ITEM.npcDrops)).map((npc): Who => ['Npc', npc]), ...numbers(db.get('Item', id, ITEM.objectDrops)).map((object): Who => ['Object', object])]
+      const seen = [0, 0, 0, 0]
+      for (const objective of quest.objectives) {
+        if (objective.kind < 1 || objective.kind > 3) continue
+        const id = entry(objective.kind, seen[objective.kind]!++)
+        if (id !== undefined && !objective.done) targets.push(...of(objective.kind, id))
+      }
+      // The game told no objective QuestieDB knows: everything the quest asks for is shown.
+      if (!quest.objectives.some((o) => o.kind >= 1 && o.kind <= 3)) for (const kind of [1, 2, 3]) for (const row of list(at(groups, kind))) for (const id of numbers([at(row, 1)])) targets.push(...of(kind, id))
+      stand(targets)
+      // A place to go to, for a quest that asks for nothing else.
+      for (const [area, places] of Object.entries((at(db.get('Quest', quest.id, QUEST.triggerEnd), 2) ?? {}) as Record<string, unknown>)) {
+        for (const place of list(places)) {
+          const [x, y] = numbers(place)
+          if (x !== undefined && y !== undefined) put(+area, x, y)
+        }
+      }
+      icons.objective.push(...spots)
+    }
+    active.push({ id: quest.id, done: quest.done, targets: [...new Set(targets.map(([kind, id]) => `${kind === 'Npc' ? 'm' : 'o'}_${id}`))] })
+  }
+  return { icons, active }
 }
 
 /** The quests of the log, each by the name its pins carry. */

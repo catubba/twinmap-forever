@@ -8,6 +8,7 @@ export interface SetupStatus {
   gameFolder: string | null
   /** The version of the Twinmap Forever addon found in it, or null. */
   addon: string | null
+  /** QuestieDB is among the addons: the data the app reads, with or without Questie itself. */
   questie: boolean
   /** Shortest Path Forever is among the addons. */
   shortestPath: boolean
@@ -29,7 +30,7 @@ export const ADDON_MISSING = 'The Twinmap Forever addon is not in your game, so 
 
 /** The optional addons the app points to, each with its name and its page on CurseForge. */
 export const OPTIONAL = {
-  questie: { name: 'Questie', page: 'https://www.curseforge.com/wow/addons/questie' },
+  questie: { name: 'QuestieDB', page: 'https://www.curseforge.com/wow/addons/questiedb' },
   shortestPath: { name: 'Shortest Path', page: 'https://www.curseforge.com/wow/addons/shortest-path-forever' },
 } as const
 export type Optional = keyof typeof OPTIONAL
@@ -112,7 +113,9 @@ export function setupPages(setup: SetupStatus, tiles: TilesStatus | null, link: 
     intro: 'None of these is needed. When one is installed, Twinmap shows more.',
     state: 'done',
     lines: [
-      setup.questie ? 'Questie: installed. The map will show the quests it shows.' : 'Questie: not installed. With it, the map shows the same quests Questie shows in the game.',
+      setup.questie
+        ? 'QuestieDB: installed. The map shows who offers a service, ore, herbs and the quests of your log. With Questie running too, it shows the same quests Questie shows, the ones to take as well.'
+        : 'QuestieDB: not installed. It comes with Twinmap Forever from the CurseForge app. Without it the map has no NPCs, no services and no quests.',
       setup.shortestPath
         ? 'Shortest Path: installed. The map will show its journey, and what you send to the game is reached along the roads.'
         : 'Shortest Path: not installed. With it, the map shows the journey it plans, and what you send to the game is reached along the roads.',

@@ -24,7 +24,7 @@ Twinmap is an interactive map of World of Warcraft: Forever for your second scre
 
 - **Real-time position.** Your arrow moves on the map as you move in the game, a few times a second.
 - **Even inside dungeons.** In dungeons and raids the arrow moves through the rooms, with the bosses marked.
-- **Your quests, as Questie shows them.** Available quests, turn-ins and objectives, the same ones Questie shows to your character.
+- **Your quests.** Where to hand in what is done and where to find what is left, for every quest of your log. With Questie installed, the same quests Questie shows to your character, the ones to take as well.
 - **Services and resources.** Flight masters, inns, vendors, repair, trainers, banks, ore and herbs, each one a layer you turn on or off.
 - **Search.** NPCs, items, quests and zones, with the distance on foot.
 - **From the map to the game.** Mark a point or build a route on Twinmap, and it appears in the game.
@@ -40,7 +40,7 @@ Twinmap is an interactive map of World of Warcraft: Forever for your second scre
 
 You need two things: the addon in the game, and the app on your computer.
 
-1. **The addon.** Install [Twinmap Forever from CurseForge](https://www.curseforge.com/wow/addons/twinmap-forever), then restart the game.
+1. **The addon.** Install [Twinmap Forever from CurseForge](https://www.curseforge.com/wow/addons/twinmap-forever), then restart the game. The CurseForge app installs [QuestieDB](https://www.curseforge.com/wow/addons/questiedb) with it: the data about NPCs, items and quests that the map reads. If you install by hand, get QuestieDB too.
 2. **The app.** Download `Twinmap-Setup` from the [latest release](https://github.com/catubba/twinmap-forever/releases/latest) and open it. It installs for your Windows user only, asks for no administrator rights, and starts by itself.
 3. **First run.** The app finds your game, builds the map from your own game files (once, about a minute), and waits for you to log in. Your arrow appears on its own.
 
@@ -73,7 +73,7 @@ Twinmap never touches the game's memory and never plays for you.
 
 None of these is needed. When one is installed, Twinmap shows more.
 
-- [Questie](https://www.curseforge.com/wow/addons/questie): the map shows the same quests Questie shows in the game.
+- [Questie](https://www.curseforge.com/wow/addons/questie): the map shows the same quests Questie shows in the game, with the ones you can take. Without it, the map shows the quests of your log.
 - [Shortest Path Forever](https://www.curseforge.com/wow/addons/shortest-path-forever): the map shows the journey it plans, and what you send to the game is reached along the roads.
 
 ## Phone and tablet

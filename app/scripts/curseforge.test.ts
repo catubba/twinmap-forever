@@ -43,6 +43,7 @@ test('the zip goes to the project with the game version of the .toc, and a .toc 
     const sent = seen.find((s) => s.url === '/api/projects/99/upload-file')!
     expect(sent.token).toBe('a-token')
     expect(sent.body).toContain('"gameVersions":[7]')
+    expect(sent.body).toContain('"relations":{"projects":[{"slug":"questiedb","type":"requiredDependency"}]}')
     expect(sent.body).toContain('"displayName":"Twinmap Forever 1.2.3"')
     expect(sent.body).toContain('zip bytes')
 

@@ -60,9 +60,9 @@
         {setup.addon ? `Version ${setup.addon}, installed` : 'Not installed'}
         {#if !setup.addon}<button class="btn" onclick={() => window.twinmap.openCurseForge()}>Get it on CurseForge</button>{/if}
       </dd>
-      <dt>Questie</dt>
+      <dt>QuestieDB</dt>
       <dd>
-        {setup.questie ? 'Installed' : 'Not installed (optional)'}
+        {setup.questie ? 'Installed' : 'Not installed: no NPCs, services or quests on the map'}
         {#if !setup.questie}<button class="btn" onclick={() => window.twinmap.openCurseForge('questie')}>Get it on CurseForge</button>{/if}
       </dd>
       <dt>Shortest Path</dt>

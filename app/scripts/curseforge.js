@@ -1,6 +1,7 @@
 // Uploads the zip of the addon to its project on CurseForge, as a release for the game version its .toc names.
 //   node scripts/curseforge.js <zip> <toc> <version> <changelog file>
 // Needs CF_API_TOKEN and CF_PROJECT_ID in the environment.
+// The file names QuestieDB as a required dependency: the CurseForge app installs it with the addon, and the map reads it.
 // CF_API, for trials, is an address to talk to instead of CurseForge's.
 const fs = require('node:fs')
 const path = require('node:path')
@@ -25,7 +26,7 @@ async function upload(zip, toc, version, changelog, token, project) {
   if (!ids.length) throw new Error(`CurseForge knows no game version named ${name}`)
 
   const form = new FormData()
-  form.append('metadata', JSON.stringify({ changelog, changelogType: 'markdown', displayName: `Twinmap Forever ${version}`, gameVersions: ids, releaseType: 'release' }))
+  form.append('metadata', JSON.stringify({ changelog, changelogType: 'markdown', displayName: `Twinmap Forever ${version}`, gameVersions: ids, releaseType: 'release', relations: { projects: [{ slug: 'questiedb', type: 'requiredDependency' }] } }))
   form.append('file', new Blob([fs.readFileSync(zip)]), path.basename(zip))
   const answer = await fetch(`${API}/api/projects/${project}/upload-file`, { method: 'POST', headers: { 'X-Api-Token': token }, body: form })
   if (!answer.ok) throw new Error(`CurseForge answered ${answer.status} to the upload: ${(await answer.text()).slice(0, 300)}`)

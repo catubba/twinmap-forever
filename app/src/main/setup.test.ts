@@ -83,7 +83,7 @@ test('an optional addon that is missing gets a button to its own page, and no ot
   expect(extras(setup)).toEqual(['shortestPath'])
   expect(extras({ ...setup, questie: false })).toEqual(['questie', 'shortestPath'])
   expect(extras({ ...setup, shortestPath: true })).toEqual([])
-  expect(pageOf('questie')).toBe('https://www.curseforge.com/wow/addons/questie')
+  expect(pageOf('questie')).toBe('https://www.curseforge.com/wow/addons/questiedb')
   expect(pageOf('shortestPath')).toBe('https://www.curseforge.com/wow/addons/shortest-path-forever')
   for (const other of [undefined, 'toString', 'https://example.com', 7]) expect(pageOf(other)).toBe('https://www.curseforge.com/wow/addons/twinmap-forever')
 })

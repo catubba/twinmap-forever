@@ -8,7 +8,7 @@ test('the details say what the app knows about itself, and nothing of the player
   expect(details).toContain('Twinmap 0.1.0')
   expect(details).toContain('Twinmap Forever addon: 0.1.0')
   expect(details).toContain('Link: Game not running')
-  expect(details).toContain('Questie: installed')
+  expect(details).toContain('QuestieDB: installed')
   expect(details).toContain('Shortest Path: not installed')
   expect(details, 'no folder of the player').not.toContain('Someone')
   expect(feedbackDetails(setup, { state: 'failed', message: "EPERM: open 'C:\\Users\\Someone\\AppData\\x'" }, null)).toContain("'C:\\Users\\...\\AppData\\x'")
