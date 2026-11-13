@@ -161,10 +161,7 @@ One for All is licensed under the GNU General Public License, version 3 or
 (at your option) any later version: https://www.gnu.org/licenses/gpl-3.0.html
 
 One for All has the places of bosses and entrances from Forever Simple World Map
-(below), and for four dungeons (Hall of Thanes, Ruins of Lordaeron, Excavation
-Site, City of Dalaran) from the boss pins of the dungeon maps of
-foreverchanges.pro, converted by One for All. Each dungeon in dungeon-pins.ts
-says which.
+(below).
 
 ================================================================================
 Shortest Path Forever
@@ -205,7 +202,6 @@ Forever Simple World Map
 by Tarolg (CurseForge project 1728535)
 Used in: the app, through One for All: where the bosses and the entrance are on
 the map of a dungeon (app/src/shared/dungeon-pins.ts), from version 0.30.2.
-Nothing comes from the later versions published under "All Rights Reserved".
 ================================================================================
 
 MIT License

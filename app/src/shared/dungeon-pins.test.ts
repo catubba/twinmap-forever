@@ -6,12 +6,11 @@ test('the list covers the 24 dungeon maps, each entry once', () => {
   expect(new Set(DUNGEON_PINS.map((d) => d.name)).size).toBe(DUNGEON_PINS.length)
 })
 
-test('every boss and entrance lies inside what its dungeon shows, and every entry says where it comes from', () => {
+test('every boss and entrance lies inside what its dungeon shows', () => {
   for (const d of DUNGEON_PINS) {
     const [u1, v1, u2, v2] = d.bounds
     expect(u1 < u2 && v1 < v2, d.name).toBe(true)
     expect(d.bosses.length, d.name).toBeGreaterThan(0)
-    expect(['fswm', 'site'], d.name).toContain(d.source)
     for (const [name, u, v] of [...d.bosses, ...(d.entrance ? [['entrance', ...d.entrance] as [string, number, number]] : [])]) {
       expect(u >= u1 - 1 && u <= u2 + 1 && v >= v1 - 1 && v <= v2 + 1, `${d.name}: ${name}`).toBe(true)
     }
