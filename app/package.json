@@ -24,6 +24,10 @@
       {
         "from": "resources/nav",
         "to": "nav"
+      },
+      {
+        "from": "../LICENSE",
+        "to": "LICENSE.txt"
       }
     ],
     "win": {
