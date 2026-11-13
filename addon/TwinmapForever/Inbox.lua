@@ -15,6 +15,7 @@ local BANK = 8184     -- same as signal.ts
 local EM, A_BASE, A_STEP = 1000, 100, 50 -- same as signal.ts
 local B_WIDTH, C_WIDTH = 1000, 500       -- same as signal.ts
 local DATA_FIRST, DATA_LETTERS = 0xE000, 1024 -- same as signal.ts
+local D_STEP = 200                            -- same as signal.ts
 local DIR = "Interface\\AddOns\\TwinmapForever_Signal\\"
 local FALLBACK_FONT = "Fonts\\FRIZQT__.TTF"
 local SIZE = 64
@@ -136,12 +137,16 @@ local function ReadData()
 end
 
 -- The number in the letter A. B and C tell our font from a fallback, where they are not 500 units apart.
+-- The game makes each letter a whole number of the screen's pixels wide, so a unit is measured on the
+-- two data letters that say how wide 0 and 255 are, 51,000 units apart: measured on B and C, 500
+-- apart, half a pixel was 1.3% and A read one number off (48 as 47, at an interface scale of 1.2).
+-- The letter of 0 is as wide as the A of number 0.
 local function ReadNumber()
-  local a, b, c = Width("A"), Width("B"), Width("C")
-  if not (a and b and c) then return nil end
-  local perUnit = (b - c) / (B_WIDTH - C_WIDTH)
-  if math.abs(perUnit * EM / SIZE - 1) > 0.2 then return nil end
-  return math.floor(((a - c) / perUnit + C_WIDTH - A_BASE) / A_STEP + 0.5)
+  local a, b, c, d0, d255 = Width("A"), Width("B"), Width("C"), DataWidth(0), DataWidth(1)
+  if not (a and b and c and d0 and d255) or d255 <= d0 then return nil end
+  local perUnit = (d255 - d0) / (255 * D_STEP)
+  if math.abs(perUnit * EM / SIZE - 1) > 0.2 or math.abs((b - c) / perUnit - (B_WIDTH - C_WIDTH)) > 100 then return nil end
+  return math.floor((a - d0) / perUnit / A_STEP + 0.5)
 end
 
 local function Failed()

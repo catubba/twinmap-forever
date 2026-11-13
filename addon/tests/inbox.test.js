@@ -55,6 +55,23 @@ test('small news arrives in the font within seconds, once, and spends no slot', 
   assert.equal(addon.ns('signal'), 'reading');
 });
 
+test('every number of the channel is read right where the interface is scaled, and no slot is spent', () => {
+  // Seen on 13 November 2026 at a scale of 1.2 (a font of 77 pixels): 48 was read as 47 at every
+  // read, and each read spent a slot.
+  for (const px of [77, 51, 64]) {
+    const { addon } = world('pin');
+    addon.lua(`GAME.fontPx = ${px}`);
+    addon.run(6);
+    for (let i = 0; i < 61; i++) {
+      const { seq } = app.send(addons, { pin: { name: 'Inn', m: 1429, x: i, y: 1 } });
+      addon.run(6);
+      assert.equal(addon.lua('return (...).db.inbox.seq'), String(seq), `send ${seq} at ${px} pixels`);
+      addon.run(12);
+    }
+    assert.equal(addon.slots(), 0, `slots spent at ${px} pixels`);
+  }
+});
+
 test('in combat nothing is read; it arrives right after', () => {
   const { addon, got } = world('pin');
   addon.run(6);
