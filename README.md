@@ -1,13 +1,20 @@
-# Twinmap Forever
+<h1 align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/logo-dark.svg">
+    <img src="docs/images/logo-light.svg" alt="Twinmap Forever" width="380">
+  </picture>
+</h1>
 
-[![CI](https://img.shields.io/github/actions/workflow/status/catubba/twinmap-forever/ci.yml?branch=main&label=CI)](https://github.com/catubba/twinmap-forever/actions)
-[![Release](https://img.shields.io/github/v/release/catubba/twinmap-forever)](https://github.com/catubba/twinmap-forever/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/catubba/twinmap-forever/total)](https://github.com/catubba/twinmap-forever/releases)
-[![VirusTotal](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fcatubba%2Ftwinmap-forever%2Fbadges%2Fvirustotal.json)](https://github.com/catubba/twinmap-forever/releases/latest)
-[![License](https://img.shields.io/github/license/catubba/twinmap-forever)](LICENSE)
-[![Ko-fi](https://img.shields.io/badge/Ko--fi-buy%20me%20a%20coffee-ff5e5b?logo=kofi&logoColor=white)](https://ko-fi.com/catubba)
+<p align="center"><b>Your position on the map, in real time. Even inside dungeons.</b></p>
 
-**Your position on the map, in real time. Even inside dungeons.**
+<p align="center">
+  <a href="https://github.com/catubba/twinmap-forever/actions"><img src="https://img.shields.io/github/actions/workflow/status/catubba/twinmap-forever/ci.yml?branch=main&amp;label=CI" alt="CI"></a>
+  <a href="https://github.com/catubba/twinmap-forever/releases/latest"><img src="https://img.shields.io/github/v/release/catubba/twinmap-forever" alt="Release"></a>
+  <a href="https://github.com/catubba/twinmap-forever/releases"><img src="https://img.shields.io/github/downloads/catubba/twinmap-forever/total" alt="Downloads"></a>
+  <a href="https://github.com/catubba/twinmap-forever/releases/latest"><img src="https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fcatubba%2Ftwinmap-forever%2Fbadges%2Fvirustotal.json" alt="VirusTotal"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/catubba/twinmap-forever" alt="License"></a>
+  <a href="https://ko-fi.com/catubba"><img src="https://img.shields.io/badge/Ko--fi-buy%20me%20a%20coffee-ff5e5b?logo=kofi&amp;logoColor=white" alt="Ko-fi"></a>
+</p>
 
 Twinmap is an interactive map of World of Warcraft: Forever for your second screen. It follows your character as you move and shows your quests, services and resources around you, on a second monitor, a laptop, a tablet or a phone.
 
