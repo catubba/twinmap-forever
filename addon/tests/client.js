@@ -114,7 +114,11 @@ const STUB = `
       local a, b, c = self.text:byte(1, 3)
       local glyph = #self.text == 2 and a - 64 or 4 + (a - 0xE0) * 4096 + (b - 0x80) * 64 + (c - 0x80) - 0xE000
       local hi, lo = self.widths:byte(1 + 4 * glyph, 2 + 4 * glyph)
-      return math.floor(32 + (hi and hi * 256 + lo or 0) * 0.064 + 0.5)
+      -- GAME.fontPx: the pixels of the screen the font is drawn at, 64 where the interface is not
+      -- scaled. Each letter is as wide as a whole number of them, as in the game.
+      local px = GAME.fontPx or 64
+      local function whole(units) return math.floor(units * px / 1000 + 0.5) end
+      return (whole(500) + whole(hi and hi * 256 + lo or 0)) * 64 / px
     end
     return s
   end
