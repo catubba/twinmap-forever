@@ -1,13 +1,10 @@
 // Where the bosses and the entrance are on the map of each dungeon.
 //
 // GENERATED, do not edit: made from One for All 6.2.2 by Smoergi (Data\DungeonMaps.lua, the
-// DUNGEON_MAPS table), GPL-3.0-or-later. One for All has these places from two sources, told for
-// each dungeon in "source":
-//   'fswm'  Forever Simple World Map 0.30.2 by Tarolg, MIT License, Copyright (c) 2026 Tarolg
-//   'site'  the boss pins of the dungeon maps of foreverchanges.pro, converted by One for All: approximate
+// DUNGEON_MAPS table), GPL-3.0-or-later. One for All has these places from Forever Simple World
+// Map 0.30.2 by Tarolg, MIT License, Copyright (c) 2026 Tarolg.
 // The names of the dungeons, their split in wings (part) and what to show (bounds) are One for All's.
-// Both notices are in THIRD-PARTY-LICENSES. Nothing here comes from a version of Forever Simple
-// World Map published under "All Rights Reserved" (0.60.2 and later).
+// Both notices are in THIRD-PARTY-LICENSES.
 //
 // The places are in the map's own yards, as the rooms in interiors.json: u east and v south from
 // the top left of the square of 64 x 64 blocks.
@@ -23,7 +20,6 @@ export interface DungeonPins {
   part?: [number, number, number, number]
   /** Where the players come in. */
   entrance?: [number, number]
-  source: 'fswm' | 'site'
   /** Name, u, v. */
   bosses: [string, number, number][]
 }
@@ -34,7 +30,6 @@ export const DUNGEON_PINS: DungeonPins[] = [
     map: 33,
     bounds: [14724, 17088, 15084, 17436],
     entrance: [14955.3, 17294.9],
-    source: 'fswm',
     bosses: [
       ['Rethilgore', 14943.6, 17318.8],
       ['Razorclaw the Butcher', 14808.7, 17269.3],
@@ -51,7 +46,6 @@ export const DUNGEON_PINS: DungeonPins[] = [
     map: 34,
     bounds: [16914.8, 16869.4, 17216.6, 17074.7],
     entrance: [17066.2, 17017.7],
-    source: 'fswm',
     bosses: [
       ['Targorr the Dread', 17065.4, 16907.1],
       ['Kam Deepfury', 17138.5, 16924],
@@ -65,7 +59,6 @@ export const DUNGEON_PINS: DungeonPins[] = [
     map: 36,
     bounds: [17408.1, 16880, 18140, 17384.1],
     entrance: [17452.1, 17081.2],
-    source: 'fswm',
     bosses: [
       ['Rhahk\'Zor', 17519.8, 17258.3],
       ['Sneed', 17575.5, 17376],
@@ -83,7 +76,6 @@ export const DUNGEON_PINS: DungeonPins[] = [
     map: 43,
     bounds: [16528.3, 16879.2, 17436.6, 17455.8],
     entrance: [16935.1, 17225.1],
-    source: 'fswm',
     bosses: [
       ['Lady Anacondra', 16792, 17121.9],
       ['Lord Cobrahn', 16652.3, 17217.8],
@@ -100,7 +92,6 @@ export const DUNGEON_PINS: DungeonPins[] = [
     map: 47,
     bounds: [14913.9, 14709.1, 15809.3, 15250.5],
     entrance: [15522.4, 15124.4],
-    source: 'fswm',
     bosses: [
       ['Roogug', 15485.1, 14923.7],
       ['Aggem Thorncurse', 15603.1, 14984.4],
@@ -115,7 +106,6 @@ export const DUNGEON_PINS: DungeonPins[] = [
     map: 48,
     bounds: [16642.6, 17143.5, 17569.1, 17954.7],
     entrance: [16960.1, 17216.9],
-    source: 'fswm',
     bosses: [
       ['Ghamoo-ra', 16854.8, 17509.1],
       ['Lady Sarevess', 16652.9, 17366.6],
@@ -132,7 +122,6 @@ export const DUNGEON_PINS: DungeonPins[] = [
     map: 70,
     bounds: [16600.3, 16882.4, 17136.4, 17438],
     entrance: [17020.6, 17295.5],
-    source: 'fswm',
     bosses: [
       ['Revelosh', 16905.4, 17292.3],
       ['Baelog', 16949.5, 17419.7],
@@ -151,7 +140,6 @@ export const DUNGEON_PINS: DungeonPins[] = [
     map: 90,
     bounds: [16310.5, 17267.6, 17208.9, 17980.8],
     entrance: [17069.9, 17395.8],
-    source: 'fswm',
     bosses: [
       ['Grubbis', 17205.2, 17581.6],
       ['Viscous Fallout', 17018.2, 17538.1],
@@ -165,7 +153,6 @@ export const DUNGEON_PINS: DungeonPins[] = [
     map: 109,
     bounds: [16742.6, 17311.8, 17200.3, 17775.2],
     entrance: [16966.5, 17382.6],
-    source: 'fswm',
     bosses: [
       ['Avatar of Hakkar', 16790.6, 17533.8],
       ['Atal\'alarion', 16971.4, 17529.8],
@@ -182,7 +169,6 @@ export const DUNGEON_PINS: DungeonPins[] = [
     map: 129,
     bounds: [15896.7, 14395.5, 16495.2, 14846],
     entrance: [15955.4, 14473],
-    source: 'fswm',
     bosses: [
       ['Tuten\'kash', 16209.7, 14514.2],
       ['Mordresh Fire Eye', 16395.2, 14600],
@@ -197,7 +183,6 @@ export const DUNGEON_PINS: DungeonPins[] = [
     bounds: [17320.5, 15074.4, 17525.5, 15548.9],
     part: [17320.5, 15074.4, 17525.5, 15548.9],
     entrance: [17385.6, 15458.6],
-    source: 'fswm',
     bosses: [
       ['Herod', 17498.3, 15101.6],
     ],
@@ -208,7 +193,6 @@ export const DUNGEON_PINS: DungeonPins[] = [
     bounds: [15549.1, 15847.3, 15813.7, 16303.9],
     part: [15549.1, 15847.3, 15813.7, 16303.9],
     entrance: [15747.5, 16213.5],
-    source: 'fswm',
     bosses: [
       ['High Inquisitor Fairbanks', 15712.4, 15907.8],
       ['High Inquisitor Whitemane', 15667.6, 15864.5],
@@ -220,7 +204,6 @@ export const DUNGEON_PINS: DungeonPins[] = [
     bounds: [15528.1, 15036.5, 16089.4, 15449.5],
     part: [15528.1, 15036.5, 16089.4, 15449.5],
     entrance: [16016.6, 15379.4],
-    source: 'fswm',
     bosses: [
       ['Interrogator Vishas', 15942.2, 15280.1],
       ['Bloodmage Thalnos', 15650, 15246.3],
@@ -232,7 +215,6 @@ export const DUNGEON_PINS: DungeonPins[] = [
     bounds: [17198.9, 16776.8, 17518.4, 16955.2],
     part: [17198.9, 16776.8, 17518.4, 16955.2],
     entrance: [17273.3, 16813],
-    source: 'fswm',
     bosses: [
       ['Houndmaster Loksey', 17327.5, 16946.7],
       ['Arcanist Doan', 17495.4, 16918.3],
@@ -243,7 +225,6 @@ export const DUNGEON_PINS: DungeonPins[] = [
     map: 209,
     bounds: [15552, 14960, 16448, 15928],
     entrance: [16224.6, 15854],
-    source: 'fswm',
     bosses: [
       ['Hydromancer Velratha', 15841.6, 15386.2],
       ['Gahz\'rilla', 15876.1, 15399.1],
@@ -259,7 +240,6 @@ export const DUNGEON_PINS: DungeonPins[] = [
     name: 'Lower Blackrock Spire',
     map: 229,
     bounds: [17307.3, 17016.7, 17692.5, 17320.6],
-    source: 'fswm',
     bosses: [
       ['Highlord Omokk', 17367.3, 17089.5],
       ['Shadow Hunter Vosh\'gajin', 17548.8, 17187.9],
@@ -276,7 +256,6 @@ export const DUNGEON_PINS: DungeonPins[] = [
     name: 'Upper Blackrock Spire',
     map: 229,
     bounds: [17264.7, 16839.8, 17680.8, 17090.2],
-    source: 'fswm',
     bosses: [
       ['Pyroguard Emberseer', 17324.7, 16922.1],
       ['Warchief Rend Blackhand', 17487.8, 16899.8],
@@ -289,7 +268,6 @@ export const DUNGEON_PINS: DungeonPins[] = [
     map: 230,
     bounds: [16801.4, 15580, 17914.2, 16807.9],
     entrance: [17032.6, 16609.7],
-    source: 'fswm',
     bosses: [
       ['High Interrogator Gerstahn', 17212.9, 16756.1],
       ['Lord Roccor', 17239.1, 16412],
@@ -316,7 +294,6 @@ export const DUNGEON_PINS: DungeonPins[] = [
     map: 249,
     bounds: [17079.4, 17003.4, 17353, 17285.3],
     entrance: [17120.7, 17035.8],
-    source: 'fswm',
     bosses: [
       ['Onyxia', 17283.8, 17071.5],
     ],
@@ -326,7 +303,6 @@ export const DUNGEON_PINS: DungeonPins[] = [
     map: 289,
     bounds: [16233.6, 16367.9, 17168.1, 17126],
     entrance: [16940.3, 16875.8],
-    source: 'fswm',
     bosses: [
       ['Jandice Barov', 16993, 16798.4],
       ['Rattlegore', 16895, 16929.5],
@@ -345,7 +321,6 @@ export const DUNGEON_PINS: DungeonPins[] = [
     map: 329,
     bounds: [19944, 12864, 20868, 13840],
     entrance: [20709.9, 13475.8],
-    source: 'fswm',
     bosses: [
       ['Hearthsinger Forresten', 20576.6, 13470.9],
       ['Cannon Master Willey', 20004, 13493.1],
@@ -367,7 +342,6 @@ export const DUNGEON_PINS: DungeonPins[] = [
     map: 349,
     bounds: [16773.3, 15897.8, 17878, 17228.3],
     entrance: [17525.2, 16049.8],
-    source: 'fswm',
     bosses: [
       ['Noxxion', 17258, 15936.3],
       ['Razorlash', 17076.8, 16087.8],
@@ -384,7 +358,6 @@ export const DUNGEON_PINS: DungeonPins[] = [
     map: 389,
     bounds: [16791.3, 17052.5, 17175, 17482.9],
     entrance: [17074.9, 17065.9],
-    source: 'fswm',
     bosses: [
       ['Oggleflint', 17028, 17214.2],
       ['Taragaman the Hungerer', 16916.6, 17311.4],
@@ -396,7 +369,6 @@ export const DUNGEON_PINS: DungeonPins[] = [
     name: 'Dire Maul: East',
     map: 429,
     bounds: [17204.6, 16731.8, 17574.7, 17161.6],
-    source: 'fswm',
     bosses: [
       ['Zevrim Thornhoof', 17514.7, 17101.6],
       ['Hydrospawn', 17505.1, 17062.1],
@@ -409,7 +381,6 @@ export const DUNGEON_PINS: DungeonPins[] = [
     name: 'Dire Maul: North',
     map: 429,
     bounds: [16472.9, 16172.7, 17129.8, 16769.9],
-    source: 'fswm',
     bosses: [
       ['Guard Mol\'dar', 17069.8, 16656],
       ['Stomper Kreeg', 16969.3, 16575.4],
@@ -424,7 +395,6 @@ export const DUNGEON_PINS: DungeonPins[] = [
     name: 'Dire Maul: West',
     map: 429,
     bounds: [16194.2, 16874, 16650.8, 17211],
-    source: 'fswm',
     bosses: [
       ['Tendris Warpwood', 16590.8, 17052.3],
       ['Illyanna Ravenoak', 16522.7, 17151],
@@ -438,7 +408,6 @@ export const DUNGEON_PINS: DungeonPins[] = [
     name: 'City of Dalaran',
     map: 2959,
     bounds: [16392, 16460, 17140, 17240],
-    source: 'site',
     bosses: [
       ['Arcane Anomaly', 16826.7, 17018.4],
       ['Arcanic Enigma', 16877.2, 16713.7],
@@ -453,7 +422,6 @@ export const DUNGEON_PINS: DungeonPins[] = [
     map: 2998,
     bounds: [18480, 20548, 19625.1, 21320],
     entrance: [19503.9, 20780.3],
-    source: 'site',
     bosses: [
       ['Saltspine', 19113.5, 20868],
       ['Shadetooth', 19012.3, 20926.5],
@@ -466,7 +434,6 @@ export const DUNGEON_PINS: DungeonPins[] = [
     map: 2999,
     bounds: [16580, 15176, 17088, 15756],
     entrance: [16911.3, 15260.1],
-    source: 'site',
     bosses: [
       ['The Baron', 16888.7, 15578.7],
       ['Witherfang', 16969, 15376.8],
@@ -482,7 +449,6 @@ export const DUNGEON_PINS: DungeonPins[] = [
     map: 3065,
     bounds: [16817.4, 16449.7, 17334.4, 17179.4],
     entrance: [17066.1, 17173],
-    source: 'site',
     bosses: [
       ['Faldrim Anvilmar', 17068, 16986],
       ['Magmatus', 17174, 16904.4],
