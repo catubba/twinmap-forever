@@ -27,14 +27,26 @@ jobs:
           node-version: 24
           cache: npm
           cache-dependency-path: app/package-lock.json
+      # The notes of a release are the section of its version in CHANGELOG.md. A release without one
+      # stops here, before anything is built; a pre-release may go without.
+      - name: Read the notes from the changelog
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          awk -v v="$VERSION" '/^## /{p=($2==v);next} p' ../CHANGELOG.md > notes.md
+          if ! grep -q '[^[:space:]]' notes.md; then
+            case "$VERSION" in
+              *-*) echo "Pre-release of $VERSION" > notes.md ;;
+              *) echo "::error::CHANGELOG.md has no section for $VERSION"; exit 1 ;;
+            esac
+          fi
+
       - run: npm ci
       - run: npm run check
       - run: npm test
 
       - name: Build the installer
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           npx electron-vite build
           npx electron-builder --win nsis --publish never -c.extraMetadata.version="$VERSION"
 
@@ -44,7 +56,7 @@ jobs:
           PRE=""
           case "$VERSION" in *-*) PRE="--prerelease" ;; esac
           UPDATE_FILES=$(ls dist/*.yml | grep -v builder-)
-          gh release create "$GITHUB_REF_NAME" --title "Twinmap $VERSION" --generate-notes $PRE \
+          gh release create "$GITHUB_REF_NAME" --title "Twinmap $VERSION" --notes-file notes.md $PRE \
             "dist/Twinmap-Setup-$VERSION.exe" "dist/Twinmap-Setup-$VERSION.exe.blockmap" $UPDATE_FILES
 
       # The result goes into the release notes, and into virustotal.json for the badge of the README and of the site.
@@ -78,7 +90,7 @@ jobs:
           git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -q -m "VirusTotal result of $GITHUB_REF_NAME"
           git push -q --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" badges
 
-      # The addon goes to CurseForge with the same version, in the same zip a player would unpack into
+      # The addon goes to CurseForge with the same version and the same notes, in the same zip a player would unpack into
       # AddOns, the two license files inside. A pre-release stays on GitHub. An upload that fails does
       # not take the release back.
       - name: Upload the addon to CurseForge
@@ -97,5 +109,4 @@ jobs:
           cp ../LICENSE dist/addon/TwinmapForever/LICENSE.txt
           cp ../THIRD-PARTY-LICENSES dist/addon/TwinmapForever/THIRD-PARTY-LICENSES.txt
           (cd dist/addon && 7z a -tzip "TwinmapForever-$VERSION.zip" TwinmapForever > /dev/null)
-          gh release view "$GITHUB_REF_NAME" --json body -q .body > dist/addon/notes.md
-          node scripts/curseforge.js "dist/addon/TwinmapForever-$VERSION.zip" ../addon/TwinmapForever/TwinmapForever.toc "$VERSION" dist/addon/notes.md
+          node scripts/curseforge.js "dist/addon/TwinmapForever-$VERSION.zip" ../addon/TwinmapForever/TwinmapForever.toc "$VERSION" notes.md
