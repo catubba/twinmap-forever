@@ -2,7 +2,7 @@
 ## Title: Twinmap Forever
 ## Notes: Live map on your second screen. Reads and draws, never plays for you.
 ## Author: Twinmap contributors
-## Version: 0.1.0
+## Version: 0.1.1
 ## X-Website: https://twinmap.app
 ## X-License: GPL-3.0-only
 ## SavedVariables: TwinmapForeverDB
