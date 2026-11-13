@@ -15,87 +15,98 @@ jobs:
   release:
     runs-on: windows-latest
     defaults:
-      run:
-        working-directory: app
-        shell: bash
+ The addon goes to CurseForge with the same version, in the same ziprun:
+ The addon goes to CurseForge with the same version, in the same zip  working-directory: app
+ The addon goes to CurseForge with the same version, in the same zip  shell: bash
     env:
-      GH_TOKEN: ${{ github.token }}
+ The addon goes to CurseForge with the same version, in the same zipGH_TOKEN: ${{ github.token }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-          cache-dependency-path: app/package-lock.json
-      - run: npm ci
-      - run: npm run check
-      - run: npm test
+ The addon goes to CurseForge with the same version, in the same zip- uses: actions/checkout@v4
+ The addon goes to CurseForge with the same version, in the same zip- uses: actions/setup-node@v4
+ The addon goes to CurseForge with the same version, in the same zip  with:
+ The addon goes to CurseForge with the same version, in the same zip    node-version: 24
+ The addon goes to CurseForge with the same version, in the same zip    cache: npm
+ The addon goes to CurseForge with the same version, in the same zip    cache-dependency-path: app/package-lock.json
+ The addon goes to CurseForge with the same version, in the same zip# The notes of a release are the section of its version in CHANGELOG.md. A release without one
+ The addon goes to CurseForge with the same version, in the same zip# stops here, before anything is built; a pre-release may go without.
+ The addon goes to CurseForge with the same version, in the same zip- name: Read the notes from the changelog
+ The addon goes to CurseForge with the same version, in the same zip  run: |
+ The addon goes to CurseForge with the same version, in the same zip    VERSION="${GITHUB_REF_NAME#v}"
+ The addon goes to CurseForge with the same version, in the same zip    echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+ The addon goes to CurseForge with the same version, in the same zip    awk -v v="$VERSION" '/^## /{p=($2==v);next} p' ../CHANGELOG.md > notes.md
+ The addon goes to CurseForge with the same version, in the same zip    if ! grep -q '[^[:space:]]' notes.md; then
+ The addon goes to CurseForge with the same version, in the same zip      case "$VERSION" in
+ The addon goes to CurseForge with the same version, in the same zip        *-*) echo "Pre-release of $VERSION" > notes.md ;;
+ The addon goes to CurseForge with the same version, in the same zip        *) echo "::error::CHANGELOG.md has no section for $VERSION"; exit 1 ;;
+ The addon goes to CurseForge with the same version, in the same zip      esac
+ The addon goes to CurseForge with the same version, in the same zip    fi
 
-      - name: Build the installer
-        run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
-          npx electron-vite build
-          npx electron-builder --win nsis --publish never -c.extraMetadata.version="$VERSION"
+ The addon goes to CurseForge with the same version, in the same zip- run: npm ci
+ The addon goes to CurseForge with the same version, in the same zip- run: npm run check
+ The addon goes to CurseForge with the same version, in the same zip- run: npm test
 
-      # The installer, its blockmap and the file that names the latest version: the app updates itself only with all three.
-      - name: Publish the release
-        run: |
-          PRE=""
-          case "$VERSION" in *-*) PRE="--prerelease" ;; esac
-          UPDATE_FILES=$(ls dist/*.yml | grep -v builder-)
-          gh release create "$GITHUB_REF_NAME" --title "Twinmap $VERSION" --generate-notes $PRE \
-            "dist/Twinmap-Setup-$VERSION.exe" "dist/Twinmap-Setup-$VERSION.exe.blockmap" $UPDATE_FILES
+ The addon goes to CurseForge with the same version, in the same zip- name: Build the installer
+ The addon goes to CurseForge with the same version, in the same zip  run: |
+ The addon goes to CurseForge with the same version, in the same zip    npx electron-vite build
+ The addon goes to CurseForge with the same version, in the same zip    npx electron-builder --win nsis --publish never -c.extraMetadata.version="$VERSION"
 
-      # The result goes into the release notes, and into virustotal.json for the badge of the README and of the site.
-      # A scan that fails does not take the release back: it is published already.
-      - name: Scan the installer with VirusTotal
-        continue-on-error: true
-        env:
-          VT_API_KEY: ${{ secrets.VT_API_KEY }}
-        run: |
-          if [ -z "$VT_API_KEY" ]; then
-            echo "::warning::VT_API_KEY is not set: the installer was not scanned"
-            exit 0
-          fi
-          node scripts/virustotal.js "dist/Twinmap-Setup-$VERSION.exe" dist/vt
-          gh release upload "$GITHUB_REF_NAME" dist/vt/virustotal.json --clobber
-          { gh release view "$GITHUB_REF_NAME" --json body -q .body; echo; cat dist/vt/virustotal.md; } > dist/vt/notes.md
-          gh release edit "$GITHUB_REF_NAME" --notes-file dist/vt/notes.md
+ The addon goes to CurseForge with the same version, in the same zip# The installer, its blockmap and the file that names the latest version: the app updates itself only with all three.
+ The addon goes to CurseForge with the same version, in the same zip- name: Publish the release
+ The addon goes to CurseForge with the same version, in the same zip  run: |
+ The addon goes to CurseForge with the same version, in the same zip    PRE=""
+ The addon goes to CurseForge with the same version, in the same zip    case "$VERSION" in *-*) PRE="--prerelease" ;; esac
+ The addon goes to CurseForge with the same version, in the same zip    UPDATE_FILES=$(ls dist/*.yml | grep -v builder-)
+ The addon goes to CurseForge with the same version, in the same zip    gh release create "$GITHUB_REF_NAME" --title "Twinmap $VERSION" --notes-file notes.md $PRE \
+ The addon goes to CurseForge with the same version, in the same zip      "dist/Twinmap-Setup-$VERSION.exe" "dist/Twinmap-Setup-$VERSION.exe.blockmap" $UPDATE_FILES
 
-      # shields.io does not read a badge's file from a release, so the latest result also lives on a
-      # branch of its own, with nothing else on it. A pre-release does not move the badge.
-      - name: Publish the result for the badge
-        continue-on-error: true
-        run: |
-          case "$VERSION" in *-*) exit 0 ;; esac
-          [ -f dist/vt/virustotal.json ] || exit 0
-          WORK=$(mktemp -d)
-          cp dist/vt/virustotal.json "$WORK/"
-          cd "$WORK"
-          git init -q -b badges
-          git add virustotal.json
-          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -q -m "VirusTotal result of $GITHUB_REF_NAME"
-          git push -q --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" badges
+ The addon goes to CurseForge with the same version, in the same zip# The result goes into the release notes, and into virustotal.json for the badge of the README and of the site.
+ The addon goes to CurseForge with the same version, in the same zip# A scan that fails does not take the release back: it is published already.
+ The addon goes to CurseForge with the same version, in the same zip- name: Scan the installer with VirusTotal
+ The addon goes to CurseForge with the same version, in the same zip  continue-on-error: true
+ The addon goes to CurseForge with the same version, in the same zip  env:
+ The addon goes to CurseForge with the same version, in the same zip    VT_API_KEY: ${{ secrets.VT_API_KEY }}
+ The addon goes to CurseForge with the same version, in the same zip  run: |
+ The addon goes to CurseForge with the same version, in the same zip    if [ -z "$VT_API_KEY" ]; then
+ The addon goes to CurseForge with the same version, in the same zip      echo "::warning::VT_API_KEY is not set: the installer was not scanned"
+ The addon goes to CurseForge with the same version, in the same zip      exit 0
+ The addon goes to CurseForge with the same version, in the same zip    fi
+ The addon goes to CurseForge with the same version, in the same zip    node scripts/virustotal.js "dist/Twinmap-Setup-$VERSION.exe" dist/vt
+ The addon goes to CurseForge with the same version, in the same zip    gh release upload "$GITHUB_REF_NAME" dist/vt/virustotal.json --clobber
+ The addon goes to CurseForge with the same version, in the same zip    { gh release view "$GITHUB_REF_NAME" --json body -q .body; echo; cat dist/vt/virustotal.md; } > dist/vt/notes.md
+ The addon goes to CurseForge with the same version, in the same zip    gh release edit "$GITHUB_REF_NAME" --notes-file dist/vt/notes.md
 
-      # The addon goes to CurseForge with the same version, in the same zip a player would unpack into
-      # AddOns, the two license files inside. A pre-release stays on GitHub. An upload that fails does
-      # not take the release back.
-      - name: Upload the addon to CurseForge
-        continue-on-error: true
-        env:
-          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
-          CF_PROJECT_ID: ${{ vars.CF_PROJECT_ID }}
-        run: |
-          case "$VERSION" in *-*) exit 0 ;; esac
-          if [ -z "$CF_API_TOKEN" ] || [ -z "$CF_PROJECT_ID" ]; then
-            echo "::warning::CF_API_TOKEN or CF_PROJECT_ID is not set: the addon was not uploaded to CurseForge"
-            exit 0
-          fi
-          mkdir -p dist/addon/TwinmapForever
-          cp ../addon/TwinmapForever/* dist/addon/TwinmapForever/
-          cp ../LICENSE dist/addon/TwinmapForever/LICENSE.txt
-          cp ../THIRD-PARTY-LICENSES dist/addon/TwinmapForever/THIRD-PARTY-LICENSES.txt
-          (cd dist/addon && 7z a -tzip "TwinmapForever-$VERSION.zip" TwinmapForever > /dev/null)
-          gh release view "$GITHUB_REF_NAME" --json body -q .body > dist/addon/notes.md
-          node scripts/curseforge.js "dist/addon/TwinmapForever-$VERSION.zip" ../addon/TwinmapForever/TwinmapForever.toc "$VERSION" dist/addon/notes.md
+ The addon goes to CurseForge with the same version, in the same zip# shields.io does not read a badge's file from a release, so the latest result also lives on a
+ The addon goes to CurseForge with the same version, in the same zip# branch of its own, with nothing else on it. A pre-release does not move the badge.
+ The addon goes to CurseForge with the same version, in the same zip- name: Publish the result for the badge
+ The addon goes to CurseForge with the same version, in the same zip  continue-on-error: true
+ The addon goes to CurseForge with the same version, in the same zip  run: |
+ The addon goes to CurseForge with the same version, in the same zip    case "$VERSION" in *-*) exit 0 ;; esac
+ The addon goes to CurseForge with the same version, in the same zip    [ -f dist/vt/virustotal.json ] || exit 0
+ The addon goes to CurseForge with the same version, in the same zip    WORK=$(mktemp -d)
+ The addon goes to CurseForge with the same version, in the same zip    cp dist/vt/virustotal.json "$WORK/"
+ The addon goes to CurseForge with the same version, in the same zip    cd "$WORK"
+ The addon goes to CurseForge with the same version, in the same zip    git init -q -b badges
+ The addon goes to CurseForge with the same version, in the same zip    git add virustotal.json
+ The addon goes to CurseForge with the same version, in the same zip    git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -q -m "VirusTotal result of $GITHUB_REF_NAME"
+ The addon goes to CurseForge with the same version, in the same zip    git push -q --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" badges
+
+ The addon goes to CurseForge with the same version, in the same zip# The addon goes to CurseForge with the same version, in the same zip a player would unpack into
+ The addon goes to CurseForge with the same version, in the same zip# AddOns, the two license files inside. A pre-release stays on GitHub. An upload that fails does
+ The addon goes to CurseForge with the same version, in the same zip# not take the release back.
+ The addon goes to CurseForge with the same version, in the same zip- name: Upload the addon to CurseForge
+ The addon goes to CurseForge with the same version, in the same zip  continue-on-error: true
+ The addon goes to CurseForge with the same version, in the same zip  env:
+ The addon goes to CurseForge with the same version, in the same zip    CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+ The addon goes to CurseForge with the same version, in the same zip    CF_PROJECT_ID: ${{ vars.CF_PROJECT_ID }}
+ The addon goes to CurseForge with the same version, in the same zip  run: |
+ The addon goes to CurseForge with the same version, in the same zip    case "$VERSION" in *-*) exit 0 ;; esac
+ The addon goes to CurseForge with the same version, in the same zip    if [ -z "$CF_API_TOKEN" ] || [ -z "$CF_PROJECT_ID" ]; then
+ The addon goes to CurseForge with the same version, in the same zip      echo "::warning::CF_API_TOKEN or CF_PROJECT_ID is not set: the addon was not uploaded to CurseForge"
+ The addon goes to CurseForge with the same version, in the same zip      exit 0
+ The addon goes to CurseForge with the same version, in the same zip    fi
+ The addon goes to CurseForge with the same version, in the same zip    mkdir -p dist/addon/TwinmapForever
+ The addon goes to CurseForge with the same version, in the same zip    cp ../addon/TwinmapForever/* dist/addon/TwinmapForever/
+ The addon goes to CurseForge with the same version, in the same zip    cp ../LICENSE dist/addon/TwinmapForever/LICENSE.txt
+ The addon goes to CurseForge with the same version, in the same zip    cp ../THIRD-PARTY-LICENSES dist/addon/TwinmapForever/THIRD-PARTY-LICENSES.txt
+ The addon goes to CurseForge with the same version, in the same zip    (cd dist/addon && 7z a -tzip "TwinmapForever-$VERSION.zip" TwinmapForever > /dev/null)
+ The addon goes to CurseForge with the same version, in the same zip    node scripts/curseforge.js "dist/addon/TwinmapForever-$VERSION.zip" ../addon/TwinmapForever/TwinmapForever.toc "$VERSION" notes.md
