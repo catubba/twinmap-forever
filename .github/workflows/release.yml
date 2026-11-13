@@ -46,7 +46,7 @@ jobs:
           gh release create "$GITHUB_REF_NAME" --title "Twinmap $VERSION" --generate-notes $PRE \
             "dist/Twinmap-Setup-$VERSION.exe" "dist/Twinmap-Setup-$VERSION.exe.blockmap" $UPDATE_FILES
 
-      # The result goes into the release notes, and into virustotal.json for the badge of the README.
+      # The result goes into the release notes, and into virustotal.json for the badge of the README and of the site.
       # A scan that fails does not take the release back: it is published already.
       - name: Scan the installer with VirusTotal
         continue-on-error: true
@@ -61,3 +61,18 @@ jobs:
           gh release upload "$GITHUB_REF_NAME" dist/vt/virustotal.json --clobber
           { gh release view "$GITHUB_REF_NAME" --json body -q .body; echo; cat dist/vt/virustotal.md; } > dist/vt/notes.md
           gh release edit "$GITHUB_REF_NAME" --notes-file dist/vt/notes.md
+
+      # shields.io does not read a badge's file from a release, so the latest result also lives on a
+      # branch of its own, with nothing else on it. A pre-release does not move the badge.
+      - name: Publish the result for the badge
+        continue-on-error: true
+        run: |
+          case "$VERSION" in *-*) exit 0 ;; esac
+          [ -f dist/vt/virustotal.json ] || exit 0
+          WORK=$(mktemp -d)
+          cp dist/vt/virustotal.json "$WORK/"
+          cd "$WORK"
+          git init -q -b badges
+          git add virustotal.json
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -q -m "VirusTotal result of $GITHUB_REF_NAME"
+          git push -q --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" badges

@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Twinmap: your position on the map, in real time</title>
+    <meta name="description" content="An interactive map of World of Warcraft: Forever for your second screen. It follows your character in real time, even inside dungeons, on a monitor, a laptop, a tablet or a phone. Free and open source." />
+    <meta name="theme-color" content="#15110e" />
+    <meta property="og:title" content="Twinmap: your position on the map, in real time" />
+    <meta property="og:description" content="World of Warcraft: Forever on your second screen. Even inside dungeons. Free and open source." />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://twinmap.app/" />
+    <meta property="og:image" content="https://twinmap.app/assets/social.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+    <link rel="preload" href="assets/Marcellus-Regular.ttf" as="font" type="font/ttf" crossorigin />
+    <link rel="stylesheet" href="assets/site.css" />
+  </head>
+  <body>
+    <header class="top">
+      <a class="brand" href="#top" aria-label="Twinmap, to the top of the page">
+        <img src="assets/mark.svg" width="34" height="34" alt="" />
+        <span>TWINMAP</span>
+      </a>
+      <p class="state"><i class="dot" aria-hidden="true"></i>Free and open source</p>
+      <a class="entry" href="https://github.com/catubba/twinmap-forever">GitHub</a>
+    </header>
+
+    <main id="top">
+      <!-- The first screen is the app's own first run: the promise, the map, the three steps.
+           On a wide screen the steps stand under the promise and the map beside both; on a narrow one the map comes before the steps. -->
+      <section class="first">
+        <div class="head">
+          <h1>Your position on the map, in real time</h1>
+          <p class="lead">Even inside dungeons. World&nbsp;of&nbsp;Warcraft:&nbsp;Forever on your second screen.</p>
+        </div>
+
+        <figure class="map">
+          <div class="frame">
+            <picture>
+              <source media="(max-width: 560px)" srcset="assets/map-narrow.webp" width="520" height="460" />
+              <img src="assets/map.webp" width="900" height="610" alt="Twinmap showing Lakeshire in Redridge Mountains: the player's yellow arrow on the bridge, the dotted line of a journey leading to it, quests, ore and objectives around the lake" />
+            </picture>
+            <i class="stud tl"></i><i class="stud tr"></i><i class="stud bl"></i><i class="stud br"></i>
+          </div>
+          <figcaption>Lakeshire, on the bridge. The yellow arrow is the player, from a live session.</figcaption>
+        </figure>
+
+        <ol class="steps">
+          <li>
+            <h2 class="band">1. The addon</h2>
+            <p>Install Twinmap Forever from CurseForge and restart the game.</p>
+            <a class="btn" href="https://www.curseforge.com/wow/addons/twinmap-forever">Get the addon on CurseForge</a>
+          </li>
+          <li>
+            <h2 class="band">2. The app</h2>
+            <p>Free, for Windows 10 and 11. It builds the map from your own game files and updates itself.</p>
+            <a class="btn" href="https://github.com/catubba/twinmap-forever/releases/latest">Get the app for Windows</a>
+          </li>
+          <li>
+            <h2 class="band">3. Play</h2>
+            <p>Log in with a character. Your arrow appears on its own.</p>
+          </li>
+        </ol>
+      </section>
+
+      <!-- Three proofs, each with a real screen. -->
+      <section class="proof">
+        <div class="words">
+          <h2>Even inside dungeons</h2>
+          <p>Your arrow moves through the rooms of dungeons and raids as you do, with every boss marked on the way.</p>
+          <p>The game gives addons no position in there, so Twinmap reads your place from the minimap on your screen. Keep it visible and not rotating.</p>
+        </div>
+        <figure class="map">
+          <div class="frame">
+            <picture>
+              <source media="(max-width: 560px)" srcset="assets/dungeon-narrow.webp" width="520" height="400" />
+              <img src="assets/dungeon.webp" width="1236" height="646" loading="lazy" alt="Twinmap inside Hall of Thanes: the rooms of the dungeon, the bosses as red dots and the yellow arrow at the door between two halls" />
+            </picture>
+            <i class="stud tl"></i><i class="stud tr"></i><i class="stud bl"></i><i class="stud br"></i>
+          </div>
+          <figcaption>Hall of Thanes: the arrow, the rooms, the bosses. A staged walk, replayed in the app.</figcaption>
+        </figure>
+      </section>
+
+      <section class="screens">
+        <div class="words">
+          <h2>On any screen you have</h2>
+          <p>A second monitor is the best seat. No second monitor? Open the same live map in the browser of a laptop, a tablet or a phone on your home network: scan a code once, and there is nothing to install.</p>
+        </div>
+        <div class="devices">
+          <div class="laptop">
+            <div class="lid"><img src="assets/laptop.webp" width="1440" height="900" loading="lazy" alt="Twinmap in the browser of a laptop" /></div>
+            <div class="deck"></div>
+          </div>
+          <div class="tablet"><img src="assets/tablet.webp" width="1180" height="820" loading="lazy" alt="Twinmap on a tablet" /></div>
+          <div class="phone"><img src="assets/phone.webp" width="780" height="1688" loading="lazy" alt="Twinmap on a phone, the map filling the screen" /></div>
+        </div>
+      </section>
+
+      <section class="proof turned">
+        <div class="words">
+          <h2>Show only what you need</h2>
+          <p>Your quests exactly as Questie shows them, flight masters, inns, trainers, repair, banks, ore, herbs, dungeons: each one a layer you turn on or off. Search finds any NPC, item or quest, with the distance on foot.</p>
+          <p>And it goes both ways: mark a point or build a route on Twinmap, and it appears in the game.</p>
+        </div>
+        <figure class="map">
+          <div class="frame">
+            <picture>
+              <source media="(max-width: 900px)" srcset="assets/layers-narrow.webp" width="568" height="968" />
+              <img src="assets/layers.webp" width="1576" height="988" loading="lazy" alt="Twinmap with the Layers menu open: arrow, route, pins, quests, services, resources and world, each with its checkbox" />
+            </picture>
+            <i class="stud tl"></i><i class="stud tr"></i><i class="stud bl"></i><i class="stud br"></i>
+          </div>
+          <figcaption>The Layers menu, as one player has it set.</figcaption>
+        </figure>
+      </section>
+
+      <!-- The foot: what it is made of, as the app's settings list things, and the two downloads once more. -->
+      <section class="facts">
+        <h2 class="band">How it works</h2>
+        <dl>
+          <dt>From the game to the app</dt>
+          <dd>The addon draws a line one pixel tall at the edge of the game window and writes your position, zone and quests in the colors of its pixels. The app reads that line from the screen. It never touches the game's memory and never plays for you.</dd>
+          <dt>The map</dt>
+          <dd>Built on your computer from the files of your own game, so it always matches your version. No map is downloaded.</dd>
+          <dt>Privacy</dt>
+          <dd>Nothing leaves your computer. No account, no ads, no tracking. The only connection is to GitHub, to look for a newer version.</dd>
+          <dt>Photosensitivity</dt>
+          <dd>The addon sends data by changing the colors of a one pixel line at the edge of the game window, many times per second. Its settings in the game can slow it down or pause it.</dd>
+        </dl>
+
+        <h2 class="band">Free, open, and still growing</h2>
+        <dl>
+          <dt>The code</dt>
+          <dd>All of it is public on <a href="https://github.com/catubba/twinmap-forever">GitHub</a>, under the GNU General Public License, version 3. Free to use, with no ads and no paid features, and it will stay that way.</dd>
+          <dt>Contribute</dt>
+          <dd>Anyone can. <a href="https://github.com/catubba/twinmap-forever/issues/new/choose">Report a bug or propose an idea</a>, or send a pull request with code. No GitHub account? Write to <a href="mailto:dev@twinmap.app">dev@twinmap.app</a>, in English or in Italian.</dd>
+          <dt>What is planned</dt>
+          <dd>Your party on the map, travel times and flight paths, zones colored by level, your whole quest log, professions and reputations, alerts, bags and bank, a macro builder, leveling guides. Plans, not promises: the <a href="https://github.com/catubba/twinmap-forever#in-active-development">full list</a> is on GitHub.</dd>
+          <dt>Support</dt>
+          <dd>Twinmap is made in spare time and costs nothing. If it is useful to you and you feel like it, you can <a href="https://ko-fi.com/catubba">buy me a coffee on Ko-fi</a>. It is never needed, and it unlocks nothing.</dd>
+        </dl>
+
+        <h2 class="band">Get Twinmap</h2>
+        <dl class="get">
+          <dt>1. The addon</dt>
+          <dd><a class="btn" href="https://www.curseforge.com/wow/addons/twinmap-forever">Get the addon on CurseForge</a></dd>
+          <dt>2. The app</dt>
+          <dd>
+            <a class="btn" href="https://github.com/catubba/twinmap-forever/releases/latest">Get the app for Windows</a>
+            <span class="badges">
+              <a href="https://github.com/catubba/twinmap-forever/releases/latest"><img src="https://img.shields.io/github/v/release/catubba/twinmap-forever?label=version" alt="Latest version" height="20" loading="lazy" /></a>
+              <a href="https://github.com/catubba/twinmap-forever/releases/latest"><img src="https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fcatubba%2Ftwinmap-forever%2Fbadges%2Fvirustotal.json" alt="VirusTotal result for the latest installer" height="20" loading="lazy" /></a>
+            </span>
+            <span class="scan">Each installer is scanned by VirusTotal when it is published.</span>
+          </dd>
+        </dl>
+      </section>
+    </main>
+
+    <footer>
+      <p>Twinmap is a fan project. It is not affiliated with or endorsed by Blizzard Entertainment, and Blizzard has not authorized it: you use it at your own risk. World of Warcraft is a trademark of Blizzard Entertainment, Inc.</p>
+      <p>Free software under the GNU General Public License, version 3. It comes with no warranty.</p>
+    </footer>
+  </body>
+</html>
