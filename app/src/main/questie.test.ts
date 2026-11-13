@@ -2,8 +2,8 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, test } from 'vitest'
-import { shownFrom } from '../shared/quests'
-import { cbor, doerIndex, fixedPins, ITEM, NPC, OBJECT, openQuestie, QUEST, questPins, search, searchIndex } from './questie'
+import { logFrom, shownFrom } from '../shared/quests'
+import { cbor, doerIndex, fixedPins, ITEM, NPC, OBJECT, openQuestie, QUEST, questLog, questPins, search, searchIndex, shownFromLog } from './questie'
 
 // Writes a value the way QuestieDB does: CBOR, then base64. Only what these tests need.
 function enc(v: unknown): Buffer {
@@ -255,4 +255,33 @@ test('the search finds who does what was typed, whatever they are called', () =>
   expect(told('fi')).toEqual([])
   // By name it is still found as before.
   expect(search(db, index, 'first mate', 12, doers).map((f) => f.name)).toEqual(['First Mate Aid'])
+})
+
+test('without Questie the pins of the log are made here: where to hand in what is done, where to find what is still asked for', () => {
+  const db = openQuestie(game([
+    ...LINES,
+    // A quest that asks for a creature, an object and an item the rats drop; and one to do at a place.
+    `## X-Quest-20-S: ${b64({ [QUEST.name]: 'Three Things' })}`,
+    `## X-Quest-20-${QUEST.objectives}: ${b64([[[103, null, 0]], [[900, null, 0]], [[55, null, 0]]])}`,
+    `## X-Quest-10-${QUEST.triggerEnd}: ${b64(['Scout the ford', { 40: [[61.5, 53.25]] }])}`,
+  ]))!
+  // As the addon sends it: the creature is done, the object and the item are not.
+  const log = logFrom({ log: [{ id: 7, done: true, o: [1, 1] }, { id: 10, done: false, o: [0, 0] }, { id: 20, done: false, o: [1, 1, 2, 0, 3, 0] }] })!
+  const shown = shownFromLog(db, log)
+  expect(shown.icons.available).toEqual([])
+  // Handed in to the rats or at the board: the rats stand in forty places a unit apart, shown four units apart.
+  expect(shown.icons.turnin.filter((i) => i.x === 50)).toEqual([{ quest: 7, area: 12, x: 50, y: 50 }])
+  expect(shown.icons.turnin.map((i) => i.x).slice(0, 3)).toEqual([10.5, 14.5, 18.5])
+  expect(shown.icons.turnin.length).toBe(11)
+  // The place to scout; the board and the rats that drop the key, not the creature already done.
+  expect(shown.icons.objective.filter((i) => i.quest === 10)).toEqual([{ quest: 10, area: 40, x: 61.5, y: 53.25 }])
+  expect(shown.active.find((q) => q.id === 20)).toEqual({ id: 20, done: false, targets: ['o_900', 'm_102'] })
+  const pins = questPins(db, shown)
+  expect(pins.find((p) => p.type === 'objective' && p.x === 50)).toMatchObject({ area: 12, name: 'Mill Notice Board', quests: ['Three Things'] })
+  expect(pins.some((p) => p.type === 'objective' && p.name === 'Road Warden'), 'the creature is done').toBe(false)
+  expect(questLog(db, shown)).toEqual([{ name: 'A Parcel for the Miller', done: true }, { name: 'Scout the Ford', done: false }, { name: 'Three Things', done: false }])
+  // A game that tells no objectives: everything the quest asks for is shown. No section at all: Questie is running.
+  expect(shownFromLog(db, logFrom({ log: [{ id: 20, done: false, o: [] }] })!).active[0]!.targets).toEqual(['m_103', 'o_900', 'm_102'])
+  expect(logFrom(undefined)).toBeNull()
+  expect(logFrom({ log: {} })).toEqual([])
 })

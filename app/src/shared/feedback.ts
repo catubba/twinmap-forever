@@ -23,7 +23,7 @@ export function feedbackDetails(setup: SetupStatus, tiles: TilesStatus | null, l
       `Game folder: ${setup.gameFolder ? 'found' : 'not found'}`,
       `Map: ${tiles ? tilesLine(tiles) : 'unknown'}`,
       `Link: ${link ?? 'unknown'}`,
-      `Questie: ${has(setup.questie)}`,
+      `QuestieDB: ${has(setup.questie)}`,
       `Shortest Path: ${has(setup.shortestPath)}`,
     ].join('\n'),
   )

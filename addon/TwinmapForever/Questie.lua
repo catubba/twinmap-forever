@@ -2,7 +2,7 @@
 -- map, each with its quest and its place. Its filters (level range, hidden quests, what the
 -- character can take), its limits and its switches stay its own: an icon it does not show is not
 -- sent. Only numbers go out: the app has the names, from the QuestieDB of the same player.
--- Without Questie nothing is sent.
+-- Without Questie nothing is sent from here: the game's own log is (Quests.lua).
 local _, ns = ...
 
 local function Ok(ok, ...) if ok then return ... end end

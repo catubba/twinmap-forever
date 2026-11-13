@@ -5,7 +5,7 @@ import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { keep, keptFrom } from '../shared/kept'
 import { linkStatus, lostPercent } from '../shared/link'
-import { shownFrom, type QuestsStatus } from '../shared/quests'
+import { logFrom, shownFrom, type QuestsStatus } from '../shared/quests'
 import type { Found } from '../shared/search'
 import { inboxFrom, marksNews, pinFrom, routeNewsFrom, stepFrom, takenFrom } from '../shared/send'
 import { feedbackLink } from '../shared/feedback'
@@ -60,7 +60,7 @@ function startTiles(gameFolder: string | null): { status: () => TilesStatus; sto
 
 // The quests on the map: the player's QuestieDB is opened once, and asked for the pins of what
 // Questie shows each time the addon tells something new. tell: called with every answer.
-function startQuests(gameFolder: string | null, tell: (status: QuestsStatus) => void): { show: (section: unknown) => void; search: (typed: string) => Promise<Found[]>; stop: () => void } {
+function startQuests(gameFolder: string | null, tell: (status: QuestsStatus) => void): { show: (section: unknown, log?: unknown) => void; search: (typed: string) => Promise<Found[]>; stop: () => void } {
   if (!gameFolder) return { show: () => {}, search: () => Promise.resolve([]), stop: () => {} }
   const worker = startQuestieWorker({ workerData: { gameFolder } })
   // A search waits for the answer that carries its number.
@@ -79,11 +79,13 @@ function startQuests(gameFolder: string | null, tell: (status: QuestsStatus) => 
   })
   let last = ''
   return {
-    show: (section) => {
-      const told = JSON.stringify(section ?? null)
+    // log: the game's own log, which the addon sends where Questie is not running.
+    show: (section, log) => {
+      const told = JSON.stringify([section ?? null, log ?? null])
       if (told === last) return
       last = told
-      post({ shown: shownFrom(section) })
+      const own = section ? null : logFrom(log)
+      post(own ? { log: own } : { shown: shownFrom(section) })
     },
     search: (typed) =>
       new Promise((answer) => {
@@ -433,7 +435,7 @@ function createWindow(): void {
   let lanTick = false
   const show = setInterval(() => {
     const snapshot = link.snapshot()
-    quests.show(snapshot.state.sections.questie)
+    quests.show(snapshot.state.sections.questie, snapshot.state.sections.quests)
     win.webContents.send('link', snapshot)
     win.webContents.send('tiles', tiles.status())
     win.webContents.send('setup', setup)

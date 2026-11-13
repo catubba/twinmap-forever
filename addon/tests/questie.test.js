@@ -136,3 +136,50 @@ test('on a window 2560 wide, six hundred icons take under two seconds to cross',
   const seconds = blocks[0].total * 0.1;
   assert.ok(seconds < 2, `${blocks[0].total} blocks, ${seconds} s`);
 });
+
+// The game's own log, as either of its two ways tells it: a header, a quest ready to hand in, one
+// with a creature killed and an item still to find, one with nothing the game counts.
+const LOG = `
+  COMPLETE = { [12] = true }
+  ROWS = { { header = true }, { id = 12 }, { id = 102 }, { id = 7 } }
+  OBJECTIVES = { [102] = { { type = "monster", finished = true }, { type = "item", finished = false } }, [12] = { { type = "object", finished = true } }, [7] = { { type = "event", finished = false } } }
+`;
+const MODERN = `
+  C_QuestLog = {
+    IsComplete = function(id) return COMPLETE[id] == true end,
+    GetNumQuestLogEntries = function() return #ROWS end,
+    GetInfo = function(i) return ROWS[i] and { isHeader = ROWS[i].header, questID = ROWS[i].id } end,
+    GetQuestObjectives = function(id) return OBJECTIVES[id] end,
+  }
+`;
+const LEGACY = `
+  C_QuestLog = { IsComplete = function(id) return COMPLETE[id] == true end, GetQuestObjectives = function(id) return OBJECTIVES[id] end }
+  function GetNumQuestLogEntries() return #ROWS end
+  function GetQuestLogTitle(i) return "A title", 5, nil, ROWS[i].header, false, false, 0, ROWS[i].id end
+`;
+const TOLD = { log: [{ id: 7, done: false, o: [0, 0] }, { id: 12, done: true, o: [2, 1] }, { id: 102, done: false, o: [1, 1, 3, 0] }] };
+
+test('without Questie the game\'s own log goes out: each quest, whether it is done, and its objectives by kind', () => {
+  for (const api of [MODERN, LEGACY]) {
+    const addon = enterWorld(LOG + api);
+    addon.run(12);
+    assert.deepEqual(section(addon, 'quests'), TOLD);
+    assert.equal(section(addon, 'questie'), undefined);
+  }
+});
+
+test('with Questie running the log is left to it', () => {
+  const addon = enterWorld(LOG + MODERN + QUESTIE.replace(/C_QuestLog = [^\n]+\n/, '') + ICONS);
+  addon.run(12);
+  assert.equal(section(addon, 'quests'), undefined);
+  assert.ok(section(addon, 'questie'));
+});
+
+test('a game with no way of telling its log sends none, and one with an empty log says so', () => {
+  const none = enterWorld('C_QuestLog = nil');
+  none.run(12);
+  assert.equal(section(none, 'quests'), undefined);
+  const empty = enterWorld('C_QuestLog = { GetNumQuestLogEntries = function() return 0 end }');
+  empty.run(12);
+  assert.deepEqual(section(empty, 'quests'), { log: [] });
+});
