@@ -70,11 +70,20 @@ function main() {
   const config = `user = ${quoted(`${to.user}:${to.password}`)}\nhostpubsha256 = ${quoted(print)}\n`
   if (process.argv.includes('--check')) {
     // Only looks: signs in and lists what is in the folder now. Nothing is sent or changed.
-    execFileSync('curl', ['--config', '-', '--silent', '--show-error', '--fail', '--list-only', `sftp://${to.host}:${to.port}${to.folder}/`], { input: config, stdio: ['pipe', 'inherit', 'inherit'] })
+    execFileSync('curl', ['--config', '-', '--silent', '--show-error', '--fail', `sftp://${to.host}:${to.port}${to.folder}/`], { input: config, stdio: ['pipe', 'inherit', 'inherit'] })
     return console.log(`signed in to ${to.host}; the lines above are what ${to.folder} holds now`)
   }
+  // A link the host left in the folder (its welcome page stands in for index.html) cannot be written
+  // through: where one has the name of a file of ours, it is taken away first. The folder is ours; what the link points at is not touched.
+  const there = execFileSync('curl', ['--config', '-', '--silent', '--show-error', '--fail', `sftp://${to.host}:${to.port}${to.folder}/`], { input: config, encoding: 'utf8', stdio: ['pipe', 'pipe', 'inherit'] })
+  for (const line of there.split('\n')) {
+    const link = /^l\S+\s.*\s(\S+) -> /.exec(line)?.[1]
+    if (!link || !files.includes(link)) continue
+    execFileSync('curl', ['--config', '-', '--silent', '--show-error', '--fail', '--quote', `rm ${to.folder}/${link}`, '--list-only', '--output', process.platform === 'win32' ? 'NUL' : '/dev/null', `sftp://${to.host}:${to.port}${to.folder}/`], { input: config, stdio: ['pipe', 'inherit', 'inherit'] })
+    console.log(`removed the host's link ${link}`)
+  }
   for (const file of files) {
-    const url =`sftp://${to.host}:${to.port}${to.folder}/${file.split('/').map(encodeURIComponent).join('/')}`
+    const url = `sftp://${to.host}:${to.port}${to.folder}/${file.split('/').map(encodeURIComponent).join('/')}`
     execFileSync('curl', ['--config', '-', '--silent', '--show-error', '--fail', '--ftp-create-dirs', '--upload-file', path.join(SITE, file), url], { input: config, stdio: ['pipe', 'inherit', 'inherit'] })
     console.log(`sent ${file}`)
   }
