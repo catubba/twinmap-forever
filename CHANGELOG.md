@@ -2,6 +2,20 @@
 
 What changed in each version of Twinmap, newest first. The section of a version is also the text of its release on GitHub and of the addon's file on CurseForge.
 
+## 0.3.3 - 2026-11-14
+
+### New
+
+- **Each objective shows what it asks for.** The objectives of your quests were all the same small red dot. They are now larger, with a sign on each: a sword for a creature to slay, a pouch for something to loot, a cog for an object to use, a speech bubble for someone to talk to, a star for a place to reach. A soft red light under them makes them easier to find. Needs the new addon: with the old one the dots stay as they were.
+
+### Changed
+
+- **The corner of the map tells what you are looking at.** When you move the map away from your character, the zone and the coordinates at the top left are now those of the middle of the map, not your character's. Press Follow and they are yours again.
+
+### Fixed
+
+- **The last of the stutter while moving.** About once every twenty seconds the addon still took the game more than five milliseconds in a single frame. That work is now spread over several frames. Update the addon and type /reload once.
+
 ## 0.3.2 - 2026-11-14
 
 ### New
