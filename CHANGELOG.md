@@ -2,6 +2,16 @@
 
 What changed in each version of Twinmap, newest first. The section of a version is also the text of its release on GitHub and of the addon's file on CurseForge.
 
+## 0.3.1 - 2026-11-14
+
+### Fixed
+
+- **"The map could not be built: not a BLTE container".** On some PCs the game keeps a few of its files in a form Twinmap did not expect, and the map was never built, even with the game fully installed and repaired. Twinmap now reads both forms.
+
+### Changed
+
+- **Updates are quicker, and you see them happen.** Putting a new version in place took about sixteen seconds with nothing on screen, and the app looked closed. It now takes five or six: the small window says what is going on, the installer shows its progress, and Twinmap opens right after. You will see all of it from the update after this one; this one is already a few seconds shorter.
+
 ## 0.3.0 - 2026-11-14
 
 ### New
