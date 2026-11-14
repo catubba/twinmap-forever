@@ -2,15 +2,20 @@
 // there is one it is downloaded behind a small window that says so, put in place of this one, and
 // started: the player never opens an old Twinmap. With no network, or an answer that is slow to
 // come, the app opens as it is.
+//
+// This app has to close for the new one to be put in its place, and its small window with it. So
+// the window says what comes next before it goes, the installer shows its own while it works, and
+// the new app, told by the installer that it was just put there, opens without looking again.
 import { app, BrowserWindow } from 'electron'
 import { autoUpdater } from 'electron-updater'
 import { join } from 'node:path'
 import { WINDOW } from '../shared/window'
 
 const ANSWER_WITHIN = 4000 // ms the look for a newer version may take before the app opens without it
+const READ_FOR = 1200 // ms the small window says the new version is being put in place, before this app closes
 
 /** What the small window is told while the newer version comes down. */
-export type Updating = { version: string; percent: number }
+export type Updating = { version: string; percent: number; installing?: boolean }
 
 /**
  * Updates the app if there is a newer version, else calls `open`. TWINMAP_UPDATES, for trials, is
@@ -18,7 +23,8 @@ export type Updating = { version: string; percent: number }
  * what came of the look, for the app's record.
  */
 export function updateFirst(open: () => void, say: (line: string) => void): void {
-  if (!app.isPackaged) return open()
+  // Started by the installer after an update: it says so, and there is nothing newer to look for.
+  if (!app.isPackaged || process.argv.includes('--updated')) return open()
   let opened = false
   let win: BrowserWindow | null = null
   // Whatever goes wrong, at any point, the app opens as it is: an update is never a reason not to start.
@@ -68,8 +74,13 @@ export function updateFirst(open: () => void, say: (line: string) => void): void
           told = { ...told, percent: progress.percent }
           tell()
         })
-        // Installed without a question, and the new version started in place of this one.
-        autoUpdater.on('update-downloaded', () => autoUpdater.quitAndInstall(true, true))
+        // Installed without a question, and the new version started in place of this one. The
+        // installer is not silent: its own window is all there is on screen while this app is closed.
+        autoUpdater.on('update-downloaded', () => {
+          told = { ...told, percent: 100, installing: true }
+          tell()
+          setTimeout(() => autoUpdater.quitAndInstall(false, true), READ_FOR)
+        })
         return autoUpdater.downloadUpdate().then(() => {})
       })
       .catch(go)
