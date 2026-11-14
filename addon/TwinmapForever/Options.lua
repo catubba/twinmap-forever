@@ -119,10 +119,11 @@ end
 local reset = CreateFrame("Button", "TwinmapForeverTuneReset", panel, "UIPanelButtonTemplate")
 reset:SetSize(180, 24)
 reset:SetPoint("TOPLEFT", heading, "BOTTOMLEFT", 0, -26 - math.ceil(#SLIDERS / 2) * 44)
-reset:SetText("Back to the usual strip")
+reset:SetText("Reset to defaults")
+-- Every choice on this page goes back to what this version of the addon starts with.
 reset:SetScript("OnClick", function()
+  for _, row in ipairs(ROWS) do ns.db[row.key] = ns.DEFAULTS[row.key] end
   for _, s in ipairs(SLIDERS) do ns.db[s.key] = ns.DEFAULTS[s.key] end
-  ns.db.idle = ns.DEFAULTS.idle
   Changed()
   Refresh()
 end)
