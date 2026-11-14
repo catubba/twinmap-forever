@@ -2,6 +2,17 @@
 
 What changed in each version of Twinmap, newest first. The section of a version is also the text of its release on GitHub and of the addon's file on CurseForge.
 
+## 0.3.0 - 2026-11-14
+
+### New
+
+- **Your group on the map.** The companions of your party are on the map with you, each one a disc in a colour of their own, with a shield, a cross or a sword on it for tank, healer and damage. Everyone in the party shows, with or without Twinmap; a companion who has Twinmap too is followed more closely when far from you. A new layer, Companions, turns them on and off. Inside dungeons and raids companions are not shown yet. Update the addon and type /reload once.
+
+### Fixed
+
+- **The bottom of the map cut off in a smaller window.** With a long Nearby list, a window that was not full screen lost the bottom of the map, with Follow and the zoom buttons, and the end of the panel. The panel now scrolls and the map stays whole.
+- **A clearer error when the map cannot be built.** "not a BLTE container" now says which file of the game could not be read, and tells when the game is not fully downloaded.
+
 ## 0.2.0 - 2026-11-13
 
 ### New
