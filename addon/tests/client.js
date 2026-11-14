@@ -201,9 +201,14 @@ const STUB = `
         local th = GAME.threshold or 0.5
         self.v = (r > th and 4 or 0) + (g > th and 2 or 0) + (b > th and 1 or 0)
         LEVELS[r], LEVELS[g], LEVELS[b] = true, true, true
+        PAINTS = (PAINTS or 0) + 1
       end
       function t:Show() self.shown = true end
       function t:Hide() self.shown = false end
+      -- Where it starts on the row, and whether it runs from there to the end of the row.
+      function t:SetPoint(point, _, _, x)
+        if point == "TOPLEFT" then self.x = x elseif point == "BOTTOMRIGHT" then self.fill = true end
+      end
       cells[#cells + 1] = t
       return t
     end
@@ -212,7 +217,13 @@ const STUB = `
       self.shown = true
       local row = {}
       for _, t in ipairs(cells) do
-        if t.shown == true then row[#row + 1] = t.v end -- only a cell that was shown: a texture never shown answers anything
+        if t.shown == true then -- only a cell that was shown: a texture never shown answers anything
+          if t.fill == true then
+            for i = t.x + 1, GAME.width do row[i] = t.v end
+          else
+            row[type(t.x) == "number" and t.x + 1 or #row + 1] = t.v
+          end
+        end
       end
       if #row > 0 then strips[#strips + 1] = table.concat(row) end
     end

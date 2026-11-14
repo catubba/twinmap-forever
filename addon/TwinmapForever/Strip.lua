@@ -238,10 +238,18 @@ local function Level(on)
   return math.min(255, ns.db.base + (on and ns.db.amp or 0)) / 255
 end
 
+-- Every cell touched is time taken from the frame it is drawn in, and a row is thousands of them:
+-- so only the cells of the block are painted, only the ones that changed since the last block, and
+-- the row past the end of the block is one even cell (the reader never looks there).
+local painted = {} -- for each layer: the levels it was painted at, the value of each cell, how many are shown
 local function Paint(key, cells)
   local f, row, off, on = Layer(key), RowCells(), Level(false), Level(true)
-  for i = 1, row do
-    local v = cells[(i - 1) % #cells + 1] -- past the end the block repeats: always full width, ignored by the reader
+  local was = painted[key] or { v = {}, used = 0 }
+  painted[key] = was
+  local n, fresh = math.min(#cells, row), was.off ~= off or was.on ~= on -- other levels: every cell again
+  was.off, was.on = off, on
+  for i = 1, n do
+    local v = cells[i]
     if key == "negative" then v = 7 - v end
     local t = f.cells[i]
     if not t then
@@ -250,10 +258,25 @@ local function Paint(key, cells)
       t:SetPoint("TOPLEFT", f, "TOPLEFT", (i - 1) * CELL, 0)
       f.cells[i] = t
     end
-    t:SetColorTexture(v >= 4 and on or off, v % 4 >= 2 and on or off, v % 2 == 1 and on or off, 1)
-    t:Show()
+    if fresh or was.v[i] ~= v then
+      t:SetColorTexture(v >= 4 and on or off, v % 4 >= 2 and on or off, v % 2 == 1 and on or off, 1)
+      was.v[i] = v
+    end
   end
-  for i = row + 1, #f.cells do f.cells[i]:Hide() end
+  for i = was.used + 1, n do f.cells[i]:Show() end
+  for i = n + 1, was.used do f.cells[i]:Hide() end
+  was.used = n
+  was.rest = was.rest or f:CreateTexture(nil, "OVERLAY")
+  if n < row then
+    local mid = (off + on) / 2
+    was.rest:ClearAllPoints()
+    was.rest:SetPoint("TOPLEFT", f, "TOPLEFT", n * CELL, 0)
+    was.rest:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 0, 0)
+    was.rest:SetColorTexture(mid, mid, mid, 1)
+    was.rest:Show()
+  else
+    was.rest:Hide()
+  end
 end
 
 -- Halfway between off and on: what a block and its negative average to.

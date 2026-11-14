@@ -45,10 +45,24 @@ test('every block is followed by its negative, cell by cell', () => {
   const strips = addon.strips();
   assert.equal(strips.length, 4);
   for (let i = 0; i < strips.length; i += 2) {
-    const negative = [...strips[i]].map((c) => 7 - Number(c)).join('');
-    assert.equal(strips[i + 1], negative);
+    // The cells of the block, then the even cell that fills the row: the same in both.
+    const block = [...strips[i]].findIndex((c, k) => Number(strips[i + 1][k]) !== 7 - Number(c));
+    assert.ok(block > 0);
+    assert.match(strips[i].slice(block), /^0+$/);
+    assert.equal(strips[i + 1].slice(block), strips[i].slice(block));
     assert.deepEqual(decodeStrip(strips[i + 1]), { ...decodeStrip(strips[i]), negative: true });
   }
+});
+
+test('a block paints its own cells only, and of those only the ones that changed', () => {
+  const addon = enterWorld();
+  addon.run(10);
+  const row = addon.strips()[0].length;
+  addon.lua('PAINTS = 0; GAME.x = 0.5');
+  addon.run(3);
+  // One block and its negative: the whole row twice over would be 2 * row.
+  const paints = addon.lua('return PAINTS');
+  assert.ok(paints > 0 && paints < row / 2, `${paints} cells painted on a row of ${row}`);
 });
 
 test('in fast mode a block is drawn once, with no negative', () => {
