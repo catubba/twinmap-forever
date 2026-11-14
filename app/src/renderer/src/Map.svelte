@@ -35,7 +35,7 @@
 
   // at: when the position was read off the game, in milliseconds.
   // insideReady: the rooms of the buildings are converted, and their list can be asked for.
-  let { pos, group = [], at: readAt, insideReady, quests = [], fixed = [], side, live = false, inbox = null, removed = [], set = [], gameFollows = null, journey = null, ahead = null, route = noRoute(), onroute }: { journey?: Journey | null; ahead?: WayLeg[] | null; pos: Position | undefined; at: number | undefined; insideReady: boolean; quests?: QuestPin[]; fixed?: FixedPin[]; side?: string; live?: boolean; inbox?: Inbox | null; removed?: string[]; set?: GameMark[]; gameFollows?: Pin | null; route?: Route; onroute?: (stop: Stop) => void; group?: Companion[] } = $props()
+  let { pos, group = [], at: readAt, insideReady, quests = [], fixed = [], side, live = false, inbox = null, removed = [], set = [], gameFollows = null, journey = null, ahead = null, route = noRoute(), onroute, looking = $bindable(null) }: { looking?: { zone: string; where: string } | null; journey?: Journey | null; ahead?: WayLeg[] | null; pos: Position | undefined; at: number | undefined; insideReady: boolean; quests?: QuestPin[]; fixed?: FixedPin[]; side?: string; live?: boolean; inbox?: Inbox | null; removed?: string[]; set?: GameMark[]; gameFollows?: Pin | null; route?: Route; onroute?: (stop: Stop) => void; group?: Companion[] } = $props()
 
   const TOP_ZOOM = 7 // the game's own detail: a block's picture is four tiles
   const BLANK = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=='
@@ -280,6 +280,15 @@
     // Not from far away: there a city is a few pixels, and its hundred pictures would be read for nothing.
     if (box) cities = new RoomsLayer({ pieces, bounds: boundsOfBox(box), minZoom: 3, keepBuffer: 2, zIndex: 3 }).addTo(map)
   }
+
+  // What the middle of the map shows, for the readout, while the map does not follow the character:
+  // someone moving the map to explore reads what is being looked at, not where the character stands.
+  function look(): void {
+    if (!map || following || inside) return void (looking = null)
+    const middle = map.getCenter(), found = zoneAt(maps, continent, { x: middle.lng, y: -middle.lat })
+    looking = { zone: found?.zone.name ?? NAMES[continent], where: found ? `${found.place.x.toFixed(1)}, ${found.place.y.toFixed(1)}` : '' }
+  }
+  $effect(look) // following, the continent on show, a dungeon entered or left
 
   // Writes the names of the continent on show: its regions, its towns, its points
   // of interest and the areas of its zones. A city has a map of its own but is not a region:
@@ -586,6 +595,7 @@
     made.setView([-128, 128], 2)
     pins.addTo(made)
     made.on('dragstart', () => (following = false))
+    made.on('move', look)
     made.on('zoomend', layout)
     made.on('moveend', layoutSoon)
     made.on('zoomstart', () => (zooming = true))

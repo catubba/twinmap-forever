@@ -37,6 +37,7 @@
   let fixed = $state.raw<FixedPin[]>([])
   // The map on show: the panel sends it to the place of a row.
   let mapView = $state<Map>()
+  let looking = $state<{ zone: string; where: string } | null>(null) // what the map shows while moved away from the character
   // The quests of the log, with a pin or without.
   let log = $state.raw<LogQuest[]>([])
   window.twinmap.onQuests((status) => {
@@ -193,7 +194,7 @@
 <div class="work" class:shut={!panelOpen} in:fade={screen} inert={onSettings} style:--peek="{peek}px">
   <div class="mapbox">
     {#if mapReady}
-      <Map {pos} {group} at={link?.state.updatedAt.pos} bind:this={mapView} {insideReady} {quests} {fixed} side={char?.side} {live} {inbox} removed={live ? goneFrom(link?.state.sections.marks) : []} set={live ? setFrom(link?.state.sections.marks) : []} gameFollows={live ? followFrom(link?.state.sections.follow) : null} {journey} {ahead} {route} onroute={(stop) => setRoute(addStop(route, stop))} />
+      <Map {pos} {group} bind:looking at={link?.state.updatedAt.pos} bind:this={mapView} {insideReady} {quests} {fixed} side={char?.side} {live} {inbox} removed={live ? goneFrom(link?.state.sections.marks) : []} set={live ? setFrom(link?.state.sections.marks) : []} gameFollows={live ? followFrom(link?.state.sections.follow) : null} {journey} {ahead} {route} onroute={(stop) => setRoute(addStop(route, stop))} />
     {:else if tiles}
       <div class="making" class:failed={tiles.state === 'failed' || tiles.state === 'no-game'}>
         <p>{tilesLine(tiles)}</p>
@@ -207,7 +208,13 @@
         {/if}
       </div>
     {/if}
-    {#if pos}
+    {#if looking}
+      <!-- The map was moved by hand: the zone and the coordinates of its middle. -->
+      <div class="readout">
+        <b>{looking.zone}</b>
+        {looking.where}
+      </div>
+    {:else if pos}
       <div class="readout">
         <b>{pos.zone ?? 'Unknown zone'}</b>
         {pos.sub ?? ''}
