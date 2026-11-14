@@ -8,6 +8,7 @@
   import { onMount, untrack } from 'svelte'
   import { DUNGEON_PINS } from '../../shared/dungeon-pins'
   import type { Position } from '../../shared/game'
+  import { coloursFor, type Companion } from '../../shared/group'
   import { unitsOfPlace, unitsOfRect, type Point } from '../../shared/geo'
   import { addFix, BEHIND, PERIOD, whereAt, type Fix } from '../../shared/glide'
   import { boxOf, buildingsAt, piecesIn, roomPixels, yardsInside, YARDS_PER_UNIT, type Box, type InteriorMap, type Interiors, type Piece, type Yards } from '../../shared/inside'
@@ -30,11 +31,11 @@
   import { kept as keptByApp } from './kept.svelte'
   import { pinOfMark, removePin, renamePin, savedAt, savedFrom, savePin, type SavedPin } from '../../shared/saved'
   import { markPart, sendState, type GameMark, type Inbox, type Pin } from '../../shared/send'
-  import { pin } from './marks'
+  import { companionPin, pin } from './marks'
 
   // at: when the position was read off the game, in milliseconds.
   // insideReady: the rooms of the buildings are converted, and their list can be asked for.
-  let { pos, at: readAt, insideReady, quests = [], fixed = [], side, live = false, inbox = null, removed = [], set = [], gameFollows = null, journey = null, ahead = null, route = noRoute(), onroute }: { journey?: Journey | null; ahead?: WayLeg[] | null; pos: Position | undefined; at: number | undefined; insideReady: boolean; quests?: QuestPin[]; fixed?: FixedPin[]; side?: string; live?: boolean; inbox?: Inbox | null; removed?: string[]; set?: GameMark[]; gameFollows?: Pin | null; route?: Route; onroute?: (stop: Stop) => void } = $props()
+  let { pos, group = [], at: readAt, insideReady, quests = [], fixed = [], side, live = false, inbox = null, removed = [], set = [], gameFollows = null, journey = null, ahead = null, route = noRoute(), onroute }: { journey?: Journey | null; ahead?: WayLeg[] | null; pos: Position | undefined; at: number | undefined; insideReady: boolean; quests?: QuestPin[]; fixed?: FixedPin[]; side?: string; live?: boolean; inbox?: Inbox | null; removed?: string[]; set?: GameMark[]; gameFollows?: Pin | null; route?: Route; onroute?: (stop: Stop) => void; group?: Companion[] } = $props()
 
   const TOP_ZOOM = 7 // the game's own detail: a block's picture is four tiles
   const BLANK = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=='
@@ -858,6 +859,42 @@
   $effect(() => {
     if (map && layers.mypins && !inside) myPinsLayer.addTo(map)
     else myPinsLayer.remove()
+  })
+
+  // The companions of the group: a disc each, in a colour of their own and with what they do in the
+  // group drawn on it, where the game or their own Twinmap tells they are. One inside a dungeon has
+  // no place, and no disc.
+  // ponytail: a disc jumps to each new place; it can glide as the arrow does (glide.ts) if that reads badly.
+  const companionLayer = L.layerGroup()
+  const companionMarks = new Map<string, L.Marker>()
+  let companionColours = new Map<string, string>()
+  $effect(() => {
+    const here = new Set<string>()
+    companionColours = coloursFor(group.map((c) => c.name), companionColours)
+    for (const c of group) {
+      const zone = c.map === undefined ? undefined : maps.find((m) => m.id === c.map)
+      if (!zone?.rect || zone.continent !== continent || c.x === undefined || c.y === undefined) continue
+      const where = at(unitsOfPlace(zone.rect, c.x, c.y)), colour = companionColours.get(c.name)!, key = `${c.name} ${colour} ${c.role ?? ''}`
+      here.add(key)
+      const marker = companionMarks.get(key)
+      if (marker) marker.setLatLng(where)
+      else
+        companionMarks.set(
+          key,
+          L.marker(where, { keyboard: false, zIndexOffset: 900, icon: L.divIcon({ className: 'door', iconSize: [22, 22], html: `<span style="display:block;line-height:0;color:${colour}">${companionPin(c.role, c.name)}</span>` }) })
+            .bindTooltip(Object.assign(document.createElement('span'), { textContent: c.name }), { direction: 'top', offset: [0, -11], className: 'tip' })
+            .addTo(companionLayer),
+        )
+    }
+    for (const [key, marker] of companionMarks) {
+      if (here.has(key)) continue
+      marker.remove()
+      companionMarks.delete(key)
+    }
+  })
+  $effect(() => {
+    if (map && layers.companions && !inside) companionLayer.addTo(map)
+    else companionLayer.remove()
   })
 
   // The journey Shortest Path guides in the game: a ring on its goal, and the way there. A walk is a

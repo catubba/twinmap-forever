@@ -11,6 +11,7 @@ TwinmapForever.lua
 Strip.lua
 Questie.lua
 Quests.lua
+Group.lua
 Inbox.lua
 Pin.lua
 Route.lua

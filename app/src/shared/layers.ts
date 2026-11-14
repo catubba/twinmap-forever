@@ -39,6 +39,7 @@ export const LAYER_GROUPS = [
       { id: 'bosses', name: 'Bosses in a dungeon', built: true },
     ],
   },
+  { name: 'Group', layers: [{ id: 'companions', name: 'Companions', built: true }] },
 ] as const
 
 export type LayerId = (typeof LAYER_GROUPS)[number]['layers'][number]['id']

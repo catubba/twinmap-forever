@@ -23,8 +23,8 @@ const DRAWINGS = {
   dungeon: [16, `<path d="M2 15.25V7.5a6 6 0 0 1 12 0v7.75Z" fill="${TEXT}" ${EDGE}/><path d="M5.6 15.25V8.2a2.4 2.4 0 0 1 4.8 0v7.05Z"/>`],
   // A rare creature or a treasure.
   rare: [16, `<path d="M8 .9 10.3 5.7 15.1 8 10.3 10.3 8 15.1 5.7 10.3.9 8 5.7 5.7Z" fill="#fff6c2" ${EDGE}/>`],
-  // Someone of the group, in the colour of their class: set the colour of the text around it.
-  companion: [12, `<circle cx="6" cy="6" r="5.25" fill="currentColor" ${EDGE}/>`],
+  // Someone of the group, in a colour of their own: set the colour of the text around it. What they do in the group is drawn on it (companionPin).
+  companion: [22, `<circle cx="11" cy="11" r="10.25" fill="currentColor" ${EDGE}/>`],
   // A pin the player put down.
   flag: [16, `<path d="M3.5 1.6v13" stroke="#000" stroke-width="3.6" stroke-linecap="round"/><path d="M3.5 1.75h10l-2.7 3.3 2.7 3.3h-10Z" fill="${TEXT}" ${EDGE}/><path d="M3.5 1.6v13" stroke="${TEXT}" stroke-width="1.6" stroke-linecap="round"/>`],
   // Where the character died.
@@ -40,6 +40,20 @@ export const pinSize = (name: PinName): number => DRAWINGS[name][0]
 export function pin(name: PinName): string {
   const [size, inside] = DRAWINGS[name]
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" aria-hidden="true">${inside}</svg>`
+}
+
+// What a companion does in the group, drawn on their disc: a shield, a cross, a sword.
+const ROLES: Record<string, string> = {
+  T: '<path d="M11 4.6 16.4 6.6v4c0 3.3-2.2 5.4-5.400 6.800-3.200-1.400-5.400-3.500-5.400-6.800v-4Z"/>',
+  H: '<path d="M9.2 5h3.6v4.200H17v3.600h-4.200V17H9.200v-4.200H5V9.200h4.200Z"/>',
+  D: '<path d="M17 5 16.200 8.600 10 14.800 8.200 13Z"/><path d="M6.400 11.200 10.800 15.600M8 14l-2.600 2.600" fill="none" stroke="#000" stroke-width="2" stroke-linecap="round"/>',
+}
+/** A companion's disc with their role on it, or the first letter of their name where the group gave no role. */
+export function companionPin(role: string | undefined, name: string): string {
+  const [size, disc] = DRAWINGS.companion
+  const letter = /^[\p{L}\p{N}]/u.exec(name)?.[0].toUpperCase() ?? ''
+  const inside = (role && ROLES[role]) ?? `<text x="11" y="15.300" text-anchor="middle" font-family="sans-serif" font-size="12" font-weight="700">${letter}</text>`
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" aria-hidden="true">${disc}${inside}</svg>`
 }
 
 /**
