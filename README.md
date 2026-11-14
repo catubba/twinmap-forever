@@ -26,6 +26,7 @@ Twinmap is an interactive map of World of Warcraft: Forever for your second scre
 - **Even inside dungeons.** In dungeons and raids the arrow moves through the rooms, with the bosses marked.
 - **Your quests.** Where to hand in what is done and where to find what is left, for every quest of your log. With Questie installed, the same quests Questie shows to your character, the ones to take as well.
 - **Services and resources.** Flight masters, inns, vendors, repair, trainers, banks, ore and herbs, each one a layer you turn on or off.
+- **Your group.** The companions of your party are on the map with you, each in a colour of their own, with their role on the disc.
 - **Search.** NPCs, items, quests and zones, with the distance on foot.
 - **From the map to the game.** Mark a point or build a route on Twinmap, and it appears in the game.
 - **Phone and tablet.** No second monitor? Open the same map in the browser of a phone, a tablet or a laptop on your home network.
@@ -66,6 +67,7 @@ Twinmap never touches the game's memory and never plays for you.
 - **The map.** The app builds the map from the files of your own game, so it always matches your version of the game. No map is downloaded.
 - **Inside dungeons.** The game does not tell addons where you are in a dungeon, so the app reads your place from the game's minimap on the screen. Keep the minimap visible and not rotating.
 - **From the app to the game.** Points and routes go back through a few small files next to the addon, which the game reads by itself.
+- **Your group.** The game tells the addon where your companions are. From far away it tells it only every few seconds, so in a group each Twinmap addon also tells the others where its own character is, through the game.
 
 > **Photosensitivity warning.** The addon sends data by changing the colors of a one pixel line at the edge of the game window, many times per second. Its settings in the game can slow it down or pause it.
 
@@ -88,7 +90,7 @@ Twinmap is young and it is being worked on all the time. New versions come out o
 
 Here is what is planned, in no particular order. These are plans, not promises: what you ask for can change them.
 
-- **Group**: your party on the map, quests you share, pins everyone sees
+- **Group**: your party inside dungeons, quests you share, pins everyone sees
 - **Travel**: time to arrive, flight paths, boats and zeppelins, your hearthstone
 - **More on the map**: zones colored by level, the places you have explored, your corpse and the graveyard, rares and treasures
 - **Quests**: your whole quest log, chains, rewards, and a plan for the session
