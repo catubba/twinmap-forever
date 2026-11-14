@@ -163,21 +163,38 @@ export function openClientFiles(folder: string): ClientFiles {
         // Five bytes: the archive number in the top ten bits, the offset in the other thirty.
         const low = entries.readUInt32BE(at + 10)
         const archive = (entries[at + 9]! << 2) | (low >>> 30), offset = low & 0x3fffffff, size = entries.readUInt32LE(at + 14)
-        const record = Buffer.alloc(size)
-        const fd = openSync(join(data, `data.${String(archive).padStart(3, '0')}`), 'r')
+        const record = Buffer.alloc(size), name = `data.${String(archive).padStart(3, '0')}`
+        const fd = openSync(join(data, name), 'r')
+        let got: number
         try {
-          readSync(fd, record, 0, size, offset)
+          got = readSync(fd, record, 0, size, offset)
         } finally {
           closeSync(fd)
         }
-        return decodeBlte(record.subarray(RECORD_HEADER), skipHidden)
+        // The index lists it, the archive does not hold it: a game still downloading, or damaged.
+        if (got < size) throw new Error(`${name} ends before the file (${got} of ${size} bytes at ${offset}): the game is not fully downloaded`)
+        try {
+          return decodeBlte(record.subarray(RECORD_HEADER), skipHidden)
+        } catch (e) {
+          if (e instanceof EncryptedFileError) throw e
+          throw new Error(`${e instanceof Error ? e.message : String(e)} (${name} at ${offset}, ${size} bytes)`)
+        }
       }
     }
     return null
   }
 
   // Encoding: pages of [key count, 5 bytes of size, content key, encoded keys], found through a page index.
-  const encoding = readEncoded(Buffer.from(encodingKey, 'hex'))
+  // An error says which file it was about: what tells a damaged game from a single bad file.
+  const naming = <T>(what: string, read: () => T): T => {
+    try {
+      return read()
+    } catch (e) {
+      if (e instanceof EncryptedFileError) throw e
+      throw new Error(`${what}: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
+  const encoding = naming('encoding file', () => readEncoded(Buffer.from(encodingKey, 'hex')))
   if (!encoding || encoding.toString('latin1', 0, 2) !== 'EN') throw new Error('the encoding file is missing or not one')
   const pageSize = encoding.readUInt16BE(5) * 1024, pages = encoding.readUInt32BE(9)
   const pageIndex = 22 + encoding.readUInt32BE(18), pageData = pageIndex + pages * 32
@@ -200,7 +217,7 @@ export function openClientFiles(folder: string): ClientFiles {
   }
 
   // Root: blocks of file numbers (as steps from the one before) and their content keys.
-  const root = readContent(Buffer.from(rootKey, 'hex'))
+  const root = naming('root file', () => readContent(Buffer.from(rootKey, 'hex')))
   if (!root) throw new Error('the root file is missing')
   let at: number, version = 0, total: number, named: number
   if (root.readUInt32LE(4) < 0x100) {
@@ -241,7 +258,7 @@ export function openClientFiles(folder: string): ClientFiles {
     count: keyAt.size,
     read(id, skipHidden) {
       const where = keyAt.get(id)
-      return where === undefined ? null : readContent(root.subarray(where, where + 16), skipHidden)
+      return where === undefined ? null : naming(`game file ${id}`, () => readContent(root.subarray(where, where + 16), skipHidden))
     },
   }
 }
