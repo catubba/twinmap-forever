@@ -41,7 +41,8 @@ test('into a dungeon and out: the position says which instance, and where in it 
     game.feed(decodeRow(pixels(s)))
     return game.state.sections.pos
   })
-  expect(seen).toEqual([
+  // A block of another section (the bosses killed, told inside a dungeon) leaves the position as it was.
+  expect(seen.filter((pos, i) => pos !== seen[i - 1])).toEqual([
     { zone: 'Elwynn Forest', sub: 'Goldshire', map: 1429, x: 42.34, y: 65.71, facing: 90 },
     { zone: 'The Deadmines', sub: '', facing: 90, inst: { id: 36, name: 'Deadmines', kind: 'party', x: -16, y: -383 } },
     { zone: 'The Deadmines', sub: '', facing: 90, inst: { id: 36, name: 'Deadmines', kind: 'party', x: -64, y: -821 } },
