@@ -15,7 +15,7 @@ function enterWorld(before) {
   return addon;
 }
 // The positions sent so far, oldest first.
-const positions = (addon) => addon.strips().map(decodeStrip).map((b) => JSON.parse(b.text));
+const positions = (addon) => addon.strips().map(decodeStrip).filter((b) => b.section === 'pos').map((b) => JSON.parse(b.text));
 const DEADMINES = 'GAME.instance = { name = "Deadmines", kind = "party", id = 36 }; GAME.zone, GAME.sub, GAME.map, GAME.x = "The Deadmines", "", nil, nil';
 
 test('in the open world the position names no instance', () => {

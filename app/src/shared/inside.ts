@@ -52,6 +52,18 @@ export interface Interiors {
   dropped: number
 }
 
+/**
+ * The bosses killed in the instance of this map, from the "kills" section as it came off the strip:
+ * their names in small letters, as nameOfBoss gives them. None from anything else, or of another map.
+ */
+export function killedIn(section: unknown, map: number | undefined): Set<string> {
+  const told = (typeof section === 'object' && section ? section : {}) as { map?: unknown; list?: unknown }
+  if (map === undefined || told.map !== map || !Array.isArray(told.list)) return new Set()
+  return new Set(told.list.filter((name): name is string => typeof name === 'string').map(nameOfBoss))
+}
+/** A boss's name as two sources may write it: the letters only, small. */
+export const nameOfBoss = (name: string): string => name.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
+
 export interface Yards { u: number; v: number }
 /** u1, v1, u2, v2. */
 export type Box = [number, number, number, number]

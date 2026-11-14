@@ -11,7 +11,7 @@
   import { coloursFor, type Companion } from '../../shared/group'
   import { unitsOfPlace, unitsOfRect, type Point } from '../../shared/geo'
   import { addFix, BEHIND, PERIOD, whereAt, type Fix } from '../../shared/glide'
-  import { boxOf, buildingsAt, piecesIn, roomPixels, yardsInside, YARDS_PER_UNIT, type Box, type InteriorMap, type Interiors, type Piece, type Yards } from '../../shared/inside'
+  import { boxOf, buildingsAt, killedIn, nameOfBoss, piecesIn, roomPixels, yardsInside, YARDS_PER_UNIT, type Box, type InteriorMap, type Interiors, type Piece, type Yards } from '../../shared/inside'
   import type { Continent, GameMap } from '../../shared/maps'
   import type { QuestPin } from '../../shared/quests'
   import { iconOf, serves, type FixedLayer, type FixedPin, type Travel } from '../../shared/services'
@@ -35,7 +35,7 @@
 
   // at: when the position was read off the game, in milliseconds.
   // insideReady: the rooms of the buildings are converted, and their list can be asked for.
-  let { pos, group = [], at: readAt, insideReady, quests = [], fixed = [], side, live = false, inbox = null, removed = [], set = [], gameFollows = null, journey = null, ahead = null, route = noRoute(), onroute, looking = $bindable(null) }: { looking?: { zone: string; where: string } | null; journey?: Journey | null; ahead?: WayLeg[] | null; pos: Position | undefined; at: number | undefined; insideReady: boolean; quests?: QuestPin[]; fixed?: FixedPin[]; side?: string; live?: boolean; inbox?: Inbox | null; removed?: string[]; set?: GameMark[]; gameFollows?: Pin | null; route?: Route; onroute?: (stop: Stop) => void; group?: Companion[] } = $props()
+  let { pos, group = [], at: readAt, insideReady, quests = [], fixed = [], side, live = false, inbox = null, removed = [], set = [], gameFollows = null, journey = null, ahead = null, route = noRoute(), onroute, kills, looking = $bindable(null) }: { kills?: unknown; looking?: { zone: string; where: string } | null; journey?: Journey | null; ahead?: WayLeg[] | null; pos: Position | undefined; at: number | undefined; insideReady: boolean; quests?: QuestPin[]; fixed?: FixedPin[]; side?: string; live?: boolean; inbox?: Inbox | null; removed?: string[]; set?: GameMark[]; gameFollows?: Pin | null; route?: Route; onroute?: (stop: Stop) => void; group?: Companion[] } = $props()
 
   const TOP_ZOOM = 7 // the game's own detail: a block's picture is four tiles
   const BLANK = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=='
@@ -369,6 +369,24 @@
     if (fit && whole?.rect) map.fitBounds(boundsOf(whole), { animate: false })
   }
 
+  // The bosses on the map of the dungeon on show, and which of them the addon tells are killed: a
+  // boss killed is drawn dark with a red cut across, and its name is struck out.
+  const bossIcon = (gone: boolean): L.DivIcon => L.divIcon({ className: gone ? 'door' : 'door boss', iconSize: [22, 22], html: pin(gone ? 'slain' : 'boss') })
+  let bosses = $state.raw<{ name: string; marker: L.Marker; gone?: boolean }[]>([])
+  const dead = $derived(killedIn(kills, inside?.id))
+  $effect(() => {
+    for (const boss of bosses) {
+      const gone = dead.has(nameOfBoss(boss.name))
+      if (gone === boss.gone) continue // the section comes again and again, unchanged
+      boss.gone = gone
+      boss.marker.setIcon(bossIcon(gone))
+      // The name is there already: its look changes where it is, and for when it is drawn again.
+      const name = boss.marker.getTooltip()
+      if (name) name.options.className = gone ? 'boss-name dead' : 'boss-name'
+      name?.getElement()?.classList.toggle('dead', gone)
+    }
+  })
+
   // Puts a dungeon or a raid on the map: its ground dimmed, its rooms, its bosses and its entrance.
   function showInside(m: InteriorMap): void {
     if (!map) return
@@ -388,19 +406,18 @@
     showRooms(m.pieces)
     // The dungeons of this map: one, or its wings.
     const dungeons = DUNGEON_PINS.filter((d) => d.map === m.id)
+    const bossMarks: typeof bosses = []
     pinned = dungeons.length > 0
     for (const d of dungeons) {
       // A boss: its skull, and its name written under it, there without the pointer on it. On a second
       // screen nobody hovers while playing.
-      for (const [name, u, v] of d.bosses)
-        L.marker(atYards({ u, v }), { keyboard: false, icon: L.divIcon({ className: 'door boss', iconSize: [22, 22], html: pin('boss') }) })
-          .bindTooltip(name, { permanent: true, direction: 'bottom', offset: [0, 9], className: 'boss-name' })
-          .addTo(pins)
+      for (const [name, u, v] of d.bosses) bossMarks.push({ name, gone: false, marker: L.marker(atYards({ u, v }), { keyboard: false, icon: bossIcon(false) }).bindTooltip(name, { permanent: true, direction: 'bottom', offset: [0, 9], className: 'boss-name' }).addTo(pins) })
       if (d.entrance)
         L.marker(atYards({ u: d.entrance[0], v: d.entrance[1] }), { keyboard: false, icon: L.divIcon({ className: 'door', iconSize: [16, 16], html: pin('dungeon') }) })
           .bindTooltip(dungeons.length > 1 ? `Entrance: ${d.name}` : 'Entrance', { direction: 'top', offset: [0, -8], className: 'tip' })
           .addTo(pins)
     }
+    bosses = bossMarks
     const box = dungeons.length
       ? dungeons.reduce<Box>((all, d) => [Math.min(all[0], d.bounds[0]), Math.min(all[1], d.bounds[1]), Math.max(all[2], d.bounds[2]), Math.max(all[3], d.bounds[3])], [Infinity, Infinity, -Infinity, -Infinity])
       : boxOf(m.pieces)
@@ -903,7 +920,9 @@
     }
     for (const [key, marker] of companionMarks) {
       if (here.has(key)) continue
-      marker.remove()
+      // Out of the layer, not only off the map: inside a dungeon the layer is not on the map, and a
+      // disc taken off a map it is not on would be back with the layer, on the way out.
+      companionLayer.removeLayer(marker)
       companionMarks.delete(key)
     }
   })
@@ -1144,7 +1163,7 @@
   {#if inside && inside.bosses.length && !pinned}
     <ol class="menu bosses" in:fly={drop()} out:fade={gone}>
       {#each inside.bosses as boss (boss)}
-        <li>{boss}</li>
+        <li class:dead={dead.has(nameOfBoss(boss))}>{boss}</li>
       {/each}
     </ol>
   {/if}
@@ -1375,6 +1394,14 @@
     white-space: nowrap;
     -webkit-text-stroke: 3px #000;
     paint-order: stroke fill;
+  }
+  .map :global(.boss-name.dead) {
+    color: #a39a8c;
+    text-decoration: line-through;
+  }
+  .bosses .dead {
+    color: var(--text-dim);
+    text-decoration: line-through;
   }
   .map :global(.boss-name::before) {
     display: none;

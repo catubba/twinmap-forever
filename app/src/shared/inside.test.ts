@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { boxOf, buildingsAt, inPiece, piecesIn, roomPixels, yardsInside, YARDS_PER_UNIT, type Piece } from './inside'
+import { boxOf, buildingsAt, inPiece, killedIn, nameOfBoss, piecesIn, roomPixels, yardsInside, YARDS_PER_UNIT, type Piece } from './inside'
 
 const piece = (over: Partial<Piece>): Piece => ({ file: 1, u: 100, v: 100, width: 32, height: 16, angle: 0, bottom: 0, top: 5, building: 0, level: 0, ...over })
 
@@ -59,4 +59,13 @@ test('a room picture decodes with its shape cut out', () => {
   expect([...rgba.slice(16, 20)]).toEqual([0, 255, 0, 255])
   expect([...rgba.slice(20, 24)]).toEqual([0, 0, 0, 0])
   expect(rgba.filter((_, i) => i % 4 === 3 && rgba[i] === 255).length).toBe(17)
+})
+
+test('the bosses killed are those the addon tells of this map, by name however written', () => {
+  const section = { map: 34, list: ['Targorr the Dread', "Rhahk'Zor", 7] }
+  expect([...killedIn(section, 34)]).toEqual(['targorr the dread', 'rhahk zor'])
+  expect(killedIn(section, 34).has(nameOfBoss('Rhahk’Zor'))).toBe(true)
+  expect(killedIn(section, 36).size).toBe(0)
+  expect(killedIn(section, undefined).size).toBe(0)
+  expect(killedIn('nonsense', 34).size).toBe(0)
 })

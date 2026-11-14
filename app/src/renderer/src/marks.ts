@@ -7,6 +7,8 @@ const EDGE = 'stroke="#000" stroke-width="1.5" stroke-linejoin="round"'
 const DRAWN = 'fill="none" stroke="#000" stroke-linecap="round" stroke-linejoin="round"' // the ! and the ? on a quest disc
 // A sword, on a square of 22: for who deals damage in a group, and for a creature to slay.
 const SWORD = '<path d="M17 5 16.200 8.600 10 14.800 8.200 13Z"/><path d="M6.400 11.200 10.800 15.600M8 14l-2.600 2.600" fill="none" stroke="#000" stroke-width="2" stroke-linecap="round"/>'
+// The skull of a boss, on a square of 22.
+const SKULL = `<path d="M11 4.3c-3.5 0-5.9 2.3-5.9 5.4 0 1.8.8 3.1 2 4v2.300c0 .6.5 1 1 1h5.800c.5 0 1-.4 1-1v-2.300c1.200-.9 2-2.200 2-4 0-3.100-2.400-5.400-5.900-5.400Z" fill="${TEXT}" stroke="#000" stroke-width="1.1" stroke-linejoin="round"/><circle cx="8.700" cy="10.100" r="1.600"/><circle cx="13.300" cy="10.100" r="1.600"/><path d="M11 12.100l-.9 1.700h1.800Z"/><path d="M9.700 15.300v1.700M11 15.300v1.700M12.300 15.300v1.700" fill="none" stroke="#000" stroke-width=".9"/>`
 const task = `<circle cx="9" cy="9" r="8.25" fill="#ff5a4d" ${EDGE}/>` // the disc of an objective
 const inTask = (drawn: string): string => `${task}<g transform="scale(1.125)">${drawn}</g>` // its sign is drawn on a square of 16
 const disc = `<circle cx="10" cy="10" r="9.25" fill="${GOLD}" ${EDGE}/>`
@@ -31,7 +33,9 @@ const DRAWINGS = {
   // Ore and herbs.
   resource: [12, `<path d="M6 .9 11.1 6 6 11.1.9 6Z" fill="#d9a066" ${EDGE}/>`],
   // A boss of a dungeon: a skull on a dark red disc.
-  boss: [22, `<circle cx="11" cy="11" r="10.25" fill="#a3201a" ${EDGE}/><path d="M11 4.3c-3.5 0-5.9 2.3-5.9 5.4 0 1.8.8 3.1 2 4v2.300c0 .6.5 1 1 1h5.800c.5 0 1-.4 1-1v-2.300c1.200-.9 2-2.200 2-4 0-3.100-2.400-5.400-5.900-5.400Z" fill="${TEXT}" stroke="#000" stroke-width="1.1" stroke-linejoin="round"/><circle cx="8.700" cy="10.100" r="1.600"/><circle cx="13.300" cy="10.100" r="1.600"/><path d="M11 12.100l-.9 1.700h1.800Z"/><path d="M9.700 15.300v1.700M11 15.300v1.700M12.300 15.300v1.700" fill="none" stroke="#000" stroke-width=".9"/>`],
+  boss: [22, `<circle cx="11" cy="11" r="10.25" fill="#a3201a" ${EDGE}/>${SKULL}`],
+  // A boss already killed: the disc gone dark, the skull dim, a red cut across it.
+  slain: [22, `<circle cx="11" cy="11" r="10.25" fill="#3a3431" ${EDGE}/><g opacity=".45">${SKULL}</g><path d="M4.500 16.500 17.500 5.500" fill="none" stroke="#000" stroke-width="4.200" stroke-linecap="round"/><path d="M4.500 16.500 17.500 5.500" fill="none" stroke="#e0352b" stroke-width="2.200" stroke-linecap="round"/>`],
   // The door of a dungeon.
   dungeon: [16, `<path d="M2 15.25V7.5a6 6 0 0 1 12 0v7.75Z" fill="${TEXT}" ${EDGE}/><path d="M5.6 15.25V8.2a2.4 2.4 0 0 1 4.8 0v7.05Z"/>`],
   // A rare creature or a treasure.

@@ -12,6 +12,7 @@ Strip.lua
 Questie.lua
 Quests.lua
 Group.lua
+Bosses.lua
 Inbox.lua
 Pin.lua
 Route.lua
