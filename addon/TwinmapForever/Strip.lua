@@ -321,6 +321,8 @@ local showing, timer = false, 0
 local steps = {} -- what is left to show of the block on screen: { layer or "rest", seconds }
 local last, paintedCells, paintedStamp -- the last block's cells; what the layers hold now
 local negativeDue -- the cells the negative has still to be painted with
+local ahead -- the next block, painted before its turn while another look is on screen
+local shown -- the look on screen
 local paused = false
 
 -- What is on screen while no block is: nothing, or the even line.
@@ -330,17 +332,21 @@ local function Rest()
   Show("flat")
 end
 
+local function Stale(cells) return cells ~= paintedCells or ns.tuneStamp ~= paintedStamp end
+
+-- Paints a block. Its negative is painted later, in a frame of its own: the two looks of a long
+-- block in one frame are a frame the player sees.
+local function Prepare(cells)
+  Paint("plain", cells)
+  negativeDue = cells
+  paintedCells, paintedStamp = cells, ns.tuneStamp
+end
+
 -- Lines up the showings of a block: as it is, its negative, a rest, as many times as asked.
 local function Begin(cells)
   local db = ns.db
   local steady = db.mode ~= "fast"
-  if cells ~= paintedCells or ns.tuneStamp ~= paintedStamp then
-    -- The negative is painted when its turn comes, a frame or more later: the two looks of a long
-    -- block in one frame are a frame the player sees.
-    Paint("plain", cells)
-    negativeDue = cells
-    paintedCells, paintedStamp = cells, ns.tuneStamp
-  end
+  if Stale(cells) then Prepare(cells) end
   for _ = 1, math.max(1, db.cycles) do
     steps[#steps + 1] = { "plain", db.on / 1000 }
     if steady then steps[#steps + 1] = { "negative", db.neg / 1000 } end
@@ -385,7 +391,9 @@ end
 
 -- A section marked spread has a long build: it yields where it can stop, and goes on one piece a
 -- frame, its JSON in a frame of its own. The same data, a few frames later, and no frame pays it all.
+-- Returns true when a piece of a long build ran: the frame has had its share of work.
 local function Tick(now, combat)
+  local busy = false
   for _, s in ipairs(SECTIONS) do
     if s.combat or not combat then
       if not s.work and now >= (s.nextAt or 0) then
@@ -402,11 +410,13 @@ local function Tick(now, combat)
         end
       end
       if s.work then
+        busy = true
         coroutine.resume(s.work) -- an error ends it, as pcall does for the others
         if coroutine.status(s.work) == "dead" then s.work = nil end
       end
     end
   end
+  return busy
 end
 
 -- The next block to draw: in combat, the first one allowed there.
@@ -414,6 +424,14 @@ local function Next(combat)
   for i, item in ipairs(queue) do
     if item.combat or not combat then return table.remove(queue, i) end
   end
+end
+
+-- The cells of the next block, if there is one.
+local function Take(combat)
+  local item = Next(combat)
+  if not item then return end
+  blockId = (blockId + 1) % 65536
+  return Encode(blockId, item.text)
 end
 
 -- Everything is sent again, changed or not: asked for when someone new is reading the strip.
@@ -432,16 +450,16 @@ driver:SetScript("OnEvent", function(_, event)
   -- The window changed size: the row has another length and another pixel scale. Blocks cut for
   -- the old row are dropped and everything is sent again, cut for the new one.
   sized, paintedCells = nil, nil
-  queue, steps, last, timer = {}, {}, nil, 0
+  queue, steps, last, ahead, timer = {}, {}, nil, nil, 0
   for _, s in ipairs(SECTIONS) do s.nextAt, s.json = 0, nil end
 end)
 driver:SetScript("OnUpdate", function(_, elapsed)
   if not startAt then return end
   if ns.db.paused then
     if not paused then
-      paused, queue, steps, last, timer = true, {}, {}, nil, 0
+      paused, queue, steps, last, ahead, timer = true, {}, {}, nil, nil, 0
       Show(nil)
-      showing = false
+      showing, shown = false, nil
     end
     return
   end
@@ -452,14 +470,35 @@ driver:SetScript("OnUpdate", function(_, elapsed)
   local now = GetTime()
   if now < startAt then return end
   local combat = InCombatLockdown()
-  Tick(now, combat) -- every frame: each section keeps its own period
+  local busy = Tick(now, combat) -- every frame: each section keeps its own period
   timer = timer - elapsed
-  if timer > 0 then return end
+  -- No frame both paints a long block and shows it: a look is painted out of sight, in a frame
+  -- that shows nothing new, and comes on screen in a later one.
+  if timer > 0 then
+    if busy then return end
+    if negativeDue and shown == "plain" then
+      Paint("negative", negativeDue)
+      negativeDue = nil
+    elseif not ahead and #steps == 0 and shown ~= "plain" then
+      ahead = Take(combat)
+      if ahead then Prepare(ahead) end
+    end
+    return
+  end
   if #steps == 0 then
-    local item = Next(combat)
-    if item then -- straight to the next one: an empty frame between blocks is a visible blink
-      blockId = (blockId + 1) % 65536
-      Begin(Encode(blockId, item.text))
+    local cells = ahead
+    ahead = nil
+    if not cells and busy and #queue > 0 then return end
+    local waited = cells ~= nil
+    cells = cells or Take(combat)
+    if cells and not waited and Stale(cells) and shown ~= "plain" then
+      -- What is on screen stays one frame more: an empty frame between blocks is a visible blink.
+      Prepare(cells)
+      ahead = cells
+      return
+    end
+    if cells then
+      Begin(cells)
     elseif last and ns.db.idle == "repeat" then
       Begin(last)
     end
@@ -471,9 +510,9 @@ driver:SetScript("OnUpdate", function(_, elapsed)
       negativeDue = nil
     end
     if step[1] == "rest" then Rest() else Show(step[1]) end
-    showing, timer = true, step[2]
+    showing, shown, timer = true, step[1], step[2]
   elseif showing then
     Rest()
-    showing = false
+    showing, shown = false, nil
   end
 end)

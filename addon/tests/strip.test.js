@@ -240,3 +240,22 @@ test('a section with a long build makes it a piece a frame, and its data goes ou
   addon.run(6);
   assert.deepEqual(data(blocks(addon).filter((b) => b.section === 'slow').at(-1)), { n: 2 });
 });
+
+test('no frame both paints a long block and shows it', () => {
+  const zone = 'Stormwind City is here '.repeat(4);
+  const addon = enterWorld(`GAME.zone = ${JSON.stringify(zone)}`);
+  addon.lua('PAINTS = 0');
+  let paints = 0, strips = 0, shows = 0;
+  for (let i = 0; i < 900; i++) {
+    addon.lua(`GAME.x = ${0.3 + (i % 200) / 1000}`);
+    addon.run(1 / 60);
+    const p = Number(addon.lua('return PAINTS')), n = addon.strips().length;
+    if (n > strips) {
+      shows++;
+      assert.ok(p - paints <= 2, `a frame painted ${p - paints} cells and showed a block`);
+    }
+    paints = p;
+    strips = n;
+  }
+  assert.ok(shows > 20 && decoded(addon).every(Boolean));
+});
