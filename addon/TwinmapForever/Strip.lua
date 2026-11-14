@@ -318,6 +318,7 @@ local startAt
 local showing, timer = false, 0
 local steps = {} -- what is left to show of the block on screen: { layer or "rest", seconds }
 local last, paintedCells, paintedStamp -- the last block's cells; what the layers hold now
+local negativeDue -- the cells the negative has still to be painted with
 local paused = false
 
 -- What is on screen while no block is: nothing, or the even line.
@@ -332,8 +333,10 @@ local function Begin(cells)
   local db = ns.db
   local steady = db.mode ~= "fast"
   if cells ~= paintedCells or ns.tuneStamp ~= paintedStamp then
+    -- The negative is painted when its turn comes, a frame or more later: the two looks of a long
+    -- block in one frame are a frame the player sees.
     Paint("plain", cells)
-    Paint("negative", cells)
+    negativeDue = cells
     paintedCells, paintedStamp = cells, ns.tuneStamp
   end
   for _ = 1, math.max(1, db.cycles) do
@@ -441,6 +444,10 @@ driver:SetScript("OnUpdate", function(_, elapsed)
   end
   local step = table.remove(steps, 1)
   if step then
+    if step[1] == "negative" and negativeDue then
+      Paint("negative", negativeDue)
+      negativeDue = nil
+    end
     if step[1] == "rest" then Rest() else Show(step[1]) end
     showing, timer = true, step[2]
   elseif showing then
