@@ -6,7 +6,9 @@
 //   .build.info            which build of the product is installed, and its build key
 //   Data/config/../<key>   the build's configuration: where its "encoding" and "root" files are
 //   Data/data/*.idx        local index: first 9 bytes of an encoded key -> archive, offset, size
-//   Data/data/data.NNN     the archives; each record is a 30 byte header and a BLTE container
+//   Data/data/data.NNN     the archives; each record is a 30 byte header and a BLTE container.
+//                          On some installs a record is the container alone, with no header
+//                          (seen on a player's PC, issue 116): told by where the container starts
 //   encoding               content key -> encoded key
 //   root                   file number -> content key
 import { execFileSync } from 'node:child_process'
@@ -173,11 +175,14 @@ export function openClientFiles(folder: string): ClientFiles {
         }
         // The index lists it, the archive does not hold it: a game still downloading, or damaged.
         if (got < size) throw new Error(`${name} ends before the file (${got} of ${size} bytes at ${offset}): the game is not fully downloaded`)
+        // The container comes after the header of the record, or at once where the record has none.
+        const bare = record.toString('latin1', RECORD_HEADER, RECORD_HEADER + 4) !== 'BLTE' && record.toString('latin1', 0, 4) === 'BLTE'
         try {
-          return decodeBlte(record.subarray(RECORD_HEADER), skipHidden)
+          return decodeBlte(bare ? record : record.subarray(RECORD_HEADER), skipHidden)
         } catch (e) {
           if (e instanceof EncryptedFileError) throw e
-          throw new Error(`${e instanceof Error ? e.message : String(e)} (${name} at ${offset}, ${size} bytes)`)
+          // How it starts goes with the error: what tells one kind of unreadable record from another.
+          throw new Error(`${e instanceof Error ? e.message : String(e)} (${name} at ${offset}, ${size} bytes, starts ${record.toString('hex', 0, 40)})`)
         }
       }
     }
