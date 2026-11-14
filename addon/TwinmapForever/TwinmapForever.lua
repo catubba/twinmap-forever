@@ -1,7 +1,7 @@
 -- Twinmap Forever, the in-game half. It reads and draws; it never acts for the player.
 local _, ns = ...
 
-ns.VERSION = "0.3.0" -- same as the .toc; a test keeps the two in step
+ns.VERSION = "0.3.1" -- same as the .toc; a test keeps the two in step
 ns.PROTOCOL = 1 -- the app refuses a strip whose protocol it does not know
 
 -- The player's choices, saved by the game in TwinmapForeverDB.
