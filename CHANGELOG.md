@@ -2,6 +2,21 @@
 
 What changed in each version of Twinmap, newest first. The section of a version is also the text of its release on GitHub and of the addon's file on CurseForge.
 
+## 0.4.0 - 2026-11-14
+
+### New
+
+- **Bosses you killed are marked.** On the map of a dungeon a boss you killed turns dark, with a red cut across its skull and its name struck out. In a raid, where bosses have no place on the map, the name is struck out in the list. The marks stay through a /reload and a walk back in, and start again when the dungeon is reset. Needs the new addon, and for now a game played in English: bosses are told by their names.
+
+### Changed
+
+- **Bosses are skulls, with their names.** A boss on the map of a dungeon was a plain red dot that told its name only under the pointer. It is now a skull on a dark red disc, with its name always written under it.
+
+### Fixed
+
+- **The map is built on a game installed without English.** On a game installed in another language only, the setup stopped at "the game has no table of its maps". Twinmap now reads the game's tables in the language your game has, and the names on the map are in that language.
+- **A companion who left the group stays off the map of the dungeon.** Their disc could come back at its last place on your way out.
+
 ## 0.3.3 - 2026-11-14
 
 ### New
