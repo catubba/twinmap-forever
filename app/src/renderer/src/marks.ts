@@ -5,6 +5,10 @@
 const GOLD = '#ffd100', TEXT = '#f3ead9'
 const EDGE = 'stroke="#000" stroke-width="1.5" stroke-linejoin="round"'
 const DRAWN = 'fill="none" stroke="#000" stroke-linecap="round" stroke-linejoin="round"' // the ! and the ? on a quest disc
+// A sword, on a square of 22: for who deals damage in a group, and for a creature to slay.
+const SWORD = '<path d="M17 5 16.200 8.600 10 14.800 8.200 13Z"/><path d="M6.400 11.200 10.800 15.600M8 14l-2.600 2.600" fill="none" stroke="#000" stroke-width="2" stroke-linecap="round"/>'
+const task = `<circle cx="9" cy="9" r="8.25" fill="#ff5a4d" ${EDGE}/>` // the disc of an objective
+const inTask = (drawn: string): string => `${task}<g transform="scale(1.125)">${drawn}</g>` // its sign is drawn on a square of 16
 const disc = `<circle cx="10" cy="10" r="9.25" fill="${GOLD}" ${EDGE}/>`
 
 /** Each pin: its size on the map in px, and what is inside its svg (a square of that size). */
@@ -13,8 +17,15 @@ const DRAWINGS = {
   quest: [20, `${disc}<path d="M10 4.9v6.4" ${DRAWN} stroke-width="2.5"/><circle cx="10" cy="15" r="1.45"/>`],
   // A quest to hand in.
   turnin: [20, `${disc}<path d="M7.2 8a2.8 2.8 0 1 1 4.3 2.4c-1 .6-1.5 1.1-1.5 2.1" ${DRAWN} stroke-width="2.2"/><circle cx="10" cy="15.5" r="1.35"/>`],
-  // Where an objective still open is found.
+  // Where an objective still open is found, when what it asks for is not known.
   objective: [9, `<circle cx="4.5" cy="4.5" r="3.75" fill="#ff5a4d" ${EDGE}/>`],
+  // The same, by what it asks for: a sword to slay, a pouch to loot, a cog for an object to
+  // use, a speech bubble to talk, a star for something to see happen.
+  slay: [18, inTask(`<g transform="translate(-1.2 -1) scale(.84)">${SWORD}</g>`)],
+  loot: [18, inTask(`<path d="M6 3.2h4l-1 2.3c2.9 1.4 3.6 7.3-1 7.3s-3.9-5.9-1-7.3Z"/>`)],
+  object: [18, inTask(`<circle cx="8" cy="8" r="3.900" fill="none" stroke="#000" stroke-width="2" stroke-dasharray="1.530 1.530"/><circle cx="8" cy="8" r="2.200" fill="none" stroke="#000" stroke-width="1.500"/>`)],
+  talk: [18, inTask(`<path d="M4.200 4.600h7.600v5h-3.500L6 12v-2.400H4.200Z"/>`)],
+  event: [18, inTask(`<path d="M8 3.300 9.200 6.800 12.700 8 9.200 9.200 8 12.700 6.800 9.200 3.300 8 6.800 6.800Z"/>`)],
   // Flight, inn, vendor, trainer, bank: the word beside it says which.
   service: [14, `<rect x=".75" y=".75" width="12.5" height="12.5" fill="#7fc8ff" ${EDGE}/>`],
   // Ore and herbs.
@@ -46,7 +57,7 @@ export function pin(name: PinName): string {
 const ROLES: Record<string, string> = {
   T: '<path d="M11 4.6 16.4 6.6v4c0 3.3-2.2 5.4-5.400 6.800-3.200-1.400-5.400-3.500-5.400-6.800v-4Z"/>',
   H: '<path d="M9.2 5h3.6v4.200H17v3.600h-4.200V17H9.200v-4.200H5V9.200h4.200Z"/>',
-  D: '<path d="M17 5 16.200 8.600 10 14.800 8.200 13Z"/><path d="M6.400 11.200 10.800 15.600M8 14l-2.600 2.600" fill="none" stroke="#000" stroke-width="2" stroke-linecap="round"/>',
+  D: SWORD,
 }
 /** A companion's disc with their role on it, or the first letter of their name where the group gave no role. */
 export function companionPin(role: string | undefined, name: string): string {

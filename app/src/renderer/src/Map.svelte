@@ -31,7 +31,7 @@
   import { kept as keptByApp } from './kept.svelte'
   import { pinOfMark, removePin, renamePin, savedAt, savedFrom, savePin, type SavedPin } from '../../shared/saved'
   import { markPart, sendState, type GameMark, type Inbox, type Pin } from '../../shared/send'
-  import { companionPin, pin } from './marks'
+  import { companionPin, pin, pinSize, type PinName } from './marks'
 
   // at: when the position was read off the game, in milliseconds.
   // insideReady: the rooms of the buildings are converted, and their list can be asked for.
@@ -667,6 +667,7 @@
   // one in, where what is still to find is. Each kind is a layer of its own.
   const questLayers = { available: L.layerGroup(), turnin: L.layerGroup(), objectives: L.layerGroup() }
   const QUEST_SAYS = { available: 'Quest to take', turnin: 'Quest to hand in', objective: 'Quest objective' } as const
+  const KIND_SAYS = { slay: 'Objective: slay', loot: 'Objective: loot', object: 'Objective: use', talk: 'Objective: talk', event: 'Objective: go there' } as const
   const QUEST_PINS = { available: ['quest', 'available', 500], turnin: ['turnin', 'turnin', 1000], objective: ['objective', 'objectives', 0] } as const
   $effect(() => {
     for (const group of Object.values(questLayers)) group.clearLayers()
@@ -674,16 +675,18 @@
     for (const p of quests) {
       const zone = zones.get(p.area)
       if (!zone?.rect) continue
-      const [drawing, layer, above] = QUEST_PINS[p.type]
+      const [plain, layer, above] = QUEST_PINS[p.type]
+      // An objective is drawn by what it asks for, where the addon told.
+      const drawing: PinName = p.type === 'objective' && p.kind ? p.kind : plain
       // Names come from the player's QuestieDB: written as text, never as markup.
       const tip = document.createElement('span')
       tip.append(Object.assign(document.createElement('b'), { textContent: p.name }))
       for (const quest of p.quests) if (quest !== p.name) tip.append(document.createElement('br'), quest)
-      const size = drawing === 'objective' ? 9 : 20
+      const size = pinSize(drawing)
       const units = unitsOfPlace(zone.rect, p.x, p.y)
-      L.marker(at(units), { keyboard: false, zIndexOffset: above, icon: L.divIcon({ className: 'door', iconSize: [size, size], html: pin(drawing) }) })
+      L.marker(at(units), { keyboard: false, zIndexOffset: above, icon: L.divIcon({ className: p.type === 'objective' ? 'door task' : 'door', iconSize: [size, size], html: pin(drawing) }) })
         .bindTooltip(tip, { direction: 'top', offset: [0, -size / 2], className: 'tip' })
-        .on('click', () => labelPin(units, p.name, [QUEST_SAYS[p.type], ...p.quests.filter((quest) => quest !== p.name)], { zone, place: { x: p.x, y: p.y } }))
+        .on('click', () => labelPin(units, p.name, [(p.kind && KIND_SAYS[p.kind]) ?? QUEST_SAYS[p.type], ...p.quests.filter((quest) => quest !== p.name)], { zone, place: { x: p.x, y: p.y } }))
         .addTo(questLayers[layer])
     }
   })
@@ -1298,6 +1301,11 @@
   .map :global(.place) {
     background: none;
     border: 0;
+  }
+  /* A soft light of its own colour under an objective: it is found at a glance on any ground. */
+  .map :global(.task) {
+    border-radius: 50%;
+    box-shadow: 0 0 9px 4px color-mix(in srgb, var(--objective) 55%, transparent);
   }
 
   .map :global(.me svg) {

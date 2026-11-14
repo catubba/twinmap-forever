@@ -9,7 +9,11 @@ export interface QuestIcon {
   area: number
   x: number
   y: number
+  /** For an objective: what it asks for. Not told by an addon older than this, nor for a kind it does not know. */
+  kind?: ObjectiveKind
 }
+/** What an objective asks for there: a creature to slay, a thing to loot, an object to use, something to see happen, someone to talk to. */
+export type ObjectiveKind = 'slay' | 'loot' | 'object' | 'event' | 'talk'
 /** What Questie is showing in the game, as the addon sends it: numbers only. */
 export interface QuestieShown {
   /** Its icons, as it draws them: its own limits, filters and switches are already in them. */
@@ -32,6 +36,8 @@ export interface QuestPin {
   area: number
   x: number
   y: number
+  /** For an objective: what it asks for, where the addon told. */
+  kind?: ObjectiveKind
   /** Who or what is there; the quest's own name for a place where something is to be done. */
   name: string
   /** The quests it is there for. */
@@ -79,12 +85,17 @@ export function logFrom(section: unknown): GameQuest[] | null {
   })
 }
 
-// The addon sends an icon as four whole numbers in a row: quest, area, x and y in hundredths of a percent.
-function iconsFrom(v: unknown): QuestIcon[] {
+// The letter the addon sends for what an objective asks for. To interact with a thing is to use an object.
+const KINDS: Record<string, ObjectiveKind> = { s: 'slay', l: 'loot', o: 'object', i: 'object', e: 'event', t: 'talk' }
+
+// The addon sends an icon as four whole numbers in a row: quest, area, x and y in hundredths of a
+// percent. kinds: for the objectives, a letter for each icon in the same order.
+function iconsFrom(v: unknown, kinds?: unknown): QuestIcon[] {
   const flat: unknown[] = Array.isArray(v) ? v : [], out: QuestIcon[] = []
   for (let i = 0; i + 3 < flat.length; i += 4) {
     const quest = flat[i], area = flat[i + 1], x = flat[i + 2], y = flat[i + 3]
-    if (Number.isInteger(quest) && Number.isInteger(area) && typeof x === 'number' && typeof y === 'number') out.push({ quest: quest as number, area: area as number, x: x / 100, y: y / 100 })
+    const kind = typeof kinds === 'string' ? KINDS[kinds[i / 4] ?? ''] : undefined
+    if (Number.isInteger(quest) && Number.isInteger(area) && typeof x === 'number' && typeof y === 'number') out.push({ quest: quest as number, area: area as number, x: x / 100, y: y / 100, ...(kind && { kind }) })
   }
   return out
 }
@@ -99,5 +110,5 @@ export function shownFrom(section: unknown): QuestieShown {
     const targets = Array.isArray(quest.targets) ? quest.targets.filter((t): t is string => typeof t === 'string') : []
     return [{ id: quest.id as number, done: quest.done === true, targets }]
   })
-  return { icons: { available: iconsFrom(icons.a), turnin: iconsFrom(icons.t), objective: iconsFrom(icons.o) }, active }
+  return { icons: { available: iconsFrom(icons.a), turnin: iconsFrom(icons.t), objective: iconsFrom(icons.o, icons.k) }, active }
 }

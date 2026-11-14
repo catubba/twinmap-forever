@@ -179,6 +179,8 @@ test('what comes off the strip is checked before it is used', () => {
   expect(shownFrom('nonsense')).toEqual(nothing)
   // What an addon older than the icons sent: no pins, and no fault.
   expect(shownFrom({ available: [6, 64], items: true, active: [] })).toEqual(nothing)
+  // What each objective asks for: a letter each, in their order. A letter not known, or none, leaves the icon without.
+  expect(shownFrom({ icons: { o: [1, 40, 100, 200, 2, 40, 300, 400, 3, 40, 500, 600, 4, 40, 700, 800], k: 'sl?' } }).icons.objective.map((i) => i.kind)).toEqual(['slay', 'loot', undefined, undefined])
 })
 
 test('values come back as QuestieDB wrote them', () => {
@@ -274,10 +276,10 @@ test('without Questie the pins of the log are made here: where to hand in what i
   expect(shown.icons.turnin.map((i) => i.x).slice(0, 3)).toEqual([10.5, 14.5, 18.5])
   expect(shown.icons.turnin.length).toBe(11)
   // The place to scout; the board and the rats that drop the key, not the creature already done.
-  expect(shown.icons.objective.filter((i) => i.quest === 10)).toEqual([{ quest: 10, area: 40, x: 61.5, y: 53.25 }])
+  expect(shown.icons.objective.filter((i) => i.quest === 10)).toEqual([{ quest: 10, area: 40, x: 61.5, y: 53.25, kind: 'event' }])
   expect(shown.active.find((q) => q.id === 20)).toEqual({ id: 20, done: false, targets: ['o_900', 'm_102'] })
   const pins = questPins(db, shown)
-  expect(pins.find((p) => p.type === 'objective' && p.x === 50)).toMatchObject({ area: 12, name: 'Mill Notice Board', quests: ['Three Things'] })
+  expect(pins.find((p) => p.type === 'objective' && p.x === 50)).toMatchObject({ area: 12, kind: 'object', name: 'Mill Notice Board', quests: ['Three Things'] })
   expect(pins.some((p) => p.type === 'objective' && p.name === 'Road Warden'), 'the creature is done').toBe(false)
   expect(questLog(db, shown)).toEqual([{ name: 'A Parcel for the Miller', done: true }, { name: 'Scout the Ford', done: false }, { name: 'Three Things', done: false }])
   // A game that tells no objectives: everything the quest asks for is shown. No section at all: Questie is running.

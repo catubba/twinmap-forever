@@ -62,7 +62,7 @@ const ICONS = `
   Icon(300, "event", 1497, 72.41, 11.37)
 `;
 
-test('the icons Questie holds go out, each with its quest and its place', () => {
+test('the icons Questie holds go out, each with its quest and its place, an objective with what it asks for', () => {
   const addon = enterWorld(QUESTIE + ICONS);
   addon.run(12);
   assert.deepEqual(section(addon, 'questie'), {
@@ -71,6 +71,8 @@ test('the icons Questie holds go out, each with its quest and its place', () => 
       a: [6, 12, 2423, 7446, 64, 40, 5650, 4725],
       t: [12, 12, 4210, 6590],
       o: [102, 40, 4400, 2150, 102, 40, 5005, 2000, 300, 1497, 7241, 1137],
+      // What each objective asks for, in the same order: an object, to slay, an event.
+      k: 'ose',
     },
     active: [
       { id: 12, done: true, targets: [] },

@@ -1,5 +1,5 @@
 -- What Questie is showing right now, read from its own tables: the icons it holds for the world
--- map, each with its quest and its place. Its filters (level range, hidden quests, what the
+-- map, each with its quest and its place, an objective with what it asks for. Its filters (level range, hidden quests, what the
 -- character can take), its limits and its switches stay its own: an icon it does not show is not
 -- sent. Only numbers go out: the app has the names, from the QuestieDB of the same player.
 -- Without Questie nothing is sent from here: the game's own log is (Quests.lua).
@@ -13,6 +13,11 @@ local function Num(v) if type(v) == "number" and not IsSecret(v) then return v e
 -- How Questie calls an icon, and the list it goes in here: a quest to take, one to hand in,
 -- anything else is something still to find or to do.
 local LISTS = { available = "a", complete = "t" }
+-- What an objective asks for, as one letter: to slay, to loot, an event, an object, to talk, to
+-- interact. By the number of the icon Questie draws (Questie.ICON_TYPE_...), which its corrections
+-- may have changed, or else by the kind of the objective.
+local KINDS = { [1] = "s", [2] = "l", [3] = "e", [4] = "o", [5] = "t", [17] = "i" }
+local BY_TYPE = { monster = "s", item = "l", event = "e", object = "o" }
 
 -- The icons on the world map (each has a twin on the minimap, left out), as four numbers each:
 -- quest, area, x and y in hundredths of a percent of the zone's map. Sorted, so that the same
@@ -27,7 +32,7 @@ local function Icons(map)
         if type(data) == "table" and not f.miniMapIcon and not f.hidden then
           local area, x, y = Num(f.AreaID), Num(f.x), Num(f.y)
           if area and x and y then
-            all[#all + 1] = { LISTS[data.Type] or "o", quest, area, math.floor(x * 100 + 0.5), math.floor(y * 100 + 0.5) }
+            all[#all + 1] = { LISTS[data.Type] or "o", quest, area, math.floor(x * 100 + 0.5), math.floor(y * 100 + 0.5), KINDS[Num(data.Icon) or 0] or BY_TYPE[data.Type] or "?" }
           end
         end
       end
@@ -39,15 +44,19 @@ local function Icons(map)
     end
     return false
   end)
-  local out, before = { a = {}, t = {}, o = {} }, nil
+  local out, before, kinds = { a = {}, t = {}, o = {} }, nil, {}
   for _, icon in ipairs(all) do
     -- Two icons of one quest on one spot (two creatures standing together) are one here.
     if not (before and before[1] == icon[1] and before[2] == icon[2] and before[3] == icon[3] and before[4] == icon[4] and before[5] == icon[5]) then
       local list = out[icon[1]]
       for i = 2, 5 do list[#list + 1] = icon[i] end
+      if icon[1] == "o" then kinds[#kinds + 1] = icon[6] end
     end
     before = icon
   end
+  -- A letter for each icon of the objectives, in their order. Beside the list, not in it: an app
+  -- that does not know the letters still reads the icons.
+  if #kinds > 0 then out.k = table.concat(kinds) end
   return out
 end
 

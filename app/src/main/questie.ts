@@ -3,7 +3,7 @@
 // QuestieDB keeps every entity in its .toc, as base64 CBOR, one metadata line per field.
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import type { GameQuest, LogQuest, QuestIcon, QuestieShown, QuestPin } from '../shared/quests'
+import type { GameQuest, LogQuest, ObjectiveKind, QuestIcon, QuestieShown, QuestPin } from '../shared/quests'
 import { best, fold, wordsMatch, type Found } from '../shared/search'
 import { resourceOf, servicesOf, type FixedPin, type ServiceLayer } from '../shared/services'
 
@@ -314,6 +314,7 @@ const ICONS_A_QUEST = 40
 // ponytail: an objective of the game is matched to QuestieDB's by its kind and its place among
 // those of that kind, and the places of a target are thinned by distance, not gathered as Questie
 // does. Kill credits and spells have no icon. Take Questie's own matching if these show wrong.
+const OBJECTIVE_KINDS: Record<number, ObjectiveKind> = { 1: 'slay', 2: 'object', 3: 'loot' } // by the game's kind of objective
 export function shownFromLog(db: Questie, log: GameQuest[]): QuestieShown {
   type Who = ['Npc' | 'Object', number]
   const numbers = (t: unknown): number[] => list(t).filter((n): n is number => typeof n === 'number')
@@ -321,11 +322,13 @@ export function shownFromLog(db: Questie, log: GameQuest[]): QuestieShown {
   const active: QuestieShown['active'] = []
   for (const quest of log) {
     const spots: QuestIcon[] = []
-    const put = (area: number, x: number, y: number): void => {
-      if (spots.length < ICONS_A_QUEST && !spots.some((s) => s.area === area && Math.hypot(s.x - x, s.y - y) < SPREAD)) spots.push({ quest: quest.id, area, x, y })
+    const put = (area: number, x: number, y: number, kind?: ObjectiveKind): void => {
+      if (spots.length < ICONS_A_QUEST && !spots.some((s) => s.area === area && Math.hypot(s.x - x, s.y - y) < SPREAD)) spots.push({ quest: quest.id, area, x, y, ...(kind && { kind }) })
     }
+    // What each target is there for, by the kind of the objective that asks for it.
+    const asked = new Map<string, ObjectiveKind>()
     const stand = (who: Who[]): void => {
-      for (const [kind, id] of who) for (const [area, places] of Object.entries(db.places(kind, id))) for (const [x, y] of places) put(+area, x, y)
+      for (const [kind, id] of who) for (const [area, places] of Object.entries(db.places(kind, id))) for (const [x, y] of places) put(+area, x, y, asked.get(`${kind}:${id}`))
     }
     const targets: Who[] = []
     if (quest.done) {
@@ -341,7 +344,10 @@ export function shownFromLog(db: Questie, log: GameQuest[]): QuestieShown {
       for (const objective of quest.objectives) {
         if (objective.kind < 1 || objective.kind > 3) continue
         const id = entry(objective.kind, seen[objective.kind]!++)
-        if (id !== undefined && !objective.done) targets.push(...of(objective.kind, id))
+        if (id === undefined || objective.done) continue
+        const who = of(objective.kind, id)
+        for (const [kind, target] of who) asked.set(`${kind}:${target}`, OBJECTIVE_KINDS[objective.kind]!)
+        targets.push(...who)
       }
       // The game told no objective QuestieDB knows: everything the quest asks for is shown.
       if (!quest.objectives.some((o) => o.kind >= 1 && o.kind <= 3)) for (const kind of [1, 2, 3]) for (const row of list(at(groups, kind))) for (const id of numbers([at(row, 1)])) targets.push(...of(kind, id))
@@ -350,7 +356,7 @@ export function shownFromLog(db: Questie, log: GameQuest[]): QuestieShown {
       for (const [area, places] of Object.entries((at(db.get('Quest', quest.id, QUEST.triggerEnd), 2) ?? {}) as Record<string, unknown>)) {
         for (const place of list(places)) {
           const [x, y] = numbers(place)
-          if (x !== undefined && y !== undefined) put(+area, x, y)
+          if (x !== undefined && y !== undefined) put(+area, x, y, 'event')
         }
       }
       icons.objective.push(...spots)
@@ -421,7 +427,7 @@ export function questPins(db: Questie, shown: QuestieShown): QuestPin[] {
       const name = found && (type === 'objective' || found.far < SAME_SPOT) ? named(found.who) : who.length === 1 ? named(who[0]!) : title
       const key = `${type}:${icon.area}:${icon.x}:${icon.y}`
       const pin = pins.get(key)
-      if (!pin) pins.set(key, { type, area: icon.area, x: icon.x, y: icon.y, name, quests: [quest] })
+      if (!pin) pins.set(key, { type, area: icon.area, x: icon.x, y: icon.y, ...(icon.kind && { kind: icon.kind }), name, quests: [quest] })
       else if (!pin.quests.includes(quest)) pin.quests.push(quest)
     }
   }
