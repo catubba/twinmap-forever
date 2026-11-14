@@ -19,14 +19,28 @@ const slide = (addon, key, value) => addon.slide(`TwinmapForeverTune${SLIDERS.in
 const setting = (addon, key) => addon.lua(`local ns = ...; return ns.db.${key}`);
 const negatives = (addon) => addon.strips().map((s) => decodeStrip(s).negative);
 
-test('each slider changes its setting, and one button puts the usual strip back', () => {
+test('each slider changes its setting, and one button puts every choice back to the defaults', () => {
   const addon = enterWorld();
+  const all = [...SLIDERS, 'idle', 'paused', 'position', 'mode'];
   SLIDERS.forEach((key, i) => slide(addon, key, 7 + i));
-  addon.click('TwinmapForeverOption4');
-  assert.deepEqual([...SLIDERS, 'idle'].map((k) => setting(addon, k)), ['7', '8', '9', '10', '11', '12', 'flat']);
+  for (const i of [1, 2, 3, 4]) addon.click(`TwinmapForeverOption${i}`);
+  assert.deepEqual(all.map((k) => setting(addon, k)), ['7', '8', '9', '10', '11', '12', 'flat', 'true', 'BOTTOM', 'fast']);
 
   addon.click('TwinmapForeverTuneReset');
-  assert.deepEqual([...SLIDERS, 'idle'].map((k) => setting(addon, k)), ['30', '30', '0', '1', '0', '100', 'flat']);
+  assert.deepEqual(all.map((k) => setting(addon, k)), ['30', '30', '0', '1', '0', '50', 'flat', 'false', 'TOP', 'steady']);
+});
+
+test('the contrast of before becomes the new one for who never moved it, and stays for who chose another', () => {
+  const contrast = (saved) => {
+    const addon = loadAddon(DIR);
+    addon.lua(`TwinmapForeverDB = ${saved}`);
+    addon.fire('PLAYER_LOGIN');
+    return setting(addon, 'amp');
+  };
+  assert.equal(contrast('{}'), '50'); // a new install
+  assert.equal(contrast('{ amp = 100 }'), '50'); // the default of before
+  assert.equal(contrast('{ amp = 180 }'), '180'); // the player's own
+  assert.equal(contrast('{ amp = 100, defaults = 2 }'), '100'); // chosen after the change
 });
 
 test('a block is shown as many times as asked, each time followed by its negative', () => {

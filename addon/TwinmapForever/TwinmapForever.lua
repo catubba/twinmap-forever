@@ -16,7 +16,7 @@ local DEFAULTS = {
   gap = 0,           -- ms of rest after each showing
   cycles = 1,        -- times a block and its negative are shown
   base = 0,          -- a color channel that is off, of 255
-  amp = 100,         -- how much brighter a channel that is on
+  amp = 50,          -- how much brighter a channel that is on
   idle = "flat",     -- between blocks: "hide", "flat" (an even line), "repeat" (the last block again)
 }
 ns.DEFAULTS = DEFAULTS
@@ -26,6 +26,10 @@ frame:RegisterEvent("PLAYER_LOGIN")
 frame:SetScript("OnEvent", function()
   TwinmapForeverDB = TwinmapForeverDB or {}
   ns.db = TwinmapForeverDB
+  -- A default that changed reaches who never moved it: what they have saved is the default of
+  -- before. defaults: the last change of this kind the saved choices have been through.
+  if (ns.db.defaults or 1) < 2 and ns.db.amp == 100 then ns.db.amp = 50 end
+  ns.db.defaults = 2
   for key, value in pairs(DEFAULTS) do
     if ns.db[key] == nil then ns.db[key] = value end
   end
