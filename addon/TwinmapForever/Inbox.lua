@@ -1,17 +1,21 @@
 -- The inbox: the app-to-game channel. What Twinmap sends arrives here without a /reload.
 --
 -- The game reads a file it has not loaded yet fresh from disk, and files must exist when it starts.
--- So the app keeps, next to this addon, a bank of font names and a set of load-on-demand slots. Here
--- a new font name is read every few seconds: the width of its letter A is a number, and a number
--- other than the one of the news we have means there is more. Small news is in the font itself, a
--- byte in the width of each of its other letters; the rest is in a slot, and a session of the
--- interface has only SLOTS of them. Only text widths are measured, and the font's data is read as
--- JSON: data, never code.
+-- So the app keeps, next to this addon, a bank of font names. Here a new font name is read every few
+-- seconds, in a fight too: the width of its letter A is a number, and a number other than the last
+-- one read means the font says something new. The news is in the font itself, a byte in the width
+-- of each of its other letters: what changed since the send we say we have (the app reads that on
+-- the strip), or everything when we follow another history of sends. News too big for one font
+-- comes in pieces, a font each. Only text widths are measured, and the font's data is read as JSON:
+-- data, never code. The slots, small addons loaded on demand that carried what did not fit, are
+-- still here and switched off (SLOTS_ON): the app no longer writes them.
 -- Slots adapted from wow-ai, Copyright (c) 2026 chelinho139, MIT License: full text in THIRD-PARTY-LICENSES.
 local _, ns = ...
 
 local SLOTS = 30      -- same as signal.ts
-local BANK = 8184     -- same as signal.ts
+local SLOTS_ON = false
+local BANK = 20460    -- same as signal.ts
+local OLD_BANK = 8184 -- what an app before 0.5 made; the rest is there from the start of the game after
 local EM, A_BASE, A_STEP = 1000, 100, 50 -- same as signal.ts
 local B_WIDTH, C_WIDTH = 1000, 500       -- same as signal.ts
 local DATA_FIRST, DATA_LETTERS = 0xE000, 1024 -- same as signal.ts
@@ -19,8 +23,12 @@ local D_STEP = 200                            -- same as signal.ts
 local DIR = "Interface\\AddOns\\TwinmapForever_Signal\\"
 local FALLBACK_FONT = "Fonts\\FRIZQT__.TTF"
 local SIZE = 64
-local POLL = 5              -- seconds between reads, so the bank lasts about 11 hours of play
-local RETRY, GIVE_UP = 1, 8 -- a font loads late, and only when asked again
+-- Seconds between reads. In a dungeon or a raid the app tells where the character is, which the
+-- game does not: at 1.5 the bank lasts 8.5 hours of that, at 5 it lasts 28. Faster while pieces come.
+local POLL, POLL_INSIDE, POLL_PIECES = 5, 1.5, 1
+-- A font is never there at the first asking and always at the next frame (950 of 950 in the game,
+-- 15 November 2026, in a fight too): it is asked again every frame.
+local GIVE_UP, PROBE_WAIT = 8, 2
 local MAX_FAILS = 3
 
 -- Who takes each part of the news: ns.receivers.name = function(value, part), value nil for a part
@@ -79,11 +87,15 @@ local function LoadNextSlot()
   Stop("slots used up", "type /reload to go on receiving from Twinmap.")
 end
 
--- What the app must know of its way to the game: the number of the last news that arrived, so it
--- can say "sent"; how many slots are left before a /reload; and why nothing can arrive, if so.
-ns.sections[#ns.sections + 1] = { name = "inbox", period = 1, build = function()
+-- What the app must know of its way to the game: the history of sends we follow and the number of
+-- the last one that arrived, so it can say "sent" and tell what is missing; how far a send in
+-- pieces has come; and why nothing can arrive, if so. In a fight too: the app waits on it.
+ns.sections[#ns.sections + 1] = { name = "inbox", period = 0.25, combat = true, build = function()
   if not (ns.db and ns.db.inbox) or ns.signal == "waiting" then return end
-  return { seq = ns.db.inbox.seq, left = SLOTS - used, off = ns.signal ~= "reading" and ns.signal or nil }
+  return {
+    id = ns.db.inbox.id, seq = ns.db.inbox.seq, left = SLOTS - used, off = ns.signal ~= "reading" and ns.signal or nil,
+    got = ns.pieces and { ns.pieces.seq, ns.pieces.i } or nil,
+  }
 end }
 
 -- The app was just opened and has heard nothing yet: it says so with a number new each time, and
@@ -129,8 +141,8 @@ local function DataWidth(i)
   return Width(string.char(0xE0 + math.floor(cp / 4096), 0x80 + math.floor(cp / 64) % 64, 0x80 + cp % 64))
 end
 
--- The news itself, when it is small: a byte in the width of each data letter. The first two say
--- how wide 0 and 255 are, then length and sum, then JSON. Anything that does not add up is no data.
+-- What the font carries: a byte in the width of each data letter. The first two say how wide 0 and
+-- 255 are, then length and sum, then the text. Anything that does not add up is no data.
 local function ReadData()
   local w0, w255 = DataWidth(0), DataWidth(1)
   if not (w0 and w255) or w255 <= w0 then return nil end
@@ -151,10 +163,50 @@ local function ReadData()
     sum = (sum * 31 + v) % 65536
   end
   if sum ~= h3 * 256 + h4 then return nil end
+  return table.concat(bytes)
+end
+
+-- News as the app writes it: { id, seq, parts } with "from", the send it goes on top of, or "all".
+local function Decode(data)
   local json = C_EncodingUtil and C_EncodingUtil.DeserializeJSON
   if not json then return nil end
-  local ok, news = pcall(json, table.concat(bytes))
-  return ok and type(news) == "table" and type(news.parts) == "table" and news or nil
+  local ok, news = pcall(json, data)
+  return ok and type(news) == "table" and type(news.parts) == "table" and type(news.id) == "string" and Num(news.seq) and news or nil
+end
+
+-- A piece of news too big for one font: a line of "#id send piece pieces", then its bytes. The
+-- pieces are held in ns.pieces until the last, and the strip tells the app which one to write next.
+-- A /reload loses them: the app then starts from the first.
+local function Piece(data)
+  local id, seq, i, k, rest = data:match("^#(%S+) (%d+) (%d+) (%d+)\n()")
+  if not id then return nil end
+  seq, i, k = tonumber(seq), tonumber(i), tonumber(k)
+  if i == 1 then ns.pieces = { id = id, seq = seq, k = k, i = 0, data = {} } end
+  local held = ns.pieces
+  if not held or held.id ~= id or held.seq ~= seq or held.k ~= k or i ~= held.i + 1 then return nil end
+  held.i, held.data[i] = i, data:sub(rest)
+  if i < k then return nil end
+  ns.pieces = nil
+  return Decode(table.concat(held.data))
+end
+
+-- Takes news in. What changed goes on top of the send it says, or of any send after that one: the
+-- app tells everything that changed since. Anything else is not for what we hold, and is left: the
+-- app reads on the strip what we hold, and writes what fits.
+local function Take(news)
+  local inbox = ns.db.inbox
+  if news.all then
+    if news.id == inbox.id and news.seq == inbox.seq then return end
+    local before = inbox.parts
+    ns.db.inbox = { id = news.id, seq = news.seq, parts = news.parts }
+    return TellAll(before)
+  end
+  if news.id ~= inbox.id or not Num(news.from) or inbox.seq < news.from or inbox.seq >= news.seq then return end
+  inbox.seq = news.seq
+  for part, value in pairs(news.parts) do
+    inbox.parts[part] = value or nil -- false: the part was taken away
+    Tell(part)
+  end
 end
 
 -- The number in the letter A. B and C tell our font from a fallback, where they are not 500 units apart.
@@ -177,26 +229,36 @@ local function Failed()
   if fails >= MAX_FAILS then Stop("fonts not readable") end
 end
 
+local bank -- the names this run of the game has
+local seen  -- the number of the font last taken in
+
 -- Until SetFont says yes the font is still loading and the text measures the previous one.
 -- The text is set anyway: that is what asks the game to go on loading it.
 local function Attempt()
   local ok, assigned = pcall(text.SetFont, text, reading.path, SIZE, "")
+  if reading.probe then
+    -- The last name of the bank, read for nothing but being there: the app made the names past
+    -- OLD_BANK later, and a game that was running then does not have them until it starts again.
+    if ok and assigned then
+      bank, reading, acc = BANK - 1, nil, POLL -- and the first read at the next frame
+    elseif reading.waited > PROBE_WAIT then
+      bank, reading, acc = OLD_BANK, nil, POLL
+    end
+    return
+  end
   local number = ReadNumber()
   if not (ok and assigned) then return end
   if not number then return Failed() end
   reading, fails, ns.signal = nil, 0, "reading"
-  local inbox = ns.db.inbox
-  if number == inbox.seq then return end
-  local news = ReadData()
-  if news and news.seq == number and news.prev == inbox.seq then
-    -- Only what this send changed, and only on top of the send before it: no slot spent.
-    inbox.seq = number
-    for part, value in pairs(news.parts) do
-      inbox.parts[part] = value or nil -- false: the part was taken away
-      Tell(part)
-    end
-  else
-    LoadNextSlot() -- too big for a font, a send was missed, or the read fell in the middle of a write
+  if number == seen then return end
+  local data = ReadData()
+  if not data then return end -- the read fell in the middle of a write: the next one has it
+  seen = number
+  local news = data:sub(1, 1) == "#" and Piece(data) or Decode(data)
+  if news then
+    Take(news)
+  elseif SLOTS_ON then
+    LoadNextSlot()
   end
 end
 
@@ -209,12 +271,17 @@ local function BeginRead()
     text:SetNonSpaceWrap(false)
     pcall(text.SetFont, text, FALLBACK_FONT, SIZE, "")
   end
+  if not bank then
+    reading = { path = DIR .. string.format("f%04d.ttf", BANK - 1), waited = 0, probe = true }
+    return Attempt()
+  end
   -- Kept across /reload, when the names already read stay cached. A new run of the game has them
-  -- all fresh. ponytail: a name cached by another account in the same run reads old, and costs
-  -- one slot; on a run past the whole bank (11 hours) every read is old. Count per run of the game if that happens.
-  local index = ns.db.signalPos or 0
-  ns.db.signalPos = (index + 1) % BANK
-  reading = { path = DIR .. string.format("f%04d.ttf", index), waited = 0, sinceTry = 0 }
+  -- all fresh. ponytail: a name cached by another account in the same run reads old, and what the
+  -- app wrote since comes at the next read; on a run past the whole bank every read is old. Count
+  -- per run of the game if that happens.
+  local index = (ns.db.signalPos or 0) % bank
+  ns.db.signalPos = (index + 1) % bank
+  reading = { path = DIR .. string.format("f%04d.ttf", index), waited = 0 }
   Attempt()
 end
 
@@ -229,19 +296,15 @@ frame:SetScript("OnEvent", function()
 end)
 frame:SetScript("OnUpdate", function(_, elapsed)
   if not started or (ns.signal ~= "waiting" and ns.signal ~= "reading") then return end
-  if InCombatLockdown() then return end -- read right after: loading a slot in combat was never tried
   if reading then
     reading.waited = reading.waited + elapsed
-    reading.sinceTry = reading.sinceTry + elapsed
-    if reading.sinceTry >= RETRY then
-      reading.sinceTry = 0
-      Attempt()
-    end
+    Attempt()
     if reading and reading.waited > GIVE_UP then Failed() end
     return
   end
   acc = acc + elapsed
-  if acc >= POLL then
+  local ok, _, kind = pcall(GetInstanceInfo)
+  if acc >= (ns.pieces and POLL_PIECES or ok and (kind == "party" or kind == "raid") and POLL_INSIDE or POLL) then
     acc = 0
     BeginRead()
   end

@@ -51,6 +51,15 @@ export function writeSettings(file: string, settings: Settings): void {
   }
 }
 
+/** Whether the addon in a game folder takes its news from the fonts alone ("X-Channel: 2" in its .toc); one from before it wants the slots too. */
+export function addonHearsFonts(gameFolder: string): boolean {
+  try {
+    return /^##\s*X-Channel:\s*2\s*$/m.test(readFileSync(join(gameFolder, ...ADDONS, 'TwinmapForever', 'TwinmapForever.toc'), 'utf8'))
+  } catch {
+    return false
+  }
+}
+
 /** The version of the Twinmap Forever addon in a game folder, as its .toc says; null when it is not there. */
 export function addonVersion(gameFolder: string): string | null {
   try {

@@ -19,8 +19,8 @@ import { startLink } from './link'
 import { startLog } from './log'
 import type { Answer, Asked } from './questie-worker'
 import startQuestieWorker from './questie-worker?nodeWorker'
-import { addonsFolder, readSettings, setupStatus, writeSettings } from './setup'
-import { installChannel, send as sendSignal, sentParts } from './signal'
+import { addonHearsFonts, addonsFolder, readSettings, setupStatus, writeSettings } from './setup'
+import { hear, installChannel, send as sendSignal, sendOld, sentParts } from './signal'
 import { servedFile } from './tiles'
 import startTilesWorker from './tiles-worker?nodeWorker'
 import { updateFirst } from './update'
@@ -124,11 +124,17 @@ function startWalks(gameFolder: string | null): { find: (ask: WalkAsk) => Promis
 // The app's record of what happened to it, for the player to copy into a report.
 const record = startLog(join(app.getPath('userData'), 'twinmap.log'))
 // Every send to the game goes in the record: its number, the parts it changes by kind (the name of
-// a mark holds its place, which the record does not keep), and whether it rode the font or needs a slot.
-const send: typeof sendSignal = (addons, changed) => {
-  const sent = sendSignal(addons, changed)
+// a mark holds its place, which the record does not keep), and how it goes: in how many fonts, or,
+// to an addon from before the fonts carried everything, in the font or in a slot.
+const send = (addons: string, changed: Record<string, unknown>, fonts: boolean): { seq: number } => {
   const kinds = [...new Set(Object.keys(changed).map((part) => /^[a-z]*/i.exec(part)![0]))].join(' ')
-  record.say(`sent ${sent.seq}: ${kinds}, ${sent.bytes} bytes, ${sent.inFont ? 'in the font' : 'in a slot'}`)
+  if (fonts) {
+    const sent = sendSignal(addons, changed)
+    record.say(`sent ${sent.seq}: ${kinds}, ${sent.bytes} bytes, in ${sent.pieces === 1 ? 'the font' : `${sent.pieces} fonts`}`)
+    return sent
+  }
+  const sent = sendOld(addons, changed)
+  record.say(`sent ${sent.seq}: ${kinds}, ${sent.bytes} bytes, ${sent.inFont ? 'in the font' : 'in a slot'}, to an older addon`)
   return sent
 }
 
@@ -350,7 +356,7 @@ function createWindow(): void {
       const changed: Record<string, unknown> | null = marksNews(marksAsked, have)
       if (!changed) return
       if (JSON.stringify(have.taken ?? []) !== JSON.stringify(takenAsked)) changed.taken = takenAsked.length > 0 ? takenAsked : false
-      if (Object.keys(changed).length > 0) send(addons, changed)
+      if (Object.keys(changed).length > 0) send(addons, changed, addonHearsFonts(gameFolder))
     } catch {
       // the way to the game is not there yet: they go once it is
     }
@@ -363,7 +369,7 @@ function createWindow(): void {
     // app, which is the newest the addon can be: an older addon says so in the game's chat.
     // Small enough to ride the font.
     channel = installChannel(addons)
-      .then(() => void send(addons, { sync: Date.now(), latest: app.getVersion() }))
+      .then(() => void send(addons, { sync: Date.now(), latest: app.getVersion() }, addonHearsFonts(gameFolder!)))
       .then(() => (marksTimer ??= setTimeout(sendMarks, MARKS_WAIT)))
       .catch(() => {})
   }
@@ -374,7 +380,7 @@ function createWindow(): void {
   const sendParts = (parts: Record<string, unknown> | null): Sent => {
     if (!parts || !gameFolder) return { error: 'There is nothing to send.' }
     try {
-      return { seq: send(addonsFolder(gameFolder), parts).seq }
+      return { seq: send(addonsFolder(gameFolder), parts, addonHearsFonts(gameFolder)).seq }
     } catch {
       return { error: 'Twinmap could not write next to the addon in the game folder.' }
     }
@@ -435,8 +441,19 @@ function createWindow(): void {
   })
   turnLan(settings.lan === true)
   let lanTick = false
+  let heardLast = ''
   const show = setInterval(() => {
     const snapshot = link.snapshot()
+    // What the addon says it has of the sends: the font is written again when it needs something else.
+    const inbox = inboxFrom(snapshot.state.sections.inbox), heardNow = JSON.stringify(inbox)
+    if (gameFolder && inbox?.id !== undefined && heardNow !== heardLast) {
+      heardLast = heardNow
+      try {
+        hear(addonsFolder(gameFolder), { id: inbox.id, seq: inbox.seq, ...(inbox.got ? { got: inbox.got } : {}) })
+      } catch {
+        // the folder cannot be written now: at the next change
+      }
+    }
     quests.show(snapshot.state.sections.questie, snapshot.state.sections.quests)
     win.webContents.send('link', snapshot)
     win.webContents.send('tiles', tiles.status())

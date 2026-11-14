@@ -6,6 +6,7 @@
   // renamed by writing over its name, and Remove takes it away.
   import type { Point } from '../../shared/geo'
   import { labelPlace, type Size } from '../../shared/point-label'
+  import { arrived, type Inbox } from '../../shared/send'
   import { fade, scale } from 'svelte/transition'
   import Glyph from './Glyph.svelte'
   import { gone, pop } from './motion'
@@ -18,7 +19,7 @@
     spot, // the point, in pixels of the map's box
     box, // the map's box
     sending, // whether the point can be sent to the game now, and why not
-    acked, // the number of the last send the game has, as the addon tells it
+    acked, // what the addon tells of the sends it has
     onsend, // sends the point: gives back the number of the send, or what went wrong
     following = false, // the game's arrow follows this very point
     onunfollow, // asks the game to let it go: answers as onsend does
@@ -37,7 +38,7 @@
     spot: Point
     box: Size
     sending: { can: boolean; why: string }
-    acked: number | undefined
+    acked: Inbox | null
     onsend: () => Promise<{ seq: number } | { error: string }>
     following?: boolean
     onunfollow?: () => Promise<{ seq: number } | { error: string }>
@@ -66,7 +67,7 @@
     } else awaited = answer.seq
   }
   $effect(() => {
-    if (phase === 'sending' && awaited !== null && acked === awaited) phase = 'sent'
+    if (phase === 'sending' && awaited !== null && arrived(acked, awaited)) phase = 'sent'
   })
   $effect(() => {
     if (phase === 'rest') return

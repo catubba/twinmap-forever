@@ -1104,7 +1104,7 @@
       spot={labelled.spot}
       box={labelled.box}
       sending={sendState(live, inbox, !!labelled.pin)}
-      acked={inbox?.seq}
+      acked={inbox}
       onsend={() => (labelled?.pin ? window.twinmap.sendPin({ ...labelled.pin, name: pointName }) : Promise.resolve({ error: 'There is nothing to send.' }))}
       following={!!labelled.pin && markPart(labelled.pin) === followedPart}
       onunfollow={() => window.twinmap.sendUnfollow()}

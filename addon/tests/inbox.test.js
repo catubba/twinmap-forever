@@ -1,5 +1,5 @@
-// The way back, end to end: the app's own code writes the fonts and the slots into a folder, and the
-// addon reads them in the stand-in client.
+// The way back, end to end: the app's own code writes the fonts into a folder, and the addon reads
+// them in the stand-in client.
 const { test, before, after } = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
@@ -23,12 +23,27 @@ after(() => fs.rmSync(addons, { recursive: true, force: true }));
 
 // A new run of the game on that folder, with nothing sent yet as far as app and addon know, and the
 // addon in the world with one receiver per part named: what each was told, in order, is in GOT.
+// The addon of the test under way: before each send, and four times a second while the game runs,
+// the app hears what it says it has, as it does off the strip.
+let playing;
+const hearNow = () => {
+  const [id, seq, got, piece] = (playing.lua('local ns = ...; local i = ns.db.inbox; return (i.id or "") .. " " .. i.seq .. " " .. (ns.pieces and ns.pieces.seq .. " " .. ns.pieces.i or "")') || '').split(' ');
+  if (id) app.hear(addons, { id, seq: Number(seq), ...(got ? { got: [Number(got), Number(piece)] } : {}) });
+};
+const send = (changed) => (hearNow(), app.send(addons, changed));
+
 function world(...parts) {
   const outbox = path.join(addons, SIGNAL, 'outbox.json');
-  const seq = fs.existsSync(outbox) ? JSON.parse(fs.readFileSync(outbox, 'utf8')).seq : 0;
-  fs.writeFileSync(outbox, JSON.stringify({ seq, parts: {} }));
+  const was = fs.existsSync(outbox) ? JSON.parse(fs.readFileSync(outbox, 'utf8')) : { seq: 0 };
+  const seq = was.seq;
+  fs.writeFileSync(outbox, JSON.stringify({ seq, parts: {}, id: 'test', mark: was.mark ?? seq, floor: seq, at: {}, gone: {} }));
   const addon = loadAddon(DIR, { addons });
-  addon.lua(`TwinmapForeverDB.inbox = { seq = ${seq}, parts = {} }`);
+  playing = addon;
+  addon.lua(`TwinmapForeverDB.inbox = { id = "test", seq = ${seq}, parts = {} }`);
+  const run = addon.run;
+  addon.run = (seconds) => {
+    for (let left = seconds; left > 0; left -= 0.25) (run(Math.min(left, 0.25)), hearNow());
+  };
   const enter = () => {
     addon.lua(`local ns = ...; GOT = GOT or {}
       for name in ("${parts.join(' ')}"):gmatch("%S+") do ns.receivers[name] = function(v) GOT[#GOT + 1] = name .. "=" .. tostring(type(v) == "table" and v.name or v) end end`);
@@ -39,13 +54,15 @@ function world(...parts) {
   const got = () => (addon.lua('local out = table.concat(GOT, " "); GOT = {}; return out') || '').split(' ').filter(Boolean);
   return { addon, enter, got };
 }
+// What the strip told the app of the inbox, oldest first.
+const told = (addon) => addon.strips().map(decodeStrip).filter((b) => b.section === 'inbox').map((b) => JSON.parse(b.text));
 const part = (addon, code) => addon.lua(`local parts = (...).db.inbox.parts; return ${code}`);
 
 test('small news arrives in the font within seconds, once, and spends no slot', () => {
   const { addon, got } = world('pin');
   addon.run(12);
   assert.deepEqual(got(), ['pin=nil'], 'told at login what there is: nothing');
-  assert.equal(app.send(addons, { pin: { name: 'Inn', m: 1429, x: 43.7, y: 65.8 } }).inFont, true);
+  assert.equal(send({ pin: { name: 'Inn', m: 1429, x: 43.7, y: 65.8 } }).pieces, 1);
   addon.run(7);
   assert.deepEqual(got(), ['pin=Inn']);
   assert.equal(part(addon, 'parts.pin.x + parts.pin.m'), '1472.7');
@@ -61,10 +78,10 @@ test('a newer version told by the app is said in chat once, and spends no slot',
   const { addon } = world('pin');
   addon.lua('(...).VERSION = "0.9.5"');
   addon.run(12);
-  assert.equal(app.send(addons, { sync: 1, latest: '0.10.0' }).inFont, true);
+  assert.equal(send({ sync: 1, latest: '0.10.0' }).pieces, 1);
   addon.run(7);
   assert.deepEqual(notices(addon), ['Twinmap Forever: a newer version (0.10.0) is available on CurseForge. You are using 0.9.5.']);
-  app.send(addons, { sync: 2, latest: '0.10.1' });
+  send({ sync: 2, latest: '0.10.1' });
   addon.run(7);
   assert.equal(notices(addon).length, 1, 'said twice in one session');
   assert.equal(addon.slots(), 0);
@@ -75,7 +92,7 @@ test('the same version, an older one, or anything that is not a version says not
   addon.lua('(...).VERSION = "0.9.5"');
   addon.run(12);
   for (const latest of ['0.9.5', '0.9.4', '0.0.0', '0.10', '1.0.0 |cffff0000now', 7]) {
-    app.send(addons, { latest });
+    send({ latest });
     addon.run(7);
   }
   assert.deepEqual(notices(addon), []);
@@ -89,7 +106,7 @@ test('every number of the channel is read right where the interface is scaled, a
     addon.lua(`GAME.fontPx = ${px}`);
     addon.run(6);
     for (let i = 0; i < 61; i++) {
-      const { seq } = app.send(addons, { pin: { name: 'Inn', m: 1429, x: i, y: 1 } });
+      const { seq } = send({ pin: { name: 'Inn', m: 1429, x: i, y: 1 } });
       addon.run(6);
       assert.equal(addon.lua('return (...).db.inbox.seq'), String(seq), `send ${seq} at ${px} pixels`);
       addon.run(12);
@@ -98,95 +115,110 @@ test('every number of the channel is read right where the interface is scaled, a
   }
 });
 
-test('in combat nothing is read; it arrives right after', () => {
+test('in a fight the fonts are read all the same, and the strip tells the app what arrived', () => {
   const { addon, got } = world('pin');
+  addon.lua('(...).db.mode = "fast"');
   addon.run(6);
   got();
   addon.lua('GAME.combat = true');
-  app.send(addons, { pin: { name: 'After' } });
-  addon.run(12);
-  assert.deepEqual(got(), []);
-  addon.lua('GAME.combat = false');
+  const { seq } = send({ pin: { name: 'Now' } });
   addon.run(7);
-  assert.deepEqual(got(), ['pin=After']);
+  assert.deepEqual(got(), ['pin=Now']);
+  assert.equal(told(addon).at(-1).seq, seq);
   assert.equal(addon.slots(), 0);
 });
 
-test('news too big for a font comes through a slot, whole', () => {
-  const { addon, got } = world('route');
+test('news too big for a font comes in pieces, a font each, whole; a /reload between two pieces starts them over', () => {
+  const { addon, enter, got } = world('route');
   addon.run(6);
   got();
-  const stops = Array.from({ length: 60 }, (_, i) => ({ m: 1429, x: i, y: i, label: 'Stop number ' + i }));
-  const sent = app.send(addons, { route: { name: 'Big', stops } });
-  assert.equal(sent.inFont, false);
-  assert.ok(sent.bytes > app.CAPACITY);
-  addon.run(7);
+  const stops = Array.from({ length: 60 }, (_, i) => ({ m: 1429, x: i, y: i, label: 'Stop number è ' + i }));
+  const sent = send({ route: { name: 'Big', stops } });
+  assert.ok(sent.pieces > 2 && sent.bytes > app.CAPACITY);
+  addon.run(6 + 1.5 * sent.pieces);
   assert.deepEqual(got(), ['route=Big']);
-  assert.equal(addon.slots(), 1);
-  assert.equal(part(addon, '#parts.route.stops .. parts.route.stops[60].label'), '60Stop number 59');
+  assert.equal(part(addon, '#parts.route.stops .. parts.route.stops[60].label'), '60Stop number è 59');
+
+  send({ route: { name: 'Bigger', stops } });
+  for (let i = 0; i < 40 && addon.lua('return (...).pieces and (...).pieces.i') !== '1'; i++) addon.run(0.25);
+  assert.equal(addon.lua('return (...).pieces.i'), '1', 'no piece came');
+  addon.reload();
+  enter();
+  got();
+  addon.run(8 + 1.5 * sent.pieces);
+  assert.deepEqual(got(), ['route=Bigger']);
+  assert.equal(addon.slots(), 0);
 });
 
-test('two sends before one read: the font has only the second, so a slot brings both', () => {
+test('two sends before one read: the font tells both', () => {
   const { addon, got } = world('pin', 'route');
   addon.run(6);
   got();
-  app.send(addons, { pin: { name: 'First' } });
-  app.send(addons, { route: { name: 'Second' } });
+  send({ pin: { name: 'First' } });
+  send({ route: { name: 'Second' } });
   addon.run(7);
   assert.deepEqual(got().sort(), ['pin=First', 'route=Second']);
-  assert.equal(addon.slots(), 1);
+  assert.equal(addon.slots(), 0);
 });
 
 test('taking a part away rides the font too, and the others stay', () => {
   const { addon, got } = world('pin', 'route');
   addon.run(6);
-  app.send(addons, { pin: { name: 'Here' } });
+  send({ pin: { name: 'Here' } });
   addon.run(6);
-  app.send(addons, { route: { name: 'Round' } });
+  send({ route: { name: 'Round' } });
   addon.run(6);
   got();
-  assert.equal(app.send(addons, { pin: false }).inFont, true);
+  assert.equal(send({ pin: false }).pieces, 1);
   addon.run(6);
   assert.deepEqual(got(), ['pin=nil']);
   assert.equal(part(addon, 'parts.route.name'), 'Round');
   assert.equal(addon.slots(), 0);
 });
 
-test('a font whose data does not add up (a read in the middle of a write) is no data: a slot has the news', () => {
+test('a font whose data does not add up (a read in the middle of a write) is no data: the next read has the news', () => {
   const { addon, got } = world('pin');
   addon.run(6);
   got();
-  app.send(addons, { pin: { name: 'Whole' } });
-  for (let b = 0; b < 8; b++) {
+  send({ pin: { name: 'Whole' } });
+  const whole = [];
+  for (let b = 0; b < app.BANK / 1023; b++) {
     const file = path.join(addons, SIGNAL, app.nameOf(b * 1023));
     const font = fs.readFileSync(file), at = app.hmtx(font)[0] + 16 + 4 * 10; // one data letter, far off
+    whole.push([file, Buffer.from(font)]);
     font.writeUInt16BE(font.readUInt16BE(at) ^ 0x800, at);
     const fd = fs.openSync(file, 'r+');
     fs.writeSync(fd, font);
     fs.closeSync(fd);
   }
   addon.run(7);
+  assert.deepEqual(got(), []);
+  for (const [file, font] of whole) {
+    const fd = fs.openSync(file, 'r+');
+    fs.writeSync(fd, font);
+    fs.closeSync(fd);
+  }
+  addon.run(7);
   assert.deepEqual(got(), ['pin=Whole']);
-  assert.equal(addon.slots(), 1);
+  assert.equal(addon.slots(), 0);
 });
 
-test('text stays text whatever it holds, in a slot and in a font', () => {
+test('text stays text whatever it holds, in one font and in pieces', () => {
   const { addon } = world();
   const name = 'a"} os.exit() --\\ |n \n è]]';
-  app.send(addons, { pin: { name }, big: 'x'.repeat(1100) });
-  addon.run(7);
-  assert.equal(addon.slots(), 1);
+  send({ pin: { name }, big: 'x'.repeat(1100) });
+  addon.run(10);
   assert.equal(part(addon, 'parts.pin.name'), name);
   assert.equal(part(addon, '#parts.big'), '1100');
-  assert.equal(app.send(addons, { pin: { name: name + '!' } }).inFont, true);
+  assert.equal(send({ pin: { name: name + '!' } }).pieces, 1);
   addon.run(7);
-  assert.equal(addon.slots(), 1);
+  assert.equal(addon.slots(), 0);
   assert.equal(part(addon, 'parts.pin.name'), name + '!');
 });
 
 test('after a /reload the news is still there, reading goes on from the next name and no slot is spent', () => {
   const { addon, enter, got } = world('pin');
-  app.send(addons, { pin: { name: 'Kept' } });
+  send({ pin: { name: 'Kept' } });
   addon.run(7);
   got();
   const at = Number(addon.lua('return (...).db.signalPos'));
@@ -199,44 +231,64 @@ test('after a /reload the news is still there, reading goes on from the next nam
   assert.equal(addon.slots(), 0);
 });
 
-test('when the slots are used up it says so once, and a /reload brings what was missed', () => {
-  const { addon, enter, got } = world('big');
+test('forty sends too big for a font arrive in one session of the interface, and no /reload is asked', () => {
+  const { addon, got } = world('big');
   addon.run(6);
-  for (let i = 1; i <= 31; i++) {
-    app.send(addons, { big: { name: 'n' + i, fill: 'x'.repeat(1100) } });
-    addon.run(6);
+  for (let i = 1; i <= 40; i++) {
+    send({ big: { name: 'n' + i, fill: 'x'.repeat(1100) } });
+    addon.run(8);
+    assert.equal(got().at(-1), 'big=n' + i);
   }
-  assert.equal(addon.slots(), 30);
-  assert.equal(got().at(-1), 'big=n30');
-  assert.equal(addon.printed(), 'Twinmap Forever: type /reload to go on receiving from Twinmap.');
-  addon.run(30);
-  assert.equal(addon.printed().split('\n').length, 1, 'said more than once');
-  addon.reload();
-  enter();
-  addon.run(7);
-  assert.equal(got().at(-1), 'big=n31');
-  assert.equal(addon.slots(), 1);
+  assert.equal(addon.slots(), 0);
+  assert.equal(addon.printed(), '');
 });
 
-test('slots that cannot be loaded: it says so, and the news comes once they can', () => {
-  const { addon, enter, got } = world('pin');
-  addon.run(6);
-  got();
-  addon.lua('GAME.slotsOff = true');
-  app.send(addons, { pin: { name: 'One' } });
-  app.send(addons, { pin: { name: 'Two' } });
-  addon.run(12);
-  assert.deepEqual(got(), []);
-  assert.match(addon.printed(), /cannot be loaded/);
-  addon.lua('GAME.slotsOff = nil');
-  addon.reload();
-  enter();
+test('an addon that followed another history of sends is told everything, and what it held that is no longer sent is taken away', () => {
+  const { addon, got } = world('pin', 'route');
+  send({ route: { name: 'Kept' } });
   addon.run(7);
-  assert.deepEqual(got(), ['pin=nil', 'pin=Two']);
+  addon.lua('local db = (...).db; db.inbox = { id = "another", seq = db.inbox.seq + 5, parts = { pin = { name = "Old" } } }');
+  got();
+  addon.run(7);
+  assert.deepEqual(got().sort(), ['pin=nil', 'route=Kept']);
+  assert.equal(part(addon, 'tostring(parts.pin) .. parts.route.name'), 'nilKept');
+});
+
+test('inside a dungeon the fonts are read every second and a half, outside every five', () => {
+  const { addon } = world();
+  const reads = (seconds) => {
+    const at = Number(addon.lua('return (...).db.signalPos'));
+    addon.run(seconds);
+    return Number(addon.lua('return (...).db.signalPos')) - at;
+  };
+  const between = (n, least, most) => assert.ok(n >= least && n <= most, `${n} reads`);
+  addon.run(6);
+  between(reads(30), 5, 6);
+  addon.lua('GAME.instance = { name = "The Stockade", kind = "party", id = 34 }');
+  between(reads(30), 18, 20);
+  addon.lua('GAME.instance = { name = "Warsong Gulch", kind = "pvp", id = 489 }');
+  between(reads(30), 5, 6);
+});
+
+test('a game started before the app made the names past the first 8184 reads only those, round and round', () => {
+  const last = path.join(addons, SIGNAL, app.nameOf(app.BANK - 1));
+  fs.unlinkSync(last);
+  try {
+    const { addon } = world();
+    addon.lua('(...).db.signalPos = 8183');
+    addon.run(20);
+    assert.equal(addon.ns('signal'), 'reading');
+    assert.ok(Number(addon.lua('return (...).db.signalPos')) < 10, 'read past the names it has');
+  } finally {
+    fs.linkSync(path.join(addons, SIGNAL, app.nameOf(app.BANK - 1023)), last);
+  }
+  const { addon } = world();
+  addon.lua('(...).db.signalPos = 8183');
+  addon.run(20);
+  assert.ok(Number(addon.lua('return (...).db.signalPos')) > 8183);
 });
 
 // Send to game, whole: the arrow of ours follows the pin the app sends, and the strip tells the app it arrived.
-const told = (addon) => addon.strips().map(decodeStrip).filter((b) => b.section === 'inbox').map((b) => JSON.parse(b.text));
 // The point the arrow follows: its map and its place on it, 0 to 1. The game's own map pin is never set.
 const waypoint = (addon) => {
   assert.equal(addon.lua('return WAYPOINT ~= nil or TRACKED ~= nil'), 'false', 'the game\'s own pin is left alone');
@@ -250,24 +302,24 @@ test('a pin sent from the app is followed by the arrow, and the strip says which
   const before = told(addon).at(-1);
   assert.equal(before.left, 30);
   assert.equal(before.off, undefined);
-  const { seq } = app.send(addons, { pin: { m: 1429, x: 43.71, y: 65.8, name: 'Lion\'s Pride Inn', t: 1001 } });
-  assert.equal(seq, before.seq % 60 + 1);
+  const { seq } = send({ pin: { m: 1429, x: 43.71, y: 65.8, name: 'Lion\'s Pride Inn', t: 1001 } });
+  assert.equal(seq, before.seq + 1);
   addon.run(8);
   assert.equal(waypoint(addon), '1429 0.4371 0.658 true');
   assert.equal(addon.printed(), 'Twinmap Forever: Lion\'s Pride Inn is followed: the arrow points to it.');
-  assert.deepEqual(told(addon).at(-1), { seq, left: 30 });
+  assert.deepEqual(told(addon).at(-1), { id: 'test', seq, left: 30 });
 });
 
 test('a pin the player let go does not come back at the next login, and a new one does', () => {
   const { addon, enter } = world();
-  app.send(addons, { pin: { m: 1429, x: 10, y: 20, name: 'Old', t: 1 } });
+  send({ pin: { m: 1429, x: 10, y: 20, name: 'Old', t: 1 } });
   addon.run(7);
   addon.lua('(...).Forget()');
   addon.reload();
   enter();
   addon.run(7);
   assert.equal(waypoint(addon), null);
-  app.send(addons, { pin: { m: 1429, x: 30, y: 40, name: 'New', t: 2 } });
+  send({ pin: { m: 1429, x: 30, y: 40, name: 'New', t: 2 } });
   addon.run(7);
   assert.equal(waypoint(addon), '1429 0.3 0.4 true');
 });
@@ -275,12 +327,12 @@ test('a pin the player let go does not come back at the next login, and a new on
 test('a point on a map the game tells no place of is followed with no direction; a pin that is not one is left alone', () => {
   const { addon } = world();
   addon.lua('GAME.noWorld, GAME.north, GAME.west = 1455, 0, 0');
-  app.send(addons, { pin: { m: 1455, x: 50, y: 50, name: 'The Great Forge', t: 3 } });
+  send({ pin: { m: 1455, x: 50, y: 50, name: 'The Great Forge', t: 3 } });
   addon.run(7);
   assert.equal(waypoint(addon), '1455 0.5 0.5 true');
   assert.equal(addon.arrow(), 'The Great Forge | no direction from here | no tip');
   addon.lua('(...).Forget()');
-  app.send(addons, { pin: { m: 1429, x: 500, y: 'north', t: 4 } });
+  send({ pin: { m: 1429, x: 500, y: 'north', t: 4 } });
   addon.run(7);
   assert.equal(waypoint(addon), null);
 });
@@ -295,7 +347,7 @@ const threeStops = (t) => ({ t, at: 1, stops: [
 function onRoute(t) {
   const { addon, enter } = world();
   addon.lua('(...).db.mode = "fast"; GAME.map, GAME.x, GAME.y = 1432, 0.30, 0.50');
-  app.send(addons, { route: threeStops(t) });
+  send({ route: threeStops(t) });
   addon.run(8);
   return { addon, enter };
 }
@@ -324,12 +376,12 @@ test('a stop is skipped from the game and from the app, only forwards', () => {
   addon.slash('/twinmap skip');
   addon.run(2);
   assert.deepEqual(onStrip(addon), { t: 12, at: 2, of: 3 });
-  app.send(addons, { step: { t: 12, at: 3 } });
+  send({ step: { t: 12, at: 3 } });
   addon.run(8);
   assert.equal(waypoint(addon), '1429 0.2 0.2 true');
   assert.deepEqual(onStrip(addon), { t: 12, at: 3, of: 3 });
-  app.send(addons, { step: { t: 12, at: 1 } });
-  app.send(addons, { step: { t: 99, at: 3 } });
+  send({ step: { t: 12, at: 1 } });
+  send({ step: { t: 99, at: 3 } });
   addon.run(8);
   assert.deepEqual(onStrip(addon), { t: 12, at: 3, of: 3 }, 'went back, or took a step of another route');
 });
@@ -356,16 +408,16 @@ test('a /reload keeps the place on the route, a new route starts where the app s
   addon.run(8);
   assert.deepEqual(onStrip(addon), { t: 14, at: 2, of: 3 });
   assert.equal(waypoint(addon), '1432 0.6 0.5 true');
-  app.send(addons, { route: { ...threeStops(15), at: 3 } });
+  send({ route: { ...threeStops(15), at: 3 } });
   addon.run(8);
   assert.deepEqual(onStrip(addon), { t: 15, at: 3, of: 3 });
-  app.send(addons, { route: false });
+  send({ route: false });
   addon.run(8);
   assert.equal(waypoint(addon), null);
   addon.slash('/twinmap skip');
   assert.equal(addon.printed().split('\n').at(-1), 'Twinmap Forever: no route to skip on.');
   // A route that is not one is no route.
-  app.send(addons, { route: { t: 16, stops: [{ m: 1432, x: 'east' }] } });
+  send({ route: { t: 16, stops: [{ m: 1432, x: 'east' }] } });
   addon.run(8);
   assert.equal(waypoint(addon), null);
 });
@@ -379,7 +431,7 @@ test('an app just opened asks for everything, and has it within seconds though n
   addon.run(8);
   assert.deepEqual(sections(mark), ['pos'], 'unchanged sections went out again unasked');
   mark = addon.strips().length;
-  assert.equal(app.send(addons, { sync: 1731350000000 }).inFont, true);
+  assert.equal(send({ sync: 1731350000000 }).pieces, 1);
   addon.run(8);
   assert.deepEqual(sections(mark), ['char', 'inbox', 'pos']);
   assert.equal(addon.slots(), 0);
@@ -389,20 +441,21 @@ test('an app just opened asks for everything, and has it within seconds though n
   assert.equal(addon.lua('return string.format("%.0f", (...).db.syncSeen)'), '1731350000000');
 });
 
-test('the strip tells the app why nothing can arrive, and how many slots are left', () => {
+test('the strip tells the app how far a send in pieces has come, and why nothing can arrive', () => {
   const { addon } = world();
   addon.lua('(...).db.mode = "fast"');
   addon.run(6);
-  app.send(addons, { big: 'x'.repeat(1100) });
-  addon.run(8);
-  assert.equal(told(addon).at(-1).left, 29);
+  const { seq } = send({ big: 'x'.repeat(2500) });
+  addon.run(12);
+  assert.deepEqual(told(addon).filter((t) => t.got).map((t) => t.got), [[seq, 1], [seq, 2]]);
+  assert.deepEqual(told(addon).at(-1), { id: 'test', seq, left: 30 });
   const bare = loadAddon(DIR);
   bare.fire('PLAYER_LOGIN');
   bare.lua('(...).db.mode = "fast"');
   bare.fire('PLAYER_ENTERING_WORLD');
   bare.run(20);
   assert.deepEqual(told(bare), [], 'said before it knew');
-  bare.run(20);
+  bare.run(30);
   assert.deepEqual(told(bare).at(-1), { seq: 0, left: 30, off: 'fonts not readable' });
 });
 
@@ -437,13 +490,13 @@ test('the pins saved in the app are flags on the game\'s map, each on its point;
   addon.lua('GAME.mapOpen, GAME.shown = true, 1429');
   addon.run(8);
   assert.equal(addon.flags(), '');
-  const sent = app.send(addons, { mark1429x4371y6580: INN, mark1429x1000y2000: MINE, mark1433x5000y5000: { m: 1433, x: 50, y: 50, name: 'Elsewhere' } });
-  assert.equal(sent.inFont, true);
+  const sent = send({ mark1429x4371y6580: INN, mark1429x1000y2000: MINE, mark1433x5000y5000: { m: 1433, x: 50, y: 50, name: 'Elsewhere' } });
+  assert.equal(sent.pieces, 1);
   addon.run(8);
   assert.equal(addon.flags(), 'Inn 437 395; Mine 100 120', 'on a canvas 1000 by 600; the one of another map is not on this one');
   assert.equal(part(addon, 'parts.pin'), null, 'the game\'s own pin is not touched');
 
-  app.send(addons, { mark1429x1000y2000: false });
+  send({ mark1429x1000y2000: false });
   addon.run(8);
   assert.equal(addon.flags(), 'Inn 437 395');
 
@@ -451,7 +504,7 @@ test('the pins saved in the app are flags on the game\'s map, each on its point;
   enter();
   assert.equal(addon.flags(), 'Inn 437 395');
   addon.lua('GAME.mapOpen = false');
-  app.send(addons, { mark1429x1000y2000: MINE });
+  send({ mark1429x1000y2000: MINE });
   addon.run(8);
   assert.equal(addon.flags(), '', 'with the map closed nothing is drawn');
 });
@@ -459,7 +512,7 @@ test('the pins saved in the app are flags on the game\'s map, each on its point;
 test('Alt and a right click removes a flag: the strip tells the app, until the app takes the pin away itself', () => {
   const { addon } = world();
   addon.lua('(...).db.mode = "fast"; GAME.mapOpen, GAME.shown = true, 1429');
-  app.send(addons, { mark1429x4371y6580: INN, mark1429x1000y2000: MINE });
+  send({ mark1429x4371y6580: INN, mark1429x1000y2000: MINE });
   addon.run(8);
   assert.deepEqual(marksTold(addon), { gone: [], new: [] });
 
@@ -479,27 +532,26 @@ test('Alt and a right click removes a flag: the strip tells the app, until the a
   addon.fire('PLAYER_ENTERING_WORLD');
   assert.equal(addon.flags(), 'Mine 100 120', 'removed stays removed while the app has not heard');
 
-  app.send(addons, { mark1429x4371y6580: false });
+  send({ mark1429x4371y6580: false });
   addon.run(8);
   assert.deepEqual(marksTold(addon), { gone: [], new: [] });
-  app.send(addons, { mark1429x4371y6580: INN });
+  send({ mark1429x4371y6580: INN });
   addon.run(8);
   assert.equal(addon.flags(), 'Inn 437 395; Mine 100 120', 'saved again in the app, it is back');
 });
 
-test('more pins than a font holds come by a slot, and one taken away in a send that was missed goes all the same', () => {
+test('more pins than a font holds come in pieces, and one taken away in a send that was missed goes all the same', () => {
   const { addon } = world();
   addon.lua('GAME.mapOpen, GAME.shown = true, 1429');
   const many = Object.fromEntries(Array.from({ length: 40 }, (_, i) => [`mark1429x${1000 + i * 100}y5000`, { m: 1429, x: 10 + i, y: 50, name: `Pin number ${String(i).padStart(2, '0')}` }]));
-  assert.equal(app.send(addons, many).inFont, false);
-  addon.run(8);
+  assert.ok(send(many).pieces > 1);
+  addon.run(14);
   assert.equal(addon.flags().split('; ').length, 40);
-  assert.equal(addon.slots(), 1);
 
-  app.send(addons, { mark1429x1000y5000: false });
-  app.send(addons, { mark1429x1100y5000: false });
+  send({ mark1429x1000y5000: false });
+  send({ mark1429x1100y5000: false });
   addon.run(8);
-  assert.equal(addon.slots(), 2);
+  assert.equal(addon.slots(), 0);
   assert.equal(addon.flags().split('; ').length, 38);
   assert.ok(!addon.flags().includes('Pin number 00') && !addon.flags().includes('Pin number 01'));
 });
@@ -530,7 +582,7 @@ test('Alt and a click on the game\'s map sets a flag there: the strip tells the 
   addon.flagClick('Elwynn Forest 60.0, 10.0', 'RightButton');
   assert.equal(addon.flags(), 'Elwynn Forest 25.0, 50.0 250 300');
 
-  app.send(addons, { mark1429x2500y5000: { m: 1429, x: 25, y: 50, name: 'Elwynn Forest 25.0, 50.0' }, taken: ['1429x2500y5000'] });
+  send({ mark1429x2500y5000: { m: 1429, x: 25, y: 50, name: 'Elwynn Forest 25.0, 50.0' }, taken: ['1429x2500y5000'] });
   addon.lua('(...).db.mode = "fast"');
   addon.run(8);
   assert.equal(addon.flags(), 'Elwynn Forest 25.0, 50.0 250 300', 'one flag, not two');
@@ -552,7 +604,7 @@ test('the arrow turns to the point followed and tells how far; arriving ends it,
   const { addon, enter } = world();
   addon.lua('GAME.north, GAME.west, GAME.facing = 0, 0, 0'); // at the middle of Elwynn, facing north
   assert.equal(addon.arrow(), null);
-  app.send(addons, { pin: { m: 1429, x: 50, y: 25, name: 'North Gate', t: 21 } });
+  send({ pin: { m: 1429, x: 50, y: 25, name: 'North Gate', t: 21 } });
   addon.run(8);
   assert.equal(addon.arrow(), 'North Gate | 500 yd | 0 26', 'straight ahead: the tip is up');
   addon.lua('GAME.facing = math.pi / 2'); // now facing west: the point is to the right
@@ -576,7 +628,7 @@ test('the arrow turns to the point followed and tells how far; arriving ends it,
   addon.run(8);
   assert.equal(addon.arrow(), null, 'a point reached does not come back');
 
-  app.send(addons, { pin: { m: 1429, x: 50, y: 25, name: 'North Gate', t: 22 } });
+  send({ pin: { m: 1429, x: 50, y: 25, name: 'North Gate', t: 22 } });
   addon.lua('GAME.north = 0');
   addon.run(8);
   assert.equal(addon.arrow(), 'North Gate | 500 yd | 0 -26');
@@ -609,7 +661,7 @@ test('a click on a flag of the map has the arrow follow it, in gold; another cli
   const { addon } = world();
   addon.lua('GAME.mapOpen, GAME.shown, GAME.north, GAME.west, GAME.facing, GAME.miniRadius = true, 1429, 0, 0, 0, 200');
   addon.lua('Minimap = CreateFrame("Frame"); function Minimap:GetWidth() return 140 end; function Minimap:GetFrameLevel() return 1 end; function Minimap:GetZoom() return 0 end');
-  app.send(addons, { mark1429x4371y6580: INN, mark1429x1000y2000: MINE });
+  send({ mark1429x4371y6580: INN, mark1429x1000y2000: MINE });
   addon.run(8);
   assert.equal(addon.arrow(), null);
   // The inn is 316 yards south and 126 west: off a minimap that shows 200 yards around.
@@ -640,18 +692,18 @@ test('the strip tells the app which point is followed, and the app can ask to le
   addon.lua('(...).db.mode = "fast"; GAME.north, GAME.west, GAME.facing = 0, 0, 0');
   addon.run(8);
   assert.equal(followTold(), undefined, 'nothing was ever followed: nothing is told');
-  app.send(addons, { pin: { m: 1429, x: 50, y: 25, name: 'North Gate', t: 41 } });
+  send({ pin: { m: 1429, x: 50, y: 25, name: 'North Gate', t: 41 } });
   addon.run(8);
   assert.deepEqual(followTold(), { m: 1429, x: 50, y: 25, name: 'North Gate' });
 
-  app.send(addons, { unfollow: 7001 });
+  send({ unfollow: 7001 });
   addon.run(8);
   assert.equal(addon.arrow(), null);
   assert.equal(addon.printed().split('\n').at(-1), 'Twinmap Forever: North Gate is no longer followed.');
   assert.deepEqual(followTold(), [], 'told that there is none');
 
   // The same asking, told again at a login, lets go of nothing.
-  app.send(addons, { pin: { m: 1429, x: 50, y: 75, name: 'South Gate', t: 42 } });
+  send({ pin: { m: 1429, x: 50, y: 75, name: 'South Gate', t: 42 } });
   addon.run(8);
   addon.reload();
   enter();

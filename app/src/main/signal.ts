@@ -2,18 +2,22 @@
 // exist when the game starts, but its content can still change. So next to the addon there is a bank
 // of hard-linked font names, changed in place through a few base files; the addon reads one new name
 // every few seconds (Inbox.lua). The width of the letter A is a number: a new number means news.
-// Small news rides the same font, a byte in the width of each of its other letters. News that does
-// not fit, or that the addon missed, is in the slots: small addons the game loads on demand, fresh
-// from disk, and only SLOTS of them in one session of its interface.
+// The news rides the same font, a byte in the width of each of its other letters: what changed since
+// the send the addon says it has (on the strip), so a read that was missed loses nothing, and news
+// too big for one font goes in pieces, one font each. An addon older than this (no "X-Channel: 2"
+// in its .toc) is still told the old way: a font for the change alone, and for what does not fit or
+// was missed the slots, small addons the game loads on demand, only SLOTS of them in one session of
+// its interface. Nothing else writes the slots any more.
 // Slots adapted from wow-ai, Copyright (c) 2026 chelinho139, MIT License: full text in THIRD-PARTY-LICENSES.
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, renameSync, writeFileSync, writeSync } from 'node:fs'
 import { link } from 'node:fs/promises'
+import { randomBytes } from 'node:crypto'
 import { join } from 'node:path'
 
 const EM = 1000, A_BASE = 100, A_STEP = 50 // same as Inbox.lua
 const B_WIDTH = 1000, C_WIDTH = 500 // same as Inbox.lua
 const LINKS = 1023 // names one file can have on NTFS
-const BASES = 8
+const BASES = 20 // 8 until 0.4: an addon reads the names past them only in a game started after they were made
 export const BANK = BASES * LINKS // same as Inbox.lua
 const GLYPHS = 4 // .notdef, A, B, C; then the data letters
 const DATA_FIRST = 0xe000 // private use area: no rule of any script applies to these letters
@@ -24,7 +28,7 @@ const D_BASE = 100, D_STEP = 200
 /** The bytes of news one font carries: two letters say how wide 0 and 255 are, four carry length and sum. */
 export const CAPACITY = DATA_LETTERS - 6
 export const SLOTS = 30 // same as Inbox.lua
-const SEQ_MAX = 60 // only a change matters: small numbers stay close to the widths measured in the game
+const SEQ_MAX = 60 // the number in the letter A: only a change matters, and small numbers stay close to the widths measured in the game
 const SIGNAL = 'TwinmapForever_Signal' // a folder of its own: an update of the addon must not take the bank away
 
 const advanceOf = (n: number): number => A_BASE + A_STEP * n
@@ -161,20 +165,44 @@ function toLua(v: unknown): string {
   return 'nil'
 }
 
-/** Everything the game should have now, by part, and the number of the last send. */
+/** What the addon says it has, on the strip: the history it follows, the number of the last send, and how far a send in pieces has come. */
+export interface Heard {
+  id: string
+  seq: number
+  /** The send being taken in pieces, and the last piece held. */
+  got?: [seq: number, piece: number]
+}
+
+/**
+ * Everything the game should have now, by part, and the number of the last send. id: a name for
+ * this history of sends, so an addon that followed another one is told everything. at: the send
+ * that last changed each part; gone: the send that took each part away, kept until the addon has
+ * heard of it; floor: the oldest send the changes since can still be told for. heard: what the
+ * addon last said it has. mark: the number in the letter A, new at every write.
+ */
 interface Outbox {
   seq: number
   parts: Record<string, unknown>
+  id: string
+  mark: number
+  floor: number
+  at: Record<string, number>
+  gone: Record<string, number>
+  heard?: Heard
 }
 
 function readOutbox(addons: string): Outbox {
+  let read: Partial<Outbox> | null = null
   try {
-    const read = JSON.parse(readFileSync(outboxFile(addons), 'utf8')) as Partial<Outbox> | null
-    if (read && Number.isInteger(read.seq) && typeof read.parts === 'object' && read.parts) return { seq: read.seq!, parts: read.parts }
+    read = JSON.parse(readFileSync(outboxFile(addons), 'utf8')) as Partial<Outbox> | null
   } catch {
     // nothing was sent yet
   }
-  return { seq: 0, parts: {} }
+  const seq = read && Number.isInteger(read.seq) ? read.seq! : 0
+  const parts = read && typeof read.parts === 'object' && read.parts ? read.parts : {}
+  if (read && typeof read.id === 'string' && read.at && read.gone) return { mark: seq, floor: 0, ...read, seq, parts } as Outbox
+  // Written before the sends had a history: every part is as new as the last send, and nobody has heard of it.
+  return { seq, parts, id: randomBytes(4).toString('hex'), mark: seq, floor: seq, at: Object.fromEntries(Object.keys(parts).map((part) => [part, seq])), gone: {} }
 }
 
 /** The parts the game has, or will have once it reads: everything sent so far and not taken away. */
@@ -193,7 +221,7 @@ export async function installChannel(addons: string): Promise<boolean> {
   if (channelInstalled(addons)) return false
   const dir = join(addons, SIGNAL)
   mkdirSync(dir, { recursive: true })
-  const font = buildFont(readOutbox(addons).seq, dataAdvances())
+  const font = buildFont(readOutbox(addons).mark, dataAdvances())
   // A bank left half made is finished, never made again: a running game may already hold its names.
   for (let i = 0; i < BANK; i++) {
     const file = join(dir, nameOf(i))
@@ -219,22 +247,128 @@ export async function installChannel(addons: string): Promise<boolean> {
   return true
 }
 
+const nextMark = (mark: number): number => (mark % SEQ_MAX) + 1
+
+function change(box: Outbox, changed: Record<string, unknown>, seq: number): void {
+  for (const [part, value] of Object.entries(changed)) {
+    if (value === false) {
+      if (part in box.parts) box.gone[part] = seq
+      delete box.parts[part]
+      delete box.at[part]
+    } else {
+      box.parts[part] = value
+      box.at[part] = seq
+      delete box.gone[part]
+    }
+  }
+  box.seq = seq
+}
+
+// A send in pieces, kept as it was cut until the addon has all of it: news that changed meanwhile
+// waits, or a part that changes every second would start the pieces over for ever.
+interface Pieces {
+  seq: number
+  /** What the addon had when this was cut: it holds only on top of that. */
+  base: string
+  pieces: Buffer[]
+}
+const cut = new Map<string, Pieces>() // by AddOns folder
+const written = new Map<string, string>() // by AddOns folder: what the font says now
+
+const baseOf = (heard: Heard | undefined): string => (heard ? `${heard.id} ${heard.seq}` : '')
+const PIECE = CAPACITY - 48 // a piece, after its line of id, send, piece and pieces
+
+/** The text the addon needs to come from what it says it has to what it should have; null when it has it. */
+function newsFor(box: Outbox): string | null {
+  const heard = box.heard
+  const known = heard !== undefined && heard.id === box.id && heard.seq <= box.seq && heard.seq >= box.floor
+  if (!known) return JSON.stringify({ id: box.id, seq: box.seq, all: true, parts: box.parts })
+  if (heard.seq === box.seq) return null
+  const parts: Record<string, unknown> = {}
+  for (const [part, seq] of Object.entries(box.at)) if (seq > heard.seq) parts[part] = box.parts[part]
+  for (const [part, seq] of Object.entries(box.gone)) if (seq > heard.seq) parts[part] = false
+  return JSON.stringify({ id: box.id, seq: box.seq, from: heard.seq, parts })
+}
+
+/** Writes into the font what the addon needs next, if the font does not say it already. How many fonts the news takes; 0 when the addon has everything. */
+function pump(addons: string, box: Outbox): number {
+  let sending = cut.get(addons)
+  if (sending && (sending.base !== baseOf(box.heard) || sending.seq > box.seq)) cut.delete(addons), (sending = undefined)
+  if (!sending) {
+    const news = newsFor(box)
+    if (news === null) return 0
+    const bytes = Buffer.from(news)
+    if (bytes.length <= CAPACITY) {
+      if (written.get(addons) === news) return 1
+      box.mark = nextMark(box.mark)
+      atomicWrite(outboxFile(addons), JSON.stringify(box))
+      writeSignal(join(addons, SIGNAL), box.mark, bytes)
+      written.set(addons, news)
+      return 1
+    }
+    const pieces: Buffer[] = []
+    for (let at = 0; at < bytes.length; at += PIECE) pieces.push(bytes.subarray(at, at + PIECE))
+    sending = { seq: box.seq, base: baseOf(box.heard), pieces }
+    cut.set(addons, sending)
+  }
+  const got = box.heard?.got
+  const i = Math.min(got && got[0] === sending.seq ? got[1] + 1 : 1, sending.pieces.length)
+  const head = `#${box.id} ${sending.seq} ${i} ${sending.pieces.length}\n`
+  if (written.get(addons) === head) return sending.pieces.length
+  box.mark = nextMark(box.mark)
+  atomicWrite(outboxFile(addons), JSON.stringify(box))
+  writeSignal(join(addons, SIGNAL), box.mark, Buffer.concat([Buffer.from(head), sending.pieces[i - 1]!]))
+  written.set(addons, head)
+  return sending.pieces.length
+}
+
 /**
  * Sends news to the game. changed: the parts this send changes, by name; false for a part taken away.
- * The addon has it within a few seconds, out of combat. seq: the number of this send, which the
- * addon tells back once it has it. inFont: it went in the font and costs no slot (unless the addon
- * missed the send before it); bytes: how big the news was.
+ * The addon has it within a few seconds, in a fight too. seq: the number of this send; the addon
+ * tells back the number of the last send it has, this one or a later one. pieces: the fonts it
+ * takes, one read of the addon each; bytes: how big the news was.
  */
-export function send(addons: string, changed: Record<string, unknown>): { seq: number; inFont: boolean; bytes: number } {
+export function send(addons: string, changed: Record<string, unknown>): { seq: number; pieces: number; bytes: number } {
   if (!channelInstalled(addons)) throw new Error('the channel is not installed')
   const box = readOutbox(addons)
-  const prev = box.seq, seq = (prev % SEQ_MAX) + 1
-  for (const [part, value] of Object.entries(changed)) {
-    if (value === false) delete box.parts[part]
-    else box.parts[part] = value
+  change(box, changed, box.seq + 1)
+  atomicWrite(outboxFile(addons), JSON.stringify(box))
+  return { seq: box.seq, pieces: pump(addons, box), bytes: Buffer.byteLength(JSON.stringify(changed)) }
+}
+
+/** What the addon says it has, each time the strip tells: the font is written again when the addon needs something else from it. */
+export function hear(addons: string, heard: Heard): void {
+  if (!channelInstalled(addons)) return
+  const box = readOutbox(addons)
+  const same = JSON.stringify(box.heard) === JSON.stringify(heard)
+  box.heard = heard
+  if (heard.id === box.id && heard.seq <= box.seq) {
+    for (const [part, seq] of Object.entries(box.gone)) {
+      if (seq > heard.seq) continue
+      delete box.gone[part]
+      box.floor = Math.max(box.floor, seq)
+    }
   }
+  if (!same) atomicWrite(outboxFile(addons), JSON.stringify(box))
+  pump(addons, box)
+}
+
+/**
+ * The same to an addon from before the sends had a history. The addon has it within a few seconds,
+ * out of combat. inFont: it went in the font and costs no slot (unless the addon missed the send
+ * before it).
+ */
+export function sendOld(addons: string, changed: Record<string, unknown>): { seq: number; inFont: boolean; bytes: number } {
+  if (!channelInstalled(addons)) throw new Error('the channel is not installed')
+  const box = readOutbox(addons)
+  const prev = box.mark, seq = nextMark(prev)
+  change(box, changed, box.seq + 1)
+  // What this addon holds is counted by the number in the letter A: an addon of today that comes after it is told everything.
+  box.mark = seq
+  box.id = randomBytes(4).toString('hex')
+  delete box.heard
   // The number first: a send cut short here is then a missed one, which a slot makes good.
-  atomicWrite(outboxFile(addons), JSON.stringify({ seq, parts: box.parts }))
+  atomicWrite(outboxFile(addons), JSON.stringify(box))
   // The slots before the signal: a new number must find the news there.
   const lua = `TwinmapForeverInbox = ${toLua({ seq, parts: box.parts })}\n`
   for (let i = 1; i <= SLOTS; i++) atomicWrite(slotFile(addons, i), lua)
@@ -242,5 +376,6 @@ export function send(addons: string, changed: Record<string, unknown>): { seq: n
   const news = Buffer.from(JSON.stringify({ seq, prev, parts: changed }))
   const inFont = news.length <= CAPACITY
   writeSignal(join(addons, SIGNAL), seq, inFont ? news : undefined)
+  written.delete(addons)
   return { seq, inFont, bytes: news.length }
 }

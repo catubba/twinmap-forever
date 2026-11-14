@@ -49,8 +49,12 @@ export function stepFrom(asked: unknown): { t: number; at: number } | null {
 
 /** What the addon tells of its inbox, on the strip. */
 export interface Inbox {
+  /** The history of sends the addon follows; missing from an addon that still wants the slots. */
+  id?: string
   /** The number of the last send that arrived. */
   seq: number
+  /** The send being taken in pieces, and the last piece held. */
+  got?: [seq: number, piece: number]
   /** Sends too big for a font that the game can still take before a /reload. */
   left: number
   /** Why nothing can arrive in this session of the game, when so. */
@@ -60,10 +64,14 @@ export interface Inbox {
 /** The section as it came off the strip, checked. */
 export function inboxFrom(section: unknown): Inbox | null {
   if (typeof section !== 'object' || !section) return null
-  const { seq, left, off } = section as Record<string, unknown>
+  const { id, seq, left, off, got } = section as Record<string, unknown>
   if (typeof seq !== 'number' || typeof left !== 'number') return null
-  return { seq, left, ...(typeof off === 'string' ? { off } : {}) }
+  const pieces = Array.isArray(got) && got.length === 2 && got.every((n) => Number.isInteger(n)) ? { got: got as [number, number] } : {}
+  return { ...(typeof id === 'string' ? { id } : {}), seq, left, ...(typeof off === 'string' ? { off } : {}), ...pieces }
 }
+
+/** Whether the game has a send: the addon tells the last one it has, and takes several at once. An older addon counts round and round, and tells each. */
+export const arrived = (inbox: Inbox | null, seq: number): boolean => inbox !== null && (inbox.id !== undefined ? inbox.seq >= seq : inbox.seq === seq)
 
 /**
  * Whether a point can be sent now, and if not, why, in words for the player.

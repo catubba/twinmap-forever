@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { followFrom, setFrom, takenFrom, goneFrom, markPart, marksNews, inboxFrom, pinFrom, routeNewsFrom, sendState, stepFrom } from './send'
+import { arrived, followFrom, setFrom, takenFrom, goneFrom, markPart, marksNews, inboxFrom, pinFrom, routeNewsFrom, sendState, stepFrom } from './send'
 
 test('a pin is checked before it leaves: a real map, a place on it, a name of plain text', () => {
   expect(pinFrom({ m: 1429, x: 43.712, y: 65.8, name: 'Lion\'s Pride Inn' })).toEqual({ m: 1429, x: 43.71, y: 65.8, name: 'Lion\'s Pride Inn' })
@@ -71,4 +71,14 @@ test('the point the game follows is read off the strip; an empty answer is none'
   expect(followFrom([])).toBeNull()
   expect(followFrom({})).toBeNull()
   expect(followFrom(undefined)).toBeNull()
+})
+
+test('a send has arrived once the addon tells it or a later one; an older addon counts round, and tells each', () => {
+  const today = inboxFrom({ id: 'a1', seq: 7, left: 30, got: [9, 2] })
+  expect(today).toEqual({ id: 'a1', seq: 7, left: 30, got: [9, 2] })
+  expect([6, 7, 8].map((seq) => arrived(today, seq))).toEqual([true, true, false])
+  const older = inboxFrom({ seq: 7, left: 30, got: 'x' })
+  expect(older).toEqual({ seq: 7, left: 30 })
+  expect([6, 7, 8].map((seq) => arrived(older, seq))).toEqual([false, true, false])
+  expect(arrived(null, 1)).toBe(false)
 })
