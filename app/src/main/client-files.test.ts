@@ -25,7 +25,8 @@ function blte(chunks: Chunk[], headerless = false): Buffer {
 }
 
 // bare: the record is the container alone, without the 30 bytes that come before it in most records.
-interface FakeFile { id: number; chunks: Chunk[]; headerless?: boolean; locale?: number; bare?: boolean }
+// absent: listed by the game, not on this PC (a language the player did not install).
+interface FakeFile { id: number; chunks: Chunk[]; headerless?: boolean; locale?: number; bare?: boolean; absent?: boolean }
 
 /**
  * A game folder built to the format client-files.ts reads: build info, configuration, the sixteen
@@ -53,7 +54,9 @@ function fakeClient(files: FakeFile[], rootVersion: 1 | 2): string {
   // Root: one block per file, so each can have its own language.
   const blocks = files.map((f) => {
     const ckey = md5(Buffer.concat(f.chunks.map((c) => c.data)))
-    storeContent(ckey, blte(f.chunks, f.headerless), f.bare)
+    const container = blte(f.chunks, f.headerless)
+    if (f.absent) contents.push({ ckey, ekey: md5(container) })
+    else storeContent(ckey, container, f.bare)
     const locale = f.locale ?? 2, body = Buffer.concat([u32le(f.id), ckey, Buffer.alloc(8)]) // first step: the number itself
     return rootVersion === 2 ? Buffer.concat([u32le(1, locale, 0, 0), Buffer.from([0]), body]) : Buffer.concat([u32le(1, 0, locale), body])
   })
@@ -122,6 +125,19 @@ for (const rootVersion of [1, 2] as const) {
     // A record that is the container alone is read all the same.
     expect(client.read(77)?.toString()).toBe('a record with no header before its container')
     expect(client.read(78)?.toString()).toBe('bare and short')
+  })
+}
+
+for (const rootVersion of [1, 2] as const) {
+  test(`a file whose English is not on the PC is read in a language that is (root layout ${rootVersion})`, () => {
+    const client = openClientFiles(fakeClient([
+      { id: 9, chunks: [plain('in French')], locale: 0x10, absent: true },
+      { id: 9, chunks: [plain('in English')], locale: 2, absent: true },
+      { id: 9, chunks: [plain('in German')], locale: 0x20 },
+      { id: 10, chunks: [plain('nowhere')], absent: true },
+    ], rootVersion))
+    expect(client.read(9)?.toString()).toBe('in German')
+    expect(client.read(10)).toBeNull()
   })
 }
 

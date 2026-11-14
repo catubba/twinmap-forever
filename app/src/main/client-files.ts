@@ -236,6 +236,9 @@ export function openClientFiles(folder: string): ClientFiles {
     at = 12
   }
   const keyAt = new Map<number, number>() // file number -> where its content key is in the root
+  // The same file in its other languages. A PC holds only the languages the player installed
+  // (issue 140: a game without English), so the English one is not always there to read.
+  const others = new Map<number, number[]>()
   while (at < root.length) {
     const n = root.readUInt32LE(at)
     let flags: number, locale: number
@@ -251,8 +254,17 @@ export function openClientFiles(folder: string): ClientFiles {
     const keys = at + n * 4
     for (let i = 0, id = -1; i < n; i++) {
       id += root.readInt32LE(at + i * 4) + 1
-      // ponytail: a file in several languages is read in English. Choose by the game's language when texts are shown.
-      if (!keyAt.has(id) || locale & EN_US) keyAt.set(id, keys + i * 16)
+      // ponytail: a file in several languages is read in English, or in the first language the PC holds. Choose by the game's language when texts are shown.
+      const where = keys + i * 16, had = keyAt.get(id)
+      if (had === undefined) keyAt.set(id, where)
+      else {
+        let rest = others.get(id)
+        if (!rest) others.set(id, (rest = []))
+        if (locale & EN_US) {
+          keyAt.set(id, where)
+          rest.push(had)
+        } else rest.push(where)
+      }
     }
     at = keys + n * 16 + (total !== named && flags & NO_NAMES ? 0 : n * 8)
   }
@@ -262,8 +274,13 @@ export function openClientFiles(folder: string): ClientFiles {
     buildKey: key,
     count: keyAt.size,
     read(id, skipHidden) {
-      const where = keyAt.get(id)
-      return where === undefined ? null : naming(`game file ${id}`, () => readContent(root.subarray(where, where + 16), skipHidden))
+      const first = keyAt.get(id)
+      if (first === undefined) return null
+      for (const where of [first, ...(others.get(id) ?? [])]) {
+        const bytes = naming(`game file ${id}`, () => readContent(root.subarray(where, where + 16), skipHidden))
+        if (bytes) return bytes
+      }
+      return null
     },
   }
 }
