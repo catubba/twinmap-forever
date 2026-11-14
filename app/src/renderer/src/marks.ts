@@ -30,6 +30,8 @@ const DRAWINGS = {
   service: [14, `<rect x=".75" y=".75" width="12.5" height="12.5" fill="#7fc8ff" ${EDGE}/>`],
   // Ore and herbs.
   resource: [12, `<path d="M6 .9 11.1 6 6 11.1.9 6Z" fill="#d9a066" ${EDGE}/>`],
+  // A boss of a dungeon: a skull on a dark red disc.
+  boss: [22, `<circle cx="11" cy="11" r="10.25" fill="#a3201a" ${EDGE}/><path d="M11 4.3c-3.5 0-5.9 2.3-5.9 5.4 0 1.8.8 3.1 2 4v2.300c0 .6.5 1 1 1h5.800c.5 0 1-.4 1-1v-2.300c1.200-.9 2-2.200 2-4 0-3.100-2.400-5.400-5.900-5.400Z" fill="${TEXT}" stroke="#000" stroke-width="1.1" stroke-linejoin="round"/><circle cx="8.700" cy="10.100" r="1.600"/><circle cx="13.300" cy="10.100" r="1.600"/><path d="M11 12.100l-.9 1.700h1.800Z"/><path d="M9.700 15.300v1.700M11 15.300v1.700M12.300 15.300v1.700" fill="none" stroke="#000" stroke-width=".9"/>`],
   // The door of a dungeon.
   dungeon: [16, `<path d="M2 15.25V7.5a6 6 0 0 1 12 0v7.75Z" fill="${TEXT}" ${EDGE}/><path d="M5.6 15.25V8.2a2.4 2.4 0 0 1 4.8 0v7.05Z"/>`],
   // A rare creature or a treasure.

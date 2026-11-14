@@ -3,7 +3,7 @@ import { companionPin, GLYPHS, pin, PIN_NAMES, pinSize } from './marks'
 
 test('every pin of the specification is there, at its size', () => {
   expect(Object.fromEntries(PIN_NAMES.map((name) => [name, pinSize(name)]))).toEqual({
-    quest: 20, turnin: 20, objective: 9, slay: 18, loot: 18, object: 18, talk: 18, event: 18, service: 14, resource: 12, dungeon: 16, rare: 16, companion: 22, flag: 16, corpse: 14, player: 28,
+    quest: 20, turnin: 20, objective: 9, slay: 18, loot: 18, object: 18, talk: 18, event: 18, service: 14, resource: 12, boss: 22, dungeon: 16, rare: 16, companion: 22, flag: 16, corpse: 14, player: 28,
   })
 })
 

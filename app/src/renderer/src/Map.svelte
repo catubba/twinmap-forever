@@ -389,11 +389,13 @@
     // The dungeons of this map: one, or its wings.
     const dungeons = DUNGEON_PINS.filter((d) => d.map === m.id)
     pinned = dungeons.length > 0
-    const dot = (u: number, v: number, color: string, name: string): void => {
-      L.circleMarker(atYards({ u, v }), { radius: 6, color: '#000', weight: 1.5, fillColor: color, fillOpacity: 1 }).bindTooltip(name, { direction: 'top', offset: [0, -6], className: 'tip' }).addTo(pins)
-    }
     for (const d of dungeons) {
-      for (const [name, u, v] of d.bosses) dot(u, v, '#ff5a4d', name)
+      // A boss: its skull, and its name written under it, there without the pointer on it. On a second
+      // screen nobody hovers while playing.
+      for (const [name, u, v] of d.bosses)
+        L.marker(atYards({ u, v }), { keyboard: false, icon: L.divIcon({ className: 'door boss', iconSize: [22, 22], html: pin('boss') }) })
+          .bindTooltip(name, { permanent: true, direction: 'bottom', offset: [0, 9], className: 'boss-name' })
+          .addTo(pins)
       if (d.entrance)
         L.marker(atYards({ u: d.entrance[0], v: d.entrance[1] }), { keyboard: false, icon: L.divIcon({ className: 'door', iconSize: [16, 16], html: pin('dungeon') }) })
           .bindTooltip(dungeons.length > 1 ? `Entrance: ${d.name}` : 'Entrance', { direction: 'top', offset: [0, -8], className: 'tip' })
@@ -1356,7 +1358,28 @@
   .map :global(.leaflet-container) {
     font: inherit;
   }
-  /* The name of a boss over its dot: ours, like a menu. */
+  /* A dark light under a boss, and its name under the skull: light letters with a dark edge, like
+     the names of the places. */
+  .map :global(.boss) {
+    border-radius: 50%;
+    box-shadow: 0 0 10px 4px #a3201a99;
+  }
+  .map :global(.boss-name) {
+    padding: 0;
+    border: 0;
+    background: none;
+    box-shadow: none;
+    font: var(--t-small);
+    font-weight: 600;
+    color: #fff;
+    white-space: nowrap;
+    -webkit-text-stroke: 3px #000;
+    paint-order: stroke fill;
+  }
+  .map :global(.boss-name::before) {
+    display: none;
+  }
+  /* The name of a pin under the pointer: ours, like a menu. */
   .map :global(.tip) {
     padding: 2px 8px;
     border: 1px solid var(--float-edge);
