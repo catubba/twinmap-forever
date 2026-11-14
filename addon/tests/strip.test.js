@@ -219,3 +219,24 @@ test('the strip sits on the edge the player chose, and moves when the choice cha
   addon.run(2);
   assert.equal(addon.lua('return TwinmapForeverStrip.point'), 'BOTTOMLEFT');
 });
+
+test('a section with a long build makes it a piece a frame, and its data goes out all the same', () => {
+  const addon = enterWorld(null, `
+    local ns = ...
+    ns.db.mode = "fast"
+    FRAMES, AT = 0, {}
+    CreateFrame("Frame"):SetScript("OnUpdate", function() FRAMES = FRAMES + 1 end)
+    table.insert(ns.sections, { name = "slow", period = 5, spread = true, build = function()
+      AT[#AT + 1] = FRAMES
+      coroutine.yield()
+      AT[#AT + 1] = FRAMES
+      return { n = GAME.n }
+    end })
+    GAME.n = 1`);
+  addon.run(10);
+  assert.equal(addon.lua('return AT[2] - AT[1]'), '1', 'the second piece ran in the frame after the first');
+  assert.deepEqual(data(blocks(addon).filter((b) => b.section === 'slow')[0]), { n: 1 });
+  addon.lua('GAME.n = 2');
+  addon.run(6);
+  assert.deepEqual(data(blocks(addon).filter((b) => b.section === 'slow').at(-1)), { n: 2 });
+});

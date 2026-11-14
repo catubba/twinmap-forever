@@ -373,17 +373,37 @@ local function Enqueue(s, json)
   end
 end
 
+-- Queues what a section built, if it changed or its refresh is due.
+local function Built(s, value, now)
+  if type(value) ~= "table" then return end
+  local json = Json(value)
+  if json ~= s.json or now >= (s.sentAt or 0) + (s.refresh or REFRESH) then
+    s.json, s.sentAt = json, now
+    Enqueue(s, json)
+  end
+end
+
+-- A section marked spread has a long build: it yields where it can stop, and goes on one piece a
+-- frame, its JSON in a frame of its own. The same data, a few frames later, and no frame pays it all.
 local function Tick(now, combat)
   for _, s in ipairs(SECTIONS) do
-    if (s.combat or not combat) and now >= (s.nextAt or 0) then
-      s.nextAt = now + s.period
-      local ok, value = pcall(s.build)
-      if ok and type(value) == "table" then
-        local json = Json(value)
-        if json ~= s.json or now >= (s.sentAt or 0) + (s.refresh or REFRESH) then
-          s.json, s.sentAt = json, now
-          Enqueue(s, json)
+    if s.combat or not combat then
+      if not s.work and now >= (s.nextAt or 0) then
+        s.nextAt = now + s.period
+        if s.spread then
+          s.work = coroutine.create(function()
+            local value = s.build()
+            coroutine.yield()
+            Built(s, value, GetTime())
+          end)
+        else
+          local ok, value = pcall(s.build)
+          if ok then Built(s, value, now) end
         end
+      end
+      if s.work then
+        coroutine.resume(s.work) -- an error ends it, as pcall does for the others
+        if coroutine.status(s.work) == "dead" then s.work = nil end
       end
     end
   end

@@ -55,6 +55,7 @@ local function BuildQuestie()
   local modules = QuestieLoader and QuestieLoader._modules
   if not (modules and modules.QuestieMap and modules.ActiveQuests) then return end
   local out = { icons = Icons(modules.QuestieMap), active = {} }
+  coroutine.yield() -- the icons took their frame: the log has the next one (spread, see Strip.lua)
   -- The quests in the log. done: ready to hand in. targets: who or what still has to be found,
   -- as Questie names them ("m_117" a creature, "o_42" an object): the app names the icons by them.
   for id, acceptance in pairs(Try(modules.ActiveQuests.GetAll) or {}) do
@@ -82,4 +83,4 @@ local function BuildQuestie()
 end
 
 -- Every five seconds: a quest finished changes its pin in the app well within fifteen.
-ns.sections[#ns.sections + 1] = { name = "questie", period = 5, build = BuildQuestie }
+ns.sections[#ns.sections + 1] = { name = "questie", period = 5, build = BuildQuestie, spread = true }
