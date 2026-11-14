@@ -37,7 +37,7 @@ test('a block is shown as many times as asked, each time followed by its negativ
   assert.equal(new Set(addon.strips().map((s) => decodeStrip(s).id)).size, 1);
 });
 
-test('at low contrast the same block is drawn, with two close levels only', () => {
+test('at low contrast the same block is drawn, with two close levels and the even one between', () => {
   const usual = enterWorld();
   usual.run(10);
 
@@ -47,7 +47,7 @@ test('at low contrast the same block is drawn, with two close levels only', () =
   addon.lua('GAME.threshold = 20 / 255; LEVELS = {}');
   addon.run(10);
   assert.deepEqual(addon.strips(), usual.strips());
-  assert.equal(addon.lua('local n = {} for v in pairs(LEVELS) do n[#n + 1] = math.floor(v * 255 + 0.5) end table.sort(n) return table.concat(n, " ")'), '10 30');
+  assert.equal(addon.lua('local n = {} for v in pairs(LEVELS) do n[#n + 1] = math.floor(v * 255 + 0.5) end table.sort(n) return table.concat(n, " ")'), '10 20 30'); // 20: the even cell past the end of the block, halfway between the two
 });
 
 test('repeating the last block with no hold swaps it and its negative every frame', () => {
