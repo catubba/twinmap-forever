@@ -45,7 +45,7 @@ You need two things: the addon in the game, and the app on your computer.
 2. **The app.** Download `Twinmap-Setup` from the [latest release](https://github.com/catubba/twinmap-forever/releases/latest) and open it. It installs for your Windows user only, asks for no administrator rights, and starts by itself.
 3. **First run.** The app finds your game, builds the map from your own game files (once, about a minute), and waits for you to log in. Your arrow appears on its own.
 
-After that the app updates itself: every time it starts it looks for a newer version and installs it before the map opens.
+After that the app updates itself: every time it starts it looks for a newer version and installs it before the map opens. The addon is updated from CurseForge: when it falls behind the app, a line in the game's chat tells you.
 
 ### Windows says "Windows protected your PC"
 

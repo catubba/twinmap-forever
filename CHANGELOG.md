@@ -2,6 +2,21 @@
 
 What changed in each version of Twinmap, newest first. The section of a version is also the text of its release on GitHub and of the addon's file on CurseForge.
 
+## 0.3.2 - 2026-11-14
+
+### New
+
+- **The addon tells you when it is out of date.** When a newer version is on CurseForge, a line in the game's chat says so once each time you log in, until you update. The app is what tells the addon, so it needs Twinmap open. You will see it from the update after this one.
+
+### Changed
+
+- **The line at the edge of the game window is harder to see.** Its two colors are now half as far apart. If you never moved the Contrast slider in the addon's settings, yours takes the new value at your next login; a value you chose stays as it is.
+- **Reset to defaults.** The button in the addon's settings now puts back every choice on the page, not the sliders only.
+
+### Fixed
+
+- **A slight stutter in the game while moving.** Drawing the line that carries your position to the app took the game several milliseconds, four times a second while your character moved. On a fast screen it showed as a slight stutter. It now takes about a ninth of that. Thanks to the player who reported it on CurseForge. Update the addon and type /reload once.
+
 ## 0.3.1 - 2026-11-14
 
 ### Fixed
