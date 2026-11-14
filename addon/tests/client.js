@@ -35,6 +35,30 @@ const STUB = `
     if GAME.north then return GAME.north, GAME.west, 0, GAME.instance and GAME.instance.id or 0 end
   end
   function InCombatLockdown() return GAME.combat == true end
+  -- The group: GAME.party = { party1 = { name, second, class, role, map, x, y } }, GAME.raid when it is a raid.
+  -- SENT: the messages the addon gave the game for the other addons, "prefix|text|channel".
+  SENT = {}
+  function IsInGroup() return GAME.party ~= nil end
+  function IsInRaid() return GAME.raid == true end
+  function UnitExists(unit) return unit == "player" or (GAME.party ~= nil and GAME.party[unit] ~= nil) end
+  function UnitIsUnit(a, b) return a == b end
+  function UnitName(unit)
+    local other = GAME.party and GAME.party[unit]
+    if other then return other.name, other.second end
+    return "Catubbio", "Sucameli"
+  end
+  function UnitClass(unit)
+    local other = GAME.party and GAME.party[unit]
+    return other and other.class, other and other.class
+  end
+  function UnitGroupRolesAssigned(unit)
+    local other = GAME.party and GAME.party[unit]
+    return other and other.role or "NONE"
+  end
+  C_ChatInfo = {
+    RegisterAddonMessagePrefix = function(prefix) PREFIX_KNOWN = prefix return 0 end,
+    SendAddonMessage = function(prefix, text, channel) SENT[#SENT + 1] = prefix .. "|" .. text .. "|" .. channel return 0 end,
+  }
   -- GAME.level, GAME.xp, GAME.xpMax, GAME.rested: unset, the game tells nothing of the character.
   function UnitLevel() return GAME.level end
   function UnitXP() return GAME.xp end
@@ -48,7 +72,11 @@ const STUB = `
   -- The game's own map pin: WAYPOINT is where it stands, TRACKED whether it is followed on screen.
   -- GAME.noPinMap: a map the game allows no pin on.
   C_Map = {
-    GetBestMapForUnit = function() return GAME.map end,
+    GetBestMapForUnit = function(unit)
+      local other = GAME.party and GAME.party[unit]
+      if other then return other.map end
+      return GAME.map
+    end,
     GetMapInfo = function(map) return { mapID = map, name = GAME.zone } end,
     -- The world of the stand-in: every zone map is 2000 yards a side, its middle (map - 1429) times
     -- 5000 yards north of Elwynn's and as far west as it. GAME.noWorld: a map the game tells no place of.
@@ -60,7 +88,11 @@ const STUB = `
       return map, CreateVector2D(0.5 - world.y / 2000, 0.5 - (world.x - (map - 1429) * 5000) / 2000)
     end,
     -- The place on a map is told only for the map the character is on.
-    GetPlayerMapPosition = function(map) return GAME.x and (map == nil or map == GAME.map) and { x = GAME.x, y = GAME.y } or nil end,
+    GetPlayerMapPosition = function(map, unit)
+      local other = GAME.party and GAME.party[unit]
+      if other then return other.x and map == other.map and { x = other.x, y = other.y } or nil end
+      return GAME.x and (map == nil or map == GAME.map) and { x = GAME.x, y = GAME.y } or nil
+    end,
     CanSetUserWaypointOnMap = function(map) return map ~= GAME.noPinMap end,
     SetUserWaypoint = function(point) WAYPOINT = point end,
     ClearUserWaypoint = function() WAYPOINT, TRACKED = nil, nil end,
@@ -193,10 +225,10 @@ const STUB = `
   function T_load(name, source, chunk) return assert(load(source, "@" .. chunk))(name, ns) end
   -- /reload: the interface starts over, the saved variables and the fonts already read stay.
   function T_reload() frames, slots, ns, SlashCmdList, TwinmapForeverArrow = {}, {}, {}, {}, nil end
-  function T_fire(event)
+  function T_fire(event, ...)
     for _, f in ipairs(frames) do
       local fn = rawget(f, "OnEvent")
-      if f.events[event] and fn then fn(f, event) end
+      if f.events[event] and fn then fn(f, event, ...) end
     end
   end
   function T_run(seconds)
@@ -325,7 +357,7 @@ function loadAddon(dir, { addons } = {}) {
 
   return {
     meta: toc.meta,
-    fire: (event) => call('T_fire', event),
+    fire: (event, ...args) => call('T_fire', event, ...args),
     // /reload: the addon is loaded again, with what it saved.
     reload: () => {
       call('T_reload');

@@ -1,6 +1,7 @@
 <script lang="ts">
   // The main screen: the top row with the state of the link, the map in its frame, and the Now panel.
   import { experience, linkStatus, type LinkSnapshot } from '../../shared/link'
+  import { groupFrom } from '../../shared/group'
   import { feedbackDetails } from '../../shared/feedback'
   import { tilesHelp, tilesLine, type TilesStatus } from '../../shared/tiles-status'
   import { onMount } from 'svelte'
@@ -114,6 +115,8 @@
   // The journey Shortest Path guides in the game, and its legs as they lie on the map when the addon could read them.
   const journey = $derived(live ? journeyFrom(link?.state.sections.journey) : null)
   const ahead = $derived(live ? legsAhead(journey, wayFrom(link?.state.sections.line)) : null)
+  // The companions of the group, where the game tells: gone with the strip, and with a group no longer told of.
+  const group = $derived(live ? groupFrom(link?.state.sections.group, now - (link?.state.updatedAt.group ?? 0)) : [])
   const xp = $derived(char ? experience(char) : null)
   const mapReady = $derived(tiles?.state === 'ready')
   const insideReady = $derived(tiles?.state === 'ready' && !!tiles.interiors && !tiles.interiors.problem)
@@ -190,7 +193,7 @@
 <div class="work" class:shut={!panelOpen} in:fade={screen} inert={onSettings} style:--peek="{peek}px">
   <div class="mapbox">
     {#if mapReady}
-      <Map {pos} at={link?.state.updatedAt.pos} bind:this={mapView} {insideReady} {quests} {fixed} side={char?.side} {live} {inbox} removed={live ? goneFrom(link?.state.sections.marks) : []} set={live ? setFrom(link?.state.sections.marks) : []} gameFollows={live ? followFrom(link?.state.sections.follow) : null} {journey} {ahead} {route} onroute={(stop) => setRoute(addStop(route, stop))} />
+      <Map {pos} {group} at={link?.state.updatedAt.pos} bind:this={mapView} {insideReady} {quests} {fixed} side={char?.side} {live} {inbox} removed={live ? goneFrom(link?.state.sections.marks) : []} set={live ? setFrom(link?.state.sections.marks) : []} gameFollows={live ? followFrom(link?.state.sections.follow) : null} {journey} {ahead} {route} onroute={(stop) => setRoute(addStop(route, stop))} />
     {:else if tiles}
       <div class="making" class:failed={tiles.state === 'failed' || tiles.state === 'no-game'}>
         <p>{tilesLine(tiles)}</p>
