@@ -246,8 +246,10 @@ local function Paint(key, cells)
   local f, row, off, on = Layer(key), RowCells(), Level(false), Level(true)
   local was = painted[key] or { v = {}, used = 0 }
   painted[key] = was
-  local n, fresh = math.min(#cells, row), was.off ~= off or was.on ~= on -- other levels: every cell again
-  was.off, was.on = off, on
+  local n = math.min(#cells, row)
+  -- Other levels: every cell again, the ones past the end of this block too when their turn comes.
+  -- One cell left at the levels of before and the app reads the whole row wrong.
+  if was.off ~= off or was.on ~= on then was.v, was.off, was.on = {}, off, on end
   for i = 1, n do
     local v = cells[i]
     if key == "negative" then v = 7 - v end
@@ -258,7 +260,7 @@ local function Paint(key, cells)
       t:SetPoint("TOPLEFT", f, "TOPLEFT", (i - 1) * CELL, 0)
       f.cells[i] = t
     end
-    if fresh or was.v[i] ~= v then
+    if was.v[i] ~= v then
       t:SetColorTexture(v >= 4 and on or off, v % 4 >= 2 and on or off, v % 2 == 1 and on or off, 1)
       was.v[i] = v
     end

@@ -196,10 +196,8 @@ const STUB = `
     end
     function f:CreateTexture()
       local t = setmetatable({}, Widget)
-      -- A channel is on above GAME.threshold: half, unless a test draws the strip with other levels.
       function t:SetColorTexture(r, g, b)
-        local th = GAME.threshold or 0.5
-        self.v = (r > th and 4 or 0) + (g > th and 2 or 0) + (b > th and 1 or 0)
+        self.r, self.g, self.b = r, g, b
         LEVELS[r], LEVELS[g], LEVELS[b] = true, true, true
         PAINTS = (PAINTS or 0) + 1
       end
@@ -215,13 +213,23 @@ const STUB = `
     -- A frame with textures is a strip: showing it records the row of cells on screen.
     function f:Show()
       self.shown = true
-      local row = {}
+      -- A channel is on above the middle of the darkest and the brightest on the row, as the app reads
+      -- it: a cell left at the levels of before spoils the whole row. GAME.threshold: a test's own.
+      local lo, hi = 1, 0
       for _, t in ipairs(cells) do
         if t.shown == true then -- only a cell that was shown: a texture never shown answers anything
+          lo, hi = math.min(lo, t.r, t.g, t.b), math.max(hi, t.r, t.g, t.b)
+        end
+      end
+      local th = GAME.threshold or (lo + hi) / 2
+      local row = {}
+      for _, t in ipairs(cells) do
+        if t.shown == true then
+          local v = (t.r > th and 4 or 0) + (t.g > th and 2 or 0) + (t.b > th and 1 or 0)
           if t.fill == true then
-            for i = t.x + 1, GAME.width do row[i] = t.v end
+            for i = t.x + 1, GAME.width do row[i] = v end
           else
-            row[type(t.x) == "number" and t.x + 1 or #row + 1] = t.v
+            row[type(t.x) == "number" and t.x + 1 or #row + 1] = v
           end
         end
       end

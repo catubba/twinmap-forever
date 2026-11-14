@@ -50,6 +50,26 @@ test('at low contrast the same block is drawn, with two close levels and the eve
   assert.equal(addon.lua('local n = {} for v in pairs(LEVELS) do n[#n + 1] = math.floor(v * 255 + 0.5) end table.sort(n) return table.concat(n, " ")'), '10 20 30'); // 20: the even cell past the end of the block, halfway between the two
 });
 
+test('when the contrast changes while playing, no cell keeps the levels of before', () => {
+  // A long block at the usual levels, short ones at the new levels, then the long one again: its
+  // cells past the end of the short ones are the ones that could be left as they were.
+  const long = 'Stormwind City is here '.repeat(4);
+  const addon = enterWorld();
+  addon.lua(`GAME.zone = "${long}"`);
+  addon.run(10);
+  addon.lua('GAME.zone = "Elwynn"');
+  addon.run(10);
+  const before = addon.strips().length;
+  slide(addon, 'base', 10);
+  slide(addon, 'amp', 20);
+  addon.run(10);
+  addon.lua(`GAME.zone = "${long}"`);
+  addon.run(10);
+  const after = addon.strips().slice(before);
+  assert.ok(after.length > 4);
+  for (const strip of after) assert.ok(decodeStrip(strip).section, 'a strip the app cannot read');
+});
+
 test('repeating the last block with no hold swaps it and its negative every frame', () => {
   const addon = enterWorld();
   slide(addon, 'on', 0);
