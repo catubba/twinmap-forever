@@ -55,6 +55,32 @@ test('small news arrives in the font within seconds, once, and spends no slot', 
   assert.equal(addon.ns('signal'), 'reading');
 });
 
+const notices = (addon) => addon.printed().split('\n').filter((line) => line.includes('newer version'));
+
+test('a newer version told by the app is said in chat once, and spends no slot', () => {
+  const { addon } = world('pin');
+  addon.lua('(...).VERSION = "0.9.5"');
+  addon.run(12);
+  assert.equal(app.send(addons, { sync: 1, latest: '0.10.0' }).inFont, true);
+  addon.run(7);
+  assert.deepEqual(notices(addon), ['Twinmap Forever: a newer version (0.10.0) is available on CurseForge. You are using 0.9.5.']);
+  app.send(addons, { sync: 2, latest: '0.10.1' });
+  addon.run(7);
+  assert.equal(notices(addon).length, 1, 'said twice in one session');
+  assert.equal(addon.slots(), 0);
+});
+
+test('the same version, an older one, or anything that is not a version says nothing', () => {
+  const { addon } = world('pin');
+  addon.lua('(...).VERSION = "0.9.5"');
+  addon.run(12);
+  for (const latest of ['0.9.5', '0.9.4', '0.0.0', '0.10', '1.0.0 |cffff0000now', 7]) {
+    app.send(addons, { latest });
+    addon.run(7);
+  }
+  assert.deepEqual(notices(addon), []);
+});
+
 test('every number of the channel is read right where the interface is scaled, and no slot is spent', () => {
   // Seen on 13 November 2026 at a scale of 1.2 (a font of 77 pixels): 48 was read as 47 at every
   // read, and each read spent a slot.

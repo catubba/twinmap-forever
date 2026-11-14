@@ -359,9 +359,11 @@ function createWindow(): void {
     if (!gameFolder || setup.addon === null || channel) return
     const addons = addonsFolder(gameFolder)
     // Once the way is there, the addon is told that this app was just opened and has heard nothing yet:
-    // a game already running then sends everything again at once. Small enough to ride the font.
+    // a game already running then sends everything again at once. With it goes the version of this
+    // app, which is the newest the addon can be: an older addon says so in the game's chat.
+    // Small enough to ride the font.
     channel = installChannel(addons)
-      .then(() => void send(addons, { sync: Date.now() }))
+      .then(() => void send(addons, { sync: Date.now(), latest: app.getVersion() }))
       .then(() => (marksTimer ??= setTimeout(sendMarks, MARKS_WAIT)))
       .catch(() => {})
   }

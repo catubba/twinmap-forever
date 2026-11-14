@@ -94,6 +94,27 @@ ns.receivers.sync = function(session)
   ns.ResendAll()
 end
 
+-- The addon cannot look for a newer version of itself: the app, which keeps itself up to date and
+-- comes out with the addon under one number, tells its own at every start. A higher one is said in
+-- chat, once in a session of the interface. It is told again at every login, so the line comes
+-- back until the addon is updated, and then never.
+local function Newer(a, b)
+  local x, y = a:gmatch("%d+"), b:gmatch("%d+")
+  while true do
+    local m, n = tonumber(x() or ""), tonumber(y() or "")
+    if not m then return false end
+    if not n or m ~= n then return not n or m > n end
+  end
+end
+local announced = false
+ns.receivers.latest = function(version)
+  -- Three numbers and nothing else: what comes from a file is never printed as it is.
+  if announced or type(version) ~= "string" or not version:match("^%d+%.%d+%.%d+$") then return end
+  if not Newer(version, ns.VERSION) then return end
+  announced = true
+  print(("Twinmap Forever: a newer version (%s) is available on CurseForge. You are using %s."):format(version, ns.VERSION))
+end
+
 local text, reading
 local fails, acc = 0, POLL
 
