@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { deflateSync } from 'node:zlib'
@@ -129,6 +129,19 @@ test('asked to skip what is hidden, the encrypted part comes as zeros of its siz
   const client = openClientFiles(fakeClient(FILES, 2))
   const start = Buffer.from('readable start')
   expect(client.read(70000, true)).toEqual(Buffer.concat([start, Buffer.alloc(locked.data.length)]))
+})
+
+test('a file the archive does not hold is refused, and the error names the file and the archive', () => {
+  const folder = fakeClient(FILES, 2)
+  const client = openClientFiles(folder)
+  const archive = join(folder, 'Data', 'data', 'data.000'), whole = readFileSync(archive)
+  // Zeros where the files were: listed in the index, not downloaded yet.
+  writeFileSync(archive, Buffer.alloc(whole.length))
+  expect(() => client.read(5)).toThrow(/^game file 5: not a BLTE container \(data\.000 at \d+, \d+ bytes\)$/)
+  expect(() => openClientFiles(folder)).toThrow(/^encoding file: not a BLTE container/)
+  // An archive cut short.
+  writeFileSync(archive, whole.subarray(0, 10))
+  expect(() => client.read(5)).toThrow(/^game file 5: data\.000 ends before the file .*not fully downloaded$/)
 })
 
 test('the game folder is found from a path inside it, and only if it holds Forever', () => {
