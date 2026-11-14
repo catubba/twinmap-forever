@@ -373,6 +373,8 @@
     inset: 46px 0 0;
     display: grid;
     grid-template-columns: minmax(0, 1fr) 340px;
+    /* One row, as tall as the window and no taller: a panel with much to say scrolls, it does not push the map's foot out of sight. */
+    grid-template-rows: minmax(0, 1fr);
   }
 
   .mapbox {
