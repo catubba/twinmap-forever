@@ -24,7 +24,8 @@ function blte(chunks: Chunk[], headerless = false): Buffer {
   return Buffer.concat([Buffer.from('BLTE'), u32be(12 + 24 * chunks.length), Buffer.from([0x0f, 0, 0, chunks.length]), ...table, ...bodies])
 }
 
-interface FakeFile { id: number; chunks: Chunk[]; headerless?: boolean; locale?: number }
+// bare: the record is the container alone, without the 30 bytes that come before it in most records.
+interface FakeFile { id: number; chunks: Chunk[]; headerless?: boolean; locale?: number; bare?: boolean }
 
 /**
  * A game folder built to the format client-files.ts reads: build info, configuration, the sixteen
@@ -40,19 +41,19 @@ function fakeClient(files: FakeFile[], rootVersion: 1 | 2): string {
   const index: { ekey: Buffer; offset: number; size: number }[] = []
   const contents: { ckey: Buffer; ekey: Buffer }[] = []
   // Stores a container as a record of the archive and lists it in the index.
-  const store = (container: Buffer): Buffer => {
-    const ekey = md5(container), record = Buffer.concat([Buffer.alloc(30), container])
+  const store = (container: Buffer, bare = false): Buffer => {
+    const ekey = md5(container), record = bare ? container : Buffer.concat([Buffer.alloc(30), container])
     archive.push(record)
     index.push({ ekey, offset, size: record.length })
     offset += record.length
     return ekey
   }
-  const storeContent = (ckey: Buffer, container: Buffer): void => { contents.push({ ckey, ekey: store(container) }) }
+  const storeContent = (ckey: Buffer, container: Buffer, bare = false): void => { contents.push({ ckey, ekey: store(container, bare) }) }
 
   // Root: one block per file, so each can have its own language.
   const blocks = files.map((f) => {
     const ckey = md5(Buffer.concat(f.chunks.map((c) => c.data)))
-    storeContent(ckey, blte(f.chunks, f.headerless))
+    storeContent(ckey, blte(f.chunks, f.headerless), f.bare)
     const locale = f.locale ?? 2, body = Buffer.concat([u32le(f.id), ckey, Buffer.alloc(8)]) // first step: the number itself
     return rootVersion === 2 ? Buffer.concat([u32le(1, locale, 0, 0), Buffer.from([0]), body]) : Buffer.concat([u32le(1, 0, locale), body])
   })
@@ -106,16 +107,21 @@ const FILES: FakeFile[] = [
   { id: 70000, chunks: [plain('readable start'), locked] },
   { id: 9, chunks: [plain('in English')], locale: 2 },
   { id: 9, chunks: [plain('in German')], locale: 0x20 },
+  { id: 77, chunks: [packed('a record with no header before its container')], bare: true },
+  { id: 78, chunks: [plain('bare and short')], headerless: true, bare: true },
 ]
 
 for (const rootVersion of [1, 2] as const) {
   test(`a file is read by its number, whatever its chunks (root layout ${rootVersion})`, () => {
     const client = openClientFiles(fakeClient(FILES, rootVersion))
-    expect([client.version, client.buildKey.slice(0, 4), client.count]).toEqual(['1.60.1.70862', 'ab12', 4])
+    expect([client.version, client.buildKey.slice(0, 4), client.count]).toEqual(['1.60.1.70862', 'ab12', 6])
     expect(client.read(5)?.toString()).toBe('stored as it is')
     expect(client.read(1957206)?.toString()).toBe('deflated, then plain, then deflated again')
     expect(client.read(9)?.toString()).toBe('in English')
     expect(client.read(6)).toBeNull()
+    // A record that is the container alone is read all the same.
+    expect(client.read(77)?.toString()).toBe('a record with no header before its container')
+    expect(client.read(78)?.toString()).toBe('bare and short')
   })
 }
 
@@ -137,7 +143,7 @@ test('a file the archive does not hold is refused, and the error names the file 
   const archive = join(folder, 'Data', 'data', 'data.000'), whole = readFileSync(archive)
   // Zeros where the files were: listed in the index, not downloaded yet.
   writeFileSync(archive, Buffer.alloc(whole.length))
-  expect(() => client.read(5)).toThrow(/^game file 5: not a BLTE container \(data\.000 at \d+, \d+ bytes\)$/)
+  expect(() => client.read(5)).toThrow(/^game file 5: not a BLTE container \(data\.000 at \d+, \d+ bytes, starts (00)+\)$/)
   expect(() => openClientFiles(folder)).toThrow(/^encoding file: not a BLTE container/)
   // An archive cut short.
   writeFileSync(archive, whole.subarray(0, 10))
