@@ -1,6 +1,6 @@
 <script lang="ts">
   // The label on a point of the map: its name, where it is, how far and how long on foot. It opens
-  // on the side with the most room and a thin line ties it to the point. Send to game has the game's
+  // on the side with the most room, some way off, and a gold line ties it to the point. Send to game has the game's
   // arrow follow the point, and says Sent once the addon tells it has it; on the point the game
   // follows the same button is Stop following. Add to route puts it at the end of the route. Save keeps the point among My pins; a saved one is
   // renamed by writing over its name, and Remove takes it away.
@@ -80,15 +80,19 @@
     return () => clearTimeout(timer)
   })
 
+  // How far from the point the label opens: far enough for the line between them to be seen past the pin.
+  const GAP = 40
   let width = $state(0), height = $state(0)
-  const at = $derived(labelPlace(spot, box, { width, height }))
+  const at = $derived(labelPlace(spot, box, { width, height }, GAP))
   // The line ends on the label's edge nearest to the point.
   const end = $derived({ x: Math.max(at.left, Math.min(spot.x, at.left + width)), y: Math.max(at.top, Math.min(spot.y, at.top + height)) })
 </script>
 
 <svg class="tie" aria-hidden="true" in:fade={gone} out:fade={gone}>
+  <!-- Twice: a dark line under the gold one, so that it shows on any ground. -->
+  <line class="rim" x1={spot.x} y1={spot.y} x2={end.x} y2={end.y} />
   <line x1={spot.x} y1={spot.y} x2={end.x} y2={end.y} />
-  <circle cx={spot.x} cy={spot.y} r="3.5" />
+  <circle cx={spot.x} cy={spot.y} r="5.5" />
 </svg>
 <div class="label" data-side={at.side} role="dialog" in:scale={pop()} out:fade={gone} aria-label={title} style:left="{at.left}px" style:top="{at.top}px" style:visibility={width ? 'visible' : 'hidden'} bind:offsetWidth={width} bind:offsetHeight={height}>
   <button class="close" aria-label="Close" onclick={onclose}><Glyph name="close" size={14} /></button>
@@ -118,14 +122,18 @@
     pointer-events: none;
   }
   line {
-    stroke: #fff;
-    stroke-width: 1;
-    filter: drop-shadow(0 0 1px #000);
+    stroke: var(--gold);
+    stroke-width: 3;
+    stroke-linecap: round;
+  }
+  .rim {
+    stroke: #000;
+    stroke-width: 6;
   }
   circle {
-    fill: #fff;
+    fill: var(--gold);
     stroke: #000;
-    stroke-width: 1.5;
+    stroke-width: 2;
   }
 
   .label {
