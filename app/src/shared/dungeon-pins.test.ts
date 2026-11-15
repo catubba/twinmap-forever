@@ -14,13 +14,6 @@ test('the dungeons Forever added last have their own list: five maps, none of th
   expect(NEW_DUNGEON_PINS[0]!.bosses.map((b) => b[0])).toEqual(["Zul'Alai", "Var'Taka", 'Primeval Elemental', 'Captain Dreadrise', 'Deathless Guardians', "Min'loth the Serpent"])
 })
 
-test('a boss the game names otherwise than the source of the pins has the game\'s name: a kill is told by it', () => {
-  const names = (map: number): string[] => DUNGEON_PINS.filter((d) => d.map === map).flatMap((d) => d.bosses.map((b) => b[0]))
-  expect(names(3065)).toEqual(['Faldrim Anvilmar', 'Infurnus', 'Plunder', 'Durgen Dirgehammer'])
-  expect(names(2999)).toContain('The Butcher')
-  expect(names(2999)).not.toContain('The Baron')
-})
-
 test('every boss and entrance lies inside what its dungeon shows', () => {
   for (const d of [...DUNGEON_PINS, ...NEW_DUNGEON_PINS]) {
     const [u1, v1, u2, v2] = d.bounds

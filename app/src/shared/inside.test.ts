@@ -68,4 +68,11 @@ test('the bosses killed are those the addon tells of this map, by name however w
   expect(killedIn(section, 36).size).toBe(0)
   expect(killedIn(section, undefined).size).toBe(0)
   expect(killedIn('nonsense', 34).size).toBe(0)
+  // A kill told with the name of the fight marks the creatures whose skull is on the map.
+  const fights = (map: number, ...list: string[]): Set<string> => killedIn({ map, list }, map)
+  expect(fights(3065, 'Infurnus').has(nameOfBoss('Magmatus'))).toBe(true)
+  expect(fights(2999, 'The Butcher').has(nameOfBoss('The Baron'))).toBe(true)
+  expect(['Baelog', 'Eric "The Swift"', 'Olaf'].every((dwarf) => fights(70, 'The Lost Dwarves').has(nameOfBoss(dwarf)))).toBe(true)
+  expect(fights(230, 'The Seven').has(nameOfBoss("Doom'rel"))).toBe(true)
+  expect(fights(3065, 'Plunder').has(nameOfBoss('Magmatus'))).toBe(false)
 })

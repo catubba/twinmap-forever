@@ -52,17 +52,34 @@ export interface Interiors {
   dropped: number
 }
 
+/** A boss's name as two sources may write it: the letters only, small. */
+export const nameOfBoss = (name: string): string => name.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
+
+// The game tells a kill with the name of the fight, and a skull carries the name of the creature, the one
+// over its head. Where the two differ: the fight, then the creatures it is the kill of. From the game's table
+// of encounters against the names of the pins (design/interiors/names-fdj.ts).
+const FIGHTS: Record<string, string[]> = {
+  Infurnus: ['Magmatus'], // The Hall of Thanes
+  'The Butcher': ['The Baron'], // Ruins of Lordaeron
+  Geilhast: ['Gelihast'], // Blackfathom Deeps: the game spells the fight so
+  'The Lost Dwarves': ['Baelog', 'Eric "The Swift"', 'Olaf'], // Uldaman
+  'The Seven': ["Doom'rel"], // Blackrock Depths
+  "Jammal'an and Ogom": ["Jammal'an the Prophet", 'Ogom the Wretched'], // The Temple of Atal'Hakkar
+  'Morphaz and Hazzas': ['Morphaz', 'Hazzas'],
+}
+const KILL_OF = new Map(Object.entries(FIGHTS).map(([fight, creatures]) => [nameOfBoss(fight), creatures.map(nameOfBoss)]))
+
 /**
  * The bosses killed in the instance of this map, from the "kills" section as it came off the strip:
- * their names in small letters, as nameOfBoss gives them. None from anything else, or of another map.
+ * their names in small letters, as nameOfBoss gives them, and with a fight the creatures it is the
+ * kill of. None from anything else, or of another map.
  */
 export function killedIn(section: unknown, map: number | undefined): Set<string> {
   const told = (typeof section === 'object' && section ? section : {}) as { map?: unknown; list?: unknown }
   if (map === undefined || told.map !== map || !Array.isArray(told.list)) return new Set()
-  return new Set(told.list.filter((name): name is string => typeof name === 'string').map(nameOfBoss))
+  const names = told.list.filter((name): name is string => typeof name === 'string').map(nameOfBoss)
+  return new Set(names.flatMap((name) => [name, ...(KILL_OF.get(name) ?? [])]))
 }
-/** A boss's name as two sources may write it: the letters only, small. */
-export const nameOfBoss = (name: string): string => name.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
 
 export interface Yards { u: number; v: number }
 /** u1, v1, u2, v2. */
