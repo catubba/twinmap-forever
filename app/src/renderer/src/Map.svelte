@@ -7,6 +7,7 @@
   import 'leaflet/dist/leaflet.css'
   import { onMount, untrack } from 'svelte'
   import { DUNGEON_PINS } from '../../shared/dungeon-pins'
+  import { NEW_DUNGEON_PINS } from '../../shared/new-dungeon-pins'
   import type { Position } from '../../shared/game'
   import { coloursFor, type Companion } from '../../shared/group'
   import { unitsOfPlace, unitsOfRect, type Point } from '../../shared/geo'
@@ -405,7 +406,7 @@
     upTo = levels
     showRooms(m.pieces)
     // The dungeons of this map: one, or its wings.
-    const dungeons = DUNGEON_PINS.filter((d) => d.map === m.id)
+    const dungeons = [...DUNGEON_PINS, ...NEW_DUNGEON_PINS].filter((d) => d.map === m.id)
     const bossMarks: typeof bosses = []
     pinned = dungeons.length > 0
     for (const d of dungeons) {

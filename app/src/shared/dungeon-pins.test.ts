@@ -1,13 +1,21 @@
 import { expect, test } from 'vitest'
 import { DUNGEON_PINS } from './dungeon-pins'
+import { NEW_DUNGEON_PINS } from './new-dungeon-pins'
 
 test('the list covers the 24 dungeon maps, each entry once', () => {
   expect(new Set(DUNGEON_PINS.map((d) => d.map)).size).toBe(24)
   expect(new Set(DUNGEON_PINS.map((d) => d.name)).size).toBe(DUNGEON_PINS.length)
 })
 
+test('the dungeons Forever added last have their own list: five maps, none of them in the other', () => {
+  expect(NEW_DUNGEON_PINS.map((d) => d.map)).toEqual([2970, 2974, 2994, 3001, 3039])
+  expect(NEW_DUNGEON_PINS.every((d) => d.entrance && !DUNGEON_PINS.some((old) => old.map === d.map))).toBe(true)
+  // The bosses of The Drowned City by the names the game tells a kill with.
+  expect(NEW_DUNGEON_PINS[0]!.bosses.map((b) => b[0])).toEqual(["Zul'Alai", "Var'Taka", 'Primeval Elemental', 'Captain Dreadrise', 'Deathless Guardians', "Min'loth the Serpent"])
+})
+
 test('every boss and entrance lies inside what its dungeon shows', () => {
-  for (const d of DUNGEON_PINS) {
+  for (const d of [...DUNGEON_PINS, ...NEW_DUNGEON_PINS]) {
     const [u1, v1, u2, v2] = d.bounds
     expect(u1 < u2 && v1 < v2, d.name).toBe(true)
     expect(d.bosses.length, d.name).toBeGreaterThan(0)
