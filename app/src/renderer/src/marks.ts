@@ -36,6 +36,10 @@ const DRAWINGS = {
   boss: [22, `<circle cx="11" cy="11" r="10.25" fill="#a3201a" ${EDGE}/>${SKULL}`],
   // A boss already killed: the disc gone dark, the skull dim, a red cut across it.
   slain: [22, `<circle cx="11" cy="11" r="10.25" fill="#3a3431" ${EDGE}/><g opacity=".45">${SKULL}</g><path d="M4.500 16.500 17.500 5.500" fill="none" stroke="#000" stroke-width="4.200" stroke-linecap="round"/><path d="M4.500 16.500 17.500 5.500" fill="none" stroke="#e0352b" stroke-width="2.200" stroke-linecap="round"/>`],
+  // A boss that is not there in every run: the same disc and skull in a silver ring, the ring the game puts round a rare's portrait.
+  rareBoss: [26, `<circle cx="13" cy="13" r="12.25" fill="#d5d9df" ${EDGE}/><circle cx="13" cy="13" r="9.4" fill="#a3201a" stroke="#000" stroke-width="1"/><g transform="translate(13 13) scale(.9) translate(-11 -11)">${SKULL}</g>`],
+  // The same killed: the ring gone grey, the disc dark, the skull dim, the red cut.
+  rareSlain: [26, `<circle cx="13" cy="13" r="12.25" fill="#7d8189" ${EDGE}/><circle cx="13" cy="13" r="9.4" fill="#3a3431" stroke="#000" stroke-width="1"/><g opacity=".45" transform="translate(13 13) scale(.9) translate(-11 -11)">${SKULL}</g><path d="M6 19 20 7" fill="none" stroke="#000" stroke-width="4.200" stroke-linecap="round"/><path d="M6 19 20 7" fill="none" stroke="#e0352b" stroke-width="2.200" stroke-linecap="round"/>`],
   // The door of a dungeon.
   dungeon: [16, `<path d="M2 15.25V7.5a6 6 0 0 1 12 0v7.75Z" fill="${TEXT}" ${EDGE}/><path d="M5.6 15.25V8.2a2.4 2.4 0 0 1 4.8 0v7.05Z"/>`],
   // A rare creature or a treasure.

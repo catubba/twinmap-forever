@@ -68,6 +68,10 @@ const FIGHTS: Record<string, string[]> = {
   "Jammal'an and Ogom": ["Jammal'an the Prophet", 'Ogom the Wretched'], // The Temple of Atal'Hakkar
   'Morphaz and Hazzas': ['Morphaz', 'Hazzas'],
 }
+// The bosses on the pins that are not there in every run, as AnoUI's dungeon maps mark them (rare: true);
+// all but Lordaeron Captain, a boss of Forever, are rare spawns in the classic game as well.
+export const RARE_BOSSES = new Set(['Miner Johnson', 'Ragglesnout', 'Pyromancer Loregrain', 'Skul', 'Stonespine', 'Hearthsinger Forresten', 'Lordaeron Captain'].map(nameOfBoss))
+
 const KILL_OF = new Map(Object.entries(FIGHTS).map(([fight, creatures]) => [nameOfBoss(fight), creatures.map(nameOfBoss)]))
 
 /**

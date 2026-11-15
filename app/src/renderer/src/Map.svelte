@@ -12,7 +12,7 @@
   import { coloursFor, type Companion } from '../../shared/group'
   import { unitsOfPlace, unitsOfRect, type Point } from '../../shared/geo'
   import { addFix, BEHIND, PERIOD, whereAt, type Fix } from '../../shared/glide'
-  import { boxOf, buildingsAt, killedIn, nameOfBoss, piecesIn, roomPixels, yardsInside, YARDS_PER_UNIT, type Box, type InteriorMap, type Interiors, type Piece, type Yards } from '../../shared/inside'
+  import { boxOf, buildingsAt, killedIn, nameOfBoss, piecesIn, RARE_BOSSES, roomPixels, yardsInside, YARDS_PER_UNIT, type Box, type InteriorMap, type Interiors, type Piece, type Yards } from '../../shared/inside'
   import type { Continent, GameMap } from '../../shared/maps'
   import type { QuestPin } from '../../shared/quests'
   import { iconOf, serves, type FixedLayer, type FixedPin, type Travel } from '../../shared/services'
@@ -386,15 +386,18 @@
     mark.append(picture)
     return L.divIcon({ className: 'door', iconSize: [DOOR, DOOR], html: mark })
   }
-  const bossIcon = (gone: boolean): L.DivIcon => L.divIcon({ className: gone ? 'door' : 'door boss', iconSize: [22, 22], html: pin(gone ? 'slain' : 'boss') })
-  let bosses = $state.raw<{ name: string; marker: L.Marker; gone?: boolean }[]>([])
+  const bossIcon = (gone: boolean, rare: boolean): L.DivIcon => {
+    const size = rare ? 26 : 22
+    return L.divIcon({ className: gone ? 'door' : 'door boss', iconSize: [size, size], html: pin(rare ? (gone ? 'rareSlain' : 'rareBoss') : gone ? 'slain' : 'boss') })
+  }
+  let bosses = $state.raw<{ name: string; rare: boolean; marker: L.Marker; gone?: boolean }[]>([])
   const dead = $derived(killedIn(kills, inside?.id))
   $effect(() => {
     for (const boss of bosses) {
       const gone = dead.has(nameOfBoss(boss.name))
       if (gone === boss.gone) continue // the section comes again and again, unchanged
       boss.gone = gone
-      boss.marker.setIcon(bossIcon(gone))
+      boss.marker.setIcon(bossIcon(gone, boss.rare))
       // The name is there already: its look changes where it is, and for when it is drawn again.
       const name = boss.marker.getTooltip()
       if (name) name.options.className = gone ? 'boss-name dead' : 'boss-name'
@@ -426,7 +429,11 @@
     for (const d of dungeons) {
       // A boss: its skull, and its name written under it, there without the pointer on it. On a second
       // screen nobody hovers while playing.
-      for (const [name, u, v] of d.bosses) bossMarks.push({ name, gone: false, marker: L.marker(atYards({ u, v }), { keyboard: false, icon: bossIcon(false) }).bindTooltip(name, { permanent: true, direction: 'bottom', offset: [0, 9], className: 'boss-name' }).addTo(pins) })
+      for (const [name, u, v] of d.bosses) {
+        // A rare boss is not there in every run: a silver ring, and said in its name.
+        const rare = RARE_BOSSES.has(nameOfBoss(name))
+        bossMarks.push({ name, rare, gone: false, marker: L.marker(atYards({ u, v }), { keyboard: false, icon: bossIcon(false, rare) }).bindTooltip(rare ? `${name} (rare)` : name, { permanent: true, direction: 'bottom', offset: [0, rare ? 11 : 9], className: 'boss-name' }).addTo(pins) })
+      }
       if (d.entrance)
         L.marker(atYards({ u: d.entrance[0], v: d.entrance[1] }), { keyboard: false, icon: doorIcon(m.kind === 'raid') })
           .bindTooltip(dungeons.length > 1 ? `Entrance: ${d.name}` : 'Entrance', { direction: 'top', offset: [0, -13], className: 'tip' })
