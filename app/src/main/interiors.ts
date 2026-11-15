@@ -28,7 +28,7 @@ import { BLOCK_YARDS, BLOCKS, minimapTiles, WORLDS } from '../shared/world'
 import { EncryptedFileError } from './client-files'
 import { convertWorld, keep } from './tiles'
 
-/** The file numbers of the three tables in the game's archive. They have parts the game keeps encrypted: read around them. */
+/** The file numbers of the three tables in the game's archive. They have parts the game keeps encrypted: read around the ones still locked. */
 export const MAP_FILE = 1349477
 export const ROOM_PICTURES_FILE = 1323241
 export const ENCOUNTERS_FILE = 1347279
@@ -270,7 +270,7 @@ export function convertInteriors(
   folder: string,
   onProgress?: (done: number, total: number) => void,
 ): Interiors {
-  // A file the game keeps encrypted is a file the map does without.
+  // A file still locked (the server has sent no key for it) is a file the map does without.
   const get = (id: number): Buffer | null => {
     try {
       return read(id)

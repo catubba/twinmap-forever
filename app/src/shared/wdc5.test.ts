@@ -90,6 +90,11 @@ function fakeTable(): Buffer {
   return Buffer.concat([head, sections, sizes, storage, pallet, common, body, Buffer.alloc(HIDDEN_ROWS * RECORD, 0xee)])
 }
 
+test('a locked section is read when the caller says its key opened it, and only that key', () => {
+  expect(readTable(fakeTable(), (keyName) => keyName === '0da4670db36fb2a9')).toMatchObject({ rows: { length: 4 }, encryptedRows: 0 })
+  expect(readTable(fakeTable(), (keyName) => keyName === 'd2c028cb7ac14d0b')).toMatchObject({ rows: { length: 3 }, encryptedRows: 1 })
+})
+
 test('every kind of column reads back: text, whole and decimal numbers, pallet, packed, common', () => {
   const table = readTable(fakeTable())
   expect([table.fields, table.rows.length, table.encryptedRows]).toEqual([6, 3, 1])

@@ -4,7 +4,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { deflateSync } from 'node:zlib'
 import { expect, test } from 'vitest'
+import { salsa20 } from '../shared/salsa20'
 import { EncryptedFileError, gameFolderFrom, installedBuild, openClientFiles, registryInstallPath } from './client-files'
+import { sentKeys } from './keys'
 
 const md5 = (b: Buffer): Buffer => createHash('md5').update(b).digest()
 const u32le = (...v: number[]): Buffer => Buffer.concat(v.map((x) => { const b = Buffer.alloc(4); b.writeUInt32LE(x >>> 0); return b }))
@@ -16,6 +18,28 @@ const packed = (text: string): Chunk => ({ mode: 'Z', data: Buffer.from(text) })
 const KEY_NAME = '0da4670db36fb2a9'
 // An encrypted chunk: key name length, the name with its bytes in reverse, then what only the game can read.
 const locked: Chunk = { mode: 'E', data: Buffer.concat([Buffer.from([8]), Buffer.from(KEY_NAME, 'hex').reverse(), Buffer.alloc(20, 7)]) }
+
+// A chunk locked as the game locks one: the name of the key, a nonce of 4 or 8 bytes, "S" for Salsa20, then a
+// plain chunk under the cipher. The nonce is changed by the chunk's place in the file before it is used.
+const SENT_NAME = 'd2c028cb7ac14d0b', SENT_NUMBER = 8283, SENT_KEY = Buffer.from('a key of 16 byte')
+function lockedWith(key: Buffer, text: string, place: number, nonceSize: 4 | 8): Chunk {
+  const nonce = Buffer.from([9, 8, 7, 6, 5, 4, 3, 2]).subarray(0, nonceSize), used = Buffer.alloc(8)
+  nonce.copy(used)
+  used[0]! ^= place
+  return { mode: 'E', data: Buffer.concat([Buffer.from([8]), Buffer.from(SENT_NAME, 'hex').reverse(), Buffer.from([nonceSize]), nonce, Buffer.from('S'), salsa20(key, used, Buffer.from('N' + text))]) }
+}
+// The game's table of the names of its keys, with one row: the name, then the number the key goes by.
+function keyNames(): Chunk {
+  const table = Buffer.alloc(204 + 40 + 8 + 4)
+  table.write('WDC5', 'latin1')
+  table.writeUInt32LE(8, 144) // the size of a row
+  table.writeUInt32LE(1, 200) // sections
+  table.writeUInt32LE(244, 204 + 8) // where the rows are
+  table.writeUInt32LE(1, 204 + 12) // how many
+  Buffer.from(SENT_NAME, 'hex').reverse().copy(table, 244)
+  table.writeUInt32LE(SENT_NUMBER, 252)
+  return { mode: 'N', data: table }
+}
 
 function blte(chunks: Chunk[], headerless = false): Buffer {
   const bodies = chunks.map((c) => Buffer.concat([Buffer.from(c.mode), c.mode === 'Z' ? deflateSync(c.data) : c.data]))
@@ -153,6 +177,24 @@ test('asked to skip what is hidden, the encrypted part comes as zeros of its siz
   expect(client.read(70000, true)).toEqual(Buffer.concat([start, Buffer.alloc(locked.data.length)]))
 })
 
+test('a part locked with a key the server has sent is opened; with another key, or none, it stays shut', () => {
+  const files: FakeFile[] = [
+    { id: 1302851, chunks: [keyNames()] },
+    { id: 70001, chunks: [plain('readable start, '), lockedWith(SENT_KEY, 'then what was locked', 1, 8), lockedWith(SENT_KEY, ', twice', 2, 4)] },
+    { id: 70000, chunks: [plain('readable start'), locked] },
+  ]
+  const folder = fakeClient(files, 2), client = openClientFiles(folder, new Map([[SENT_NUMBER, SENT_KEY]]))
+  expect(client.read(70001)!.toString()).toBe('readable start, then what was locked, twice')
+  expect([client.opens(SENT_NAME), client.opens(KEY_NAME)]).toEqual([true, false])
+  expect(() => client.read(70000)).toThrow(KEY_NAME) // a key the server has not sent
+  // Without the key, or with the key of another number, as before.
+  for (const keys of [undefined, new Map([[8334, SENT_KEY]])]) {
+    const shut = openClientFiles(folder, keys)
+    expect(() => shut.read(70001)).toThrow(SENT_NAME)
+    expect(shut.opens(SENT_NAME)).toBe(false)
+  }
+})
+
 test('a file the archive does not hold is refused, and the error names the file and the archive', () => {
   const folder = fakeClient(FILES, 2)
   const client = openClientFiles(folder)
@@ -186,4 +228,13 @@ test.skipIf(!real)('the real game opens and gives UiMap in under a second', () =
   expect(table.toString('latin1', 0, 4)).toBe('WDC5')
   expect(table.readUInt32LE(136)).toBe(60) // records
   expect(ms).toBeLessThan(1000)
+})
+
+// On a PC whose game has been sent the key of the dungeons that came out in November 2026: the world file of The Drowned City.
+const sent = real ? sentKeys(real) : new Map<number, Buffer>()
+test.skipIf(!sent.has(8283))('the real game opens a locked world file with the key the server sent, and not without', () => {
+  expect(() => openClientFiles(real!).read(6992746)).toThrow(EncryptedFileError)
+  const world = openClientFiles(real!, sent).read(6992746)!
+  expect(world.toString('latin1', 0, 4)).toBe('REVM')
+  expect(world.length).toBe(163908)
 })

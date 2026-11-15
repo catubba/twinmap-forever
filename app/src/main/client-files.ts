@@ -1,6 +1,7 @@
 // Reads the player's own game files, straight from the game's archive (CASC) on their PC. Read
-// only: nothing is written there, nothing leaves the PC, and what the game keeps encrypted stays
-// unread. The game can be running meanwhile.
+// only: nothing is written there, nothing leaves the PC. What the game keeps encrypted stays unread,
+// but for the parts whose key the server has already sent to this PC (keys.ts). The game can be
+// running meanwhile.
 //
 // The chain, from a file's number to its bytes:
 //   .build.info            which build of the product is installed, and its build key
@@ -15,19 +16,21 @@ import { execFileSync } from 'node:child_process'
 import { closeSync, existsSync, openSync, readdirSync, readFileSync, readSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { inflateSync } from 'node:zlib'
+import { salsa20 } from '../shared/salsa20'
 
 /** World of Warcraft: Forever, as the game's own files call it. */
 export const PRODUCT = 'wowf'
 
+const KEY_NAMES_FILE = 1302851 // the game's table of the names of its keys
 const RECORD_HEADER = 30 // bytes before the BLTE container of a record
 const INDEX_ENTRY = 18 // bytes: 9 of key, 5 of archive and offset, 4 of size
 const NO_NAMES = 0x10000000 // root block flag: the block carries no name hashes
 const EN_US = 2 // root block locale bit
 
-/** A file, or a part of one, that the game keeps encrypted. Twinmap never decrypts. */
+/** A file, or a part of one, that the game keeps encrypted and the server has sent this PC no key for. */
 export class EncryptedFileError extends Error {
   constructor(readonly keyName: string) {
-    super(`this game file is encrypted (key ${keyName}): Twinmap does not read what the game keeps hidden`)
+    super(`this game file is encrypted (key ${keyName}) and the game has not been given its key`)
     this.name = 'EncryptedFileError'
   }
 }
@@ -41,10 +44,12 @@ export interface ClientFiles {
   count: number
   /**
    * The bytes of a file by its number, or null when the build has no such file. Throws
-   * EncryptedFileError, unless skipHidden: then the parts the game keeps encrypted come as zeros,
+   * EncryptedFileError, unless skipHidden: then the parts still locked come as zeros,
    * unread (a table says which of its sections those are, and wdc5.ts leaves them out).
    */
   read(id: number, skipHidden?: boolean): Buffer | null
+  /** Whether the parts locked with the key of this name are opened: the server has sent the key to this PC. */
+  opens(keyName: string): boolean
 }
 
 /** The build of the product installed in a game folder, or null when the folder has none. */
@@ -92,16 +97,29 @@ export function registryInstallPath(): string | null {
 
 /**
  * Decodes a BLTE container: chunks stored plain or deflated, one after the other. An encrypted
- * chunk is never decrypted: it throws, or with skipHidden it comes as zeros of its plain size.
+ * chunk is opened with the key keyOf gives for its name; with none it throws, or with skipHidden
+ * it comes as zeros of its plain size.
  */
-export function decodeBlte(b: Buffer, skipHidden = false): Buffer {
+export function decodeBlte(b: Buffer, skipHidden = false, keyOf: (keyName: string) => Buffer | null = () => null): Buffer {
   if (b.toString('latin1', 0, 4) !== 'BLTE') throw new Error('not a BLTE container')
-  const chunk = (c: Buffer, plainSize?: number): Buffer => {
+  const chunk = (c: Buffer, plainSize?: number, index = 0): Buffer => {
     const mode = String.fromCharCode(c[0] ?? 0)
     if (mode === 'N') return c.subarray(1)
     if (mode === 'Z') return inflateSync(c.subarray(1))
-    if (mode === 'E' && skipHidden && plainSize !== undefined) return Buffer.alloc(plainSize)
-    if (mode === 'E') throw new EncryptedFileError(Buffer.from(c.subarray(2, 10)).reverse().toString('hex'))
+    if (mode === 'E') {
+      // After the mode: the size of the key's name (8) and the name, the size of the nonce and the
+      // nonce, the cipher ("S" for Salsa20), the data. The nonce is changed by the chunk's place in the file.
+      const keyName = Buffer.from(c.subarray(2, 10)).reverse().toString('hex'), nonceSize = c[10] ?? 0
+      const key = c[1] === 8 && nonceSize <= 8 && c[11 + nonceSize] === 0x53 ? keyOf(keyName) : null
+      if (key) {
+        const nonce = Buffer.alloc(8)
+        c.copy(nonce, 0, 11, 11 + nonceSize)
+        for (let k = 0; k < 4; k++) nonce[k]! ^= (index >>> (8 * k)) & 255
+        return chunk(salsa20(key, nonce, c.subarray(12 + nonceSize)), plainSize, index)
+      }
+      if (skipHidden && plainSize !== undefined) return Buffer.alloc(plainSize)
+      throw new EncryptedFileError(keyName)
+    }
     throw new Error(`BLTE chunk of unknown kind "${mode}"`)
   }
   const headerSize = b.readUInt32BE(4)
@@ -109,14 +127,18 @@ export function decodeBlte(b: Buffer, skipHidden = false): Buffer {
   const parts: Buffer[] = []
   for (let i = 0, count = b.readUIntBE(9, 3), at = headerSize; i < count; i++) {
     const size = b.readUInt32BE(12 + i * 24)
-    parts.push(chunk(b.subarray(at, at + size), b.readUInt32BE(16 + i * 24)))
+    parts.push(chunk(b.subarray(at, at + size), b.readUInt32BE(16 + i * 24), i))
     at += size
   }
   return Buffer.concat(parts)
 }
 
-/** Opens the game files of a game folder. Reads the build's two big tables once: about half a second. */
-export function openClientFiles(folder: string): ClientFiles {
+/**
+ * Opens the game files of a game folder. Reads the build's two big tables once: about half a second.
+ * keys: the keys the server has sent to this PC, by the game's number of each (keys.ts); with them
+ * the parts they lock are read like the rest.
+ */
+export function openClientFiles(folder: string, keys: Map<number, Buffer> = new Map()): ClientFiles {
   const build = installedBuild(folder)
   if (!build) throw new Error(`no ${PRODUCT} game in ${folder}`)
   const key = build.buildKey
@@ -151,6 +173,25 @@ export function openClientFiles(folder: string): ClientFiles {
     return entries
   }
 
+  // A locked part names its key; the game's table of key names gives the number the key goes by.
+  let numbers: Map<string, number> | undefined
+  const keyOf = (keyName: string): Buffer | null => {
+    if (!keys.size) return null
+    if (!numbers) {
+      numbers = new Map() // set first: reading the table of names must not ask for a key
+      const table = files.read(KEY_NAMES_FILE, true)
+      if (table && table.toString('latin1', 0, 4) === 'WDC5' && table.readUInt32LE(144) === 8) {
+        // Each row is the 8 bytes of a name; the rows' numbers follow the rows and the texts of their section.
+        for (let s = 0, sections = table.readUInt32LE(200); s < sections; s++) {
+          const p = 204 + s * 40, rows = table.readUInt32LE(p + 8), count = table.readUInt32LE(p + 12), ids = rows + count * 8 + table.readUInt32LE(p + 16)
+          for (let i = 0; i < count; i++) numbers.set(Buffer.from(table.subarray(rows + i * 8, rows + i * 8 + 8)).reverse().toString('hex'), table.readUInt32LE(ids + i * 4))
+        }
+      }
+    }
+    const number = numbers.get(keyName)
+    return number === undefined ? null : keys.get(number) ?? null
+  }
+
   const readEncoded = (ekey: Buffer, skipHidden = false): Buffer | null => {
     const short = ekey.subarray(0, 9)
     let x = 0
@@ -178,7 +219,7 @@ export function openClientFiles(folder: string): ClientFiles {
         // The container comes after the header of the record, or at once where the record has none.
         const bare = record.toString('latin1', RECORD_HEADER, RECORD_HEADER + 4) !== 'BLTE' && record.toString('latin1', 0, 4) === 'BLTE'
         try {
-          return decodeBlte(bare ? record : record.subarray(RECORD_HEADER), skipHidden)
+          return decodeBlte(bare ? record : record.subarray(RECORD_HEADER), skipHidden, keyOf)
         } catch (e) {
           if (e instanceof EncryptedFileError) throw e
           // How it starts goes with the error: what tells one kind of unreadable record from another.
@@ -269,7 +310,7 @@ export function openClientFiles(folder: string): ClientFiles {
     at = keys + n * 16 + (total !== named && flags & NO_NAMES ? 0 : n * 8)
   }
 
-  return {
+  const files: ClientFiles = {
     version: build.version,
     buildKey: key,
     count: keyAt.size,
@@ -282,5 +323,7 @@ export function openClientFiles(folder: string): ClientFiles {
       }
       return null
     },
+    opens: (keyName) => keyOf(keyName) !== null,
   }
+  return files
 }

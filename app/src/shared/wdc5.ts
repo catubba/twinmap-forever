@@ -1,6 +1,7 @@
 // Reads a table of the game (a .db2 file in the WDC5 format). The file says by itself how each
 // column is stored, so no outside definition is needed: only which column means what, which the
-// caller knows. Sections the game keeps encrypted are skipped and counted, never decrypted.
+// caller knows. Sections the game keeps encrypted are skipped and counted, unless the caller says
+// they came opened (the server has sent this PC their key: main/keys.ts).
 //
 // Layout: header, section headers, field sizes, field storage, pallet data, common data, then
 // for each section its records, texts, id list, copy table and parent ids.
@@ -25,7 +26,7 @@ export interface Table {
   /** Columns in a row. */
   fields: number
   rows: Row[]
-  /** Rows the game keeps encrypted: not read. */
+  /** Rows the game keeps encrypted and this PC has no key for: not read. */
   encryptedRows: number
 }
 
@@ -42,7 +43,8 @@ interface Field {
 
 const float32 = new Float32Array(1), bits32 = new Uint32Array(float32.buffer)
 
-export function readTable(b: Buffer): Table {
+/** opens: whether the sections locked with the key of this name came opened; by default none did. */
+export function readTable(b: Buffer, opens: (keyName: string) => boolean = () => false): Table {
   if (b.toString('latin1', 0, 4) !== 'WDC5') throw new Error('not a WDC5 table')
   const u32 = (at: number): number => b.readUInt32LE(at)
   const recordSize = u32(144), flags = b.readUInt16LE(172), idIndex = b.readUInt16LE(174)
@@ -52,7 +54,8 @@ export function readTable(b: Buffer): Table {
   let at = HEADER
   const sections = Array.from({ length: sectionCount }, (_, i) => {
     const p = at + i * SECTION
-    return { encrypted: b.readBigUInt64LE(p) !== 0n, offset: u32(p + 8), rows: u32(p + 12), texts: u32(p + 16), ids: u32(p + 24), parents: u32(p + 28), offsetMap: u32(p + 32), copies: u32(p + 36) }
+    const key = b.readBigUInt64LE(p)
+    return { encrypted: key !== 0n && !opens(key.toString(16).padStart(16, '0')), offset: u32(p + 8), rows: u32(p + 12), texts: u32(p + 16), ids: u32(p + 24), parents: u32(p + 28), offsetMap: u32(p + 32), copies: u32(p + 36) }
   })
   at += sectionCount * SECTION
   const sizes = Array.from({ length: totalFields }, (_, i) => 32 - b.readInt16LE(at + i * 4))
