@@ -4,6 +4,8 @@
 // DUNGEON_MAPS table), GPL-3.0-or-later. One for All has these places from Forever Simple World
 // Map 0.30.2 by Tarolg, MIT License, Copyright (c) 2026 Tarolg.
 // The names of the dungeons, their split in wings (part) and what to show (bounds) are One for All's.
+// Two bosses have the name the game tells their kill with, not One for All's: Infurnus (Magmatus)
+// and The Butcher (The Baron).
 // Both notices are in THIRD-PARTY-LICENSES.
 //
 // The places are in the map's own yards, as the rooms in interiors.json: u east and v south from
@@ -435,7 +437,7 @@ export const DUNGEON_PINS: DungeonPins[] = [
     bounds: [16580, 15176, 17088, 15756],
     entrance: [16911.3, 15260.1],
     bosses: [
-      ['The Baron', 16888.7, 15578.7],
+      ['The Butcher', 16888.7, 15578.7],
       ['Witherfang', 16969, 15376.8],
       ['The Abandoned', 16711.3, 15468.5],
       ['Bjork', 16693.5, 15397],
@@ -451,7 +453,7 @@ export const DUNGEON_PINS: DungeonPins[] = [
     entrance: [17066.1, 17173],
     bosses: [
       ['Faldrim Anvilmar', 17068, 16986],
-      ['Magmatus', 17174, 16904.4],
+      ['Infurnus', 17174, 16904.4],
       ['Plunder', 17069.7, 16907.3],
       ['Durgen Dirgehammer', 17071.4, 16740.8],
     ],
