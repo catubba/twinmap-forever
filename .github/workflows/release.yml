@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: write
+  actions: read # the release reads the CI runs of its commit
 
 jobs:
   release:
@@ -22,6 +23,25 @@ jobs:
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
+      # A release is published only from a commit of main whose CI passed: the jobs of ci.yml, the addon's
+      # and the server's tests among them, are not run again here. The tag usually lands while that run is
+      # still going, so wait for it. A pre-release may be cut from anywhere.
+      - name: Wait for a green CI on main for this commit
+        run: |
+          case "$GITHUB_REF_NAME" in *-*) exit 0 ;; esac
+          for attempt in $(seq 1 60); do
+            state=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$GITHUB_SHA&event=push&branch=main" \
+              --jq '.workflow_runs | if length == 0 then "none/" else (max_by(.run_started_at) | "\(.status)/\(.conclusion // "")") end') || state="unreadable/"
+            case "$state" in
+              completed/success) echo "CI on main is green for $GITHUB_SHA"; exit 0 ;;
+              completed/*) echo "::error::CI on main did not pass ($state) for $GITHUB_SHA"; exit 1 ;;
+              none/*) echo "::error::No CI run on main for $GITHUB_SHA: tag a commit of main"; exit 1 ;;
+            esac
+            echo "CI on main is $state for $GITHUB_SHA, waiting ($attempt of 60)"
+            sleep 20
+          done
+          echo "::error::CI on main is still running for $GITHUB_SHA after 20 minutes"
+          exit 1
       - uses: actions/setup-node@v4
         with:
           node-version: 24
