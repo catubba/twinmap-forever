@@ -2,6 +2,21 @@
 
 What changed in each version of Twinmap, newest first. The section of a version is also the text of its release on GitHub and of the addon's file on CurseForge.
 
+## 0.5.0 - 2026-11-15
+
+### New
+
+- **Your companions inside dungeons.** In a dungeon or a raid the game tells addons nothing of where anyone is, so a companion in there had no disc on the map. Each Twinmap now tells the group the place it finds for its own character, and your companions are on the map of the dungeon with you. Each of them needs Twinmap at this version, app and addon. A companion without it is shown without a place inside, as before.
+
+### Changed
+
+- **What you send to the game arrives without a /reload.** After some pins and routes the app could ask you to type /reload in the game before it would send again. It no longer does: there is no limit to what you send, it arrives in a fight too, and a send the game missed goes again by itself.
+- **Update the app and the addon together.** The addon of this version needs the app of this version. If the app says "Update the app", close Twinmap and open it again: it updates itself when it starts. An addon not updated yet still works with the new app.
+
+### Fixed
+
+- **The arrow in the wrong part of a dungeon.** In a dungeon whose parts look alike the arrow could take long to come and then stand in the wrong part, outside every room. Seen in Scarlet Monastery, where a character in the Library was shown in the Graveyard.
+
 ## 0.4.0 - 2026-11-14
 
 ### New
