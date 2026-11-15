@@ -2,6 +2,23 @@
 
 What changed in each version of Twinmap, newest first. The section of a version is also the text of its release on GitHub and of the addon's file on CurseForge.
 
+## 0.8.0 - 2026-11-15
+
+### New
+
+- **Your corpse and the way back.** When you die the map marks your corpse, the graveyard where your ghost came back, and the way on foot between the two. If you died in a dungeon it marks the door of that dungeon instead: you live again as soon as you walk in. The marks go away when you are alive again. They have a layer of their own, Corpse and graveyard.
+- **Attention.** A new block above your quests says what needs you now. Its first line is your corpse, or the dungeon to walk back into, with how far it is.
+- **Bosses of the newest dungeons.** The Drowned City, Blackmaw Hold, Alcaz Prison, The Shaper's Terrace and Krol'dok Stronghold have a skull for each boss and their entrance. The places come from players' guides and may be some tens of yards off.
+
+### Changed
+
+- **The doors of dungeons and raids.** A door is now the swirl the game's own maps use, blue for a dungeon and green for a raid, and larger than the other pins.
+- **The label of a point.** It opens a little further from its point, and a gold line ties the two, so you see at once which point it speaks of.
+
+### Fixed
+
+- **Bosses that stayed unmarked when killed.** Gelihast, the three Lost Dwarves of Uldaman, Doom'rel, Magmatus, The Baron and the pairs of The Temple of Atal'Hakkar are now marked as killed like the others.
+
 ## 0.7.0 - 2026-11-15
 
 ### New

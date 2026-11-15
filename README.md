@@ -27,6 +27,7 @@ Twinmap is an interactive map of World of Warcraft: Forever for your second scre
 - **Your quests.** Where to hand in what is done and where to find what is left, for every quest of your log. With Questie installed, the same quests Questie shows to your character, the ones to take as well.
 - **Services and resources.** Flight masters, inns, vendors, repair, trainers, banks, ore and herbs, each one a layer you turn on or off.
 - **Your group.** The companions of your party are on the map with you, each in a colour of their own, with their role on the disc. Inside dungeons and raids too, when they have Twinmap.
+- **When you die.** The map marks your corpse, the graveyard and the way back on foot, or the door of the dungeon you died in.
 - **Search.** NPCs, items, quests and zones, with the distance on foot.
 - **From the map to the game.** Mark a point or build a route on Twinmap, and it appears in the game.
 - **Phone and tablet.** No second monitor? Open the same map in the browser of a phone, a tablet or a laptop on your home network.
