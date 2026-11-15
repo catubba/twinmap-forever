@@ -115,3 +115,24 @@ test('the minimap of a game at 1920 stretched over 2560 pixels is found as well'
   expect(Math.abs(found.u - 1320)).toBeLessThanOrEqual(1.5)
   expect(Math.abs(found.v - 2290)).toBeLessThanOrEqual(1.5)
 })
+
+test('rooms the map has and the minimap does not show do not move the place to a wing that looks alike', () => {
+  // Two wings with the same hall. The second has a corridor beside it, where the character is, and
+  // further on a large room that the game leaves off its minimap.
+  const width = 900, height = 400
+  const paint = (grey: Float32Array, u: number, v: number, w: number, h: number, light: number): void => {
+    for (let y = v; y < v + h; y++) for (let x = u; x < u + w; x++) grey[y * width + x] = light + ((x >> 2) + (y >> 2)) % 2 * 30
+  }
+  const wings = (all: boolean): Mosaic => {
+    const grey = new Float32Array(width * height)
+    paint(grey, 180, 170, 50, 70, 150) // the hall of the first wing
+    paint(grey, 620, 170, 50, 70, 150) // the same hall, of the second
+    paint(grey, 685, 160, 14, 90, 190) // its corridor
+    if (all) paint(grey, 715, 150, 90, 110, 110) // the room past the corridor
+    return { u0: 1000, v0: 2000, width, height, grey }
+  }
+  const found = locate(levelsOf(wings(true)), shown(wings(false), 1692, 2205, 238), 0)!
+  expect(found.score).toBeGreaterThanOrEqual(SURE)
+  expect(Math.abs(found.u - 1692)).toBeLessThanOrEqual(1.5)
+  expect(Math.abs(found.v - 2205)).toBeLessThanOrEqual(1.5)
+})

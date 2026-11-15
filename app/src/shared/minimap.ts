@@ -39,6 +39,8 @@ const ARROW = 0.1 // of the radius, around the middle: the arrow of the characte
 export const SURE = 0.75 // a likeness under this is not a place: the arrow goes, it does not guess
 const STEPS = [6, 2, 1] // yards a pixel, from the look at the whole dungeon to the last yard
 const NEAR = 12 // yards around the last place where the next is looked for: more than a second of running
+const LIT = 40 // of 255: a pixel of the minimap lighter than this shows something; its background under a roof is black
+const BAND = 9 // yards around what the minimap shows that still count: the walls of a room are told by the black beside it
 
 const grey = (rgb: Uint8Array, i: number): number => rgb[i]! * 0.299 + rgb[i + 1]! * 0.587 + rgb[i + 2]! * 0.114
 
@@ -63,7 +65,7 @@ export interface Levels {
 }
 export const levelsOf = (mosaic: Mosaic): Levels => ({ mosaic, at: STEPS.map((step) => ({ step, ...shrunk(mosaic, step) })) })
 
-/** The round middle of the minimap at `step` yards a pixel: where each pixel that counts is, and how far its grey is from their mean. */
+/** The round middle of the minimap at `step` yards a pixel: where each pixel that counts is (those on and near what the minimap shows), and how far its grey is from their mean. */
 interface Template {
   size: number
   dx: Int32Array
@@ -75,10 +77,10 @@ interface Template {
 
 function templateOf(box: Box, across: number, step: number, thin: number): Template {
   const size = Math.round(across / step), per = box.size / size
-  const dx: number[] = [], dy: number[] = [], value: number[] = []
-  let sum = 0
-  for (let y = 0; y < size; y += thin) {
-    for (let x = 0; x < size; x += thin) {
+  // Every pixel of the round middle first: its grey, and whether the minimap shows anything there.
+  const greys = new Float32Array(size * size), counts = new Uint8Array(size * size), lit = new Uint8Array(size * size)
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
       const far = Math.hypot(x + 0.5 - size / 2, y + 0.5 - size / 2) / (size / 2)
       if (far >= KEEP || far <= ARROW) continue
       // The mean of the pixels of the screen under this one.
@@ -86,10 +88,27 @@ function templateOf(box: Box, across: number, step: number, thin: number): Templ
       let g = 0
       for (let sy = y0; sy < y1; sy++) for (let sx = x0; sx < x1; sx++) g += grey(box.rgb, (sy * box.size + sx) * 3)
       g /= (x1 - x0) * (y1 - y0)
+      greys[y * size + x] = g
+      counts[y * size + x] = 1
+      if (g > LIT) lit[y * size + x] = 1
+    }
+  }
+  // How many lit pixels there are up to each one, to ask of any square whether it holds one.
+  const sums = new Int32Array((size + 1) * (size + 1))
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) sums[(y + 1) * (size + 1) + x + 1] = lit[y * size + x]! + sums[y * (size + 1) + x + 1]! + sums[(y + 1) * (size + 1) + x]! - sums[y * (size + 1) + x]!
+  const band = Math.ceil(BAND / step)
+  const dx: number[] = [], dy: number[] = [], value: number[] = []
+  let sum = 0
+  for (let y = 0; y < size; y += thin) {
+    for (let x = 0; x < size; x += thin) {
+      if (!counts[y * size + x]) continue
+      // Only what the minimap shows and a band around it: the game leaves out rooms the map has, and far from the ones on show they would count against the right place.
+      const x0 = Math.max(0, x - band), x1 = Math.min(size, x + band + 1), y0 = Math.max(0, y - band), y1 = Math.min(size, y + band + 1)
+      if (sums[y1 * (size + 1) + x1]! - sums[y0 * (size + 1) + x1]! - sums[y1 * (size + 1) + x0]! + sums[y0 * (size + 1) + x0]! === 0) continue
       dx.push(x)
       dy.push(y)
-      value.push(g)
-      sum += g
+      value.push(greys[y * size + x]!)
+      sum += greys[y * size + x]!
     }
   }
   const mean = sum / value.length
