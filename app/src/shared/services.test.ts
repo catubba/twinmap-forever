@@ -85,7 +85,7 @@ test('doors and flights come from the tables of the maps and of the flight paths
   expect(added.format).toBe(TRAVEL_FORMAT)
   expect(told.doors).toEqual([
     { continent: 0, ...unitsOfWorld(-11207.8, 1681.2), names: ['Deadmines'] },
-    { continent: 1, ...unitsOfWorld(-8114.5, 1526.4), names: ["Ruins of Ahn'Qiraj", "Ahn'Qiraj Temple"] },
+    { continent: 1, ...unitsOfWorld(-8114.5, 1526.4), names: ["Ruins of Ahn'Qiraj", "Ahn'Qiraj Temple"], raid: true },
   ])
   expect(told.nodes.map((n) => `${n.continent} ${n.name} ${n.side}`)).toEqual(['0 Stormwind, Elwynn A', '0 Sentinel Hill, Westfall A', '0 Undercity, Tirisfal H', '1 Orgrimmar, Durotar H'])
   expect(told.nodes[0]).toMatchObject(unitsOfWorld(-8833, 479))

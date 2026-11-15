@@ -1,10 +1,18 @@
 import { join } from 'node:path'
 import { expect, test } from 'vitest'
 import { decodeBlpCutout } from '../shared/blp'
-import { withoutGround, withoutPointer } from './icons'
+import { cutOut, withoutGround, withoutPointer } from './icons'
 import { servedFile } from './tiles'
 
 const alphaAt = (c: { width: number; rgba: Uint8Array }, x: number, y: number): number => c.rgba[(y * c.width + x) * 4 + 3]!
+
+test('a picture is cut out of the sheet it is kept on', () => {
+  // A sheet of 8 x 4 pixels, each with its own number in the red.
+  const sheet = { width: 8, height: 4, rgba: new Uint8Array(8 * 4 * 4).map((_, i) => (i % 4 === 0 ? i / 4 : 255)) }
+  const cut = cutOut(sheet, 2, 5, 1, 3)
+  expect([cut.width, cut.height]).toEqual([3, 2])
+  expect([0, 1, 2, 3, 4, 5].map((i) => cut.rgba[i * 4])).toEqual([10, 11, 12, 18, 19, 20])
+})
 
 test('a cursor loses its pointer and keeps its picture', () => {
   const cursor = withoutPointer({ width: 32, height: 32, rgba: new Uint8Array(32 * 32 * 4).fill(255) })

@@ -12,7 +12,7 @@ import { WORLDS } from '../shared/world'
 import { installedBuild, openClientFiles, type ClientFiles } from './client-files'
 import { convertInteriors, ENCOUNTERS_FILE, finishedInteriors, INTERIORS_FILE, MAP_FILE, mapEntries, ROOM_PICTURES_FILE, roomPictures } from './interiors'
 import { sentKeys } from './keys'
-import { writeIcons } from './icons'
+import { ICONS_MADE, writeIcons } from './icons'
 import { convertWorld, dropOtherBuilds, finished, ICONS_FOLDER, MAPS_FILE, PLACES_FILE, tilesFolder, TRAVEL_FILE } from './tiles'
 
 const { gameFolder, base } = workerData as { gameFolder: string; base: string }
@@ -91,8 +91,8 @@ try {
     const [maps, nodes, paths] = [MAP_FILE, TAXI_NODES_FILE, TAXI_PATH_FILE].map((id) => files.read(id, true))
     writeFileSync(join(folder, TRAVEL_FILE), JSON.stringify(maps && nodes && paths ? travel(table(maps), table(nodes), table(paths), zones) : { format: TRAVEL_FORMAT, doors: [], nodes: [], routes: [] }))
   }
-  // The pictures of the pins. A folder made before the app knew of them gets them now.
-  if (!existsSync(join(folder, ICONS_FOLDER))) writeIcons(open(), folder)
+  // The pictures of the pins. A folder made before the app knew of them, or of some of them, gets them now.
+  if (!existsSync(join(folder, ICONS_FOLDER, ICONS_MADE))) writeIcons(open(), folder)
   const ready = { state: 'ready', folder, version: build.version, tiles, missing, seconds: (Date.now() - started) / 1000, converted } as const
   tell(ready)
 

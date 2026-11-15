@@ -1,7 +1,8 @@
 // The pictures of the pins of services, ore and herbs, taken from the player's own game and kept
 // beside the tiles as PNG files: what the minimap shows for who offers a service, the cursor of
-// the game over a herb or a vendor, and for a vein the picture of its ore. Nothing of them is in
-// the app: a game without them leaves the map its plain pins.
+// the game over a herb or a vendor, for a vein the picture of its ore, and for the door of a
+// dungeon or a raid the swirl the game's own maps mark it with. Nothing of them is in the app: a
+// game without them leaves the map its plain pins.
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { decodeBlpCutout, type Cutout } from '../shared/blp'
@@ -16,6 +17,14 @@ const TRACKING = { flight: 136456, inn: 136458, bank: 136453, auction: 136452, s
 /** Interface/Cursor: the picture beside the pointer. `ore` is for a vein whose ore has no picture. */
 const CURSORS = { herbs: 131018, vendors: 131014, ore: 131025 }
 const ITEM_FILE = 841626, ITEM_ICON = 7 // the table of the items, and its column with the number of the picture
+// The game keeps many small pictures on large sheets. Two tables say where each is: the sheets (their file) and
+// the pictures (name, sheet, left, right, top, bottom in pixels of the sheet).
+const SHEETS_FILE = 897470, SHEET_PICTURE = 1
+const SHEET_PICTURES_FILE = 897532, PICTURE_NAME = 0, PICTURE_SHEET = 2, PICTURE_LEFT = 5, PICTURE_RIGHT = 6, PICTURE_TOP = 7, PICTURE_BOTTOM = 8
+/** The swirls of the doors, by the names the game gives them: blue for a dungeon, green for a raid. */
+const SWIRLS = ['dungeon', 'raid']
+/** Written last in the folder of the icons: the icons there are the ones this app makes. An older folder is made again. */
+export const ICONS_MADE = 'made-2'
 
 const SIZE = 32 // of an icon cut from an item's picture: the size of the others
 const FRAME = 5 // pixels of border an item's picture has on each side, of 64
@@ -63,6 +72,13 @@ export function withoutGround({ width, height, rgba }: Cutout): Cutout {
   return { width: w, height: h, rgba: lined }
 }
 
+/** A part of a picture: the pixels from left to right (not included) and from top to bottom (not included). */
+export function cutOut({ width, rgba }: Cutout, left: number, right: number, top: number, bottom: number): Cutout {
+  const w = right - left, h = bottom - top, out = new Uint8Array(w * h * 4)
+  for (let y = 0; y < h; y++) out.set(rgba.subarray(((top + y) * width + left) * 4, ((top + y) * width + right) * 4), y * w * 4)
+  return { width: w, height: h, rgba: out }
+}
+
 /** Writes every icon the game has into <folder>/icons; one the game lacks is left out. */
 export function writeIcons(files: ClientFiles, folder: string): void {
   const into = join(folder, 'icons')
@@ -91,4 +107,15 @@ export function writeIcons(files: ClientFiles, folder: string): void {
     const picture = rows.get(item)?.int(ITEM_ICON)
     write(`ore-${ore}`, picture, (c) => (c.width === SIZE * 2 && c.height === SIZE * 2 ? withoutGround(c) : c))
   }
+  try {
+    const sheets = files.read(SHEETS_FILE, true), pictures = files.read(SHEET_PICTURES_FILE, true)
+    const sheetOf = new Map(sheets ? readTable(sheets).rows.map((r) => [r.id, r.int(SHEET_PICTURE)]) : [])
+    for (const r of pictures ? readTable(pictures).rows : []) {
+      const name = r.text(PICTURE_NAME)
+      if (SWIRLS.includes(name)) write(name, sheetOf.get(r.int(PICTURE_SHEET)), (c) => cutOut(c, r.int(PICTURE_LEFT), r.int(PICTURE_RIGHT), r.int(PICTURE_TOP), r.int(PICTURE_BOTTOM)))
+    }
+  } catch {
+    // No tables of the sheets: the doors keep the drawn pin.
+  }
+  writeFileSync(join(into, ICONS_MADE), '')
 }

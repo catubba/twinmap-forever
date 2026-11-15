@@ -44,12 +44,12 @@ export const TAXI_PATH_FILE = 1067802
 
 /** A place on a continent, in map units (geo.ts). */
 interface Spot { continent: Continent; x: number; y: number }
-/** Told in the file of what travel() gives: one made by an older travel() is made again. 2: the doors of the dungeons Forever added. */
-export const TRAVEL_FORMAT = 2
+/** Told in the file of what travel() gives: one made by an older travel() is made again. 2: the doors of the dungeons Forever added. 3: which doors are of raids. */
+export const TRAVEL_FORMAT = 3
 export interface Travel {
   format?: number
-  /** Where one walks into a dungeon or a raid; several share a door. */
-  doors: (Spot & { names: string[] })[]
+  /** Where one walks into a dungeon or a raid; several share a door. raid: all behind it are raids. */
+  doors: (Spot & { names: string[]; raid?: true })[]
   /** Where a flight starts and ends. */
   nodes: (Spot & { name: string; side: string })[]
   /** Flights, each a pair of places in `nodes`. */
@@ -71,15 +71,17 @@ const continentOf = (world: number | undefined): Continent | null => (world === 
  * dungeon-doors.ts, each placed on the map of its zone (zones: the game's maps, as gameMaps gives them).
  */
 export function travel(maps: Table, taxiNodes: Table, taxiPaths: Table, zones: GameMap[] = []): Travel {
-  const doors: (Spot & { names: string[]; at: [number, number] })[] = []
+  const doors: (Spot & { names: string[]; at: [number, number]; raid: boolean })[] = []
   const given = new Set<number>()
   for (const row of maps.rows) {
     const continent = continentOf(row.int(MAP_DOOR_WORLD)), kind = row.int(MAP_KIND), name = row.text(MAP_NAME)
     const x = row.float(MAP_DOOR, 0), y = row.float(MAP_DOOR, 1)
     if (continent === null || (kind !== 1 && kind !== 2) || !name || name.startsWith('<') || (!x && !y)) continue
     const same = doors.find((d) => d.continent === continent && Math.hypot(d.at[0] - x, d.at[1] - y) < SAME_DOOR)
-    if (same) same.names.push(name)
-    else doors.push({ continent, ...unitsOfWorld(x, y), names: [name], at: [x, y] })
+    if (same) {
+      same.names.push(name)
+      same.raid &&= kind === 2
+    } else doors.push({ continent, ...unitsOfWorld(x, y), names: [name], at: [x, y], raid: kind === 2 })
     given.add(row.id)
   }
   for (const door of DUNGEON_DOORS) {
@@ -87,7 +89,7 @@ export function travel(maps: Table, taxiNodes: Table, taxiPaths: Table, zones: G
     if (given.has(door.map) || !zone?.rect || zone.continent === null) continue
     // The name as the game writes it, when the row of the map is one this PC can read.
     const name = maps.rows.find((row) => row.id === door.map)?.text(MAP_NAME) || door.name
-    doors.push({ continent: zone.continent, ...unitsOfPlace(zone.rect, door.x * 100, door.y * 100), names: [name], at: [0, 0] })
+    doors.push({ continent: zone.continent, ...unitsOfPlace(zone.rect, door.x * 100, door.y * 100), names: [name], at: [0, 0], raid: false })
   }
 
   // A node is one a player flies from when a side may use it and a path leaves it: the table also
@@ -108,7 +110,7 @@ export function travel(maps: Table, taxiNodes: Table, taxiPaths: Table, zones: G
     if (a === undefined || b === undefined || a === b || nodes[a]!.continent !== nodes[b]!.continent) continue
     routes.set(`${Math.min(a, b)}-${Math.max(a, b)}`, [Math.min(a, b), Math.max(a, b)])
   }
-  return { format: TRAVEL_FORMAT, doors: doors.map(({ at: _at, ...door }) => door), nodes, routes: [...routes.values()] }
+  return { format: TRAVEL_FORMAT, doors: doors.map(({ at: _at, raid, ...door }) => (raid ? { ...door, raid } : door)), nodes, routes: [...routes.values()] }
 }
 
 /**

@@ -372,6 +372,19 @@
 
   // The bosses on the map of the dungeon on show, and which of them the addon tells are killed: a
   // boss killed is drawn dark with a red cut across, and its name is struck out.
+  // The door of a dungeon or a raid: the swirl the game's own maps mark it with, from the player's game (blue for
+  // a dungeon, green for a raid), larger than the other pins so that it stands out. The picture has a glow around
+  // the swirl, which is about half of it. Where the game's picture is not there, the drawn door.
+  const DOOR = 44
+  function doorIcon(raid: boolean): L.DivIcon {
+    const mark = document.createElement('div'), picture = new Image(DOOR, DOOR)
+    mark.className = 'swirl'
+    picture.alt = ''
+    picture.onerror = () => (mark.innerHTML = pin('dungeon'))
+    picture.src = `${TILES}/icons/${raid ? 'raid' : 'dungeon'}.png`
+    mark.append(picture)
+    return L.divIcon({ className: 'door', iconSize: [DOOR, DOOR], html: mark })
+  }
   const bossIcon = (gone: boolean): L.DivIcon => L.divIcon({ className: gone ? 'door' : 'door boss', iconSize: [22, 22], html: pin(gone ? 'slain' : 'boss') })
   let bosses = $state.raw<{ name: string; marker: L.Marker; gone?: boolean }[]>([])
   const dead = $derived(killedIn(kills, inside?.id))
@@ -414,8 +427,8 @@
       // screen nobody hovers while playing.
       for (const [name, u, v] of d.bosses) bossMarks.push({ name, gone: false, marker: L.marker(atYards({ u, v }), { keyboard: false, icon: bossIcon(false) }).bindTooltip(name, { permanent: true, direction: 'bottom', offset: [0, 9], className: 'boss-name' }).addTo(pins) })
       if (d.entrance)
-        L.marker(atYards({ u: d.entrance[0], v: d.entrance[1] }), { keyboard: false, icon: L.divIcon({ className: 'door', iconSize: [16, 16], html: pin('dungeon') }) })
-          .bindTooltip(dungeons.length > 1 ? `Entrance: ${d.name}` : 'Entrance', { direction: 'top', offset: [0, -8], className: 'tip' })
+        L.marker(atYards({ u: d.entrance[0], v: d.entrance[1] }), { keyboard: false, icon: doorIcon(m.kind === 'raid') })
+          .bindTooltip(dungeons.length > 1 ? `Entrance: ${d.name}` : 'Entrance', { direction: 'top', offset: [0, -13], className: 'tip' })
           .addTo(pins)
     }
     bosses = bossMarks
@@ -836,8 +849,8 @@
     for (const group of Object.values(travelLayers)) group.clearLayers()
     for (const door of travel.doors) {
       if (door.continent !== continent) continue
-      L.marker(at(door), { keyboard: false, zIndexOffset: 200, icon: L.divIcon({ className: 'door', iconSize: [16, 16], html: pin('dungeon') }) })
-        .bindTooltip(door.names.join(', '), { direction: 'top', offset: [0, -8], className: 'tip' })
+      L.marker(at(door), { keyboard: false, zIndexOffset: 200, icon: doorIcon(door.raid === true) })
+        .bindTooltip(door.names.join(', '), { direction: 'top', offset: [0, -13], className: 'tip' })
         .on('click', () => labelPin({ x: door.x, y: door.y }, door.names.join(', '), ['Entrance']))
         .addTo(travelLayers.dungeons)
     }
@@ -1322,6 +1335,13 @@
   .map :global(.place) {
     background: none;
     border: 0;
+  }
+  /* The swirl of a door, or the drawn door in its place, in the middle of its square. */
+  .map :global(.swirl) {
+    display: grid;
+    place-items: center;
+    width: 100%;
+    height: 100%;
   }
   /* A soft light of its own colour under an objective: it is found at a glance on any ground. */
   .map :global(.task) {
