@@ -7,7 +7,7 @@ import { decodeRow, PROTOCOL, readStrip, type Block } from './strip'
 // Strips the addon really drew, recorded in the simulated game by addon/tests/record.js.
 // Each is a string of cells, one digit 0 to 7 (R*4 + G*2 + B) per pixel.
 const strips = JSON.parse(readFileSync(join(__dirname, 'strips.fixture.json'), 'utf8')) as Record<
-  'session' | 'narrow' | 'protocol2' | 'instance',
+  'session' | 'narrow' | 'newer' | 'older' | 'instance',
   string[]
 >
 
@@ -126,23 +126,32 @@ test('a missing block is counted as lost; the numbers restarting is not a loss',
 test('an addon with a newer protocol is not read, and the app says to update the app', () => {
   const game = createGame()
   game.feed(decodeRow(pixels(strips.session[0]!)))
-  const readings = strips.protocol2.map((s) => decodeRow(pixels(s)))
-  expect(readings).toEqual([{ kind: 'protocol', protocol: 2 }, { kind: 'protocol', protocol: 2 }])
+  const readings = strips.newer.map((s) => decodeRow(pixels(s)))
+  expect(readings).toEqual([{ kind: 'protocol', protocol: 3 }, { kind: 'protocol', protocol: 3 }])
 
   game.feed(readings[0]!)
   game.feed(readings[1]!)
   expect(game.state.protocol, 'two odd readings are not yet believed').toBeNull()
   game.feed(readings[0]!)
   expect(game.state.protocol).toEqual({
-    addon: 2,
+    addon: 3,
     app: PROTOCOL,
     update: 'app',
-    message: 'The Twinmap Forever addon is newer than this app (protocol 2, this app speaks 1). Close Twinmap and open it again: it updates itself when it starts.',
+    message: 'The Twinmap Forever addon is newer than this app (protocol 3, this app speaks 2). Close Twinmap and open it again: it updates itself when it starts.',
   })
   expect(game.state.sections.pos?.zone, 'what was known stays').toBe('Elwynn Forest')
 
   game.feed(decodeRow(pixels(strips.session[2]!)))
   expect(game.state.protocol, 'a strip it can read clears the message').toBeNull()
+})
+
+test('an addon one protocol behind is still read: its map stays until it is updated', () => {
+  const game = createGame()
+  const readings = strips.older.map((s) => decodeRow(pixels(s)))
+  expect(readings.map((r) => r.kind)).toEqual(['block', 'block'])
+  readings.forEach((r) => game.feed(r, 1000))
+  expect(game.state.protocol).toBeNull()
+  expect(game.state.sections.pos?.zone).toBe('Elwynn Forest')
 })
 
 test('an addon with an older protocol: the app says to update the addon', () => {

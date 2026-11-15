@@ -32,8 +32,12 @@ function record() {
   narrow.run(10);
 
   // The same addon, speaking a protocol the app does not know yet.
-  const protocol2 = enterWorld(null, 'local ns = ...; ns.PROTOCOL = 2');
-  protocol2.run(10);
+  const newer = enterWorld(null, 'local ns = ...; ns.PROTOCOL = 3');
+  newer.run(10);
+
+  // And the one before this, which the app still reads: an addon not updated yet.
+  const older = enterWorld(null, 'local ns = ...; ns.PROTOCOL = 1');
+  older.run(10);
 
   // Into a dungeon, around in it, to where the game stops telling the place, and out again.
   const instance = enterWorld(null, 'local ns = ...; ns.db.mode = "fast"');
@@ -47,7 +51,7 @@ function record() {
   instance.lua('GAME.instance = nil; GAME.zone, GAME.sub, GAME.map, GAME.x = "Westfall", "Moonbrook", 1436, 0.423');
   instance.run(3);
 
-  return { session: session.strips(), narrow: narrow.strips(), protocol2: protocol2.strips(), instance: instance.strips() };
+  return { session: session.strips(), narrow: narrow.strips(), newer: newer.strips(), older: older.strips(), instance: instance.strips() };
 }
 
 module.exports = { record, FILE };

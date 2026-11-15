@@ -15,5 +15,5 @@ test('the addon loads and becomes ready at login', () => {
 test('/twinmap prints the version of the .toc and the protocol', () => {
   const addon = loadAddon(DIR);
   addon.slash('/twinmap');
-  assert.equal(addon.printed(), `Twinmap Forever ${addon.meta.Version}, protocol 1`);
+  assert.equal(addon.printed(), `Twinmap Forever ${addon.meta.Version}, protocol 2`);
 });

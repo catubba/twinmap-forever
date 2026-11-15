@@ -38,7 +38,7 @@ test('a game that never sent anything: connecting at first, then a lost link', (
 })
 
 test('a different protocol says which of the two to update, whatever else is true', () => {
-  expect(linkStatus(link('open', { ...heard(1000), protocol: protocolMismatch(2) }), NOW)).toMatchObject({ kind: 'update-app', word: 'Update the app', tone: 'objective' })
+  expect(linkStatus(link('open', { ...heard(1000), protocol: protocolMismatch(3) }), NOW)).toMatchObject({ kind: 'update-app', word: 'Update the app', tone: 'objective' })
   const older = linkStatus(link('open', { protocol: protocolMismatch(0) }, 5), NOW)
   expect(older).toMatchObject({ kind: 'update-addon', word: 'Update the addon' })
   expect(older.line).toContain('Update the addon')

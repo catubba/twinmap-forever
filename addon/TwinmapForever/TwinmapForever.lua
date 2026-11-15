@@ -2,7 +2,7 @@
 local _, ns = ...
 
 ns.VERSION = "0.4.0" -- same as the .toc; a test keeps the two in step
-ns.PROTOCOL = 1 -- the app refuses a strip whose protocol it does not know
+ns.PROTOCOL = 2 -- the app refuses a strip whose protocol it does not know; 2 since the app tells everything through the fonts, so that an app from before says to update itself
 
 -- The player's choices, saved by the game in TwinmapForeverDB.
 local DEFAULTS = {

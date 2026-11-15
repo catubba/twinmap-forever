@@ -4,8 +4,10 @@
 // are the two levels found on the row itself: the addon may draw them close together.
 // Payload: section US version US part US total US chunk of JSON.
 
-/** The strip protocol this app speaks. The same number as PROTOCOL in the addon. */
-export const PROTOCOL = 1
+/** The strip protocol this app speaks. The same number as PROTOCOL in the addon. 2 says nothing new on the strip: it tells an app from before the fonts carried everything to update itself. */
+export const PROTOCOL = 2
+/** The oldest it still reads: an addon not updated yet keeps its map. */
+export const OLDEST = 1
 
 export interface Block {
   kind: 'block'
@@ -27,7 +29,7 @@ export type Reading =
   | { kind: 'none' }
   /** A strip that did not survive: caught halfway through a redraw, or covered. */
   | { kind: 'corrupt' }
-  /** A strip of a protocol this app does not speak. Its contents are not read. */
+  /** A strip of a protocol this app does not read. Its contents are not read. */
   | { kind: 'protocol'; protocol: number }
 
 const HEADER = 7 // bytes before the payload
@@ -83,7 +85,7 @@ export function decodeRow(row: Uint8Array): Reading {
     return { kind: 'none' }
   }
   const protocol = head[2]!
-  if (protocol !== PROTOCOL) return { kind: 'protocol', protocol }
+  if (protocol < OLDEST || protocol > PROTOCOL) return { kind: 'protocol', protocol }
 
   const end = HEADER + ((head[5]! << 8) | head[6]!)
   if (end + 2 > capacity) return { kind: 'corrupt' }

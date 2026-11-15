@@ -32,7 +32,7 @@ test('the drawn strip decodes to the position the game reports, with the protoco
   const block = decodeStrip(strips[0]);
   assert.equal(block.protocol, Number(addon.ns('PROTOCOL')));
   assert.deepEqual({ ...block, text: data(block) }, {
-    negative: false, protocol: 1, id: 1, section: 'pos', version: 1, part: 1, total: 1,
+    negative: false, protocol: 2, id: 1, section: 'pos', version: 1, part: 1, total: 1,
     text: { zone: 'Elwynn Forest', sub: 'Goldshire', map: 1429, x: 42.34, y: 65.71, facing: 90 },
   });
 });
