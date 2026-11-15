@@ -158,7 +158,7 @@
     <Search ready={mapReady} {pos} side={char?.side} onpick={(place) => mapView?.goTo(place)} />
   {/if}
   {#if status}
-    <p class="status" class:alone={onSetup !== false || onSettings || !mapReady}><i class={status.tone} title={status.word}></i><span class="word">{status.word}</span>{#if inbox && !inbox.off}<span class="left" class:low={inbox.left < 5}>{inbox.left} sends left</span>{/if}</p>
+    <p class="status" class:alone={onSetup !== false || onSettings || !mapReady}><i class={status.tone} title={status.word}></i><span class="word">{status.word}</span>{#if inbox && !inbox.off && inbox.id === undefined}<span class="left" class:low={inbox.left < 5}>{inbox.left} sends left</span>{/if}</p>
   {/if}
   {#if setup}
     <button class="entry feedback" onclick={() => (onFeedback = true)}>Feedback</button>
