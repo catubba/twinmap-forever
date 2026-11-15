@@ -7,7 +7,7 @@ import { keep, keptFrom } from '../shared/kept'
 import { linkStatus, lostPercent } from '../shared/link'
 import { logFrom, shownFrom, type QuestsStatus } from '../shared/quests'
 import type { Found } from '../shared/search'
-import { inboxFrom, marksNews, pinFrom, routeNewsFrom, stepFrom, takenFrom } from '../shared/send'
+import { arrived, inboxFrom, marksNews, pinFrom, routeNewsFrom, stepFrom, takenFrom } from '../shared/send'
 import { feedbackLink } from '../shared/feedback'
 import { pageOf, setupComplete, setupPages, type SetupStatus } from '../shared/setup'
 import { tilesLine, type TilesStatus } from '../shared/tiles-status'
@@ -464,6 +464,35 @@ function createWindow(): void {
     lan.tell('tiles', tiles.status())
     lan.tell('setup', setup)
   }, SHOW_EVERY)
+
+  // TWINMAP_TRIAL, for a trial of the way to the game with nobody clicking: 40 sends one behind the
+  // other, each once the game has the one before, then one too big for a font, then five more, each
+  // sent while the game says it is in a fight. All in the record. The part sent is one the addon
+  // keeps and does nothing with, and the last send takes it away.
+  if (process.env.TWINMAP_TRIAL) {
+    const ROW = 40, FIGHTS = 5, began = Date.now()
+    let n = 0, awaited = 0, at = 0
+    const trial = setInterval(() => {
+      const state = link.snapshot().state, inbox = inboxFrom(state.sections.inbox), fight = state.sections.pos?.combat === true
+      if (!gameFolder || inbox?.id === undefined || Date.now() - began < 15000) return
+      if (awaited) {
+        if (!arrived(inbox, awaited)) return
+        record.say(`trial ${n}: send ${awaited} arrived after ${Date.now() - at} ms${fight ? ', in a fight' : ''}`)
+        awaited = 0
+        if (n > ROW + 1 + FIGHTS) return clearInterval(trial)
+      }
+      const last = n === ROW + 1 + FIGHTS
+      if (n > ROW && !last && !fight) return // the rest waits for a fight
+      n++
+      at = Date.now()
+      try {
+        awaited = send(addonsFolder(gameFolder), { trial: last ? false : n === ROW + 1 ? 'x'.repeat(3000) : n }, true).seq
+        if (fight) record.say(`trial ${n}: sent in a fight`)
+      } catch {
+        n--
+      }
+    }, 250)
+  }
 
   // The measures of a live session, for whoever tunes the link: read, lost, processor.
   const logFile = join(app.getPath('userData'), 'link-measures.json')
