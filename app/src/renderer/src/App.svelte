@@ -2,6 +2,7 @@
   // The main screen: the top row with the state of the link, the map in its frame, and the Now panel.
   import { experience, linkStatus, type LinkSnapshot } from '../../shared/link'
   import { groupFrom } from '../../shared/group'
+  import { deathFrom, type Place as DeathPlace } from '../../shared/death'
   import { feedbackDetails } from '../../shared/feedback'
   import { tilesHelp, tilesLine, type TilesStatus } from '../../shared/tiles-status'
   import { onMount } from 'svelte'
@@ -118,6 +119,8 @@
   const ahead = $derived(live ? legsAhead(journey, wayFrom(link?.state.sections.line)) : null)
   // The companions of the group, where the game tells: gone with the strip, and with a group no longer told of.
   const group = $derived(live ? groupFrom(link?.state.sections.group, now - (link?.state.updatedAt.group ?? 0)) : [])
+  const death = $derived(live ? deathFrom(link?.state.sections.dead, now - (link?.state.updatedAt.dead ?? 0)) : null)
+  let back = $state.raw<(DeathPlace & { name: string; door: boolean }) | null>(null) // where the ghost walks to, as the map places it
   const xp = $derived(char ? experience(char) : null)
   const mapReady = $derived(tiles?.state === 'ready')
   const insideReady = $derived(tiles?.state === 'ready' && !!tiles.interiors && !tiles.interiors.problem)
@@ -194,7 +197,7 @@
 <div class="work" class:shut={!panelOpen} in:fade={screen} inert={onSettings} style:--peek="{peek}px">
   <div class="mapbox">
     {#if mapReady}
-      <Map {pos} {group} kills={live ? link?.state.sections.kills : undefined} bind:looking at={link?.state.updatedAt.pos} bind:this={mapView} {insideReady} {quests} {fixed} side={char?.side} {live} {inbox} removed={live ? goneFrom(link?.state.sections.marks) : []} set={live ? setFrom(link?.state.sections.marks) : []} gameFollows={live ? followFrom(link?.state.sections.follow) : null} {journey} {ahead} {route} onroute={(stop) => setRoute(addStop(route, stop))} />
+      <Map {pos} {group} {death} bind:back kills={live ? link?.state.sections.kills : undefined} bind:looking at={link?.state.updatedAt.pos} bind:this={mapView} {insideReady} {quests} {fixed} side={char?.side} {live} {inbox} removed={live ? goneFrom(link?.state.sections.marks) : []} set={live ? setFrom(link?.state.sections.marks) : []} gameFollows={live ? followFrom(link?.state.sections.follow) : null} {journey} {ahead} {route} onroute={(stop) => setRoute(addStop(route, stop))} />
     {:else if tiles}
       <div class="making" class:failed={tiles.state === 'failed' || tiles.state === 'no-game'}>
         <p>{tilesLine(tiles)}</p>
@@ -242,6 +245,7 @@
       {route}
       inGame={route.sent && gameRoute?.t === route.t}
       {journey}
+      back={death ? back : null}
       wayKnown={!!ahead}
       onsent={(t) => setRoute({ ...route, sent: true, t })}
       onskip={skip}

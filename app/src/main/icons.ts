@@ -1,8 +1,8 @@
 // The pictures of the pins of services, ore and herbs, taken from the player's own game and kept
 // beside the tiles as PNG files: what the minimap shows for who offers a service, the cursor of
 // the game over a herb or a vendor, for a vein the picture of its ore, and for the door of a
-// dungeon or a raid the swirl the game's own maps mark it with. Nothing of them is in the app: a
-// game without them leaves the map its plain pins.
+// dungeon or a raid the swirl the game's own maps mark it with, for a death its tombstone and a
+// ghost. Nothing of them is in the app: a game without them leaves the map its plain pins.
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { decodeBlpCutout, type Cutout } from '../shared/blp'
@@ -21,10 +21,11 @@ const ITEM_FILE = 841626, ITEM_ICON = 7 // the table of the items, and its colum
 // the pictures (name, sheet, left, right, top, bottom in pixels of the sheet).
 const SHEETS_FILE = 897470, SHEET_PICTURE = 1
 const SHEET_PICTURES_FILE = 897532, PICTURE_NAME = 0, PICTURE_SHEET = 2, PICTURE_LEFT = 5, PICTURE_RIGHT = 6, PICTURE_TOP = 7, PICTURE_BOTTOM = 8
-/** The swirls of the doors, by the names the game gives them: blue for a dungeon, green for a raid. */
-const SWIRLS = ['dungeon', 'raid']
+/** Pictures of the sheets, saved under our name, by the names the game gives them: the swirls of the doors (blue for a
+ * dungeon, green for a raid), the tombstone the game marks a corpse with, and a ghost for the graveyard. */
+const SHEET_NAMES: Record<string, string> = { dungeon: 'dungeon', raid: 'raid', 'Navigation-Tombstone-Icon': 'corpse', 'poi-soulspiritghost': 'ghost' }
 /** Written last in the folder of the icons: the icons there are the ones this app makes. An older folder is made again. */
-export const ICONS_MADE = 'made-2'
+export const ICONS_MADE = 'made-3'
 
 const SIZE = 32 // of an icon cut from an item's picture: the size of the others
 const FRAME = 5 // pixels of border an item's picture has on each side, of 64
@@ -112,7 +113,8 @@ export function writeIcons(files: ClientFiles, folder: string): void {
     const sheetOf = new Map(sheets ? readTable(sheets).rows.map((r) => [r.id, r.int(SHEET_PICTURE)]) : [])
     for (const r of pictures ? readTable(pictures).rows : []) {
       const name = r.text(PICTURE_NAME)
-      if (SWIRLS.includes(name)) write(name, sheetOf.get(r.int(PICTURE_SHEET)), (c) => cutOut(c, r.int(PICTURE_LEFT), r.int(PICTURE_RIGHT), r.int(PICTURE_TOP), r.int(PICTURE_BOTTOM)))
+      const ours = SHEET_NAMES[name]
+      if (ours) write(ours, sheetOf.get(r.int(PICTURE_SHEET)), (c) => cutOut(c, r.int(PICTURE_LEFT), r.int(PICTURE_RIGHT), r.int(PICTURE_TOP), r.int(PICTURE_BOTTOM)))
     }
   } catch {
     // No tables of the sheets: the doors keep the drawn pin.

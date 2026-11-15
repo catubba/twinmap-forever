@@ -15,6 +15,7 @@
   import { span, startedBy, type Journey } from '../../shared/journey'
   import { nearestOnFoot } from '../../shared/walk'
   import { feet } from './feet.svelte'
+  import type { Place } from '../../shared/death'
 
   // onpick: a row was chosen, the map should go there. onpoint: the pointer or the keyboard is on
   // a row (or on none: null), the map should show which pin it is.
@@ -32,6 +33,7 @@
     route,
     inGame,
     journey, // the journey Shortest Path guides in the game, whoever started it
+    back, // dead: where to walk to live again, the corpse or the door of the dungeon it lies in
     wayKnown, // its legs are known with their points: the map draws all of it
     onpick,
     onpoint,
@@ -55,6 +57,7 @@
     route: Route
     inGame: boolean
     journey: Journey | null
+    back: (Place & { name: string; door: boolean }) | null
     wayKnown: boolean
     onsent: (t: number) => void
     onarrive: () => void
@@ -140,6 +143,9 @@
     if (Math.hypot(e.clientX - down.x, e.clientY - down.y) > 5) return
     if (on.closest('.leaflet-container') || (on.closest('.now') && !on.closest('button'))) chosen = null
   }
+  // Attention: what wants doing first. Its one row for now: dead, the way back to life.
+  const attention = $derived<NowRow[]>(back ? [{ key: 'death', name: back.name, kind: back.door ? 'Entrance' : 'Corpse', tone: 'service', continent: back.continent, at: back.at }] : [])
+  const toBack = feet(() => (me && back && back.continent === me.continent ? { continent: me.continent, from: me.at, to: [back.at], reach: FAR } : null), 20)
   const yards = (n: number): string => `${Math.round(n).toLocaleString('en-US')} yd`
 </script>
 
@@ -166,6 +172,20 @@
 {/snippet}
 
 <div class="now" data-took={walked.took.toFixed(1)}>
+  {#if attention.length && me}
+    <h2 class="band">Attention</h2>
+    <div class="rows attention">
+      {#each attention as row (row.key)}
+        {@const way = row.continent === me.continent ? { ...wayOf(me.at, row.at), ...(toBack.yards(row.at) === undefined ? {} : { yards: toBack.yards(row.at)! }) } : null}
+        <button class="row" aria-current={row.key === chosen} onclick={() => pick(row)}>
+          <span><img src="{TILES}/icons/{back?.door ? 'dungeon' : 'corpse'}.png" alt="" class:swirl={back?.door} />{row.name}</span>
+          <span>{row.kind}</span>
+          <span class="num">{way ? yards(way.yards) : ''}</span>
+          {#if way}<Glyph name="direction" size={12} turn={way.turn} />{/if}
+        </button>
+      {/each}
+    </div>
+  {/if}
   <NextStop {route} band={bandOf(route, me, live, stop && toStop.yards(stop.at))} sending={sendState(live, inbox, news !== null, 'A stop is')} {inGame} onsend={sendRoute} {onskip} {onarrive} {onclear} {onend} {onremove} {onmove} onpick={onstop} />
   {#if journey}
     <!-- What Shortest Path guides in the game now: its goal and the legs still ahead, as its tracker words them. -->
@@ -230,6 +250,18 @@
     white-space: nowrap;
   }
   .legs .hint {
+    color: var(--text-dim);
+  }
+  .attention img {
+    height: 16px;
+    margin-right: 6px;
+    vertical-align: -3px;
+  }
+  .attention img.swirl {
+    height: 22px;
+    margin: -3px 3px -3px -3px;
+  }
+  .attention .row > :nth-child(2) {
     color: var(--text-dim);
   }
   .placeless .row:hover {

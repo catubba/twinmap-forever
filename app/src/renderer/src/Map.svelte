@@ -28,6 +28,7 @@
   import { inRoute, noRoute, type Route, type Stop } from '../../shared/route'
   import type { Journey, WayLeg } from '../../shared/journey'
   import { ahead as restOf } from '../../shared/walk'
+  import { deathPlaces, type Death, type Place as DeathPlace } from '../../shared/death'
   import { feet } from './feet.svelte'
   import { kept as keptByApp } from './kept.svelte'
   import { pinOfMark, removePin, renamePin, savedAt, savedFrom, savePin, type SavedPin } from '../../shared/saved'
@@ -36,7 +37,7 @@
 
   // at: when the position was read off the game, in milliseconds.
   // insideReady: the rooms of the buildings are converted, and their list can be asked for.
-  let { pos, group = [], at: readAt, insideReady, quests = [], fixed = [], side, live = false, inbox = null, removed = [], set = [], gameFollows = null, journey = null, ahead = null, route = noRoute(), onroute, kills, looking = $bindable(null) }: { kills?: unknown; looking?: { zone: string; where: string } | null; journey?: Journey | null; ahead?: WayLeg[] | null; pos: Position | undefined; at: number | undefined; insideReady: boolean; quests?: QuestPin[]; fixed?: FixedPin[]; side?: string; live?: boolean; inbox?: Inbox | null; removed?: string[]; set?: GameMark[]; gameFollows?: Pin | null; route?: Route; onroute?: (stop: Stop) => void; group?: Companion[] } = $props()
+  let { pos, group = [], at: readAt, insideReady, quests = [], fixed = [], side, live = false, inbox = null, removed = [], set = [], gameFollows = null, journey = null, ahead = null, route = noRoute(), onroute, kills, death = null, back = $bindable(null), looking = $bindable(null) }: { kills?: unknown; death?: Death | null; back?: (DeathPlace & { name: string; door: boolean }) | null; looking?: { zone: string; where: string } | null; journey?: Journey | null; ahead?: WayLeg[] | null; pos: Position | undefined; at: number | undefined; insideReady: boolean; quests?: QuestPin[]; fixed?: FixedPin[]; side?: string; live?: boolean; inbox?: Inbox | null; removed?: string[]; set?: GameMark[]; gameFollows?: Pin | null; route?: Route; onroute?: (stop: Stop) => void; group?: Companion[] } = $props()
 
   const TOP_ZOOM = 7 // the game's own detail: a block's picture is four tiles
   const BLANK = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=='
@@ -1031,8 +1032,63 @@
       .addTo(journeyLayer)
   })
   $effect(() => {
-    if (map && !inside) journeyLayer.addTo(map)
+    // A ghost walks back: the way Shortest Path shows then is the same walk, drawn below.
+    if (map && !inside && !(death?.ghost && back)) journeyLayer.addTo(map)
     else journeyLayer.remove()
+  })
+
+  // A death: the tombstone on the corpse, a ghost on the graveyard it came back at, and the way on
+  // foot from the ghost to the corpse. Died in a dungeon, the way goes to its door, where the ghost
+  // lives again. Found on the same grid as the journey's walks, again when the ghost strays off it.
+  // The tombstone and the ghost are the game's own pictures; the way is in the red of the tombstone.
+  const WAY_BACK = '#e0703a'
+  const deathAt = $derived(death ? deathPlaces(death, maps, travel.doors) : { back: null, yard: null })
+  $effect(() => {
+    back = deathAt.back
+  })
+  let ghostWalk = $state<{ key: string; points: Point[] } | null>(null)
+  let ghostAsking = false
+  $effect(() => {
+    const to = death?.ghost ? deathAt.back : null
+    if (!to || !me || me.continent !== to.continent) return void (ghostWalk = null)
+    const key = `${to.continent} ${to.at.x} ${to.at.y}`, from = me.units
+    if (ghostWalk?.key === key && restOf(ghostWalk.points, from).off <= OFF_THE_WAY) return
+    if (ghostAsking) return
+    ghostAsking = true
+    void window.twinmap.walk({ continent: to.continent, from: { ...from }, to: { ...to.at } }).then((path) => {
+      ghostAsking = false
+      ghostWalk = { key, points: path?.points ?? [from, to.at] }
+    })
+  })
+  function deathIcon(name: string, size: number): L.DivIcon {
+    const picture = new Image()
+    picture.alt = ''
+    picture.height = size
+    picture.onerror = () => (picture.outerHTML = pin('corpse'))
+    picture.src = `${TILES}/icons/${name}.png`
+    return L.divIcon({ className: 'door death', iconSize: [size, size], html: picture })
+  }
+  const deathLayer = L.layerGroup()
+  $effect(() => {
+    deathLayer.clearLayers()
+    const { back: to, yard } = deathAt
+    if (ghostWalk && me && me.continent === continent && to?.continent === continent) {
+      const rest = restOf(ghostWalk.points, me.units).rest.map(at)
+      for (const [color, weight] of [['#000', 7.5], [WAY_BACK, 4.5]] as const) L.polyline(rest, { color, weight, dashArray: '9 13', lineCap: 'round', lineJoin: 'round', interactive: false }).addTo(deathLayer)
+    }
+    if (death?.ghost && yard?.continent === continent)
+      L.marker(at(yard.at), { keyboard: false, zIndexOffset: 700, icon: deathIcon('ghost', 26) }).bindTooltip('Graveyard', { direction: 'top', offset: [0, -13], className: 'tip' }).addTo(deathLayer)
+    if (to?.continent !== continent) return
+    if (to.door) {
+      // The door has its swirl already: a ring in the colour of the way says it is the one to walk to.
+      for (const [color, weight] of [['#000', 5], [WAY_BACK, 3]] as const) L.circleMarker(at(to.at), { radius: 24, color, weight, fill: false, interactive: false }).addTo(deathLayer)
+      return
+    }
+    L.marker(at(to.at), { keyboard: false, zIndexOffset: 800, icon: deathIcon('corpse', 28) }).bindTooltip('Your corpse', { direction: 'top', offset: [0, -14], className: 'tip' }).addTo(deathLayer)
+  })
+  $effect(() => {
+    if (map && layers.death && !inside) deathLayer.addTo(map)
+    else deathLayer.remove()
   })
 
   // The route: a white line through its stops on this continent, and a disc on each. A stop done is

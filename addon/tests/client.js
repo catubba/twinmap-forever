@@ -60,6 +60,11 @@ const STUB = `
     SendAddonMessage = function(prefix, text, channel) SENT[#SENT + 1] = prefix .. "|" .. text .. "|" .. channel return 0 end,
   }
   -- GAME.level, GAME.xp, GAME.xpMax, GAME.rested: unset, the game tells nothing of the character.
+  -- GAME.dead, GAME.ghost: the character is dead, and released. GAME.corpse = { map, x, y }: where the game shows the corpse,
+  -- on that map only. GAME.parents[map]: the map around a map, and GAME.continents[map] when that one is a continent.
+  function UnitIsDeadOrGhost() return GAME.dead == true or GAME.ghost == true end
+  function UnitIsGhost() return GAME.ghost == true end
+  C_DeathInfo = { GetCorpseMapPosition = function(map) local c = GAME.corpse return c and c.map == map and CreateVector2D(c.x, c.y) or nil end }
   function UnitLevel() return GAME.level end
   function UnitXP() return GAME.xp end
   function UnitXPMax() return GAME.xpMax end
@@ -77,7 +82,7 @@ const STUB = `
       if other then return other.map end
       return GAME.map
     end,
-    GetMapInfo = function(map) return { mapID = map, name = GAME.zone } end,
+    GetMapInfo = function(map) return { mapID = map, name = GAME.zone, parentMapID = GAME.parents and GAME.parents[map] or 0, mapType = GAME.continents and GAME.continents[map] and 2 or 3 } end,
     -- The world of the stand-in: every zone map is 2000 yards a side, its middle (map - 1429) times
     -- 5000 yards north of Elwynn's and as far west as it. GAME.noWorld: a map the game tells no place of.
     GetWorldPosFromMapPos = function(map, at)
