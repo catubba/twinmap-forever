@@ -1,0 +1,22 @@
+# The Cloudflare Worker behind api.twinmap.app.
+#   test:    node --test server/src/index.test.ts
+#   publish: npx wrangler@4 deploy            (from this folder)
+#   secret:  npx wrangler@4 secret put GITHUB_TOKEN
+name = "twinmap-api"
+main = "src/index.ts"
+compatibility_date = "2026-11-01"
+workers_dev = false
+routes = [{ pattern = "api.twinmap.app", custom_domain = true }]
+
+[vars]
+INBOX = "catubba/twinmap-inbox"
+
+# About five messages a minute from one address. Cloudflare counts loosely: a quick burst gets
+# some fifteen through before the refusals start (seen on 15 November 2026).
+[[ratelimits]]
+name = "LIMIT"
+namespace_id = "1001"
+
+[ratelimits.simple]
+limit = 5
+period = 60
