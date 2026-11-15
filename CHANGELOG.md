@@ -2,6 +2,17 @@
 
 What changed in each version of Twinmap, newest first. The section of a version is also the text of its release on GitHub and of the addon's file on CurseForge.
 
+## 0.7.0 - 2026-11-15
+
+### New
+
+- **The newest dungeons of Forever.** The Drowned City, Blackmaw Hold, Alcaz Prison, The Shaper's Terrace and Krol'dok Stronghold now have their map, which is also what your arrow needs to find its place in them. It is built on your computer from your own game, like the others. The bosses of these five are not marked yet.
+- **The doors of the dungeons Forever added.** City of Dalaran, The Drowned City, Blackmaw Hold, Alcaz Prison, Excavation Site: Wetlands, Ruins of Lordaeron, The Shaper's Terrace, Krol'dok Stronghold and The Hall of Thanes now have their door on the world map, like the old dungeons.
+
+### Changed
+
+- **Nothing to do to get them.** The first time you open this version the app works for a few seconds on the insides of the dungeons. The map of the continents is not made again.
+
 ## 0.6.0 - 2026-11-15
 
 ### New
