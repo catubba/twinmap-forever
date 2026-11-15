@@ -31,7 +31,7 @@ Twinmap is an interactive map of World of Warcraft: Forever for your second scre
 - **From the map to the game.** Mark a point or build a route on Twinmap, and it appears in the game.
 - **Phone and tablet.** No second monitor? Open the same map in the browser of a phone, a tablet or a laptop on your home network.
 
-**Twinmap is free and open source.** No Overwolf, no ads, no account, no paid features. Nothing leaves your computer.
+**Twinmap is free and open source.** No Overwolf, no ads, no account, no paid features. Nothing leaves your computer unless you send it.
 
 ![The game on one monitor, Twinmap on the other](docs/images/second-monitor.png)
 
@@ -105,8 +105,8 @@ Something missing? [Tell us](https://github.com/catubba/twinmap-forever/issues/n
 
 ## Privacy
 
-- The app sends nothing to anyone. There is no account and no tracking.
-- The only connection it makes is to GitHub, to look for a newer version of itself.
+- The app sends nothing by itself. There is no account and no tracking.
+- It connects to the internet to look for a newer version of itself, on GitHub, and when you press Send in the Feedback window. What a message carries and where it goes: [twinmap.app/privacy.html](https://twinmap.app/privacy.html).
 - The map on your home network is off until you turn it on.
 
 ## Not affiliated with Blizzard

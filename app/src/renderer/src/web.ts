@@ -65,6 +65,7 @@ if (!inApp) {
     drawn: () => {},
     onUpdate: () => {}, // the app updates itself on its computer, never from here
     retryTiles: call('retry-tiles', undefined),
+    sendFeedback: call<string | null>('send-feedback', 'Twinmap on the computer did not answer.'),
     readLog: call('read-log', ''),
     search: call('search', []),
     walk: call('walk', null),

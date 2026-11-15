@@ -1,9 +1,9 @@
 <script lang="ts">
   // Feedback: a small window over the app with the ways to tell us something. The app sends
-  // nothing by itself: it opens an issue on GitHub or a letter in the player's mail program, with
-  // what it knows about itself already written, shown here first.
+  // nothing by itself: the player writes here and presses Send, or opens an issue on GitHub or a
+  // letter in their mail program. What the app adds about itself is shown here first.
   import { onMount } from 'svelte'
-  import { FEEDBACK, type FeedbackWay } from '../../shared/feedback'
+  import { FEEDBACK, LONGEST_MESSAGE, type FeedbackWay } from '../../shared/feedback'
 
   let { details, onclose }: { details: string; onclose: () => void } = $props()
 
@@ -11,6 +11,17 @@
   let dialog: HTMLDialogElement
   onMount(() => dialog.showModal())
   const open = (way: FeedbackWay): void => void window.twinmap.openFeedback(way, details)
+  // What the player writes stays in the window until it is delivered: a failure loses nothing.
+  let message = $state(''), email = $state(''), withLog = $state(false)
+  let sending = $state(false), sent = $state(false), wrong = $state<string | null>(null)
+  async function send(event: SubmitEvent): Promise<void> {
+    event.preventDefault()
+    sending = true
+    wrong = await window.twinmap.sendFeedback({ message, email, details, withLog })
+    sending = false
+    sent = wrong === null
+    if (sent) message = ''
+  }
   // Copying asks for a page the browser trusts: the app's window is one, a phone on the home network is not.
   const canCopy = !!navigator.clipboard
   let copied = $state<'details' | 'log' | null>(null)
@@ -22,15 +33,23 @@
 
 <dialog bind:this={dialog} class="surface" aria-labelledby="feedback-title" {onclose} onclick={(e) => e.target === dialog && dialog.close()}>
   <h1 id="feedback-title">Feedback</h1>
-  <p>Found a bug, or have an idea? Tell us. Twinmap sends nothing by itself: you choose where to write, and you see every word before it leaves.</p>
-  <div class="ways">
-    <button class="btn" onclick={() => open('github')}>Open an issue on GitHub</button>
-    <button class="btn" onclick={() => open('email')}>Write an email</button>
-  </div>
+  <p>Found a bug, or have an idea? Tell us. Write here and press Send, or open an issue on GitHub, or write an email. You see every word before it leaves.</p>
+  <form onsubmit={send}>
+    <textarea class="field" bind:value={message} oninput={() => ((sent = false), (wrong = null))} maxlength={LONGEST_MESSAGE} rows="5" placeholder="What happened, or what you would like" aria-label="Your message" aria-describedby="feedback-said"></textarea>
+    <input class="field" type="email" bind:value={email} maxlength="200" placeholder="Your email, if you want an answer" aria-label="Your email, if you want an answer" />
+    <label class="choice"><input type="checkbox" class="check" bind:checked={withLog} />Add the log</label>
+    <div class="ways">
+      <button class="btn" type="submit" disabled={sending || !message.trim()}>{sending ? 'Sending' : 'Send'}</button>
+      <button class="btn" type="button" onclick={() => open('github')}>Open an issue on GitHub</button>
+      <button class="btn" type="button" onclick={() => open('email')}>Write an email</button>
+    </div>
+    <p id="feedback-said" class={wrong ? 'field-note' : 'said'} role="status">{wrong ?? (sent ? 'Sent. Thank you.' : '')}</p>
+  </form>
+  <p class="dim">Send delivers your message to the Twinmap developer: the text you wrote, the details shown here, and your email and the log only if you add them. Nothing is sent until you press Send. <button class="link" onclick={() => open('privacy')}>Privacy</button></p>
   <p class="dim">No GitHub account? Write to {FEEDBACK.email}, in English or in Italian.</p>
   <h2>What Twinmap adds to your message</h2>
   <pre>{details}</pre>
-  {#if canCopy}<p class="dim log">For a bug, the log helps: it is Twinmap's own record of what happened to it (started, game found, map, link). Copy it and paste it into your message.</p>{/if}
+  <p class="dim log">For a bug, the log helps: it is Twinmap's own record of what happened to it (started, game found, map, link). Add it to what you send{#if canCopy}, or copy it and paste it into an issue or an email{/if}.</p>
   <div class="foot">
     {#if canCopy}
       <button class="btn" onclick={() => copy('details')}>{copied === 'details' ? 'Copied' : 'Copy details'}</button>
@@ -72,14 +91,38 @@
   .log {
     margin: 12px 0 0;
   }
+  form {
+    display: grid;
+    gap: 8px;
+  }
+  textarea.field {
+    height: auto;
+    padding: 6px 8px;
+    resize: vertical;
+  }
+  form .field {
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .said,
+  form .field-note {
+    min-height: 1.4em;
+    margin: 0;
+  }
+  .link {
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    color: var(--gold);
+    text-decoration: underline;
+    cursor: pointer;
+  }
   .ways,
   .foot {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
-  }
-  .ways {
-    margin-bottom: 12px;
   }
   .foot {
     justify-content: flex-end;

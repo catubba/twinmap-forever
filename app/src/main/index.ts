@@ -9,7 +9,7 @@ import { logFrom, shownFrom, type QuestsStatus } from '../shared/quests'
 import type { Found } from '../shared/search'
 import { groupFrom } from '../shared/group'
 import { arrived, inboxFrom, marksNews, pinFrom, routeNewsFrom, stepFrom, takenFrom } from '../shared/send'
-import { feedbackLink } from '../shared/feedback'
+import { feedbackLink, sendFeedback } from '../shared/feedback'
 import { pageOf, setupComplete, setupPages, type SetupStatus } from '../shared/setup'
 import { tilesLine, type TilesStatus } from '../shared/tiles-status'
 import { placeWindow, WINDOW } from '../shared/window'
@@ -296,6 +296,8 @@ function createWindow(): void {
   })
   // The latest lines of the app's record, for the player to copy.
   asks('read-log', (): string => record.read())
+  // What the player wrote in the Feedback window, sent when they press Send. TWINMAP_API, for trials, names another address.
+  asks('send-feedback', (sent: unknown): Promise<string | null> => sendFeedback(sent, record.read, process.env.TWINMAP_API))
   // A conversion that failed is started again, from where it stopped: the cause may be gone (a full disk, a folder in use).
   asks('retry-tiles', () => {
     if (tiles.status().state !== 'failed') return
