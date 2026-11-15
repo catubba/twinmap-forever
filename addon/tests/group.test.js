@@ -78,3 +78,41 @@ test('leaving the group, the app is told once that no one is left', () => {
   assert.deepEqual(groups(addon).at(-1), []);
   assert.equal(groups(addon).length, 2);
 });
+
+// Inside The Stockade, with a companion the game tells no place of.
+const INSIDE = 'GAME.map = nil; GAME.instance = { name = "The Stockade", kind = "party", id = 34 }; GAME.party = { party1 = { name = "Staliot", second = "Falsaperla", class = "MAGE" } }';
+const here = (addon, value) => addon.lua(`local ns = ...; ns.receivers.here(${value})`);
+
+test('inside a dungeon the place the app found goes to the group, when it changes, and again while standing still', () => {
+  const addon = enterWorld(INSIDE);
+  addon.run(10);
+  assert.deepEqual(sent(addon), []); // the app has told nothing yet
+  here(addon, '{ i = 34, x = 120, y = -45, l = 1 }');
+  addon.run(2);
+  assert.deepEqual(sent(addon), ['TwinmapF|2 34 120.0 -45.0 1|PARTY']);
+  here(addon, '{ i = 34, x = 121, y = -45, l = 1 }');
+  addon.run(2);
+  assert.deepEqual(sent(addon).slice(1), ['TwinmapF|2 34 121.0 -45.0 1|PARTY']);
+  addon.run(6);
+  assert.deepEqual(sent(addon).slice(2), ['TwinmapF|2 34 121.0 -45.0 1|PARTY']);
+});
+
+test('a place of another instance, or one the app took back, is not told', () => {
+  const addon = enterWorld(INSIDE);
+  here(addon, '{ i = 36, x = 120, y = -45, l = 0 }');
+  addon.run(10);
+  here(addon, '{ i = 34, x = 120, y = -45, l = 0 }');
+  here(addon, 'nil');
+  addon.run(10);
+  assert.deepEqual(sent(addon), []);
+});
+
+test('a companion inside is sent where their Twinmap says, while that is fresh', () => {
+  const addon = enterWorld(INSIDE);
+  addon.run(10);
+  addon.fire('CHAT_MSG_ADDON', 'TwinmapF', '2 34 120.0 -45.5 1', 'PARTY', 'Staliot Falsaperla');
+  addon.run(1);
+  assert.deepEqual(groups(addon).at(-1), [{ n: 'Staliot Falsaperla', c: 'MAGE', i: 34, wx: 120, wy: -45.5, l: 1 }]);
+  addon.run(10);
+  assert.deepEqual(groups(addon).at(-1), [{ n: 'Staliot Falsaperla', c: 'MAGE' }]);
+});

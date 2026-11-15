@@ -9,6 +9,10 @@ export interface Companion {
   map?: number
   x?: number
   y?: number
+  /** Inside a dungeon or a raid, where their own Twinmap found them: the instance, and the yards of the world, x to the north and y to the west. */
+  inst?: number
+  wx?: number
+  wy?: number
 }
 
 /** What a companion does in the group, where the group gave roles: tank, healer, damage. */
@@ -44,11 +48,13 @@ export function groupFrom(section: unknown, age = 0): Companion[] {
   if (!Array.isArray(list) || age > GROUP_STALE) return []
   const num = (v: unknown): number | undefined => (typeof v === 'number' && Number.isFinite(v) ? v : undefined)
   return list.flatMap((entry: unknown): Companion[] => {
-    const e = entry as { n?: unknown; c?: unknown; r?: unknown; m?: unknown; x?: unknown; y?: unknown } | null
+    const e = entry as { n?: unknown; c?: unknown; r?: unknown; m?: unknown; x?: unknown; y?: unknown; i?: unknown; wx?: unknown; wy?: unknown } | null
     if (typeof e?.n !== 'string' || !e.n) return []
     const map = num(e.m), x = num(e.x), y = num(e.y)
     const placed = map !== undefined && x !== undefined && y !== undefined
+    const inst = num(e.i), wx = num(e.wx), wy = num(e.wy)
+    const inside = inst !== undefined && wx !== undefined && wy !== undefined
     const role = e.r === 'T' || e.r === 'H' || e.r === 'D' ? e.r : undefined
-    return [{ name: e.n, ...(typeof e.c === 'string' ? { cls: e.c } : {}), ...(role ? { role } : {}), ...(placed ? { map, x, y } : {}) }]
+    return [{ name: e.n, ...(typeof e.c === 'string' ? { cls: e.c } : {}), ...(role ? { role } : {}), ...(placed ? { map, x, y } : {}), ...(inside ? { inst, wx, wy } : {}) }]
   })
 }

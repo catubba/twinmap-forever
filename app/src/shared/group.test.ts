@@ -26,3 +26,10 @@ test('each companion has a colour of their own, and keeps it as others come and 
   const raid = coloursFor(Array.from({ length: 12 }, (_, i) => `R${i}`))
   expect([...raid.values()].every((c) => (COMPANION_COLOURS as readonly string[]).includes(c))).toBe(true)
 })
+
+test('a companion inside a dungeon has the instance and the yards their Twinmap told, and no zone', () => {
+  expect(groupFrom({ list: [{ n: 'Anna', c: 'MAGE', i: 34, wx: 120, wy: -45.5, l: 1 }, { n: 'Bruno', i: 34 }] })).toEqual([
+    { name: 'Anna', cls: 'MAGE', inst: 34, wx: 120, wy: -45.5 },
+    { name: 'Bruno' },
+  ])
+})

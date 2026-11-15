@@ -7,6 +7,7 @@ import { keep, keptFrom } from '../shared/kept'
 import { linkStatus, lostPercent } from '../shared/link'
 import { logFrom, shownFrom, type QuestsStatus } from '../shared/quests'
 import type { Found } from '../shared/search'
+import { groupFrom } from '../shared/group'
 import { arrived, inboxFrom, marksNews, pinFrom, routeNewsFrom, stepFrom, takenFrom } from '../shared/send'
 import { feedbackLink } from '../shared/feedback'
 import { pageOf, setupComplete, setupPages, type SetupStatus } from '../shared/setup'
@@ -130,7 +131,8 @@ const send = (addons: string, changed: Record<string, unknown>, fonts: boolean):
   const kinds = [...new Set(Object.keys(changed).map((part) => /^[a-z]*/i.exec(part)![0]))].join(' ')
   if (fonts) {
     const sent = sendSignal(addons, changed)
-    record.say(`sent ${sent.seq}: ${kinds}, ${sent.bytes} bytes, in ${sent.pieces === 1 ? 'the font' : `${sent.pieces} fonts`}`)
+    // Not the character's place inside a dungeon: it goes every second and a half.
+    if (kinds !== 'here') record.say(`sent ${sent.seq}: ${kinds}, ${sent.bytes} bytes, in ${sent.pieces === 1 ? 'the font' : `${sent.pieces} fonts`}`)
     return sent
   }
   const sent = sendOld(addons, changed)
@@ -465,6 +467,28 @@ function createWindow(): void {
     lan.tell('setup', setup)
   }, SHOW_EVERY)
 
+  // Inside a dungeon or a raid only this app knows where the character is, from the minimap. In a
+  // group it tells the addon, which tells the companions' Twinmap: to the yard, when it changed, as
+  // often as the addon reads inside. Out of there, or alone, the place is taken back; one left by an
+  // app closed inside is taken back at the next start.
+  const HERE_EVERY = 1500
+  let hereSaid: string | null = null
+  const tellHere = setInterval(() => {
+    if (!gameFolder || !addonHearsFonts(gameFolder)) return
+    const state = link.snapshot().state, inst = state.sections.pos?.inst
+    const grouped = groupFrom(state.sections.group).length > 0
+    const here = grouped && inst?.x !== undefined && inst.y !== undefined && { i: inst.id, x: Math.round(inst.x), y: Math.round(inst.y), l: inst.level ?? 0 }
+    try {
+      const addons = addonsFolder(gameFolder)
+      hereSaid ??= JSON.stringify(sentParts(addons).here ?? false)
+      if (JSON.stringify(here) === hereSaid) return
+      send(addons, { here }, true)
+      hereSaid = JSON.stringify(here)
+    } catch {
+      // the way to the game is not there yet
+    }
+  }, HERE_EVERY)
+
   // TWINMAP_TRIAL, for a trial of the way to the game with nobody clicking: 40 sends one behind the
   // other, each once the game has the one before, then one too big for a font, then five more, each
   // sent while the game says it is in a fight. All in the record. The part sent is one the addon
@@ -520,6 +544,7 @@ function createWindow(): void {
 
   win.on('closed', () => {
     clearInterval(show)
+    clearInterval(tellHere)
     clearInterval(log)
     clearInterval(look)
     ipcMain.removeHandler('choose-game-folder')

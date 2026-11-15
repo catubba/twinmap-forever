@@ -894,8 +894,8 @@
   })
 
   // The companions of the group: a disc each, in a colour of their own and with what they do in the
-  // group drawn on it, where the game or their own Twinmap tells they are. One inside a dungeon has
-  // no place, and no disc.
+  // group drawn on it, where the game or their own Twinmap tells they are. Inside a dungeon only
+  // their Twinmap can tell, and the disc is on the dungeon's map while that is on show.
   // ponytail: a disc jumps to each new place; it can glide as the arrow does (glide.ts) if that reads badly.
   const companionLayer = L.layerGroup()
   const companionMarks = new Map<string, L.Marker>()
@@ -904,9 +904,10 @@
     const here = new Set<string>()
     companionColours = coloursFor(group.map((c) => c.name), companionColours)
     for (const c of group) {
-      const zone = c.map === undefined ? undefined : maps.find((m) => m.id === c.map)
-      if (!zone?.rect || zone.continent !== continent || c.x === undefined || c.y === undefined) continue
-      const where = at(unitsOfPlace(zone.rect, c.x, c.y)), colour = companionColours.get(c.name)!, key = `${c.name} ${colour} ${c.role ?? ''}`
+      const zone = inside || c.map === undefined ? undefined : maps.find((m) => m.id === c.map)
+      const within = inside && c.inst === inside.id ? yardsInside({ id: c.inst, x: c.wx, y: c.wy }) : undefined
+      if (!within && (!zone?.rect || zone.continent !== continent || c.x === undefined || c.y === undefined)) continue
+      const where = within ? atYards(within) : at(unitsOfPlace(zone!.rect!, c.x!, c.y!)), colour = companionColours.get(c.name)!, key = `${c.name} ${colour} ${c.role ?? ''}`
       here.add(key)
       const marker = companionMarks.get(key)
       if (marker) marker.setLatLng(where)
@@ -920,14 +921,12 @@
     }
     for (const [key, marker] of companionMarks) {
       if (here.has(key)) continue
-      // Out of the layer, not only off the map: inside a dungeon the layer is not on the map, and a
-      // disc taken off a map it is not on would be back with the layer, on the way out.
       companionLayer.removeLayer(marker)
       companionMarks.delete(key)
     }
   })
   $effect(() => {
-    if (map && layers.companions && !inside) companionLayer.addTo(map)
+    if (map && layers.companions) companionLayer.addTo(map)
     else companionLayer.remove()
   })
 

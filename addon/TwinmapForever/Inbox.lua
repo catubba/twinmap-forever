@@ -35,7 +35,7 @@ local MAX_FAILS = 3
 -- taken away. Called at login with what was last received, and it may be called again with the same
 -- value. A part named with letters and then more ("mark" and a place) goes to the receiver of the
 -- letters: one receiver for as many parts as the app cares to send.
-ns.receivers = {}
+ns.receivers = ns.receivers or {}
 ns.signal = "waiting" -- "waiting", "reading", or why nothing can arrive in this session
 
 local function Num(v) if type(v) == "number" and not (issecretvalue and issecretvalue(v)) then return v end end
