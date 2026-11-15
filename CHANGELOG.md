@@ -2,6 +2,13 @@
 
 What changed in each version of Twinmap, newest first. The section of a version is also the text of its release on GitHub and of the addon's file on CurseForge.
 
+## 0.6.0 - 2026-11-15
+
+### New
+
+- **Write to us from the app.** The Feedback window now has a field to write in and a Send button: a bug or an idea reaches us without a GitHub account and without your mail program. Your message goes with the details the window shows you, and with your email address and the log only if you add them. Nothing is sent until you press Send. The buttons for GitHub and for email are still there.
+- **A privacy page.** [twinmap.app/privacy.html](https://twinmap.app/privacy.html) says what a message carries, where it goes, how long it is kept and how to have it deleted.
+
 ## 0.5.0 - 2026-11-15
 
 ### New

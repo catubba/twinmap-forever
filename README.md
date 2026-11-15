@@ -117,7 +117,7 @@ World of Warcraft is a trademark of Blizzard Entertainment, Inc.
 
 ## Feedback
 
-Found a bug, or have an idea? In the app, **Feedback** opens an issue here or an email, already filled with what we need to know.
+Found a bug, or have an idea? In the app, **Feedback** sends us your message, or opens an issue here or an email, already filled with what we need to know.
 
 - [Open an issue](https://github.com/catubba/twinmap-forever/issues/new/choose)
 - No GitHub account? Write to dev@twinmap.app, in English or in Italian.
