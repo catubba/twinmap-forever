@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest'
-import { unitsOfWorld } from './geo'
-import { iconOf, resourceOf, serves, servicesOf, travel, type FixedLayer } from './services'
+import { unitsOfPlace, unitsOfWorld } from './geo'
+import type { GameMap } from './maps'
+import { iconOf, resourceOf, serves, servicesOf, travel, TRAVEL_FORMAT, type FixedLayer } from './services'
 import type { Row, Table } from './wdc5'
 
 // A table of the game, as far as these readers look at one: rows of columns, a column a value or a list.
@@ -73,6 +74,15 @@ test('doors and flights come from the tables of the maps and of the flight paths
     { id: 10, cols: { 1: 59, 2: 2 } },
   ])
   const told = travel(maps, nodes, paths)
+  // With the game's maps given, the dungeons Forever added get the door the table has none for: on the map of
+  // their zone, by the game's name when the row can be read. One whose zone is not there gets none.
+  const zone = (id: number, continent: 0 | 1 | null): GameMap => ({ id, name: '', parent: 0, level: 'zone', continent, rect: { minX: -1000, minY: -2000, maxX: 1000, maxY: 2000 }, area: 0 })
+  const added = travel(table([{ id: 3065, cols: { 1: 'The Hall of Thanes (as the game names it)', 8: 1, 17: -1 } }]), nodes, paths, [zone(1455, 0), zone(1434, 0), zone(1445, null)])
+  expect(added.doors).toEqual([
+    { continent: 0, ...unitsOfPlace(zone(1434, 0).rect!, 21.317, 27.817), names: ['The Drowned City'] },
+    { continent: 0, ...unitsOfPlace(zone(1455, 0).rect!, 27.864, 47.695), names: ['The Hall of Thanes (as the game names it)'] },
+  ])
+  expect(added.format).toBe(TRAVEL_FORMAT)
   expect(told.doors).toEqual([
     { continent: 0, ...unitsOfWorld(-11207.8, 1681.2), names: ['Deadmines'] },
     { continent: 1, ...unitsOfWorld(-8114.5, 1526.4), names: ["Ruins of Ahn'Qiraj", "Ahn'Qiraj Temple"] },

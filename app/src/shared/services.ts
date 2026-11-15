@@ -1,8 +1,9 @@
 // What stands on the map whatever the character does: who offers a service, where ore and herbs
 // grow (both from the player's QuestieDB), the doors of the dungeons and the flight routes (both
-// from the game's own tables).
-import { unitsOfWorld } from './geo'
-import type { Continent } from './maps'
+// from the game's own tables; the doors the tables do not give are in dungeon-doors.ts).
+import { DUNGEON_DOORS } from './dungeon-doors'
+import { unitsOfPlace, unitsOfWorld } from './geo'
+import type { Continent, GameMap } from './maps'
 import type { Table } from './wdc5'
 
 /** The bit of an NPC's flags behind each layer of services: QuestieDB's npcFlags of this game. */
@@ -43,7 +44,10 @@ export const TAXI_PATH_FILE = 1067802
 
 /** A place on a continent, in map units (geo.ts). */
 interface Spot { continent: Continent; x: number; y: number }
+/** Told in the file of what travel() gives: one made by an older travel() is made again. 2: the doors of the dungeons Forever added. */
+export const TRAVEL_FORMAT = 2
 export interface Travel {
+  format?: number
   /** Where one walks into a dungeon or a raid; several share a door. */
   doors: (Spot & { names: string[] })[]
   /** Where a flight starts and ends. */
@@ -63,10 +67,12 @@ const continentOf = (world: number | undefined): Continent | null => (world === 
 /**
  * The doors and the flights, from the tables of the maps, of the flight nodes and of the flight
  * paths. A map says where a ghost walks back in: that is its door. A dungeon reached through
- * another has none.
+ * another has none. The dungeons Forever added have none in the table either: theirs come from
+ * dungeon-doors.ts, each placed on the map of its zone (zones: the game's maps, as gameMaps gives them).
  */
-export function travel(maps: Table, taxiNodes: Table, taxiPaths: Table): Travel {
+export function travel(maps: Table, taxiNodes: Table, taxiPaths: Table, zones: GameMap[] = []): Travel {
   const doors: (Spot & { names: string[]; at: [number, number] })[] = []
+  const given = new Set<number>()
   for (const row of maps.rows) {
     const continent = continentOf(row.int(MAP_DOOR_WORLD)), kind = row.int(MAP_KIND), name = row.text(MAP_NAME)
     const x = row.float(MAP_DOOR, 0), y = row.float(MAP_DOOR, 1)
@@ -74,6 +80,14 @@ export function travel(maps: Table, taxiNodes: Table, taxiPaths: Table): Travel 
     const same = doors.find((d) => d.continent === continent && Math.hypot(d.at[0] - x, d.at[1] - y) < SAME_DOOR)
     if (same) same.names.push(name)
     else doors.push({ continent, ...unitsOfWorld(x, y), names: [name], at: [x, y] })
+    given.add(row.id)
+  }
+  for (const door of DUNGEON_DOORS) {
+    const zone = zones.find((z) => z.id === door.zone)
+    if (given.has(door.map) || !zone?.rect || zone.continent === null) continue
+    // The name as the game writes it, when the row of the map is one this PC can read.
+    const name = maps.rows.find((row) => row.id === door.map)?.text(MAP_NAME) || door.name
+    doors.push({ continent: zone.continent, ...unitsOfPlace(zone.rect, door.x * 100, door.y * 100), names: [name], at: [0, 0] })
   }
 
   // A node is one a player flies from when a side may use it and a path leaves it: the table also
@@ -94,7 +108,7 @@ export function travel(maps: Table, taxiNodes: Table, taxiPaths: Table): Travel 
     if (a === undefined || b === undefined || a === b || nodes[a]!.continent !== nodes[b]!.continent) continue
     routes.set(`${Math.min(a, b)}-${Math.max(a, b)}`, [Math.min(a, b), Math.max(a, b)])
   }
-  return { doors: doors.map(({ at: _at, ...door }) => door), nodes, routes: [...routes.values()] }
+  return { format: TRAVEL_FORMAT, doors: doors.map(({ at: _at, ...door }) => door), nodes, routes: [...routes.values()] }
 }
 
 /**

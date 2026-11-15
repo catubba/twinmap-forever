@@ -190,6 +190,8 @@ map is taken) and addon/TwinmapForever/Arrow.lua (how far a point is and which
 way, from the character's place in the world, and how many yards the minimap
 shows), adapted from libs/D4Lib/D4Waypoints.lua and gathernodes.lua of
 MapUtils 1.6.1
+And in the app: where one walks into the dungeons World of Warcraft: Forever
+added (app/src/shared/dungeon-doors.ts), from pins.lua of MapUtils 1.7.5
 ================================================================================
 
 Copyright (c) 2026 D4KiR

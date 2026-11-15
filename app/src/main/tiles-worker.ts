@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { parentPort, workerData } from 'node:worker_threads'
 import { gameMaps, UI_MAP_ASSIGNMENT_FILE, UI_MAP_FILE, type GameMap } from '../shared/maps'
 import { AREA_POI_FILE, AREA_TABLE_FILE, places, UI_MAP_X_MAP_ART_FILE, WORLD_MAP_OVERLAY_FILE } from '../shared/places'
-import { TAXI_NODES_FILE, TAXI_PATH_FILE, travel } from '../shared/services'
+import { TAXI_NODES_FILE, TAXI_PATH_FILE, travel, TRAVEL_FORMAT, type Travel } from '../shared/services'
 import type { TilesStatus } from '../shared/tiles-status'
 import { readTable } from '../shared/wdc5'
 import { WORLDS } from '../shared/world'
@@ -79,10 +79,17 @@ try {
     writeFileSync(join(folder, PLACES_FILE), JSON.stringify(poi && overlays && arts && areas ? places(table(poi), table(overlays), table(arts), table(areas), maps) : []))
   }
   // The doors of the dungeons and the flight routes. Without the tables the map has none of them.
-  if (!existsSync(join(folder, TRAVEL_FILE))) {
+  let travelMade = false
+  try {
+    travelMade = (JSON.parse(readFileSync(join(folder, TRAVEL_FILE), 'utf8')) as Travel).format === TRAVEL_FORMAT
+  } catch {
+    // Not there yet.
+  }
+  if (!travelMade) {
     const files = open()
+    const zones = JSON.parse(readFileSync(join(folder, MAPS_FILE), 'utf8')) as GameMap[]
     const [maps, nodes, paths] = [MAP_FILE, TAXI_NODES_FILE, TAXI_PATH_FILE].map((id) => files.read(id, true))
-    writeFileSync(join(folder, TRAVEL_FILE), JSON.stringify(maps && nodes && paths ? travel(table(maps), table(nodes), table(paths)) : { doors: [], nodes: [], routes: [] }))
+    writeFileSync(join(folder, TRAVEL_FILE), JSON.stringify(maps && nodes && paths ? travel(table(maps), table(nodes), table(paths), zones) : { format: TRAVEL_FORMAT, doors: [], nodes: [], routes: [] }))
   }
   // The pictures of the pins. A folder made before the app knew of them gets them now.
   if (!existsSync(join(folder, ICONS_FOLDER))) writeIcons(open(), folder)
