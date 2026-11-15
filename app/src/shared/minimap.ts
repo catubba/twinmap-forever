@@ -41,8 +41,26 @@ const STEPS = [6, 2, 1] // yards a pixel, from the look at the whole dungeon to 
 const NEAR = 12 // yards around the last place where the next is looked for: more than a second of running
 const LIT = 40 // of 255: a pixel of the minimap lighter than this shows something; its background under a roof is black
 const BAND = 9 // yards around what the minimap shows that still count: the walls of a room are told by the black beside it
+// Of the round middle: less lit than this and the minimap shows nothing to look for, only the dots of the
+// party. The cove of the ship in Deadmines: at most 0.5%; a room, 8% and more.
+const SHOWN = 0.02
 
 const grey = (rgb: Uint8Array, i: number): number => rgb[i]! * 0.299 + rgb[i + 1]! * 0.587 + rgb[i + 2]! * 0.114
+
+/** How much of the round middle of the minimap shows something: 0 to 1. */
+function shownPart(box: Box): number {
+  let all = 0, lit = 0
+  const half = box.size / 2
+  for (let y = 0; y < box.size; y++) {
+    for (let x = 0; x < box.size; x++) {
+      const far = Math.hypot(x + 0.5 - half, y + 0.5 - half) / half
+      if (far >= KEEP || far <= ARROW) continue
+      all++
+      if (grey(box.rgb, (y * box.size + x) * 3) > LIT) lit++
+    }
+  }
+  return all ? lit / all : 0
+}
 
 /** A picture at fewer pixels: each the mean of a square of `step`. */
 function shrunk(from: { width: number; height: number; grey: Float32Array | Uint8Array }, step: number): { width: number; height: number; grey: Float32Array | Uint8Array } {
@@ -156,11 +174,12 @@ export interface Found {
 /**
  * Where the middle of the minimap is among the rooms. zoom: the minimap's own (0 the widest).
  * near: the place found a moment ago, to look only around it; without it the whole dungeon is
- * looked through, which costs a hundred times more. Null when the zoom is not known.
+ * looked through, which costs a hundred times more. Null when the zoom is not known, or when the
+ * minimap shows next to nothing: a guess there lands anywhere.
  */
 export function locate(levels: Levels, box: Box, zoom: number, near?: { u: number; v: number }, width?: number): Found | null {
   const across = width ?? INDOOR_YARDS[zoom]
-  if (!across || box.size < 32) return null
+  if (!across || box.size < 32 || shownPart(box) < SHOWN) return null
   const { u0, v0 } = levels.mosaic
   let at: { x: number; y: number; score: number } | null = null, yards = 0
   for (const level of levels.at) {

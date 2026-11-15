@@ -74,5 +74,6 @@ test('the bosses killed are those the addon tells of this map, by name however w
   expect(fights(2999, 'The Butcher').has(nameOfBoss('The Baron'))).toBe(true)
   expect(['Baelog', 'Eric "The Swift"', 'Olaf'].every((dwarf) => fights(70, 'The Lost Dwarves').has(nameOfBoss(dwarf)))).toBe(true)
   expect(fights(230, 'The Seven').has(nameOfBoss("Doom'rel"))).toBe(true)
+  expect(['Sneed', "Sneed's Shredder"].every((boss) => fights(36, 'Sneed').has(nameOfBoss(boss)))).toBe(true)
   expect(fights(3065, 'Plunder').has(nameOfBoss('Magmatus'))).toBe(false)
 })

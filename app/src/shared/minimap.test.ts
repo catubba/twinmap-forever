@@ -53,6 +53,14 @@ test('a picture that is not of these rooms is not a place', () => {
   expect(locate(levels, other, 9)).toBeNull() // a zoom the minimap has not
 })
 
+test('a minimap that shows nothing but the dots of the party is not a place', () => {
+  // The cove of the ship in Deadmines: the game draws nothing there, only the dark ground and the party.
+  const size = 238, rgb = new Uint8Array(size * size * 3)
+  for (let i = 0; i < size * size; i++) rgb.set([10, 30, 30], i * 3)
+  for (const [x, y] of [[119, 140], [119, 150], [100, 120]]) for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) rgb.set([90, 160, 240], ((y! + dy) * size + x! + dx) * 3)
+  expect(locate(levelsOf(rooms(700, 640)), { size, rgb }, 0)).toBeNull()
+})
+
 test('the arrow in the middle of the minimap says which way the character faces', () => {
   // A light arrow on a brown floor: its eye (dark blue) at the back, its point at the front.
   const arrow = (degrees: number): Box => {
