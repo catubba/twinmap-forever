@@ -22,7 +22,7 @@ beforeAll(async () => {
   expect(channelInstalled(addons)).toBe(false)
   expect(await installChannel(addons), 'something was made: the game must be restarted').toBe(true)
 }, 60_000)
-afterAll(() => rmSync(addons, { recursive: true, force: true }))
+afterAll(() => rmSync(addons, { recursive: true, force: true }), 60_000) // twenty thousand files to take away: over the ten seconds a hook has, on a slow disk
 
 test('a font is a whole TrueType file that carries a number and up to 1018 bytes', () => {
   const news = Buffer.from(Array.from({ length: CAPACITY }, (_, i) => (i * 7) % 256))
