@@ -93,7 +93,7 @@ Here is what is planned, in no particular order. These are plans, not promises: 
 
 - **Group**: quests you share, pins everyone sees
 - **Travel**: time to arrive, flight paths, boats and zeppelins, your hearthstone
-- **More on the map**: zones colored by level, the places you have explored, your corpse and the graveyard, rares and treasures
+- **More on the map**: zones colored by level, the places you have explored, rares and treasures
 - **Quests**: your whole quest log, chains, rewards, and a plan for the session
 - **Character**: experience per hour, professions, reputations, a reminder when your trainer has something new
 - **Alerts**: full bags, broken gear, a disconnected game, and why you died
