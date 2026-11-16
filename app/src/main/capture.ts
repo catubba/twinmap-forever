@@ -61,17 +61,21 @@ export function programOf(hwnd: WindowHandle): string | null {
   return ok ? name.toString('utf16le', 0, size[0]! * 2) : null
 }
 
-/**
- * The window of World of Warcraft: Forever, or null when the game is not open. Other clients of
- * the game have the same window title: Forever is the one that runs from the _forever_ folder.
- */
-export function findGameWindow(): WindowHandle | null {
+/** The first visible top-level window of a program whose full path matches, or null. */
+export function findWindowOf(program: RegExp): WindowHandle | null {
   let hwnd: WindowHandle | null = null
-  while ((hwnd = (FindWindowExW(null, hwnd, null, 'World of Warcraft') as WindowHandle | null) || null)) {
-    if (IsWindowVisible(hwnd) && /\\_forever_\\Wow\.exe$/i.test(programOf(hwnd) ?? '')) return hwnd
+  while ((hwnd = (FindWindowExW(null, hwnd, null, null) as WindowHandle | null) || null)) {
+    if (IsWindowVisible(hwnd) && program.test(programOf(hwnd) ?? '')) return hwnd
   }
   return null
 }
+
+/**
+ * The window of World of Warcraft: Forever, or null when the game is not open. Found by its program,
+ * not its title: the title changes with the client's language (a Chinese player's game was not found
+ * by "World of Warcraft"), and other clients of the game share it. Forever runs from _forever_.
+ */
+export const findGameWindow = (): WindowHandle | null => findWindowOf(/\\_forever_\\Wow\.exe$/i)
 
 /** Whether a window is still there, and whether there is anything of it on screen. */
 export function windowState(hwnd: WindowHandle): 'gone' | 'minimized' | 'open' {

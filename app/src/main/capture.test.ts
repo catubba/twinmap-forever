@@ -1,15 +1,22 @@
 import { spawn } from 'node:child_process'
+import { copyFileSync, mkdirSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { afterAll, beforeAll, expect, test } from 'vitest'
-import { findWindow, readBox, readRow, type WindowHandle } from './capture'
+import { findWindow, findWindowOf, readBox, readRow, type WindowHandle } from './capture'
 
-// A real window on the real screen, drawn by capture.test.ps1 with the same formulas as below.
-const TITLE = `Twinmap capture test ${process.pid}`
+// A real window on the real screen, drawn by capture.test.ps1 with the same formulas as below. It
+// passes for a Chinese client of the game: PowerShell copied to a _forever_ folder as Wow.exe, and
+// a title that is not "World of Warcraft".
+const TITLE = `魔兽世界 Twinmap capture test ${process.pid}`
 const WIDTH = 640, HEIGHT = 60
+const fake = join(tmpdir(), `twinmap-capture-${process.pid}`)
+mkdirSync(join(fake, '_forever_'), { recursive: true })
+copyFileSync(join(process.env.SystemRoot!, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'), join(fake, '_forever_', 'Wow.exe'))
 
 const child = spawn(
-  'powershell.exe',
+  join(fake, '_forever_', 'Wow.exe'),
   ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', join(__dirname, 'capture.test.ps1'), TITLE, String(WIDTH), String(HEIGHT)],
   { stdio: ['ignore', 'ignore', 'inherit'] },
 )
@@ -29,7 +36,12 @@ beforeAll(async () => {
     if (colors(readRow(hwnd, 'top')).slice(0, 3).join() === first.join()) break
   }
 }, 70_000)
-afterAll(() => void child.kill())
+afterAll(async () => {
+  const gone = new Promise((done) => child.once('exit', done))
+  child.kill()
+  await gone
+  rmSync(fake, { recursive: true, force: true, maxRetries: 20 })
+})
 
 // Blue, green, red, unused: the bytes Windows gives for a cell of the strip (R*4 + G*2 + B).
 function expected(cell: (x: number) => number): number[] {
@@ -46,6 +58,11 @@ test('the top row of a window is read pixel by pixel', () => {
 
 test('the bottom row is read too, and it is another row', () => {
   expect(colors(readRow(hwnd!, 'bottom'))).toEqual(expected((x) => (x * 5 + 1) % 8))
+})
+
+test('the game is found by its program, whatever its title', () => {
+  expect(findWindowOf(new RegExp(`\\\\twinmap-capture-${process.pid}\\\\_forever_\\\\Wow\\.exe$`, 'i'))).toBe(hwnd)
+  expect(findWindowOf(/\\no such folder\\Wow\.exe$/i)).toBeNull()
 })
 
 test('a window that does not exist is not found, and gives no row', () => {
