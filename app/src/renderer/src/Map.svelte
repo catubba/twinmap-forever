@@ -2,7 +2,8 @@
   // The map: the game's own pictures of the two continents, the names of the zones, and the
   // character as an arrow. It follows the character until the player drags the map away.
   // Inside a dungeon or a raid it shows that instead: its rooms, its bosses, its entrance.
-  import { TILES } from './web'
+  import { inApp, TILES } from './web'
+  import type { Terrain } from './terrain3d'
   import L from 'leaflet'
   import 'leaflet/dist/leaflet.css'
   import { onMount, untrack } from 'svelte'
@@ -739,6 +740,60 @@
     }
   }
 
+  // The 3D view of the continent (terrain3d.ts; ui.md, section 4), over the 2D map, made the first
+  // time it is asked for. The 2D map stays under it and keeps the place: the view goes from one to
+  // the other at the same point and zoom, and what moves the map by itself (search, Follow, the
+  // continents, + and -) moves the 3D view with it.
+  let threeD = $state(false)
+  let terrainHost: HTMLDivElement
+  let compassHost: HTMLButtonElement
+  let terrain: Terrain | undefined
+  let tilted = { polar: 0.9, azimuth: 0 } // how the 3D view was left
+  let syncing = false // the 2D map is moved from the 3D view: not the other way round
+  const worldShown = (): string | undefined => (inside ? undefined : WORLDS.find((w) => w.continent === continent)?.name)
+  // Yards of ground from top to foot of the 2D map at a zoom, and back.
+  const seenAt = (z: number): number => (holder.clientHeight / 2 ** z) * YARDS_PER_UNIT
+  const zoomFor = (seen: number): number => Math.log2((holder.clientHeight * YARDS_PER_UNIT) / seen)
+  function lookAsTheMap(polar: number, azimuth: number): void {
+    const c = map!.getCenter()
+    terrain!.look({ x: c.lng * YARDS_PER_UNIT, z: -c.lat * YARDS_PER_UNIT, seen: seenAt(map!.getZoom()), polar, azimuth })
+  }
+  async function view3d(on: boolean): Promise<void> {
+    const folder = worldShown()
+    if (on === threeD || !map || (on && !folder)) return
+    if (on) {
+      if (!terrain) {
+        const { Terrain } = await import('./terrain3d')
+        terrain ??= new Terrain(terrainHost, compassHost)
+        terrain.onGrab = () => (following = false)
+      }
+      threeD = true
+      terrain.show(folder!)
+      lookAsTheMap(0, 0)
+      terrain.start()
+      await terrain.turn(tilted.polar, tilted.azimuth)
+    } else if (terrain) {
+      const left = terrain.looking()
+      tilted = { polar: left.polar, azimuth: left.azimuth }
+      await terrain.turn(0, 0)
+      back2d()
+    }
+  }
+  // Straight to 2D, where the 3D view is looking.
+  function back2d(): void {
+    if (!terrain || !map) return
+    const now = terrain.looking()
+    syncing = true
+    map.setView(at({ x: now.x / YARDS_PER_UNIT, y: now.z / YARDS_PER_UNIT }), zoomFor(now.seen), { animate: false })
+    syncing = false
+    threeD = false
+    terrain.stop()
+  }
+  // Inside a dungeon there is no ground to show: back to 2D.
+  $effect(() => {
+    if (inside && untrack(() => threeD)) back2d()
+  })
+
   onMount(() => {
     const made = L.map(holder, { zoomControl: false, crs: L.CRS.Simple, minZoom: 1, maxZoom: 9, zoomSnap: 0.5, zoomDelta: 0.5, wheelPxPerZoomLevel: 90, attributionControl: false, zoomAnimation: !still(), fadeAnimation: !still(), maxBounds: WORLD_BOUNDS.pad(0.2) })
     map = made
@@ -748,6 +803,14 @@
     made.on('move', look)
     made.on('zoomend', layout)
     made.on('moveend', layoutSoon)
+    made.on('moveend', () => {
+      if (!threeD || syncing || !terrain) return
+      const folder = worldShown()
+      if (!folder) return back2d()
+      terrain.show(folder)
+      const l = terrain.looking()
+      lookAsTheMap(l.polar, l.azimuth)
+    })
     made.on('zoomstart', () => (zooming = true))
     made.on('zoomend', () => (zooming = false))
     made.on('zoomend', () => (zoom = made.getZoom()))
@@ -1254,6 +1317,7 @@
       else layersOpen = false
     } else if (e.key === 'l' || e.key === 'L') layersOpen = !layersOpen
     else if (e.key === 'f' || e.key === 'F') follow()
+    else if (e.key === '3' && inApp && !inside) void view3d(!threeD)
     else if (e.target === holder && e.key.startsWith('Arrow')) following = false // moved by hand, like a drag
     else if (e.key === ' ' && e.target === holder && map) {
       e.preventDefault()
@@ -1283,6 +1347,8 @@
 <svelte:window onkeydown={key} />
 
 <div class="map" bind:this={holder}></div>
+<div class="terrain" class:on={threeD} bind:this={terrainHost}></div>
+<button class="compass" class:on={threeD} bind:this={compassHost} tabindex={threeD ? 0 : -1} aria-hidden={!threeD} title="North up" aria-label="North up" onclick={() => terrain?.north()}></button>
 {#if labelled}
   {#key labelled.units}
     <PointLabel
@@ -1331,6 +1397,10 @@
       <button class="btn" aria-pressed={!inside && continent === which} onclick={() => choose(which)}>{NAMES[which]}</button>
     {/each}
     <button class="btn" aria-expanded={layersOpen} aria-controls="layers" title="Layers (L)" onclick={() => (layersOpen = !layersOpen)}>Layers</button>
+    <!-- ponytail: the app's window only; whether the phone gets the 3D view is M16-F8's to decide. -->
+    {#if inApp && !inside}
+      <button class="view" role="switch" aria-checked={threeD} aria-label="3D view" title="2D or 3D view (3)" onclick={() => view3d(!threeD)}><i class="knob"></i><span class="two">2D</span><span class="three">3D</span></button>
+    {/if}
   </div>
   {#if layersOpen}
     <div class="menu layers" id="layers" role="group" aria-label="Layers" in:fly={drop()} out:fade={gone}>
@@ -1380,6 +1450,103 @@
     position: absolute;
     inset: 0;
     background: #000; /* the sea of the game's own pictures ends in black */
+  }
+
+  /* The 3D view lies over the 2D map, under the controls; hidden, it keeps its size. */
+  .terrain {
+    position: absolute;
+    inset: 0;
+    z-index: 1100;
+    visibility: hidden;
+  }
+  .terrain.on {
+    visibility: visible;
+  }
+  .terrain :global(canvas) {
+    display: block;
+  }
+  /* The compass: bottom left, in 3D only; a click turns the north up. */
+  .compass {
+    position: absolute;
+    left: 12px;
+    bottom: calc(12px + var(--lift, 0px));
+    z-index: 1200;
+    width: 110px;
+    height: 110px;
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 200ms;
+  }
+  .compass.on {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .compass :global(canvas) {
+    display: block;
+  }
+  /* The view switch: a dark box with 2D and 3D in it; a red block like the buttons lies on the one in use and slides to the other. */
+  .view {
+    position: relative;
+    display: flex;
+    height: 32px;
+    padding: 0;
+    border: 1px solid #120b05;
+    border-radius: 4px;
+    cursor: pointer;
+    font: var(--t-label);
+    color: var(--bronze-500);
+    text-shadow: 0 1px 0 #000;
+    background: linear-gradient(#000, var(--stone-800));
+    box-shadow:
+      inset 0 0 0 1px var(--bronze-700),
+      inset 0 2px 4px #000,
+      0 2px 4px #000d;
+  }
+  .view:hover {
+    box-shadow:
+      inset 0 0 0 1px var(--bronze-500),
+      inset 0 2px 4px #000,
+      0 2px 4px #000d;
+  }
+  .view:focus-visible {
+    outline: none;
+    box-shadow:
+      inset 0 0 0 1px var(--bronze-500),
+      0 0 0 5px #000;
+  }
+  .view span {
+    position: relative;
+    z-index: 1;
+    width: 38px;
+    line-height: 30px;
+    text-align: center;
+    transition: color var(--quick);
+  }
+  .view .knob {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 38px;
+    height: 30px;
+    border-radius: 3px;
+    transition: transform 180ms ease;
+    background: linear-gradient(var(--red-top), var(--red-mid) 55%, var(--red-low));
+    box-shadow:
+      inset 0 1px 0 #ffb09a66,
+      inset 0 0 0 1px var(--bronze-400),
+      inset 0 -6px 8px #0005,
+      0 1px 3px #000;
+  }
+  .view[aria-checked='true'] .knob {
+    transform: translateX(38px);
+  }
+  .view[aria-checked='false'] .two,
+  .view[aria-checked='true'] .three {
+    color: var(--gold-pale);
   }
 
   /* The controls sit inside the frame, over its vignette. */

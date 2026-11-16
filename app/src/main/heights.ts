@@ -3,10 +3,14 @@
 //   <folder>/heights/<column>/<row>.bin    SIDE x SIDE heights, packHeights, deflated.
 //   <folder>/shade/<zoom>/<column>/<row>.png   the relief's tiles, zoom 6 (a block each) and below,
 //                                          grey, FLAT where the ground is level or unknown.
+//   <folder>/levels/<zoom>/<column>/<row>.bin  the ground of the 3D view (shared/levels.ts), with
+//                                          its liquids (shared/water.ts), zoom 6 and below, deflated.
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join as joinPath } from 'node:path'
 import { deflateSync } from 'node:zlib'
 import { blockHeights, FLAT, packHeights, shadeOfBlock, SHADE_PIXELS } from '../shared/heights'
+import { BLOCK_ZOOM, levelsOfTile, packLevels } from '../shared/levels'
+import { blockWater, type BlockWater } from '../shared/water'
 import { halve, join } from '../shared/pixels'
 import { BLOCKS, terrainFiles } from '../shared/world'
 import { encodePng } from './png'
@@ -22,36 +26,62 @@ export const RELIEF_STRENGTH = 1
  */
 export const RELIEF_VERSION = 2
 const SHADE_ZOOM = 6
+/** The layout of the 3D tiles: change it when they are made otherwise, and they are made again at the next start, alone. */
+export const LEVELS_VERSION = 1
+
+interface Marker {
+  blocks?: number
+  missing?: number
+  relief?: number
+  levels?: number
+}
 
 export const heightsFile = (folder: string, column: number, row: number): string => joinPath(folder, 'heights', String(column), `${row}.bin`)
 export const shadeFile = (folder: string, zoom: number, column: number, row: number): string => joinPath(folder, 'shade', String(zoom), String(column), `${row}.png`)
+export const levelsFile = (folder: string, zoom: number, column: number, row: number): string => joinPath(folder, 'levels', String(zoom), String(column), `${row}.bin`)
 
-/** True when the heights and the relief of this continent's folder are all there, the relief as it is drawn now. */
-export function heightsDone(folder: string): boolean {
+function markerOf(folder: string): Marker | null {
   try {
-    return (JSON.parse(readFileSync(joinPath(folder, 'heights', MARKER), 'utf8')) as { relief?: number }).relief === RELIEF_VERSION
+    return JSON.parse(readFileSync(joinPath(folder, 'heights', MARKER), 'utf8')) as Marker
   } catch {
-    return false
+    return null
   }
+}
+
+/** True when the heights, the relief and the 3D tiles of this continent's folder are all there, made as they are made now. */
+export function heightsDone(folder: string): boolean {
+  const marker = markerOf(folder)
+  return marker?.relief === RELIEF_VERSION && marker.levels === LEVELS_VERSION
 }
 
 /**
  * Blocks kept and blocks the world lists that could not be read. A folder already done is left as
- * it is; one left half done is finished, files already there kept.
+ * it is; one left half done is finished, files already there kept. Of the relief and the 3D tiles,
+ * only what is missing or made another way is made. liquid: what a liquid type is (water.ts).
  */
-export function convertHeights(wdt: Buffer, read: (id: number) => Buffer | null, folder: string, onProgress?: (done: number, total: number) => void): { blocks: number; missing: number } {
+export function convertHeights(
+  wdt: Buffer,
+  read: (id: number) => Buffer | null,
+  folder: string,
+  onProgress?: (done: number, total: number) => void,
+  liquid: (type: number) => number = () => 1,
+): { blocks: number; missing: number } {
   if (heightsDone(folder)) return { blocks: -1, missing: -1 }
-  // A relief drawn another way: its tiles go, or the ones already there would be kept. The heights stay.
-  if (existsSync(joinPath(folder, 'heights', MARKER))) rmSync(joinPath(folder, 'shade'), { recursive: true, force: true })
-  const files = terrainFiles(wdt), all = new Map<number, Float32Array>()
+  const marker = markerOf(folder), shade = marker?.relief !== RELIEF_VERSION, levels = marker?.levels !== LEVELS_VERSION
+  // A relief or 3D tiles made another way: they go, or the ones already there would be kept. The heights stay.
+  if (marker && shade) rmSync(joinPath(folder, 'shade'), { recursive: true, force: true })
+  if (marker && levels) rmSync(joinPath(folder, 'levels'), { recursive: true, force: true })
+  const files = terrainFiles(wdt), all = new Map<number, Float32Array>(), waters = new Map<number, BlockWater>()
   let missing = 0, done = 0
-  const total = files.size * 2 // read, then shaded
+  const total = files.size * (1 + (shade ? 1 : 0) + (levels ? 1 : 0)) // read, then shaded, then the 3D tiles
   for (const [block, file] of files) {
     const column = block % BLOCKS, row = Math.floor(block / BLOCKS)
     let h: Float32Array | null = null
     try {
       const adt = read(file)
       h = adt && blockHeights(adt, column, row)
+      const water = adt && h && levels ? blockWater(adt, liquid) : null
+      if (water) waters.set(block, water)
     } catch {
       h = null
     }
@@ -85,9 +115,27 @@ export function convertHeights(wdt: Buffer, read: (id: number) => Buffer | null,
     png(zoom, column, row, rgb)
     return rgb
   }
-  tile(0, 0, 0)
+  if (shade) tile(0, 0, 0)
+
+  // The 3D tiles: every block, then each zoom below from them.
+  if (levels) {
+    const block = (column: number, row: number): { heights: Float32Array; water: BlockWater | null } | null => {
+      const heights = get(column, row)
+      return heights && { heights, water: waters.get(row * BLOCKS + column) ?? null }
+    }
+    for (let zoom = BLOCK_ZOOM; zoom >= 0; zoom--) {
+      const tiles = 2 ** zoom
+      for (let row = 0; row < tiles; row++) {
+        for (let column = 0; column < tiles; column++) {
+          const made = levelsOfTile(zoom, column, row, block)
+          if (made) keep(levelsFile(folder, zoom, column, row), () => deflateSync(packLevels(made)))
+          if (zoom === BLOCK_ZOOM && all.has(row * BLOCKS + column)) onProgress?.(++done, total)
+        }
+      }
+    }
+  }
 
   mkdirSync(joinPath(folder, 'heights'), { recursive: true })
-  writeFileSync(joinPath(folder, 'heights', MARKER), JSON.stringify({ blocks: all.size, missing, relief: RELIEF_VERSION }))
+  writeFileSync(joinPath(folder, 'heights', MARKER), JSON.stringify({ blocks: all.size, missing, relief: RELIEF_VERSION, levels: LEVELS_VERSION } satisfies Marker))
   return { blocks: all.size, missing }
 }

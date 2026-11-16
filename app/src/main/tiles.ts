@@ -67,6 +67,9 @@ export const ICONS_FOLDER = 'icons'
 export function servedFile(base: string, path: string): string | null {
   const icon = /^\/icons\/([a-z0-9-]{1,40})\.png$/.exec(path)
   if (icon) return joinPath(base, ICONS_FOLDER, `${icon[1]}.png`)
+  // The ground of the 3D view (heights.ts), a continent's only.
+  const levels = /^\/([a-z]+)\/levels\/(\d)\/(\d{1,2})\/(\d{1,2})\.bin$/.exec(path)
+  if (levels) return joinPath(base, levels[1]!, 'levels', levels[2]!, levels[3]!, `${levels[4]}.bin`)
   const m = /^\/(?:(maps|places|travel|interiors)\.json|rooms\/(\d{1,9})\.dxt|([a-z]+|i\d{1,5})\/(?:blocks\/(\d{1,2})\/(\d{1,2})\.dxt|(shade\/)?(\d)\/(\d{1,3})\/(\d{1,3})\.png))$/.exec(path)
   if (!m) return null
   if (m[1]) return joinPath(base, `${m[1]}.json`)

@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, test } from 'vitest'
 import { BLOCK_YARDS } from '../shared/world'
-import { convertHeights, heightsDone, heightsFile, RELIEF_VERSION, shadeFile } from './heights'
+import { convertHeights, heightsDone, heightsFile, LEVELS_VERSION, levelsFile, RELIEF_VERSION, shadeFile } from './heights'
 import { servedFile } from './tiles'
 
 const chunk = (tag: string, data: Buffer): Buffer => {
@@ -26,10 +26,12 @@ test('a continent gets its heights and its relief, down to the tile of the whole
   try {
     const steps: number[] = []
     expect(convertHeights(chunk('DIAM', maid), (id) => (id === 7 ? adt : null), folder, (done) => steps.push(done))).toEqual({ blocks: 1, missing: 1 })
-    expect(steps.at(-1)).toBe(3)
+    expect(steps.at(-1)).toBe(4)
     expect(existsSync(heightsFile(folder, 32, 48))).toBe(true)
     for (const zoom of [6, 3, 0]) expect(existsSync(shadeFile(folder, zoom, 32 >> (6 - zoom), 48 >> (6 - zoom))), `zoom ${zoom}`).toBe(true)
     expect(existsSync(shadeFile(folder, 6, 33, 48))).toBe(false)
+    for (const zoom of [6, 5, 0]) expect(existsSync(levelsFile(folder, zoom, 32 >> (6 - zoom), 48 >> (6 - zoom))), `3D zoom ${zoom}`).toBe(true)
+    expect(existsSync(levelsFile(folder, 6, 33, 48))).toBe(false)
     expect(heightsDone(folder)).toBe(true)
     expect(convertHeights(chunk('DIAM', maid), () => null, folder)).toEqual({ blocks: -1, missing: -1 })
     // A relief drawn another way before: made again, the old tiles gone.
@@ -42,6 +44,13 @@ test('a continent gets its heights and its relief, down to the tile of the whole
     expect(existsSync(shadeFile(folder, 6, 40, 40))).toBe(false)
     expect(existsSync(shadeFile(folder, 0, 0, 0))).toBe(true)
     expect(JSON.parse(readFileSync(marker, 'utf8')).relief).toBe(RELIEF_VERSION)
+    // 3D tiles made another way before: they alone are made again, the relief left as it is.
+    writeFileSync(marker, JSON.stringify({ blocks: 1, missing: 1, relief: RELIEF_VERSION }))
+    writeFileSync(shadeFile(folder, 0, 0, 0), 'kept')
+    expect(convertHeights(chunk('DIAM', maid), (id) => (id === 7 ? adt : null), folder)).toEqual({ blocks: 1, missing: 1 })
+    expect(readFileSync(shadeFile(folder, 0, 0, 0), 'utf8')).toBe('kept')
+    expect(existsSync(levelsFile(folder, 0, 0, 0))).toBe(true)
+    expect(JSON.parse(readFileSync(marker, 'utf8')).levels).toBe(LEVELS_VERSION)
   } finally {
     rmSync(folder, { recursive: true, force: true })
   }
@@ -50,5 +59,6 @@ test('a continent gets its heights and its relief, down to the tile of the whole
 test('the relief is served from its folder, and nothing beside it', () => {
   const base = join(tmpdir(), 'build')
   expect(servedFile(base, '/azeroth/shade/6/32/48.png')).toBe(shadeFile(join(base, 'azeroth'), 6, 32, 48))
-  for (const path of ['/azeroth/shade/../6/1/1.png', '/azeroth/heights/32/48.bin', '/azeroth/shade/12/1/1.png']) expect(servedFile(base, path), path).toBeNull()
+  expect(servedFile(base, '/azeroth/levels/6/32/48.bin')).toBe(levelsFile(join(base, 'azeroth'), 6, 32, 48))
+  for (const path of ['/azeroth/shade/../6/1/1.png', '/azeroth/heights/32/48.bin', '/azeroth/shade/12/1/1.png', '/azeroth/levels/6/../1.bin', '/i33/levels/6/1/1.bin']) expect(servedFile(base, path), path).toBeNull()
 })

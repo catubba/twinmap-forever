@@ -8,6 +8,7 @@ import { AREA_POI_FILE, AREA_TABLE_FILE, places, UI_MAP_X_MAP_ART_FILE, WORLD_MA
 import { TAXI_NODES_FILE, TAXI_PATH_FILE, travel, TRAVEL_FORMAT, type Travel } from '../shared/services'
 import type { TilesStatus } from '../shared/tiles-status'
 import { readTable } from '../shared/wdc5'
+import { LIQUID_TYPE_FILE, liquidOfName, WATER } from '../shared/water'
 import { WORLDS } from '../shared/world'
 import { installedBuild, openClientFiles, type ClientFiles } from './client-files'
 import { convertInteriors, ENCOUNTERS_FILE, finishedInteriors, INTERIORS_FILE, MAP_FILE, mapEntries, ROOM_PICTURES_FILE, roomPictures } from './interiors'
@@ -66,7 +67,14 @@ try {
     if (relief) {
       try {
         const files = open()
-        convertHeights(wdt(), (id) => files.read(id), join(folder, world.name), (done, total) => progress(((i + 1 - share + share * (done / total)) / WORLDS.length) * 100))
+        // What each liquid is, by its name in the game's table; without the table, all water.
+        const liquids = new Map<number, number>()
+        try {
+          for (const row of table(files.read(LIQUID_TYPE_FILE)!).rows) liquids.set(row.id, liquidOfName(row.text(0)))
+        } catch {
+          // all water
+        }
+        convertHeights(wdt(), (id) => files.read(id), join(folder, world.name), (done, total) => progress(((i + 1 - share + share * (done / total)) / WORLDS.length) * 100), (type) => liquids.get(type) ?? WATER)
       } catch {
         // The map does without its relief; it is tried again at the next start.
       }
