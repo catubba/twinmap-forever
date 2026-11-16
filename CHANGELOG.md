@@ -2,6 +2,24 @@
 
 What changed in each version of Twinmap, newest first. The section of a version is also the text of its release on GitHub and of the addon's file on CurseForge.
 
+## 0.9.0 - 2026-11-16
+
+### New
+
+- **A dungeon's map from outside.** The label of a dungeon's door has a Dungeon Map button (Raid Map for a raid, and one button per map where a door leads to several, as at Ahn'Qiraj). It opens the dungeon's own map, with its rooms, levels, bosses and entrance, while you are still outside. Back to, at the top, takes you back to where you were. The search finds dungeons and raids by name too, and the wings of Scarlet Monastery and Dire Maul open the map on their wing.
+- **My pins.** A new band in the Now column lists your saved pins, the nearest first, with how far they are and which way. The search finds them by the names you gave them.
+- **Pins that go once you get there.** A pin set in the game with Alt and a click is now temporary: it goes away from the game and the app when you reach it. Save, in its label, keeps it among My pins. The label of a point sent with Send to game closes when you get there too.
+- **Bands that fold.** A click on the title of a band (Attention, In game, My pins, Quests, Nearby) folds it away or opens it again. The app remembers which ones are folded.
+- **Six more bosses on the dungeon maps.** Ras Frostwhisper, Malor the Zealous, Ribbly Screwspigot, Kirtonos the Herald (at the brazier that calls him), Darkmaster Gandling and Timmy the Cruel now have their skull.
+- **Rare bosses.** The seven bosses that are not there in every run, such as Miner Johnson and Skul, have their skull in a silver ring and "(rare)" after their name.
+
+### Fixed
+
+- **Killed bosses in every language.** In a game that is not in English, bosses were never marked as killed. Now they are, with the new version of the addon.
+- **A game with another window title.** The app looked for the game's window by its English title, so with the Chinese client it kept saying Game not running. It now finds the game whatever its title.
+- **The arrow in the Deadmines cove.** Where the minimap shows nothing, as in the cove of the ship, the arrow could land hundreds of yards off. Now it waits until the minimap shows the place again.
+- **Sneed's Shredder** is marked as killed together with Sneed.
+
 ## 0.8.0 - 2026-11-15
 
 ### New
