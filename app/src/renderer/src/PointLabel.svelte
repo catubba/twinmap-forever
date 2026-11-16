@@ -108,11 +108,14 @@
   {#each notes as note}<p>{note}</p>{/each}
   {#if where}<p class="dim">{where}</p>{/if}
   {#if way}<p>{way.far}, {way.time}</p>{/if}
+  <!-- One map behind the door: Dungeon Map, or Raid Map, first of the buttons. Several: a button each, by its name, on a row of their own. -->
+  {#if dungeons.length > 1}
+    <div class="go">
+      {#each dungeons as d (d.id)}<button class="btn" onclick={() => ondungeon?.(d.id)}>{d.name}</button>{/each}
+    </div>
+  {/if}
   <div class="go">
-    <!-- One map behind the door: Dungeon Map, or Raid Map. Several: a button each, by its name. -->
-    {#each dungeons as d (d.id)}
-      <button class="btn" onclick={() => ondungeon?.(d.id)}>{dungeons.length > 1 ? d.name : d.raid ? 'Raid Map' : 'Dungeon Map'}</button>
-    {/each}
+    {#if dungeons.length === 1}<button class="btn" onclick={() => ondungeon?.(dungeons[0]!.id)}>{dungeons[0]!.raid ? 'Raid Map' : 'Dungeon Map'}</button>{/if}
     <button class="btn" disabled={!sending.can} aria-busy={phase === 'sending'} onclick={go}>{phase === 'sending' ? 'Sending' : phase === 'sent' ? 'Sent' : following ? 'Stop following' : 'Send to game'}</button>
     <button class="btn" disabled={routed} onclick={onroute}>{routed ? 'In route' : 'Add to route'}</button>
     {#if saved}<button class="btn" onclick={onremove}>Remove</button>{:else}<button class="btn" onclick={onsave}>Save</button>{/if}
@@ -200,7 +203,6 @@
   }
   .go {
     display: flex;
-    flex-wrap: wrap;
     gap: 8px;
     margin-top: 9px;
   }
