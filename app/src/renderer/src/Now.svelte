@@ -1,6 +1,6 @@
 <script lang="ts">
-  // The Now column: the next stop of the route, every quest of the log (the nearest first), and
-  // who is near.
+  // The Now column: the next stop of the route, My pins, every quest of the log (the nearest first),
+  // and who is near. A click on the title of a band folds it away, and again opens it.
   // Nothing to click to make it work: it composes itself from where the character is.
   import { TILES } from './web'
   import type { Position } from '../../shared/game'
@@ -16,6 +16,8 @@
   import { nearestOnFoot } from '../../shared/walk'
   import { feet } from './feet.svelte'
   import type { Place } from '../../shared/death'
+  import { savedFrom } from '../../shared/saved'
+  import { kept as keptByApp } from './kept.svelte'
 
   // onpick: a row was chosen, the map should go there. onpoint: the pointer or the keyboard is on
   // a row (or on none: null), the map should show which pin it is.
@@ -113,6 +115,29 @@
     near = steady(near, onFoot(crowd).slice(0, NEAR), now)
     return { here: here.rows, placeless: journal.placeless, near: near.rows }
   })
+  // My pins, the saved ones (not the temporary), the nearest first and those of the other continent last.
+  // A click takes the map to one, where its label renames it.
+  const keptPins = keptByApp('pins', savedFrom)
+  const myPins = $derived.by((): NowRow[] => {
+    if (!me) return []
+    const rows = keptPins.value.flatMap((p, i): NowRow[] => (p.temp ? [] : [{ key: `pin ${i} ${p.name}`, name: p.name, kind: '', tone: 'service', continent: p.continent, at: p.at }]))
+    const far = (row: NowRow): number => (row.continent === me.continent ? wayOf(me.at, row.at).yards : Infinity)
+    return rows.sort((a, b) => far(a) - far(b))
+  })
+
+  // The bands folded away, remembered from one run to the next.
+  let folded = $state<Record<string, boolean>>((() => {
+    try {
+      return JSON.parse(localStorage.getItem('folded') ?? '{}') as Record<string, boolean>
+    } catch {
+      return {}
+    }
+  })())
+  function fold(band: string): void {
+    folded[band] = !folded[band]
+    localStorage.setItem('folded', JSON.stringify(folded))
+  }
+
   // The next stop of the route: the way to it alone, asked again every few dozen yards.
   const stop = $derived(route.stops[route.next])
   const toStop = feet(() => (me && stop && stop.continent === me.continent ? { continent: me.continent, from: me.at, to: [stop.at], reach: FAR } : null), 40)
@@ -127,7 +152,7 @@
   // The row chosen last keeps its mark, here and on the map, until another is chosen, it is chosen
   // again, it leaves the lists, or it is let go (clicked, below).
   let chosen = $state<string | null>(null)
-  const kept = $derived([...lists.here, ...lists.near].find((row) => row.key === chosen) ?? null)
+  const kept = $derived([...lists.here, ...myPins, ...lists.near].find((row) => row.key === chosen) ?? null)
   let over = $state.raw<NowRow | null>(null) // the row under the pointer or the keyboard: it comes first
   $effect(() => onpoint?.(over ?? kept))
   function pick(row: NowRow): void {
@@ -155,6 +180,17 @@
   onclick={clicked}
 />
 
+<!-- The title of a band: a click folds what is under it away, + and - say which way it goes. -->
+{#snippet title(band: string, text: string, count?: string | number)}
+  <h2 class="band">
+    <button class="fold" aria-expanded={!folded[band]} onclick={() => fold(band)}>
+      {text}
+      {#if count !== undefined}<span class="count">{count}</span>{/if}
+      <span class="sign" class:alone={count === undefined}><Glyph name={folded[band] ? 'plus' : 'minus'} size={14} /></span>
+    </button>
+  </h2>
+{/snippet}
+
 {#snippet rows(list: NowRow[])}
   <div class="rows">
     {#each list as row (row.key)}
@@ -173,8 +209,8 @@
 
 <div class="now" data-took={walked.took.toFixed(1)}>
   {#if attention.length && me}
-    <h2 class="band">Attention</h2>
-    <div class="rows attention">
+    {@render title('attention', 'Attention')}
+    {#if !folded.attention}<div class="rows attention">
       {#each attention as row (row.key)}
         {@const way = row.continent === me.continent ? { ...wayOf(me.at, row.at), ...(toBack.yards(row.at) === undefined ? {} : { yards: toBack.yards(row.at)! }) } : null}
         <button class="row" aria-current={row.key === chosen} onclick={() => pick(row)}>
@@ -184,13 +220,13 @@
           {#if way}<Glyph name="direction" size={12} turn={way.turn} />{/if}
         </button>
       {/each}
-    </div>
+    </div>{/if}
   {/if}
   <NextStop {route} band={bandOf(route, me, live, stop && toStop.yards(stop.at))} sending={sendState(live, inbox, news !== null, 'A stop is')} {inGame} onsend={sendRoute} {onskip} {onarrive} {onclear} {onend} {onremove} {onmove} onpick={onstop} />
   {#if journey}
     <!-- What Shortest Path guides in the game now: its goal and the legs still ahead, as its tracker words them. -->
-    <h2 class="band">In game {#if !journey.loading}<span class="count">{span(journey.left)}</span>{/if}</h2>
-    <div class="rows placeless legs" role="status">
+    {@render title('game', 'In game', journey.loading ? undefined : span(journey.left))}
+    {#if !folded.game}<div class="rows placeless legs" role="status">
       {#if journey.loading}
         <div class="row"><span>Finding the way</span></div>
       {:else}
@@ -203,21 +239,27 @@
           <div class="row hint"><span>Open the game's map once to see the whole way here</span></div>
         {/if}
       {/if}
-    </div>
+    </div>{/if}
+  {/if}
+  {#if myPins.length}
+    {@render title('pins', 'My pins', myPins.length)}
+    {#if !folded.pins}{@render rows(myPins)}{/if}
   {/if}
   {#if lists.here.length + lists.placeless.length}
-    <h2 class="band">Quests <span class="count">{lists.here.length + lists.placeless.length}</span></h2>
-    {@render rows(lists.here)}
-    <!-- In the log, with no place on the map: in a dungeon, or one Questie cannot place. -->
-    <div class="rows placeless">
-      {#each lists.placeless as row (row.key)}
-        <div class="row"><span>{row.name}</span><span class="t-{row.tone}">{row.kind}</span></div>
-      {/each}
-    </div>
+    {@render title('quests', 'Quests', lists.here.length + lists.placeless.length)}
+    {#if !folded.quests}
+      {@render rows(lists.here)}
+      <!-- In the log, with no place on the map: in a dungeon, or one Questie cannot place. -->
+      <div class="rows placeless">
+        {#each lists.placeless as row (row.key)}
+          <div class="row"><span>{row.name}</span><span class="t-{row.tone}">{row.kind}</span></div>
+        {/each}
+      </div>
+    {/if}
   {/if}
   {#if lists.near.length}
-    <h2 class="band">Nearby</h2>
-    {@render rows(lists.near)}
+    {@render title('near', 'Nearby')}
+    {#if !folded.near}{@render rows(lists.near)}{/if}
   {/if}
 </div>
 
@@ -266,5 +308,36 @@
   }
   .placeless .row:hover {
     background: none;
+  }
+  /* The whole title band is the button that folds it. */
+  .fold {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    align-self: stretch;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    color: inherit;
+    text-shadow: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  .fold:focus-visible {
+    outline: 1px solid var(--gold-pale);
+    outline-offset: -2px;
+  }
+  .sign {
+    display: flex;
+    margin-left: 10px;
+    color: var(--text-dim);
+  }
+  .sign.alone {
+    margin-left: auto;
+  }
+  .fold:hover .sign {
+    color: var(--gold);
   }
 </style>
