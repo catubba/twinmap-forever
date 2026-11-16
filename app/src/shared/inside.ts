@@ -60,6 +60,8 @@ export const nameOfBoss = (name: string): string => name.toLowerCase().replace(/
 // of encounters against the names of the pins (design/interiors/names-fdj.ts).
 const FIGHTS: Record<string, string[]> = {
   Infurnus: ['Magmatus'], // The Hall of Thanes
+  Kirtonos: ['Kirtonos the Herald'], // Scholomance
+  'Ras Frostwhisperer': ['Ras Frostwhisper'],
   Sneed: ["Sneed's Shredder"], // The Deadmines: one fight, the shredder first and Sneed out of it
   'The Butcher': ['The Baron'], // Ruins of Lordaeron
   Geilhast: ['Gelihast'], // Blackfathom Deeps: the game spells the fight so

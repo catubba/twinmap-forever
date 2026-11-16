@@ -8,6 +8,7 @@
   import { onMount, untrack } from 'svelte'
   import { DUNGEON_PINS } from '../../shared/dungeon-pins'
   import { NEW_DUNGEON_PINS } from '../../shared/new-dungeon-pins'
+  import { MORE_BOSS_PINS } from '../../shared/more-boss-pins'
   import type { Position } from '../../shared/game'
   import { coloursFor, type Companion } from '../../shared/group'
   import { unitsOfPlace, unitsOfRect, type Point } from '../../shared/geo'
@@ -426,14 +427,15 @@
     const dungeons = [...DUNGEON_PINS, ...NEW_DUNGEON_PINS].filter((d) => d.map === m.id)
     const bossMarks: typeof bosses = []
     pinned = dungeons.length > 0
+    // A boss: its skull, and its name written under it, there without the pointer on it. On a second
+    // screen nobody hovers while playing. Those of the pins, then the ones the pins lacked.
+    const all = [...dungeons.flatMap((d) => d.bosses), ...MORE_BOSS_PINS.filter(([map]) => map === m.id).map(([, name, u, v]) => [name, u, v] as const)]
+    for (const [name, u, v] of all) {
+      // A rare boss is not there in every run: a silver ring, and said in its name.
+      const rare = RARE_BOSSES.has(nameOfBoss(name))
+      bossMarks.push({ name, rare, gone: false, marker: L.marker(atYards({ u, v }), { keyboard: false, icon: bossIcon(false, rare) }).bindTooltip(rare ? `${name} (rare)` : name, { permanent: true, direction: 'bottom', offset: [0, rare ? 11 : 9], className: 'boss-name' }).addTo(pins) })
+    }
     for (const d of dungeons) {
-      // A boss: its skull, and its name written under it, there without the pointer on it. On a second
-      // screen nobody hovers while playing.
-      for (const [name, u, v] of d.bosses) {
-        // A rare boss is not there in every run: a silver ring, and said in its name.
-        const rare = RARE_BOSSES.has(nameOfBoss(name))
-        bossMarks.push({ name, rare, gone: false, marker: L.marker(atYards({ u, v }), { keyboard: false, icon: bossIcon(false, rare) }).bindTooltip(rare ? `${name} (rare)` : name, { permanent: true, direction: 'bottom', offset: [0, rare ? 11 : 9], className: 'boss-name' }).addTo(pins) })
-      }
       if (d.entrance)
         L.marker(atYards({ u: d.entrance[0], v: d.entrance[1] }), { keyboard: false, icon: doorIcon(m.kind === 'raid') })
           .bindTooltip(dungeons.length > 1 ? `Entrance: ${d.name}` : 'Entrance', { direction: 'top', offset: [0, -13], className: 'tip' })

@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest'
 import { boxOf, buildingsAt, inPiece, killedIn, nameOfBoss, piecesIn, RARE_BOSSES, roomPixels, yardsInside, YARDS_PER_UNIT, type Piece } from './inside'
 import { DUNGEON_PINS } from './dungeon-pins'
+import { MORE_BOSS_PINS } from './more-boss-pins'
 
 const piece = (over: Partial<Piece>): Piece => ({ file: 1, u: 100, v: 100, width: 32, height: 16, angle: 0, bottom: 0, top: 5, building: 0, level: 0, ...over })
 
@@ -83,4 +84,13 @@ test('every rare boss is a boss on the pins, written as the pins have it', () =>
   const pinned = new Set(DUNGEON_PINS.flatMap((d) => d.bosses.map(([name]) => nameOfBoss(name))))
   expect([...RARE_BOSSES].filter((name) => !pinned.has(name))).toEqual([])
   expect(RARE_BOSSES.size).toBe(7)
+})
+
+test('the bosses the pins lacked are marked killed by the name the game gives their fight', () => {
+  const fights = (map: number, fight: string): Set<string> => killedIn({ map, list: [fight] }, map)
+  expect(fights(289, 'Kirtonos').has(nameOfBoss('Kirtonos the Herald'))).toBe(true)
+  expect(fights(289, 'Ras Frostwhisperer').has(nameOfBoss('Ras Frostwhisper'))).toBe(true)
+  // And none of them is a pin twice.
+  const pinned = new Set(DUNGEON_PINS.flatMap((d) => d.bosses.map(([name]) => `${d.map} ${nameOfBoss(name)}`)))
+  expect(MORE_BOSS_PINS.filter(([map, name]) => pinned.has(`${map} ${nameOfBoss(name)}`))).toEqual([])
 })
