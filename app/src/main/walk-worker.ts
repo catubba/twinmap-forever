@@ -7,12 +7,14 @@ import { join } from 'node:path'
 import { parentPort, workerData } from 'node:worker_threads'
 import { UNITS_PER_BLOCK, unitsOfWorld } from '../shared/geo'
 import { navFrom } from '../shared/nav-data'
-import type { Far, FarAsk, WalkAsk, WalkPath } from '../shared/walk'
+import type { Far, FarAsk, Floors, TrackAsk, WalkAsk, WalkPath } from '../shared/walk'
 import { BLOCK_YARDS, BLOCKS } from '../shared/world'
-import { readAddonNav, shortestPathFolder, walker, type Walker, type Yards } from './walk'
+import { readAddonNav, shortestPathFolder, walker, type Tracker, type Walker, type Yards } from './walk'
 
 const { gameFolder, shipped } = workerData as { gameFolder: string | null; shipped: string }
 const finders = new Map<number, Walker | null>()
+// One character, followed on each continent: the floor it stands on is known from where it stood before.
+const trackers = new Map<number, Tracker>()
 
 function finder(continent: number): Walker | null {
   if (!finders.has(continent)) {
@@ -30,8 +32,21 @@ function finder(continent: number): Walker | null {
 // Map units to yards of the world: the other way of unitsOfWorld (shared/geo.ts).
 const yardsOf = (p: { x: number; y: number }): Yards => [(BLOCKS / 2 - p.y / UNITS_PER_BLOCK) * BLOCK_YARDS, (BLOCKS / 2 - p.x / UNITS_PER_BLOCK) * BLOCK_YARDS]
 
-// An asking with a reach is for the yards to many ends; any other for the way to one.
-parentPort?.on('message', ({ id, ask }: { id: number; ask: WalkAsk | FarAsk }) => {
+// An asking with a reach is for the yards to many ends; one with a single point, for the floor
+// the character stands on; any other for the way to one.
+parentPort?.on('message', ({ id, ask }: { id: number; ask: WalkAsk | FarAsk | TrackAsk }) => {
+  if ('at' in ask) {
+    let floors: Floors = null
+    try {
+      const find = finder(ask.continent)
+      if (find && !trackers.has(ask.continent)) trackers.set(ask.continent, find.track())
+      const told = trackers.get(ask.continent)?.(yardsOf(ask.at), ask.indoors)
+      floors = told ? { over: told.over, under: told.under } : null
+    } catch {
+      // as for the ways: nothing to say, rather than a thread that dies
+    }
+    return void parentPort?.postMessage({ id, path: floors })
+  }
   const many = 'reach' in ask
   let path: WalkPath | Far = many ? ask.to.map(() => null) : null
   try {

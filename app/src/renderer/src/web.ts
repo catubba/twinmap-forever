@@ -70,6 +70,7 @@ if (!inApp) {
     search: call('search', []),
     walk: call('walk', null),
     walkFar: call('walk-far', []),
+    walkTrack: call('walk-track', null),
     sendPin: call('send-pin', unsent),
     sendMarks: call('send-marks', undefined),
     sendUnfollow: call('send-unfollow', unsent),

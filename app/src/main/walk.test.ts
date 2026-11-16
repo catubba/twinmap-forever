@@ -73,3 +73,24 @@ test('across Stormwind the way goes by its streets and bridges, which are floors
   expect(walk.yards).toBeLessThan(crow(from, to) * 2)
   expect(find(stormwind(62, 72), stormwind(50, 45))!.yards).toBeGreaterThan(crow(stormwind(62, 72), stormwind(50, 45)))
 })
+
+test('a character followed through Fargodeep Mine is told the floor it stands on, under the hill', () => {
+  // Walks taken step by step over the grid, so the height stood at is known; the tracker gets every second point.
+  const find = walker(shipped)
+  let seed = 11, right = 0, layered = 0, below = 0
+  const random = (): number => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648)
+  for (let w = 0; w < 60; w++) {
+    const track = find.track()
+    const path = find.wander([-9900 + random() * 150, 50 + random() * 150], 300, random)
+    for (let i = 0; i < path.length; i += 2) {
+      const [at, z] = path[i]!, told = track(at)
+      if (!told || told.over + told.under === 0) continue
+      layered++
+      if (Math.abs(told.z - z) <= 3) right++
+      if (told.over > 0) below++
+    }
+  }
+  expect(layered).toBeGreaterThan(200)
+  expect(right / layered, `${right} of ${layered}`).toBeGreaterThan(0.9) // the bar of M16-F4; 95% in this run
+  expect(below).toBeGreaterThan(0) // in the mine, the hill is over the character
+})

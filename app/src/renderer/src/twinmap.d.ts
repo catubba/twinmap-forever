@@ -29,6 +29,7 @@ declare global {
       search: (typed: string) => Promise<Found[]>
       walk: (ask: import('../../shared/walk').WalkAsk) => Promise<import('../../shared/walk').WalkPath>
       walkFar: (ask: import('../../shared/walk').FarAsk) => Promise<import('../../shared/walk').Far>
+      walkTrack: (ask: import('../../shared/walk').TrackAsk) => Promise<import('../../shared/walk').Floors>
       sendPin: (pin: Pin) => Promise<{ seq: number } | { error: string }>
       sendMarks: (pins: Pin[], taken: string[]) => Promise<void>
       sendUnfollow: () => Promise<{ seq: number } | { error: string }>

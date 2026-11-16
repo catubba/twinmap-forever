@@ -268,6 +268,20 @@
       html: pin('player'),
     }),
   })
+  // Under something it can walk on (a bridge, the floor above, the rock over a mine) the arrow
+  // fades, a little: the map shows what is on top. The walk worker follows the floor it stands on
+  // from point to point; an answer that comes after a newer point is dropped.
+  const BELOW = 0.6
+  let tracked = 0
+  $effect(() => {
+    const here = me
+    const asked = ++tracked
+    if (!here) return void arrow.setOpacity(1)
+    void window.twinmap.walkTrack({ continent: here.continent, at: { x: here.units.x, y: here.units.y }, indoors: untrack(() => pos?.indoors === true) }).then((floors) => {
+      if (asked === tracked) arrow.setOpacity(floors && floors.over > 0 ? BELOW : 1)
+    })
+  })
+
   let turned = 0
   function turnTo(degrees: number): void {
     turned += ((((degrees - turned) % 360) + 540) % 360) - 180 // the short way round

@@ -39,6 +39,24 @@ export interface FarAsk {
 /** By end, the yards on foot; null where no way was found within the reach. */
 export type Far = (number | null)[]
 
+/** Where the character is now, in map units: for the floor it stands on (main/walk.ts, Tracker). */
+export interface TrackAsk {
+  continent: Continent
+  at: Point
+  /** Under a roof, as the game tells it. */
+  indoors?: boolean
+}
+
+/** How many other places to stand its cell has over the character and under it; null where the grid has none. */
+export type Floors = { over: number; under: number } | null
+
+/** What the window asked, checked. */
+export function trackAskFrom(asked: unknown): TrackAsk | null {
+  if (typeof asked !== 'object' || !asked) return null
+  const { continent, at, indoors } = asked as Record<string, unknown>
+  return (continent === 0 || continent === 1) && point(at) ? { continent, at: { x: at.x, y: at.y }, indoors: indoors === true } : null
+}
+
 const MOST_ENDS = 200
 
 /** What the window asked, checked. */
