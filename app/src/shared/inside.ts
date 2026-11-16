@@ -3,6 +3,7 @@
 //
 // Places are in the map's own yards: u east and v south from the top left of the square of
 // 64 x 64 blocks, the same for a continent and for a dungeon.
+import { ENCOUNTER_NAMES } from './encounter-names'
 import type { Instance } from './game'
 import { UNITS_PER_BLOCK } from './geo'
 import { BLOCK_YARDS, BLOCKS } from './world'
@@ -79,12 +80,14 @@ const KILL_OF = new Map(Object.entries(FIGHTS).map(([fight, creatures]) => [name
 /**
  * The bosses killed in the instance of this map, from the "kills" section as it came off the strip:
  * their names in small letters, as nameOfBoss gives them, and with a fight the creatures it is the
- * kill of. None from anything else, or of another map.
+ * kill of. The names come in the game's language, the numbers of the fights in every language the
+ * same: a number gives the English name of the pins. None from anything else, or of another map.
  */
 export function killedIn(section: unknown, map: number | undefined): Set<string> {
-  const told = (typeof section === 'object' && section ? section : {}) as { map?: unknown; list?: unknown }
+  const told = (typeof section === 'object' && section ? section : {}) as { map?: unknown; list?: unknown; ids?: unknown }
   if (map === undefined || told.map !== map || !Array.isArray(told.list)) return new Set()
-  const names = told.list.filter((name): name is string => typeof name === 'string').map(nameOfBoss)
+  const byNumber = (Array.isArray(told.ids) ? told.ids : []).map((id) => (typeof id === 'number' ? ENCOUNTER_NAMES[id] : undefined))
+  const names = [...told.list, ...byNumber].filter((name): name is string => typeof name === 'string').map(nameOfBoss)
   return new Set(names.flatMap((name) => [name, ...(KILL_OF.get(name) ?? [])]))
 }
 

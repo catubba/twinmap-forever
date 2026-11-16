@@ -94,3 +94,13 @@ test('the bosses the pins lacked are marked killed by the name the game gives th
   const pinned = new Set(DUNGEON_PINS.flatMap((d) => d.bosses.map(([name]) => `${d.map} ${nameOfBoss(name)}`)))
   expect(MORE_BOSS_PINS.filter(([map, name]) => pinned.has(`${map} ${nameOfBoss(name)}`))).toEqual([])
 })
+
+test('a kill in a game in another language marks its boss by the number of the fight', () => {
+  // Die Todesminen: the names are German, the numbers those of every game.
+  const killed = killedIn({ map: 36, list: ['Schnitter', 'Kapitän Grünhaut'], ids: [2742, 2744] }, 36)
+  expect(['Sneed', "Sneed's Shredder", 'Captain Greenskin'].every((boss) => killed.has(nameOfBoss(boss)))).toBe(true)
+  // A number the table does not have, or not a number, marks nothing.
+  expect(killedIn({ map: 36, list: [], ids: [999999, 'x'] }, 36).size).toBe(0)
+  // An addon before the numbers: the names alone, as before.
+  expect(killedIn({ map: 36, list: ['Cookie'] }, 36).has('cookie')).toBe(true)
+})
