@@ -1,21 +1,25 @@
 <script lang="ts">
   // The search of the top row: zones from the game's own maps, NPCs, quests and items from the
-  // player's QuestieDB. The results open under the field; one chosen takes the map to its place.
+  // player's QuestieDB, dungeons and raids from the doors of the world map. The results open under
+  // the field; one chosen takes the map to its place, or a dungeon's to its own map.
   import { TILES } from './web'
   import { unitsOfPlace, type Point } from '../../shared/geo'
   import type { Continent, GameMap } from '../../shared/maps'
   import { wayOf, whereIs } from '../../shared/now'
-  import { best, fold } from '../../shared/search'
+  import { best, dungeonsOf, fold, type Dungeon } from '../../shared/search'
+  import { zoneAt } from '../../shared/point-label'
+  import type { Travel } from '../../shared/services'
   import { serves } from '../../shared/services'
   import { nearestOnFoot } from '../../shared/walk'
   import Glyph from './Glyph.svelte'
 
-  export interface Place { continent: Continent; at: Point; title: string; where?: string; whole?: GameMap }
+  export interface Place { continent: Continent; at: Point; title: string; where?: string; whole?: GameMap; dungeon?: { id: number; wing?: string } }
   let { ready, onpick, pos, side }: { ready: boolean; onpick: (place: Place) => void; pos?: { map?: number; x?: number; y?: number }; side?: string } = $props()
 
   const MOST = 14 // results under the field
   const DOERS = 8 // of which found by what they do, the nearest, at most
   const ZONES = 4 // of which zones, at most
+  const DUNGEONS = 4 // of which dungeons and raids, at most
   const REACH = 2500 // the yards the search for the ways on foot walks at most, as it prices them: a quarter of a second, after the results are shown
   const ENDS = 200 // the places it is asked the way to, at most: the nearest as the crow flies
 
@@ -26,6 +30,15 @@
     void fetch(`${TILES}/maps.json`)
       .then((answer) => answer.json() as Promise<GameMap[]>)
       .then((list) => (zones = list.filter((m) => m.level === 'zone' && m.rect && m.continent !== null).map((m) => ({ ...m, lower: fold(m.name) }))))
+      .catch(() => {})
+  })
+  // The dungeons and raids, by the names of their maps, behind the doors of the world map.
+  let dungeons = $state.raw<(Dungeon & { lower: string })[]>([])
+  $effect(() => {
+    if (!ready || dungeons.length) return
+    void fetch(`${TILES}/travel.json`)
+      .then((answer) => answer.json() as Promise<Travel>)
+      .then((told) => (dungeons = dungeonsOf(told.doors).map((d) => ({ ...d, lower: fold(d.name) }))))
       .catch(() => {})
   })
 
@@ -47,6 +60,14 @@
     const found = await window.twinmap.search(wanted)
     if (mine !== asked) return // something else was typed while this was being looked for
     const me = whereIs(zones, pos)
+    // A dungeon first, told by the zone of its door and how far that door is.
+    places.unshift(
+      ...best(dungeons, wanted, DUNGEONS).map((d): Result => {
+        const zone = zoneAt(zones, d.continent, d.at)?.zone.name
+        const yards = me && me.continent === d.continent ? wayOf(me.at, d.at).yards : undefined
+        return { continent: d.continent, at: d.at, title: d.name, where: zone ?? '', note: `${d.raid ? 'Raid' : 'Dungeon'}${zone ? `, ${zone}` : ''}`, yards, dungeon: { id: d.id, ...(d.wing ? { wing: d.wing } : {}) } }
+      }),
+    )
     const named: Result[] = [], doers: Result[] = []
     for (const f of found) {
       const zone = byArea.get(f.area) // a place in a zone the app has no map of cannot be shown
@@ -78,7 +99,7 @@
 
   function pick(result: Result | undefined): void {
     if (!result) return
-    onpick({ continent: result.continent, at: result.at, title: result.title, where: result.where, whole: result.whole })
+    onpick({ continent: result.continent, at: result.at, title: result.title, where: result.where, whole: result.whole, dungeon: result.dungeon })
     open = false
   }
 

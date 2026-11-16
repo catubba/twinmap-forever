@@ -3,7 +3,7 @@
   // on the side with the most room, some way off, and a gold line ties it to the point. Send to game has the game's
   // arrow follow the point, and says Sent once the addon tells it has it; on the point the game
   // follows the same button is Stop following. Add to route puts it at the end of the route. Save keeps the point among My pins; a saved one is
-  // renamed by writing over its name, and Remove takes it away.
+  // renamed by writing over its name, and Remove takes it away. On the door of a dungeon, Dungeon Map opens its own map.
   import type { Point } from '../../shared/geo'
   import { labelPlace, type Size } from '../../shared/point-label'
   import { arrived, type Inbox } from '../../shared/send'
@@ -30,6 +30,8 @@
     onrename,
     onremove,
     onclose,
+    dungeons = [], // on a door: the dungeons and raids behind it whose maps the app has
+    ondungeon,
   }: {
     title: string
     notes?: string[]
@@ -49,6 +51,8 @@
     onrename: (name: string) => void
     onremove: () => void
     onclose: () => void
+    dungeons?: { id: number; name: string; raid: boolean }[]
+    ondungeon?: (id: number) => void
   } = $props()
 
   const SENT_FOR = 2000 // ms the button says Sent
@@ -105,6 +109,10 @@
   {#if where}<p class="dim">{where}</p>{/if}
   {#if way}<p>{way.far}, {way.time}</p>{/if}
   <div class="go">
+    <!-- One map behind the door: Dungeon Map, or Raid Map. Several: a button each, by its name. -->
+    {#each dungeons as d (d.id)}
+      <button class="btn" onclick={() => ondungeon?.(d.id)}>{dungeons.length > 1 ? d.name : d.raid ? 'Raid Map' : 'Dungeon Map'}</button>
+    {/each}
     <button class="btn" disabled={!sending.can} aria-busy={phase === 'sending'} onclick={go}>{phase === 'sending' ? 'Sending' : phase === 'sent' ? 'Sent' : following ? 'Stop following' : 'Send to game'}</button>
     <button class="btn" disabled={routed} onclick={onroute}>{routed ? 'In route' : 'Add to route'}</button>
     {#if saved}<button class="btn" onclick={onremove}>Remove</button>{:else}<button class="btn" onclick={onsave}>Save</button>{/if}
@@ -183,7 +191,7 @@
     color: var(--text-dim);
   }
   /* Sending and Sent are shorter words: the button keeps its width, so the one beside it stays put. */
-  .go .btn:first-child {
+  .go .btn:nth-last-child(3) {
     min-width: 112px;
   }
   .why {
@@ -192,6 +200,7 @@
   }
   .go {
     display: flex;
+    flex-wrap: wrap;
     gap: 8px;
     margin-top: 9px;
   }

@@ -1,4 +1,8 @@
 // The search of the top row: what it finds, and how names are ranked against what was typed.
+import { DUNGEON_PINS } from './dungeon-pins'
+import type { Point } from './geo'
+import type { Continent } from './maps'
+import type { Travel } from './services'
 
 /** A result from the player's QuestieDB: where it is, as a percent of the map of a zone. */
 export interface Found {
@@ -55,4 +59,32 @@ export function best<T extends { name: string }>(entries: Iterable<T & { lower: 
     .sort((a, b) => a.rank - b.rank || a.entry.name.length - b.entry.name.length || (a.entry.name < b.entry.name ? -1 : a.entry.name > b.entry.name ? 1 : 0))
     .slice(0, most)
     .map((hit) => hit.entry)
+}
+
+/** A dungeon or a raid the search finds by its name: its map, the wing when it is one of several on that map, and its door on the world map. */
+export interface Dungeon {
+  name: string
+  /** The game's number of its map. */
+  id: number
+  wing?: string
+  raid: boolean
+  continent: Continent
+  at: Point
+}
+
+/**
+ * Every dungeon and raid behind the doors of the world map, by the game's names, and the wings of
+ * the ones that have several on one map (Scarlet Monastery: Armory), by the names of the pins.
+ */
+export function dungeonsOf(doors: Travel['doors']): Dungeon[] {
+  const all: Dungeon[] = []
+  for (const door of doors) {
+    door.maps?.forEach((id, i) => {
+      const raid = door.raid === true, place = { continent: door.continent, at: { x: door.x, y: door.y } }
+      all.push({ name: door.names[i] ?? door.names[0]!, id, raid, ...place })
+      const wings = DUNGEON_PINS.filter((d) => d.map === id)
+      if (wings.length > 1) for (const wing of wings) all.push({ name: wing.name, id, wing: wing.name, raid, ...place })
+    })
+  }
+  return all
 }

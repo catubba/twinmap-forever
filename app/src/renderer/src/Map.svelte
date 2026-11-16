@@ -68,13 +68,17 @@
   let levels = $state(0)
   let upTo = $state(0)
   let pinned = $state(false)
+  // A dungeon or a raid opened from outside it (the button on its door, the search): the map shows it
+  // until Back, or until the character goes into an instance or out of one. inst: the one the
+  // character was in then. The rest is the view to go back to, and its name.
+  let browsing = $state<{ inst: number | null; continent: Continent; center: L.LatLng; zoom: number; following: boolean; dungeon: boolean; from: string } | null>(null)
 
   // The layers the player wants on the map: remembered from one run of the app to the next.
   let layers = $state(layersFrom(localStorage.getItem('layers')))
   let layersOpen = $state(false)
   // The point the player clicked, with its label: in map units, and where that is in the map's box now.
   // pin: the same point as the game names it, a zone map and a place on it; none where no zone is.
-  let labelled = $state<{ units: Point; continent: Continent; title: string; where: string; spot: Point; box: Size; pin: { m: number; x: number; y: number } | null; plain?: boolean; notes?: string[] } | null>(null)
+  let labelled = $state<{ units: Point; continent: Continent; title: string; where: string; spot: Point; box: Size; pin: { m: number; x: number; y: number } | null; plain?: boolean; notes?: string[]; dungeons?: { id: number; name: string; raid: boolean }[] } | null>(null)
   // Where the character is on the world map, for the distance on the label.
   let me = $state<{ units: Point; continent: Continent } | null>(null)
   // The yards and the time are those of the way on foot, where one is found: asked for the one point, again every few dozen yards.
@@ -287,11 +291,12 @@
   // What the middle of the map shows, for the readout, while the map does not follow the character:
   // someone moving the map to explore reads what is being looked at, not where the character stands.
   function look(): void {
+    if (browsing && inside) return void (looking = { zone: inside.name, where: '' }) // a dungeon opened from outside: its name, not the character's place
     if (!map || following || inside) return void (looking = null)
     const middle = map.getCenter(), found = zoneAt(maps, continent, { x: middle.lng, y: -middle.lat })
     looking = { zone: found?.zone.name ?? NAMES[continent], where: found ? `${found.place.x.toFixed(1)}, ${found.place.y.toFixed(1)}` : '' }
   }
-  $effect(look) // following, the continent on show, a dungeon entered or left
+  $effect(look) // following, the continent on show, a dungeon entered or left, or opened from outside
 
   // Writes the names of the continent on show: its regions, its towns, its points
   // of interest and the areas of its zones. A city has a map of its own but is not a region:
@@ -360,6 +365,7 @@
     if (!map) return
     ground(WORLDS.find((w) => w.continent === which)!.name)
     inside = null
+    browsing = null
     if (labelled && labelled.continent !== which) labelled = null
     showRooms([])
     under = ''
@@ -407,7 +413,8 @@
   })
 
   // Puts a dungeon or a raid on the map: its ground dimmed, its rooms, its bosses and its entrance.
-  function showInside(m: InteriorMap): void {
+  // wing: of a map with several, the one to put in view.
+  function showInside(m: InteriorMap, wing?: string): void {
     if (!map) return
     if (m.ground) ground(m.ground, GROUND_INSIDE)
     else {
@@ -442,8 +449,9 @@
           .addTo(pins)
     }
     bosses = bossMarks
+    const framed = dungeons.filter((d) => d.name === wing)
     const box = dungeons.length
-      ? dungeons.reduce<Box>((all, d) => [Math.min(all[0], d.bounds[0]), Math.min(all[1], d.bounds[1]), Math.max(all[2], d.bounds[2]), Math.max(all[3], d.bounds[3])], [Infinity, Infinity, -Infinity, -Infinity])
+      ? (framed.length ? framed : dungeons).reduce<Box>((all, d) => [Math.min(all[0], d.bounds[0]), Math.min(all[1], d.bounds[1]), Math.max(all[2], d.bounds[2]), Math.max(all[3], d.bounds[3])], [Infinity, Infinity, -Infinity, -Infinity])
       : boxOf(m.pieces)
     if (box) map.fitBounds(boundsOfBox(box), { animate: false }) // at once: the arrow is placed against this view
   }
@@ -454,7 +462,7 @@
     const level = pos?.inst?.level
     if (level === onLevel) return
     onLevel = level
-    if (inside && level !== undefined && level <= levels && level !== upTo) showUpTo(level)
+    if (inside && !browsing && level !== undefined && level <= levels && level !== upTo) showUpTo(level)
   })
 
   // Shows the rooms up to a level: the ones above are taken off, to see what they cover.
@@ -462,6 +470,44 @@
     if (!inside) return
     upTo = level
     showRooms(inside.pieces.filter((p) => p.level <= level))
+  }
+
+  /**
+   * Shows the map of a dungeon or a raid from outside it, with its bosses and its entrance; false where
+   * the app has no rooms of it. The character in it: the map follows the character there, as always.
+   */
+  export function openDungeon(id: number, wing?: string): boolean {
+    const m = interiors?.maps.find((d) => d.id === id && d.kind !== 'world')
+    if (!map || !m) return false
+    if (pos?.inst?.id === id) {
+      browsing = null
+      following = true
+      showInside(m, wing)
+      place(true)
+      return true
+    }
+    // Opened from another dungeon opened so: Back still goes to where the player was before the first.
+    if (!browsing) {
+      const center = map.getCenter(), found = inside ? undefined : zoneAt(maps, continent, { x: center.lng, y: -center.lat })
+      browsing = { inst: pos?.inst?.id ?? null, continent, center, zoom: map.getZoom(), following, dungeon: inside !== null, from: inside?.name ?? found?.zone.name ?? NAMES[continent] }
+    }
+    following = false
+    showInside(m, wing)
+    arrow.remove() // the character is not in there
+    return true
+  }
+
+  // Back from a dungeon opened from outside: to the view the player had, or to the dungeon the character is in.
+  function goBack(): void {
+    const from = browsing
+    if (!map || !from) return
+    browsing = null
+    following = from.following
+    if (!from.dungeon) {
+      show(from.continent, false)
+      map.setView(from.center, from.zoom, { animate: false })
+    }
+    place(true)
   }
 
   function choose(which: Continent): void {
@@ -473,8 +519,10 @@
    * Takes the map to a place and opens the label on it: for a row chosen in the panel, for a
    * result of the search. zoom: how near to look, when the map is farther than that.
    */
-  export function goTo(to: { continent: Continent; at: Point; title: string; where?: string; zoom?: number; whole?: GameMap }): void {
+  export function goTo(to: { continent: Continent; at: Point; title: string; where?: string; zoom?: number; whole?: GameMap; dungeon?: { id: number; wing?: string } }): void {
     if (!map || !maps.length) return
+    // A dungeon: its own map, or its door where the app has no rooms of it.
+    if (to.dungeon && openDungeon(to.dungeon.id, to.dungeon.wing)) return
     following = false
     if (inside || continent !== to.continent) show(to.continent, false)
     const view = map
@@ -496,7 +544,7 @@
 
   // A click on a pin opens the label on it, as on any point of the map: its name, and under it what
   // the pin is. on: the zone the pin was placed by, since where two maps overlap the point alone does not tell.
-  function labelPin(units: Point, title: string, notes: string[], on = zoneAt(maps, continent, units)): void {
+  function labelPin(units: Point, title: string, notes: string[], on = zoneAt(maps, continent, units), dungeons?: { id: number; name: string; raid: boolean }[]): void {
     if (!map) return
     if (holder.clientWidth < 640) layersOpen = false // on a narrow map the menu would lie over the label
     labelled = {
@@ -508,6 +556,7 @@
       spot: map.latLngToContainerPoint(at(units)),
       box: { width: holder.clientWidth, height: holder.clientHeight },
       pin: on ? { m: on.zone.id, ...on.place } : null,
+      dungeons,
     }
   }
 
@@ -585,6 +634,13 @@
   let under = '' // the buildings whose rooms are on show on a continent: the character is under their roof
   function place(jump = false): void {
     if (!map || !maps.length) return
+    // A dungeon opened from outside stays on show while the character stays where it was; going into
+    // an instance or out of one, the map follows the game again.
+    if (browsing) {
+      if ((pos?.inst?.id ?? null) === browsing.inst) return void arrow.remove()
+      browsing = null
+      following = true
+    }
     // Inside a dungeon or a raid the app has the rooms of: that is the map, whatever was on show.
     const inst = pos?.inst, dungeon = inst && interiors?.maps.find((m) => m.id === inst.id && m.kind !== 'world')
     if (inst && dungeon) {
@@ -861,7 +917,11 @@
       if (door.continent !== continent) continue
       L.marker(at(door), { keyboard: false, zIndexOffset: 200, icon: doorIcon(door.raid === true) })
         .bindTooltip(door.names.join(', '), { direction: 'top', offset: [0, -13], className: 'tip' })
-        .on('click', () => labelPin({ x: door.x, y: door.y }, door.names.join(', '), ['Entrance']))
+        .on('click', () => {
+          // The maps behind the door the app has the rooms of: a button each on the label.
+          const behind = (door.maps ?? []).flatMap((id, i) => (interiors?.maps.some((m) => m.id === id) ? [{ id, name: door.names[i] ?? door.names[0]!, raid: door.raid === true }] : []))
+          labelPin({ x: door.x, y: door.y }, door.names.join(', '), ['Entrance'], undefined, behind)
+        })
         .addTo(travelLayers.dungeons)
     }
     for (const [a, b] of travel.routes) {
@@ -1199,11 +1259,16 @@
       onrename={(name) => setPins(renamePin(myPins, savedIndex, name))}
       onremove={() => setPins(removePin(myPins, savedIndex))}
       onclose={() => (labelled = null)}
+      dungeons={labelled.dungeons}
+      ondungeon={(id) => openDungeon(id)}
     />
   {/key}
 {/if}
 <div class="corner top">
   <div class="line">
+    {#if browsing}
+      <button class="btn" onclick={goBack}>Back to {browsing.from}</button>
+    {/if}
     {#if inside}
       <span class="tag">{inside.name}</span>
     {/if}
