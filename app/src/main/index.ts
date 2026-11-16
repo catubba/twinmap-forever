@@ -186,6 +186,19 @@ function createWindow(): void {
     event.preventDefault()
   })
 
+  // A page that falls over (out of memory, a crash) is said in the record and loaded again, at most
+  // once a minute: never a window left empty, never one that loads again and again.
+  let reloadedAt = 0
+  win.webContents.on('render-process-gone', (_event, gone) => {
+    const again = gone.reason !== 'clean-exit' && Date.now() - reloadedAt > 60_000
+    record.say(`window: page gone (${gone.reason}, code ${gone.exitCode})${again ? ', loaded again' : ''}`)
+    if (!again || win.isDestroyed()) return
+    reloadedAt = Date.now()
+    win.webContents.reload()
+  })
+  win.webContents.on('unresponsive', () => record.say('window: page not answering'))
+  win.webContents.on('responsive', () => record.say('window: page answering again'))
+
   // In development the renderer comes from the dev server, in a build from disk.
   // TWINMAP_KIT opens the trial page of the basic controls instead of the app.
   const devUrl = process.env.ELECTRON_RENDERER_URL, hash = process.env.TWINMAP_KIT ? 'kit' : ''
