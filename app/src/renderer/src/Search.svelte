@@ -1,6 +1,6 @@
 <script lang="ts">
   // The search of the top row: zones from the game's own maps, NPCs, quests and items from the
-  // player's QuestieDB, dungeons and raids from the doors of the world map. The results open under
+  // player's QuestieDB, dungeons and raids from the doors of the world map, and My pins. The results open under
   // the field; one chosen takes the map to its place, or a dungeon's to its own map.
   import { TILES } from './web'
   import { unitsOfPlace, type Point } from '../../shared/geo'
@@ -12,6 +12,8 @@
   import { serves } from '../../shared/services'
   import { nearestOnFoot } from '../../shared/walk'
   import Glyph from './Glyph.svelte'
+  import { kept as keptByApp } from './kept.svelte'
+  import { savedFrom } from '../../shared/saved'
 
   export interface Place { continent: Continent; at: Point; title: string; where?: string; whole?: GameMap; dungeon?: { id: number; wing?: string } }
   let { ready, onpick, pos, side }: { ready: boolean; onpick: (place: Place) => void; pos?: { map?: number; x?: number; y?: number }; side?: string } = $props()
@@ -20,6 +22,7 @@
   const DOERS = 8 // of which found by what they do, the nearest, at most
   const ZONES = 4 // of which zones, at most
   const DUNGEONS = 4 // of which dungeons and raids, at most
+  const PINS = 4 // of which My pins, at most
   const REACH = 2500 // the yards the search for the ways on foot walks at most, as it prices them: a quarter of a second, after the results are shown
   const ENDS = 200 // the places it is asked the way to, at most: the nearest as the crow flies
 
@@ -32,6 +35,9 @@
       .then((list) => (zones = list.filter((m) => m.level === 'zone' && m.rect && m.continent !== null).map((m) => ({ ...m, lower: fold(m.name) }))))
       .catch(() => {})
   })
+  // My pins, the saved ones: found by the names the player gave them.
+  const keptPins = keptByApp('pins', savedFrom)
+  const myPins = $derived(keptPins.value.filter((p) => !p.temp).map((p) => ({ ...p, lower: fold(p.name) })))
   // The dungeons and raids, by the names of their maps, behind the doors of the world map.
   let dungeons = $state.raw<(Dungeon & { lower: string })[]>([])
   $effect(() => {
@@ -60,8 +66,13 @@
     const found = await window.twinmap.search(wanted)
     if (mine !== asked) return // something else was typed while this was being looked for
     const me = whereIs(zones, pos)
-    // A dungeon first, told by the zone of its door and how far that door is.
+    // My pins first, then a dungeon, told by the zone of its door and how far that door is.
     places.unshift(
+      ...best(myPins, wanted, PINS).map((p): Result => {
+        const zone = zoneAt(zones, p.continent, p.at)?.zone.name
+        const yards = me && me.continent === p.continent ? wayOf(me.at, p.at).yards : undefined
+        return { continent: p.continent, at: p.at, title: p.name, note: `My pin${zone ? `, ${zone}` : ''}`, yards }
+      }),
       ...best(dungeons, wanted, DUNGEONS).map((d): Result => {
         const zone = zoneAt(zones, d.continent, d.at)?.zone.name
         const yards = me && me.continent === d.continent ? wayOf(me.at, d.at).yards : undefined
