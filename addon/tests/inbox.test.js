@@ -566,7 +566,7 @@ test('Alt and a click on the game\'s map sets a flag there: the strip tells the 
   assert.equal(addon.flags(), '');
   assert.equal(addon.mapClick('LeftButton', 0.25, 0.5), true);
   assert.equal(addon.flags(), 'Elwynn Forest 25.0, 50.0 250 300');
-  assert.equal(addon.printed(), 'Twinmap Forever: Elwynn Forest 25.0, 50.0 is among your pins.');
+  assert.equal(addon.printed(), 'Twinmap Forever: Elwynn Forest 25.0, 50.0 is a pin until you get there. Save it in Twinmap to keep it.');
   addon.run(3);
   const set = { id: '1429x2500y5000', m: 1429, x: 25, y: 50, name: 'Elwynn Forest 25.0, 50.0' };
   assert.deepEqual(marksTold(addon), { gone: [], new: [set] });

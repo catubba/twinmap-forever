@@ -3,7 +3,8 @@
 -- a part taken away takes its flag away. Alt and a right click on a flag removes it here: the strip
 -- tells the app, which forgets the point and takes the part away. Alt and a left click on the map
 -- sets a new one: it is drawn at once, told on the strip, and kept here until the app says it has
--- taken it among its pins. A click on a flag has the arrow follow it (Arrow.lua), and the point
+-- taken it among its pins, where it is temporary until saved: the app takes it away once the
+-- character gets there. A click on a flag has the arrow follow it (Arrow.lua), and the point
 -- followed is a flag too, in gold. Only frames of ours are drawn, and nothing of the game's own map is touched.
 -- value: { m = map, x = 0 to 100, y = 0 to 100, name = text }.
 -- Placing a frame on the map's canvas and taking a click on it adapted from MapUtils, Copyright (c) 2026 D4KiR, GPL-3.0: see THIRD-PARTY-LICENSES.
@@ -158,7 +159,7 @@ local function OnMapClick(map, button, x, y)
   local id = ("%dx%dy%d"):format(m, math.floor(px * 100 + 0.5), math.floor(py * 100 + 0.5))
   new[id] = { m = m, x = px, y = py, name = name }
   fresh[id] = Mark(new[id])
-  Say(name .. " is among your pins.")
+  Say(name .. " is a pin until you get there. Save it in Twinmap to keep it.")
   Redraw()
   return true
 end

@@ -32,7 +32,7 @@
   import { deathPlaces, type Death, type Place as DeathPlace } from '../../shared/death'
   import { feet } from './feet.svelte'
   import { kept as keptByApp } from './kept.svelte'
-  import { pinOfMark, removePin, renamePin, savedAt, savedFrom, savePin, type SavedPin } from '../../shared/saved'
+  import { ARRIVE, pinOfMark, removePin, renamePin, savedAt, savedFrom, savePin, yardsBetween, type SavedPin } from '../../shared/saved'
   import { markPart, sendState, type GameMark, type Inbox, type Pin } from '../../shared/send'
   import { companionPin, pin, pinSize, type PinName } from './marks'
 
@@ -93,7 +93,7 @@
   // The game draws the same pins on its own map: it is told them all at every change. removed: the
   // ones the player removed there, which are forgotten here too. Only when that list changes: a
   // point saved again while the game still names it is kept. set: the ones the player set there
-  // with Alt and a click, which become pins here; the game is told they were taken, with the pins.
+  // with Alt and a click, which become temporary pins here; the game is told they were taken, with the pins.
   // Nothing of this before the app has said which pins it keeps: no pins yet is not the player's word.
   let taken = $state.raw<string[]>([])
   $effect(() => {
@@ -107,7 +107,7 @@
       let pins = myPins
       for (const mark of marks) {
         const pin = pinOfMark(maps, mark)
-        if (pin) pins = savePin(pins, pin)
+        if (pin) pins = savePin(pins, { ...pin, temp: true })
       }
       setPins(pins)
       taken = marks.map((mark) => mark.id)
@@ -122,8 +122,35 @@
       if (left.length < myPins.length) setPins(left)
     })
   })
+  // A temporary pin goes once the character gets there, in the game too; and the label of a point
+  // sent to the game with it, unless the point is saved. Only once the character was further away:
+  // a pin set where the character stands stays until it has left.
+  const away = new Set<string>()
+  const keyOf = (continent: Continent, at: Point): string => `${continent} ${at.x} ${at.y}`
+  let sentTo: string | null = null // the point of the last Send to game from a label
+  $effect(() => {
+    const here = me, pins = myPins // a pin set while the character stands far from it is counted at once
+    if (!here || !keptPins.heard) return
+    untrack(() => {
+      const reached = (continent: Continent, at: Point): boolean => {
+        if (continent !== here.continent) return false
+        const key = keyOf(continent, at)
+        if (yardsBetween(at, here.units) <= ARRIVE) return away.has(key)
+        away.add(key)
+        return false
+      }
+      const left = pins.filter((p) => !(p.temp && reached(p.continent, p.at)))
+      if (left.length < pins.length) setPins(left)
+      if (labelled && !savedForGood && sentTo === keyOf(labelled.continent, labelled.units) && reached(labelled.continent, labelled.units)) {
+        labelled = null
+        sentTo = null
+      }
+    })
+  })
   // The labelled point as one of them, or -1; and the point under the name it goes by: a saved one has its own.
+  // A temporary pin has its name too, but is not saved: its label offers Save.
   const savedIndex = $derived(labelled ? savedAt(myPins, labelled.continent, labelled.units) : -1)
+  const savedForGood = $derived(savedIndex >= 0 && !myPins[savedIndex]!.temp)
   const pointName = $derived(!labelled ? '' : savedIndex >= 0 ? myPins[savedIndex]!.name : labelled.plain ? `${labelled.title} ${labelled.where}` : labelled.title)
   const asStop = (): Stop | null => labelled && { name: pointName, continent: labelled.continent, at: { ...labelled.units }, pin: labelled.pin && { ...labelled.pin } }
 
@@ -1243,7 +1270,11 @@
       box={labelled.box}
       sending={sendState(live, inbox, !!labelled.pin)}
       acked={inbox}
-      onsend={() => (labelled?.pin ? window.twinmap.sendPin({ ...labelled.pin, name: pointName }) : Promise.resolve({ error: 'There is nothing to send.' }))}
+      onsend={() => {
+        if (!labelled?.pin) return Promise.resolve({ error: 'There is nothing to send.' })
+        sentTo = keyOf(labelled.continent, labelled.units)
+        return window.twinmap.sendPin({ ...labelled.pin, name: pointName })
+      }}
       following={!!labelled.pin && markPart(labelled.pin) === followedPart}
       onunfollow={() => window.twinmap.sendUnfollow()}
       routed={inRoute(route, labelled.continent, labelled.units)}
@@ -1251,7 +1282,7 @@
         const stop = asStop()
         if (stop) onroute?.(stop)
       }}
-      saved={savedIndex >= 0}
+      saved={savedForGood}
       onsave={() => {
         const pin = asStop()
         if (pin) setPins(savePin(myPins, pin))

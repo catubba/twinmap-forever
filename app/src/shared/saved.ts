@@ -1,12 +1,18 @@
 // My pins: points the player saved, each with a name. They are kept from one run of the app to the
-// next, and shown on the map as a layer of their own.
-import { unitsOfPlace, type Point } from './geo'
+// next, and shown on the map as a layer of their own. A pin set in the game with Alt and a click is
+// temporary until it is saved: it goes once the character gets there.
+import { unitsOfPlace, UNITS_PER_BLOCK, type Point } from './geo'
 import type { Continent, GameMap } from './maps'
 import { zoneAt } from './point-label'
 import { stopFrom, type Stop } from './route'
+import { BLOCK_YARDS } from './world'
 
-/** A saved pin is a point as a stop of the route is: a name, a place, and the same place as the game names it. */
-export type SavedPin = Stop
+/** A saved pin is a point as a stop of the route is: a name, a place, and the same place as the game names it. temp: until the character gets there. */
+export type SavedPin = Stop & { temp?: true }
+
+/** Yards from a point at which the character is there: as the addon's arrow counts it. */
+export const ARRIVE = 15
+export const yardsBetween = (a: Point, b: Point): number => (Math.hypot(a.x - b.x, a.y - b.y) * BLOCK_YARDS) / UNITS_PER_BLOCK
 
 export const MAX_PINS = 200
 const NAME_MAX = 60
@@ -16,7 +22,10 @@ export function savedFrom(saved: string | null): SavedPin[] {
   try {
     const read: unknown = JSON.parse(saved ?? '')
     if (!Array.isArray(read)) return []
-    return read.map(stopFrom).filter((p): p is SavedPin => p !== null).slice(0, MAX_PINS)
+    return read.flatMap((p: unknown): SavedPin[] => {
+      const stop = stopFrom(p)
+      return stop ? [(p as { temp?: unknown }).temp === true ? { ...stop, temp: true } : stop] : []
+    }).slice(0, MAX_PINS)
   } catch {
     return []
   }
@@ -28,9 +37,11 @@ export const savedAt = (pins: SavedPin[], continent: Continent, at: Point): numb
 
 const named = (name: string): string => name.trim().slice(0, NAME_MAX)
 
-/** One pin more. A point already saved, or past the limit, changes nothing. */
+/** One pin more. A point already saved changes nothing, but a temporary one saved for good stays. Past the limit, nothing. */
 export function savePin(pins: SavedPin[], pin: SavedPin): SavedPin[] {
-  if (pins.length >= MAX_PINS || savedAt(pins, pin.continent, pin.at) >= 0) return pins
+  const at = savedAt(pins, pin.continent, pin.at)
+  if (at >= 0) return pins[at]!.temp && !pin.temp ? pins.map((p, i) => (i === at ? { name: p.name, continent: p.continent, at: p.at, pin: p.pin } : p)) : pins
+  if (pins.length >= MAX_PINS) return pins
   return [...pins, { ...pin, name: named(pin.name) || 'Pin' }]
 }
 

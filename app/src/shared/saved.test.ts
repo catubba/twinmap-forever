@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest'
 import type { GameMap } from './maps'
-import { MAX_PINS, pinOfMark, removePin, renamePin, savedAt, savedFrom, savePin, type SavedPin } from './saved'
+import { MAX_PINS, pinOfMark, removePin, renamePin, savedAt, savedFrom, savePin, yardsBetween, type SavedPin } from './saved'
 
 const pin = (name: string, x: number, continent: 0 | 1 = 0): SavedPin => ({ name, continent, at: { x, y: 2 }, pin: { m: 1429, x: 40, y: 60 } })
 const five = (): SavedPin[] => ['Inn', 'Mine', 'Tower', 'Farm', 'Dock'].reduce((pins, name, i) => savePin(pins, pin(name, i)), [] as SavedPin[])
@@ -45,4 +45,15 @@ test('a mark set in the game is the same point on our map, named by its zone; se
   expect(pinOfMark(maps, { m: 1415, x: 5, y: 5, name: 'Eastern Kingdoms 5.0, 5.0' })).toMatchObject({ name: 'Eastern Kingdoms 5.0, 5.0', pin: null })
   expect(pinOfMark(maps, { m: 947, x: 5, y: 5, name: 'no continent' })).toBeNull()
   expect(pinOfMark(maps, { m: 7, x: 5, y: 5, name: 'no such map' })).toBeNull()
+})
+
+test('a temporary pin is kept as such, saved for good by Save, and its yards are counted on the map', () => {
+  const temp: SavedPin = { ...pin('Elwynn Forest 40.0, 60.0', 7), temp: true }
+  const pins = savePin(five(), temp)
+  expect(savedFrom(JSON.stringify(pins)).at(-1)).toEqual(temp)
+  expect(savePin(pins, { ...temp, temp: true }), 'set again in the game').toBe(pins)
+  const kept = savePin(pins, pin('Another name', 7))
+  expect(kept.at(-1), 'its own name, and no longer temporary').toEqual(pin('Elwynn Forest 40.0, 60.0', 7))
+  expect(savePin(kept, temp), 'a saved pin set again in the game stays saved').toBe(kept)
+  expect(yardsBetween({ x: 0, y: 0 }, { x: 3, y: 4 }), 'a map unit is a quarter of a block of 533 yards').toBeCloseTo(666.67, 1)
 })
