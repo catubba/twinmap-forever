@@ -200,13 +200,14 @@ export class Pins3d {
         points = this.lines.get(key) ?? this.along(run, step)
       this.lines.set(key, points)
       // Stretches as faded as each other in one stroke, the dashes going on from one to the next.
+      const faded = (i: number): number => Math.round(Math.min(points[i - 1]!.shows, points[i]!.shows) * 20) / 20 || 0
       let along = 0
       for (let i = 1; i < points.length; ) {
-        const shows = Math.round(Math.min(points[i - 1]!.shows, points[i]!.shows) * 20) / 20
+        const shows = faded(i)
         ctx.beginPath()
         ctx.moveTo(points[i - 1]!.x, points[i - 1]!.y)
         ctx.lineDashOffset = -along
-        for (; i < points.length && Math.round(Math.min(points[i - 1]!.shows, points[i]!.shows) * 20) / 20 === shows; i++) {
+        for (; i < points.length && faded(i) === shows; i++) {
           ctx.lineTo(points[i]!.x, points[i]!.y)
           along += Math.hypot(points[i]!.x - points[i - 1]!.x, points[i]!.y - points[i - 1]!.y)
         }
@@ -232,7 +233,7 @@ export class Pins3d {
       for (let d = 0; ; ) {
         const far = Math.hypot(ax + (dx * d) / length - c.x, az + (dz * d) / length - c.z)
         d += Math.max(step, far / FARTHER, far - reach)
-        if (d >= length) break
+        if (!(d < length)) break // a number gone wrong too: never a loop without end
         points.push(this.terrain.spot(ax + (dx * d) / length, az + (dz * d) / length))
       }
       points.push(this.onGround(run[i]!))
