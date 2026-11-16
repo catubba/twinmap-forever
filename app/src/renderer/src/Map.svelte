@@ -165,6 +165,11 @@
   }
   const boundsOfBox = ([u1, v1, u2, v2]: Box): L.LatLngBounds => L.latLngBounds(atYards({ u: u1, v: v1 }), atYards({ u: u2, v: v2 }))
   const WORLD_BOUNDS = L.latLngBounds([-256, 0], [0, 256])
+  // The map's size as Leaflet keeps it: the box itself, read at every move, made the page lay itself out again each time.
+  const frameSize = (): Size => {
+    const size = map!.getSize()
+    return { width: size.x, height: size.y }
+  }
 
   // A file of the map as the converter keeps it, deflated; null where there is none.
   const inflated = (url: string): Promise<Uint8Array<ArrayBuffer> | null> =>
@@ -299,9 +304,11 @@
     if (!map) return
     for (const layer of shown) layer.remove()
     shown = [
-      L.tileLayer(`${TILES}/${folder}/{z}/{x}/{y}.png`, { minZoom: 0, maxZoom: 9, maxNativeZoom: TOP_ZOOM - 2, bounds: WORLD_BOUNDS, errorTileUrl: BLANK, keepBuffer: 4, zIndex: 1, opacity }).addTo(map),
-      new BlockLayer({ world: folder, minZoom: TOP_ZOOM - 1.5, minNativeZoom: TOP_ZOOM - 1, maxNativeZoom: TOP_ZOOM, bounds: WORLD_BOUNDS, keepBuffer: 3, zIndex: 2, opacity }).addTo(map),
+      L.tileLayer(`${TILES}/${folder}/{z}/{x}/{y}.png`, { minZoom: 0, maxZoom: 9, maxNativeZoom: TOP_ZOOM - 2, bounds: WORLD_BOUNDS, errorTileUrl: BLANK, keepBuffer: 4, zIndex: 1, opacity }),
+      new BlockLayer({ world: folder, minZoom: TOP_ZOOM - 1.5, minNativeZoom: TOP_ZOOM - 1, maxNativeZoom: TOP_ZOOM, bounds: WORLD_BOUNDS, keepBuffer: 3, zIndex: 2, opacity }),
     ]
+    // Under the 3D view no ground is drawn: its tiles would be read and decoded for nothing.
+    if (!threeD) for (const layer of shown) layer.addTo(map)
   }
 
   // The shaded relief of the continent on show (main/heights.ts), over its ground and under the
@@ -311,7 +318,7 @@
   $effect(() => {
     relief?.remove()
     const world = WORLDS.find((w) => w.continent === continent)
-    relief = maps.length > 0 && layers.relief && !inside && world && map ? L.tileLayer(`${TILES}/${world.name}/shade/{z}/{x}/{y}.png`, { minZoom: 0, maxZoom: 9, maxNativeZoom: 6, bounds: WORLD_BOUNDS, errorTileUrl: BLANK, keepBuffer: 4, zIndex: 3, className: 'relief' }).addTo(map) : undefined
+    relief = maps.length > 0 && layers.relief && !inside && !threeD && world && map ? L.tileLayer(`${TILES}/${world.name}/shade/{z}/{x}/{y}.png`, { minZoom: 0, maxZoom: 9, maxNativeZoom: 6, bounds: WORLD_BOUNDS, errorTileUrl: BLANK, keepBuffer: 4, zIndex: 3, className: 'relief' }).addTo(map) : undefined
   })
 
   // Puts these rooms on the map, in place of the ones before.
@@ -590,7 +597,7 @@
       // The caller may know the zone better: where two maps overlap, the point alone does not tell.
       where: to.where ?? (found ? `${found.zone.name} ${found.place.x.toFixed(1)}, ${found.place.y.toFixed(1)}` : ''),
       spot: spotOf(at(to.at)),
-      box: { width: holder.clientWidth, height: holder.clientHeight },
+      box: frameSize(),
       pin: found ? { m: found.zone.id, ...found.place } : null,
     }
   }
@@ -607,7 +614,7 @@
       notes,
       where: on ? `${on.zone.name} ${on.place.x.toFixed(1)}, ${on.place.y.toFixed(1)}` : '',
       spot: spotOf(at(units)),
-      box: { width: holder.clientWidth, height: holder.clientHeight },
+      box: frameSize(),
       pin: on ? { m: on.zone.id, ...on.place } : null,
       dungeons,
     }
@@ -755,11 +762,19 @@
   // Where a point of the map is on screen, on the view on show: a label stays on its point in 3D too.
   const spotOf = (ll: L.LatLng): L.Point => (threeD && pins3d ? pins3d.spot(ll) : map!.latLngToContainerPoint(ll))
   let tilted = { polar: 0.9, azimuth: 0 } // how the 3D view was left
+  let zoomed2d = false // the 2D map was zoomed by itself, not to follow the 3D view
+  // Followed, the character stays in the middle: the wheel, a double click and two fingers zoom on it,
+  // not on the pointer, and Follow stays on.
+  $effect(() => {
+    const centre = following ? 'center' : true
+    if (map) Object.assign(map.options, { scrollWheelZoom: centre, doubleClickZoom: centre, touchZoom: centre })
+    terrain?.zoomAtCursor(!following)
+  })
   let syncing = false // the 2D map is moved from the 3D view: not the other way round
   const worldShown = (): string | undefined => (inside ? undefined : WORLDS.find((w) => w.continent === continent)?.name)
   // Yards of ground from top to foot of the 2D map at a zoom, and back.
-  const seenAt = (z: number): number => (holder.clientHeight / 2 ** z) * YARDS_PER_UNIT
-  const zoomFor = (seen: number): number => Math.log2((holder.clientHeight * YARDS_PER_UNIT) / seen)
+  const seenAt = (z: number): number => (map!.getSize().y / 2 ** z) * YARDS_PER_UNIT
+  const zoomFor = (seen: number): number => Math.log2((map!.getSize().y * YARDS_PER_UNIT) / seen)
   function lookAsTheMap(polar: number, azimuth: number, seen = seenAt(map!.getZoom())): void {
     const c = map!.getCenter()
     terrain!.look({ x: c.lng * YARDS_PER_UNIT, z: -c.lat * YARDS_PER_UNIT, seen, polar, azimuth })
@@ -797,10 +812,12 @@
         const { Terrain } = await import('./terrain3d')
         terrain ??= new Terrain(terrainHost, compassHost)
         terrain.onGrab = () => (following = false)
+        terrain.zoomAtCursor(!following)
         pins3d ??= new Pins3d(map, terrain, pinsHost, terrainHost, arrow, () => turned)
         terrain.onFrame = onFrame
       }
       threeD = true
+      for (const layer of shown) layer.remove()
       terrain.show(folder!)
       lookAsTheMap(0, 0)
       terrain.start()
@@ -818,6 +835,7 @@
     tiedTo = ''
     mapAsTheView()
     threeD = false
+    for (const layer of shown) layer.addTo(map)
     terrain.stop()
     pins3d?.clear()
   }
@@ -827,7 +845,7 @@
   })
 
   onMount(() => {
-    const made = L.map(holder, { zoomControl: false, crs: L.CRS.Simple, minZoom: 1, maxZoom: 9, zoomSnap: 0.5, zoomDelta: 0.5, wheelPxPerZoomLevel: 90, attributionControl: false, zoomAnimation: !still(), fadeAnimation: !still(), maxBounds: WORLD_BOUNDS.pad(0.2) })
+    const made = L.map(holder, { scrollWheelZoom: 'center', doubleClickZoom: 'center', touchZoom: 'center', zoomControl: false, crs: L.CRS.Simple, minZoom: 1, maxZoom: 9, zoomSnap: 0.5, zoomDelta: 0.5, wheelPxPerZoomLevel: 90, attributionControl: false, zoomAnimation: !still(), fadeAnimation: !still(), maxBounds: WORLD_BOUNDS.pad(0.2) })
     map = made
     made.setView([-128, 128], 2)
     pins.addTo(made)
@@ -840,10 +858,12 @@
       const folder = worldShown()
       if (!folder) return back2d()
       terrain.show(folder)
-      // The 3D view keeps its own distance where the 2D map only rounded it to its steps of zoom.
+      // The 3D view keeps its own distance, unless the 2D map was zoomed (+ and -): it moved only to follow.
       const l = terrain.looking()
-      lookAsTheMap(l.polar, l.azimuth, Math.abs(zoomFor(l.seen) - made.getZoom()) < 0.3 ? l.seen : undefined)
+      lookAsTheMap(l.polar, l.azimuth, zoomed2d ? undefined : l.seen)
+      zoomed2d = false
     })
+    made.on('zoomend', () => (zoomed2d = !syncing))
     made.on('zoomstart', () => (zooming = true))
     made.on('zoomend', () => (zooming = false))
     made.on('zoomend', () => (zoom = made.getZoom()))
@@ -868,13 +888,13 @@
         where: found ? `${found.place.x.toFixed(1)}, ${found.place.y.toFixed(1)}` : '',
         spot: e.containerPoint,
         plain: true, // a bare point of the map: as a stop it is told from the others by its coordinates
-        box: { width: holder.clientWidth, height: holder.clientHeight },
+        box: frameSize(),
         pin: found ? { m: found.zone.id, ...found.place } : null,
       }
     })
     // The label stays on its point while the map moves under it.
     made.on('move zoom resize', () => {
-      if (labelled) Object.assign(labelled, { spot: spotOf(at(labelled.units)), box: { width: holder.clientWidth, height: holder.clientHeight } })
+      if (labelled) Object.assign(labelled, { spot: spotOf(at(labelled.units)), box: frameSize() })
     })
     void fetch(`${TILES}/maps.json`)
       .then((answer) => answer.json() as Promise<GameMap[]>)
@@ -1084,7 +1104,7 @@
             title: saved.name,
             where: found ? `${found.zone.name} ${found.place.x.toFixed(1)}, ${found.place.y.toFixed(1)}` : '',
             spot: spotOf(at(saved.at)),
-            box: { width: holder.clientWidth, height: holder.clientHeight },
+            box: frameSize(),
             pin: saved.pin && { ...saved.pin },
           }
         })

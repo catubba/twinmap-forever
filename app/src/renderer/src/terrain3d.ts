@@ -44,6 +44,11 @@ const DEEP = 30
 const HIDDEN = 0.35
 /** Steps from the camera to a point, to see whether a hill lies between. */
 const LOOKS = 8
+/**
+ * Milliseconds at least between two frames of the view: about 60 a second, 72 on a screen of 144.
+ * The graphics card is shared with the game, which then lost frames to a view drawn 144 times a second.
+ */
+const FRAME_MS = 1000 / 60 - 4
 /** Pixels past the edge of the view where what lies on the ground still counts as on it. */
 const OFF = 60
 
@@ -208,7 +213,16 @@ export class Terrain {
     this.controls.maxDistance = WORLD / 2
     this.controls.maxPolarAngle = MAX_TILT
     this.controls.addEventListener('change', () => (this.dirty = true))
-    this.controls.addEventListener('start', () => this.onGrab())
+    // Taken by hand: a drag, not a click (on a pin) nor the wheel, which zooms on the character while it is followed.
+    let down: { x: number; y: number } | null = null
+    const canvas = this.renderer.domElement
+    canvas.addEventListener('pointerdown', (e) => (down = { x: e.clientX, y: e.clientY }))
+    canvas.addEventListener('pointerup', () => (down = null))
+    canvas.addEventListener('pointermove', (e) => {
+      if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) <= 3) return
+      down = null
+      this.onGrab()
+    })
     this.compass = new Compass(compassHost)
     this.observer = new ResizeObserver(() => this.resize())
     this.observer.observe(host)
@@ -221,6 +235,11 @@ export class Terrain {
     this.drop()
     this.folder = folder
     this.dirty = true
+  }
+
+  /** Whether the wheel zooms on the point under the pointer, or on the point looked at (a character followed). */
+  zoomAtCursor(on: boolean): void {
+    this.controls.zoomToCursor = on
   }
 
   /** Called when the camera is taken by hand. */
@@ -443,7 +462,10 @@ export class Terrain {
     return n
   }
 
+  private drawnAt = 0
   private tick(now: number): void {
+    if (now - this.drawnAt < FRAME_MS) return
+    this.drawnAt = now
     this.frame++
     if (this.lifted) this.camera.position.copy(this.logical)
     this.lifted = false
