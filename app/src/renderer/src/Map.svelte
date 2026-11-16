@@ -4,6 +4,7 @@
   // Inside a dungeon or a raid it shows that instead: its rooms, its bosses, its entrance.
   import { inApp, TILES } from './web'
   import type { Terrain } from './terrain3d'
+  import { paintFixed, Pins3d } from './pins3d'
   import L from 'leaflet'
   import 'leaflet/dist/leaflet.css'
   import { onMount, untrack } from 'svelte'
@@ -588,7 +589,7 @@
       title: to.title,
       // The caller may know the zone better: where two maps overlap, the point alone does not tell.
       where: to.where ?? (found ? `${found.zone.name} ${found.place.x.toFixed(1)}, ${found.place.y.toFixed(1)}` : ''),
-      spot: view.latLngToContainerPoint(at(to.at)),
+      spot: spotOf(at(to.at)),
       box: { width: holder.clientWidth, height: holder.clientHeight },
       pin: found ? { m: found.zone.id, ...found.place } : null,
     }
@@ -605,7 +606,7 @@
       title,
       notes,
       where: on ? `${on.zone.name} ${on.place.x.toFixed(1)}, ${on.place.y.toFixed(1)}` : '',
-      spot: map.latLngToContainerPoint(at(units)),
+      spot: spotOf(at(units)),
       box: { width: holder.clientWidth, height: holder.clientHeight },
       pin: on ? { m: on.zone.id, ...on.place } : null,
       dungeons,
@@ -746,17 +747,47 @@
   // continents, + and -) moves the 3D view with it.
   let threeD = $state(false)
   let terrainHost: HTMLDivElement
+  let pinsHost: HTMLDivElement
   let compassHost: HTMLButtonElement
   let terrain: Terrain | undefined
+  // What the 2D map lays on the ground, on the 3D view too (pins3d.ts).
+  let pins3d: Pins3d | undefined
+  // Where a point of the map is on screen, on the view on show: a label stays on its point in 3D too.
+  const spotOf = (ll: L.LatLng): L.Point => (threeD && pins3d ? pins3d.spot(ll) : map!.latLngToContainerPoint(ll))
   let tilted = { polar: 0.9, azimuth: 0 } // how the 3D view was left
   let syncing = false // the 2D map is moved from the 3D view: not the other way round
   const worldShown = (): string | undefined => (inside ? undefined : WORLDS.find((w) => w.continent === continent)?.name)
   // Yards of ground from top to foot of the 2D map at a zoom, and back.
   const seenAt = (z: number): number => (holder.clientHeight / 2 ** z) * YARDS_PER_UNIT
   const zoomFor = (seen: number): number => Math.log2((holder.clientHeight * YARDS_PER_UNIT) / seen)
-  function lookAsTheMap(polar: number, azimuth: number): void {
+  function lookAsTheMap(polar: number, azimuth: number, seen = seenAt(map!.getZoom())): void {
     const c = map!.getCenter()
-    terrain!.look({ x: c.lng * YARDS_PER_UNIT, z: -c.lat * YARDS_PER_UNIT, seen: seenAt(map!.getZoom()), polar, azimuth })
+    terrain!.look({ x: c.lng * YARDS_PER_UNIT, z: -c.lat * YARDS_PER_UNIT, seen, polar, azimuth })
+  }
+  // The 2D map goes where the 3D view looks, a few times a second: the pins of the place in view
+  // are there to be copied, and the readout tells it. Not the other way round meanwhile.
+  let tying = 0,
+    tiedTo = ''
+  function mapAsTheView(): void {
+    if (!terrain || !map) return
+    const now = terrain.looking(),
+      key = `${Math.round(now.x)} ${Math.round(now.z)} ${Math.round(now.seen)}`
+    if (key === tiedTo) return
+    tiedTo = key
+    syncing = true
+    map.setView(at({ x: now.x / YARDS_PER_UNIT, y: now.z / YARDS_PER_UNIT }), zoomFor(now.seen), { animate: false })
+    syncing = false
+  }
+  function onFrame(): void {
+    pins3d!.draw()
+    if (labelled) {
+      const spot = spotOf(at(labelled.units))
+      if (spot.x !== labelled.spot.x || spot.y !== labelled.spot.y) labelled.spot = spot
+    }
+    tying ||= window.setTimeout(() => {
+      tying = 0
+      if (threeD) mapAsTheView()
+    }, 200)
   }
   async function view3d(on: boolean): Promise<void> {
     const folder = worldShown()
@@ -766,6 +797,8 @@
         const { Terrain } = await import('./terrain3d')
         terrain ??= new Terrain(terrainHost, compassHost)
         terrain.onGrab = () => (following = false)
+        pins3d ??= new Pins3d(map, terrain, pinsHost, terrainHost, arrow, () => turned)
+        terrain.onFrame = onFrame
       }
       threeD = true
       terrain.show(folder!)
@@ -782,12 +815,11 @@
   // Straight to 2D, where the 3D view is looking.
   function back2d(): void {
     if (!terrain || !map) return
-    const now = terrain.looking()
-    syncing = true
-    map.setView(at({ x: now.x / YARDS_PER_UNIT, y: now.z / YARDS_PER_UNIT }), zoomFor(now.seen), { animate: false })
-    syncing = false
+    tiedTo = ''
+    mapAsTheView()
     threeD = false
     terrain.stop()
+    pins3d?.clear()
   }
   // Inside a dungeon there is no ground to show: back to 2D.
   $effect(() => {
@@ -808,8 +840,9 @@
       const folder = worldShown()
       if (!folder) return back2d()
       terrain.show(folder)
+      // The 3D view keeps its own distance where the 2D map only rounded it to its steps of zoom.
       const l = terrain.looking()
-      lookAsTheMap(l.polar, l.azimuth)
+      lookAsTheMap(l.polar, l.azimuth, Math.abs(zoomFor(l.seen) - made.getZoom()) < 0.3 ? l.seen : undefined)
     })
     made.on('zoomstart', () => (zooming = true))
     made.on('zoomend', () => (zooming = false))
@@ -841,7 +874,7 @@
     })
     // The label stays on its point while the map moves under it.
     made.on('move zoom resize', () => {
-      if (labelled) Object.assign(labelled, { spot: made.latLngToContainerPoint(at(labelled.units)), box: { width: holder.clientWidth, height: holder.clientHeight } })
+      if (labelled) Object.assign(labelled, { spot: spotOf(at(labelled.units)), box: { width: holder.clientWidth, height: holder.clientHeight } })
     })
     void fetch(`${TILES}/maps.json`)
       .then((answer) => answer.json() as Promise<GameMap[]>)
@@ -948,26 +981,7 @@
   const FixedPinMark = L.CircleMarker.extend({
     _updatePath(this: L.CircleMarker & { _renderer: { _ctx: CanvasRenderingContext2D }; _point: L.Point; _empty: () => boolean; options: { lozenge: boolean; fillColor: string; picture: HTMLImageElement } }) {
       if (this._empty()) return
-      const ctx = this._renderer._ctx, { x, y } = this._point, picture = this.options.picture
-      if (picture.naturalWidth) {
-        const size = this.options.lozenge ? 20 : 24
-        ctx.imageSmoothingQuality = 'high'
-        return void ctx.drawImage(picture, x - size / 2, y - size / 2, size, size)
-      }
-      ctx.beginPath()
-      if (this.options.lozenge) {
-        ctx.moveTo(x, y - 5.1)
-        ctx.lineTo(x + 5.1, y)
-        ctx.lineTo(x, y + 5.1)
-        ctx.lineTo(x - 5.1, y)
-        ctx.closePath()
-      } else ctx.rect(x - 6.25, y - 6.25, 12.5, 12.5)
-      ctx.fillStyle = this.options.fillColor
-      ctx.fill()
-      ctx.lineWidth = 1.5
-      ctx.lineJoin = 'round'
-      ctx.strokeStyle = '#000'
-      ctx.stroke()
+      paintFixed(this._renderer._ctx, this._point.x, this._point.y, this.options)
     },
   }) as unknown as new (at: L.LatLng, options: L.CircleMarkerOptions & { lozenge: boolean; picture: HTMLImageElement }) => L.CircleMarker
   const fixedGroup = L.layerGroup()
@@ -983,7 +997,7 @@
     drawnFor = null
     if (!map || inside) return void fixedGroup.remove()
     fixedGroup.addTo(map)
-    const view = map.getBounds().pad(0.5), far = map.getZoom()
+    const view = map.getBounds().pad(threeD ? 2 : 0.5), far = map.getZoom() // the 3D view sees farther, to the fog
     drawnFor = { view, far }
     // Ore and herbs first, so that who offers a service is painted over them.
     for (const service of [false, true]) {
@@ -1069,7 +1083,7 @@
             continent: saved.continent,
             title: saved.name,
             where: found ? `${found.zone.name} ${found.place.x.toFixed(1)}, ${found.place.y.toFixed(1)}` : '',
-            spot: map.latLngToContainerPoint(at(saved.at)),
+            spot: spotOf(at(saved.at)),
             box: { width: holder.clientWidth, height: holder.clientHeight },
             pin: saved.pin && { ...saved.pin },
           }
@@ -1346,8 +1360,8 @@
 
 <svelte:window onkeydown={key} />
 
-<div class="map" bind:this={holder}></div>
-<div class="terrain" class:on={threeD} bind:this={terrainHost}></div>
+<div class="map" class:under={threeD} bind:this={holder}></div>
+<div class="terrain" class:on={threeD} bind:this={terrainHost}><div class="map pins3d" bind:this={pinsHost}></div></div>
 <button class="compass" class:on={threeD} bind:this={compassHost} tabindex={threeD ? 0 : -1} aria-hidden={!threeD} title="North up" aria-label="North up" onclick={() => terrain?.north()}></button>
 {#if labelled}
   {#key labelled.units}
@@ -1464,6 +1478,18 @@
   }
   .terrain :global(canvas) {
     display: block;
+  }
+  /* Under the 3D view the 2D map is not drawn: it keeps its pins for the view to copy, but its
+     thousands of elements made the page sort its layers out again at every frame of the view. */
+  .map.under {
+    content-visibility: hidden;
+  }
+  /* The pins over the 3D view: the 2D map's look (.map), without its ground. */
+  .pins3d {
+    z-index: 1;
+    background: none;
+    pointer-events: none;
+    overflow: hidden;
   }
   /* The compass: bottom left, in 3D only; a click turns the north up. */
   .compass {

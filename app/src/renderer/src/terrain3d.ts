@@ -40,6 +40,15 @@ const SEA = 0x1f4b6e
 const WATER_COLOUR = 0x2b5f86
 const SHALLOW = 2
 const DEEP = 30
+/** How much shows of what lies behind a hill (pins3d.ts). */
+const HIDDEN = 0.35
+/** Steps from the camera to a point, to see whether a hill lies between. */
+const LOOKS = 8
+/** Pixels past the edge of the view where what lies on the ground still counts as on it. */
+const OFF = 60
+
+/** A node's key: a number, as groundAt asks for thousands a frame (no node is wider than 2 ** 8 a side). */
+const keyOf = (z: number, x: number, y: number): number => (z << 16) | (y << 8) | x
 
 interface Grid {
   heights: Float32Array // N x N
@@ -104,7 +113,7 @@ export class Terrain {
   private scene = new THREE.Scene()
   readonly camera = new THREE.PerspectiveCamera(FOV, 1, 1, 100000)
   private controls: MapControls
-  private nodes = new Map<string, Node>()
+  private nodes = new Map<number, Node>() // by keyOf
   private pictures = new Map<
     string,
     {
@@ -127,6 +136,16 @@ export class Terrain {
   }
   private observer: ResizeObserver
   private s3tc: boolean
+  private width = 1
+  private height = 1
+  // Where the controls put the camera, while it is lifted over the ground to be drawn (hold): what
+  // the player chose stays as it was, and the camera comes back down once the ground lets it.
+  private logical = new THREE.Vector3()
+  private lifted = false
+  private drawnFrom = new THREE.Vector3()
+  private get eye(): THREE.Vector3 {
+    return this.lifted ? this.logical : this.camera.position
+  }
 
   constructor(
     private host: HTMLElement,
@@ -207,6 +226,68 @@ export class Terrain {
   /** Called when the camera is taken by hand. */
   onGrab: () => void = () => {}
 
+  /** Called at every frame while the view runs, once it is drawn: what lies over it follows. */
+  onFrame: () => void = () => {}
+
+  /**
+   * Where a point of the ground is on the view, in pixels from its top left corner; how much of it
+   * shows: 1 in plain sight, less in the fog, HIDDEN behind a hill, 0 behind the camera or past the
+   * fog; and how far it is from the camera, in distances of the point looked at.
+   */
+  spot(x: number, z: number): { x: number; y: number; shows: number; away: number } {
+    const fog = this.scene.fog as THREE.Fog,
+      out = Math.hypot(x - this.camera.position.x, z - this.camera.position.z) >= fog.far, // past the fog: the ground is not looked for
+      ground = out ? NaN : this.groundAt(x, z),
+      p = new THREE.Vector3(x, Number.isFinite(ground) ? ground : 0, z),
+      far = out ? Infinity : p.distanceTo(this.camera.position)
+    const on = p.clone().project(this.camera),
+      at = { x: ((on.x + 1) / 2) * this.width, y: ((1 - on.y) / 2) * this.height }
+    const away = far / this.eye.distanceTo(this.controls.target)
+    if (on.z > 1 || far >= fog.far) return { ...at, shows: 0, away }
+    const clear = Math.min(1, (fog.far - far) / (fog.far - fog.near)),
+      off = at.x < -OFF || at.y < -OFF || at.x > this.width + OFF || at.y > this.height + OFF // off the view: no hill looked for
+    return { ...at, shows: off || !this.behindHill(p) ? clear : clear * HIDDEN, away }
+  }
+
+  /** The angle on the view, clockwise from up, of a heading on the ground at a point, in degrees clockwise from north. */
+  angleOf(x: number, z: number, degrees: number): number {
+    const ground = this.groundAt(x, z),
+      y = Number.isFinite(ground) ? ground : 0,
+      a = (degrees * Math.PI) / 180,
+      from = new THREE.Vector3(x, y, z).project(this.camera),
+      to = new THREE.Vector3(x + Math.sin(a), y, z - Math.cos(a)).project(this.camera)
+    return (Math.atan2((to.x - from.x) * this.width, (to.y - from.y) * this.height) * 180) / Math.PI
+  }
+
+  /** The view's size in pixels, as last measured: reading it off the page at every frame would make the page lay itself out again. */
+  get size(): { width: number; height: number } {
+    return { width: this.width, height: this.height }
+  }
+
+  /** Yards from the camera to where the fog hides everything. */
+  get reach(): number {
+    return (this.scene.fog as THREE.Fog).far
+  }
+
+  // Whether the ground rises between the camera and a point a little over the ground: looked at in
+  // steps on the way. A point is looked at again only every few frames, not all of them in the same
+  // one: the camera moves little from one to the next, and a thousand pins asked at every frame.
+  private hills = new Map<number, number>() // by point: the frame it was looked at, twice, plus 1 behind a hill
+  private behindHill(p: THREE.Vector3): boolean {
+    const key = Math.round(p.x) * 65536 + Math.round(p.z),
+      seen = this.hills.get(key)
+    if (seen !== undefined && this.frame - (seen >> 1) < 3 + (key % 4)) return (seen & 1) === 1
+    const c = this.camera.position
+    let behind = false
+    for (let i = 1; i < LOOKS && !behind; i++) {
+      const t = i / LOOKS
+      behind = this.groundAt(c.x + (p.x - c.x) * t, c.z + (p.z - c.z) * t) > c.y + (p.y + 2 - c.y) * t
+    }
+    if (this.hills.size > 50000) this.hills.clear()
+    this.hills.set(key, this.frame * 2 + (behind ? 1 : 0))
+    return behind
+  }
+
   /** Puts the camera there at once. */
   look(at: Look): void {
     const ground = this.groundAt(at.x, at.z)
@@ -221,7 +302,7 @@ export class Terrain {
     return {
       x: t.x,
       z: t.z,
-      seen: 2 * this.camera.position.distanceTo(t) * Math.tan((FOV * Math.PI) / 360),
+      seen: 2 * this.eye.distanceTo(t) * Math.tan((FOV * Math.PI) / 360),
       polar: this.controls.getPolarAngle(),
       azimuth: this.controls.getAzimuthalAngle(),
     }
@@ -283,6 +364,7 @@ export class Terrain {
   }
 
   private place(distance: number, polar: number, azimuth: number): void {
+    this.lifted = false
     this.camera.position.copy(this.controls.target).add(new THREE.Vector3().setFromSphericalCoords(distance, Math.max(polar, 1e-4), azimuth))
     this.camera.lookAt(this.controls.target)
     this.dirty = true
@@ -292,6 +374,8 @@ export class Terrain {
     const w = this.host.clientWidth,
       h = this.host.clientHeight
     if (!w || !h) return
+    this.width = w
+    this.height = h
     this.renderer.setSize(w, h)
     this.camera.aspect = w / h
     this.camera.updateProjectionMatrix()
@@ -301,6 +385,7 @@ export class Terrain {
   private drop(): void {
     for (const n of this.nodes.values()) this.unload(n)
     this.nodes.clear()
+    this.finest = null
     for (const p of this.pictures.values()) p.made?.dispose()
     this.pictures.clear()
     this.blocks.clear()
@@ -309,6 +394,7 @@ export class Terrain {
 
   private unload(n: Node): void {
     if (!n.group) return
+    this.finest = null
     if (n.state === 'empty') {
       n.group.children.forEach((c) => (c as THREE.Mesh).geometry.dispose())
       this.scene.remove(n.group)
@@ -324,7 +410,7 @@ export class Terrain {
   }
 
   private node(z: number, x: number, y: number): Node {
-    const key = `${z} ${x} ${y}`
+    const key = keyOf(z, x, y)
     let n = this.nodes.get(key)
     if (!n) this.nodes.set(key, (n = { z, x, y, state: 'new', used: 0 }))
     return n
@@ -332,10 +418,13 @@ export class Terrain {
 
   private tick(now: number): void {
     this.frame++
+    if (this.lifted) this.camera.position.copy(this.logical)
+    this.lifted = false
     if (this.turning) this.turning(now)
     else if (this.controls.update()) this.dirty = true
     this.hold()
-    const distance = this.camera.position.distanceTo(this.controls.target)
+    if (!this.camera.position.equals(this.drawnFrom)) this.dirty = true
+    const distance = this.eye.distanceTo(this.controls.target)
     // Fog from the point looked at outwards: 40% of the prototype's scale (ui.md).
     const fog = this.scene.fog as THREE.Fog
     fog.near = distance * 1.56
@@ -344,16 +433,19 @@ export class Terrain {
     this.camera.far = distance * 4 + 2000
     this.camera.updateProjectionMatrix()
     this.compass.turn(this.controls.getPolarAngle() / 2, this.controls.getAzimuthalAngle())
-    if (!this.dirty) return
-    this.dirty = false
-    this.choose()
-    this.renderer.render(this.scene, this.camera)
-    this.compass.render()
-    this.evict()
+    if (this.dirty) {
+      this.dirty = false
+      this.choose()
+      this.renderer.render(this.scene, this.camera)
+      this.drawnFrom.copy(this.camera.position)
+      this.compass.render()
+      this.evict()
+    }
+    this.onFrame()
   }
 
   // The point looked at stays on the ground as it rises and falls under it, and the camera never
-  // goes into the ground: it rises over hills and mountains (ui.md).
+  // goes into the ground: it is drawn from over hills and mountains (ui.md), the controls left where they were.
   private hold(): void {
     const t = this.controls.target,
       c = this.camera.position
@@ -367,21 +459,19 @@ export class Terrain {
     const below = this.groundAt(c.x, c.z),
       clear = Math.max(6, c.distanceTo(t) * 0.04)
     if (Number.isFinite(below) && c.y < below + clear) {
+      this.logical.copy(c)
+      this.lifted = true
       c.y = below + clear
       this.camera.lookAt(t)
-      this.dirty = true
     }
   }
 
   /** The height of the ground at a point, from the finest node there that is in; NaN where none is. */
   private groundAt(x: number, z: number): number {
-    let found: Node | undefined
-    for (let level = ROOT; level <= FINEST; level++) {
-      const size = WORLD / 2 ** level,
-        n = this.nodes.get(`${level} ${Math.floor(x / size)} ${Math.floor(z / size)}`)
-      if (!n || n.state !== 'ready') break
-      found = n
-    }
+    if (!(x >= 0 && z >= 0 && x < WORLD && z < WORLD)) return NaN
+    this.finest ??= this.indexFinest()
+    const cells = 2 ** FINEST,
+      found = this.finest[Math.floor((z / WORLD) * cells) * cells + Math.floor((x / WORLD) * cells)]
     if (!found?.grid) return NaN
     const size = WORLD / 2 ** found.z,
       step = size / (N - 1)
@@ -394,6 +484,22 @@ export class Terrain {
       h = found.grid.heights
     const v = (h[i * N + j]! * (1 - a) + h[i * N + j + 1]! * a) * (1 - b) + (h[(i + 1) * N + j]! * (1 - a) + h[(i + 1) * N + j + 1]! * a) * b
     return v
+  }
+
+  // The finest node that is in, at each place, as one array: groundAt is asked thousands of times a
+  // frame (pins3d.ts). From the roots down: a node counts where its parent does.
+  private finest: (Node | undefined)[] | null = null
+  private indexFinest(): (Node | undefined)[] {
+    const cells = 2 ** FINEST,
+      index: (Node | undefined)[] = new Array(cells * cells)
+    const ready = [...this.nodes.values()].filter((n) => n.state === 'ready').sort((a, b) => a.z - b.z)
+    for (const n of ready) {
+      const span = 2 ** (FINEST - n.z),
+        first = n.y * span * cells + n.x * span
+      if (n.z > ROOT && index[first]?.z !== n.z - 1) continue // its parent is not in
+      for (let r = 0; r < span; r++) index.fill(n, first + r * cells, first + r * cells + span)
+    }
+    return index
   }
 
   // Which nodes are on show this frame: from the roots down, as long as a node's picture would be
@@ -463,6 +569,7 @@ export class Terrain {
       })
       this.scene.add(n.group)
       n.state = 'ready'
+      this.finest = null
     } catch {
       n.state = 'empty'
     } finally {
