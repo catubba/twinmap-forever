@@ -22,7 +22,9 @@ const OFFROAD = 1.5 // a yard off the road counts as this many on it
 const SNAP = 6 // cells around a point searched for one that can be walked
 const LIMIT = 400_000 // cells a search looks at before it gives up
 const TRACK_SLACK = 6 // steps a tracker searches past twice the cells between two points: a ramp, a stair that turns
-const LEVEL = 3 // yards between two places to stand for one to be over the other
+const LEVEL = 3 // yards between two places to stand for one to be another floor
+const HIGH = 10 // yards a place must be over a character on foot in the open to be over its head (see the tracker)
+const AREA = 25 // places to stand a floor over the character must lead to: the top of a tree or a lamp is an island
 const B64 = new Uint8Array(128)
 Array.from('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/').forEach((c, i) => (B64[c.charCodeAt(0)] = i))
 
@@ -462,6 +464,16 @@ export function walker(nav: NavData): Walker {
     const [, , c, node] = placeOf(key)
     return c.z[node]!
   }
+  // A place to stand that leads to at least AREA others: a floor, a bridge, a hill; not the top of a tree.
+  const wideKept = new Map<number, boolean>()
+  const wide = (from: number): boolean => {
+    if (!wideKept.has(from)) {
+      const seen = new Set([from]), queue = [from]
+      for (let i = 0; i < queue.length && seen.size < AREA; i++) steps(queue[i]!, (next) => void (seen.has(next) || (seen.add(next), queue.push(next))))
+      wideKept.set(from, seen.size >= AREA)
+    }
+    return wideKept.get(from)!
+  }
   // Follows one character: where it stood is where the next point is looked for from.
   const track = (): Tracker => {
     let at: number | null = null
@@ -494,8 +506,11 @@ export function walker(nav: NavData): Walker {
         const roofed = here.filter((n) => zOf(n) < top - LEVEL), start = (list: number[]): number => list.reduce((a, b) => (zOf(b) > zOf(a) ? b : a))
         at = found >= 0 ? found : last !== null ? here.reduce((a, b) => (Math.abs(zOf(b) - last) < Math.abs(zOf(a) - last) ? b : a)) : start(indoors && roofed.length ? roofed : here)
       }
-      const z = zOf(at)
-      return { z, over: here.filter((n) => zOf(n) > z + LEVEL).length, under: here.filter((n) => zOf(n) < z - LEVEL).length }
+      // Over its head: under a roof (a mine, the floor above), or swimming (under a bridge), any
+      // floor over it; on foot in the open only a high one. A city's streets lie a few yards under
+      // the ground the grid keeps from the terrain beneath them, which is over no one's head.
+      const z = zOf(at), [, , c, node] = placeOf(at), clear = indoors || c.val[node] === 2 ? LEVEL : HIGH
+      return { z, over: here.filter((n) => zOf(n) > z + clear && wide(n)).length, under: here.filter((n) => zOf(n) < z - LEVEL).length }
     }
   }
   // For trials of the tracker: a walk taken step by step from a point, each step one the grid

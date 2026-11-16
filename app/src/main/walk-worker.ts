@@ -2,7 +2,7 @@
 // long search more than the reading of the strip can wait. The grid is the one in the player's
 // own Shortest Path Forever, so it is always that of the version installed; where the addon is
 // not there, or its files are of a format this app does not read, the copy shipped with the app.
-import { readFileSync } from 'node:fs'
+import { appendFileSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parentPort, workerData } from 'node:worker_threads'
 import { UNITS_PER_BLOCK, unitsOfWorld } from '../shared/geo'
@@ -42,6 +42,8 @@ parentPort?.on('message', ({ id, ask }: { id: number; ask: WalkAsk | FarAsk | Tr
       if (find && !trackers.has(ask.continent)) trackers.set(ask.continent, find.track())
       const told = trackers.get(ask.continent)?.(yardsOf(ask.at), ask.indoors)
       floors = told ? { over: told.over, under: told.under } : null
+      // For trials in the game: TWINMAP_TRACK_LOG names a file that gets a line for each point followed.
+      if (process.env.TWINMAP_TRACK_LOG) appendFileSync(process.env.TWINMAP_TRACK_LOG, JSON.stringify({ t: Date.now(), ...ask, told: told ?? null }) + '\n')
     } catch {
       // as for the ways: nothing to say, rather than a thread that dies
     }
