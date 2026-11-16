@@ -249,6 +249,33 @@ export class Terrain {
     return { ...at, shows: off || !this.behindHill(p) ? clear : clear * HIDDEN, away }
   }
 
+  /** The point of the ground under a pixel of the view, in yards; null where the ray meets none before the fog. The sea is at 0. */
+  pick(px: number, py: number): { x: number; z: number } | null {
+    const ray = new THREE.Raycaster()
+    ray.setFromCamera(new THREE.Vector2((px / this.width) * 2 - 1, 1 - (py / this.height) * 2), this.camera)
+    const o = ray.ray.origin,
+      d = ray.ray.direction,
+      reach = (this.scene.fog as THREE.Fog).far,
+      step = Math.max(1, reach / 2000)
+    const over = (t: number): number => {
+      const g = this.groundAt(o.x + d.x * t, o.z + d.z * t)
+      return o.y + d.y * t - (Number.isFinite(g) ? g : 0)
+    }
+    // Along the ray in steps until it is under the ground, then halved down to where it meets it.
+    for (let t = step; t <= reach; t += step) {
+      if (over(t) > 0) continue
+      let a = t - step,
+        b = t
+      for (let i = 0; i < 20; i++) {
+        const m = (a + b) / 2
+        if (over(m) > 0) a = m
+        else b = m
+      }
+      return { x: o.x + d.x * b, z: o.z + d.z * b }
+    }
+    return null
+  }
+
   /** The angle on the view, clockwise from up, of a heading on the ground at a point, in degrees clockwise from north. */
   angleOf(x: number, z: number, degrees: number): number {
     const ground = this.groundAt(x, z),

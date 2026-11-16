@@ -80,12 +80,18 @@ export class Pins3d {
   ) {
     this.canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%'
     host.append(this.canvas)
-    // A click, not the end of a drag, on a painted pin is a click on it.
+    // A click, not the end of a drag, on a painted pin is a click on it; on the bare ground, a click
+    // on the 2D map at that point, which puts the label there.
     events.addEventListener('pointerdown', (e) => (this.down = { x: e.clientX, y: e.clientY }))
     events.addEventListener('click', (e) => {
       if (!this.down || Math.hypot(e.clientX - this.down.x, e.clientY - this.down.y) > 4) return
-      const box = host.getBoundingClientRect()
-      this.hit(e.clientX - box.left, e.clientY - box.top)?.fire('click')
+      const box = host.getBoundingClientRect(),
+        x = e.clientX - box.left,
+        y = e.clientY - box.top,
+        pin = this.hit(x, y)
+      if (pin) return void pin.fire('click')
+      const at = this.terrain.pick(x, y)
+      if (at) this.map.fire('click', { latlng: L.latLng(-at.z / YARDS_PER_UNIT, at.x / YARDS_PER_UNIT), containerPoint: L.point(x, y) })
     })
   }
 
