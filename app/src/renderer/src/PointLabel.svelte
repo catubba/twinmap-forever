@@ -19,6 +19,7 @@
     where, // zone coordinates, or nothing
     way, // distance, direction and time from the character, when it is on this map
     spot, // the point, in pixels of the map's box
+    ring = false, // the point is a pin of the map: a ring around it instead of a dot over it
     box, // the map's box
     sending, // whether the point can be sent to the game now, and why not
     acked, // what the addon tells of the sends it has
@@ -36,6 +37,7 @@
     ondungeon,
   }: {
     title: string
+    ring?: boolean
     item?: number
     notes?: string[]
     where: string
@@ -93,13 +95,24 @@
   const at = $derived(labelPlace(spot, box, { width, height }, GAP))
   // The line ends on the label's edge nearest to the point.
   const end = $derived({ x: Math.max(at.left, Math.min(spot.x, at.left + width)), y: Math.max(at.top, Math.min(spot.y, at.top + height)) })
+  // The line leaves the ring's edge, not the pin's middle.
+  const RING = 13
+  const start = $derived.by(() => {
+    const d = Math.hypot(end.x - spot.x, end.y - spot.y)
+    return ring && d > RING ? { x: spot.x + ((end.x - spot.x) * RING) / d, y: spot.y + ((end.y - spot.y) * RING) / d } : spot
+  })
 </script>
 
 <svg class="tie" aria-hidden="true" in:fade={gone} out:fade={gone}>
   <!-- Twice: a dark line under the gold one, so that it shows on any ground. -->
-  <line class="rim" x1={spot.x} y1={spot.y} x2={end.x} y2={end.y} />
-  <line x1={spot.x} y1={spot.y} x2={end.x} y2={end.y} />
-  <circle cx={spot.x} cy={spot.y} r="5.5" />
+  <line class="rim" x1={start.x} y1={start.y} x2={end.x} y2={end.y} />
+  <line x1={start.x} y1={start.y} x2={end.x} y2={end.y} />
+  {#if ring}
+    <circle class="ring rim" cx={spot.x} cy={spot.y} r={RING} />
+    <circle class="ring" cx={spot.x} cy={spot.y} r={RING} />
+  {:else}
+    <circle cx={spot.x} cy={spot.y} r="5.5" />
+  {/if}
 </svg>
 <div class="label" data-side={at.side} role="dialog" in:scale={pop()} out:fade={gone} aria-label={title} style:left="{at.left}px" style:top="{at.top}px" style:visibility={width ? 'visible' : 'hidden'} bind:offsetWidth={width} bind:offsetHeight={height}>
   <button class="close" aria-label="Close" onclick={onclose}><Glyph name="close" size={14} /></button>
@@ -147,6 +160,15 @@
     fill: var(--gold);
     stroke: #000;
     stroke-width: 2;
+  }
+  .ring {
+    fill: none;
+    stroke: var(--gold);
+    stroke-width: 3;
+  }
+  .ring.rim {
+    stroke: #000;
+    stroke-width: 6;
   }
 
   .label {

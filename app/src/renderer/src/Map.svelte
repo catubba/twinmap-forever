@@ -909,6 +909,8 @@
   }) as unknown as new (at: L.LatLng, options: L.CircleMarkerOptions & { lozenge: boolean; picture: HTMLImageElement }) => L.CircleMarker
   const fixedGroup = L.layerGroup()
   let laid: { pin: FixedPin; at: L.LatLng; zone: GameMap }[] = []
+  // The label is open on a pin of the map: a ring around the pin instead of the dot, which would hide it.
+  const onPin = $derived(!!labelled && labelled.continent === continent && !inside && laid.some((l) => at(labelled!.units).equals(l.at, 1e-6)))
   // What is drawn now: more than the view, so that the map can move a little (it does all the time
   // while it follows the character) without the pins being made again.
   let drawnFor: { view: L.LatLngBounds; far: number } | null = null
@@ -922,11 +924,14 @@
     fixedGroup.addTo(map)
     const view = map.getBounds().pad(0.5), far = map.getZoom()
     drawnFor = { view, far }
+    // What the label is open on is drawn even with its layers off: the search or a panel led there, and the line points at it.
+    const here = labelled && labelled.continent === continent ? at(labelled.units) : null
+    const labelledAt = (where: L.LatLng): boolean => !!here && here.equals(where, 1e-6)
     // Ore and herbs first, so that who offers a service is painted over them.
     for (const service of [false, true]) {
       for (const { pin: p, at: where, zone } of laid) {
         const shown = (layer: FixedLayer): boolean => layers[layer] && far >= FIXED_ZOOM[layer]
-        if ((p.side !== undefined) !== service || !p.layers.some(shown) || !view.contains(where)) continue
+        if ((p.side !== undefined) !== service || !(p.layers.some(shown) || labelledAt(where)) || !view.contains(where)) continue
         // The radius is what the pointer feels, smaller than the picture: two people a few yards apart both answer.
         new FixedPinMark(where, { renderer: fixedCanvas, radius: 7, lozenge: !service, fillColor: service ? '#7fc8ff' : '#d9a066', picture: pictureOf(iconOf(p, shown)), bubblingMouseEvents: false })
           // Made when the pointer comes over the pin, not for every pin. Names come from the
@@ -1297,6 +1302,7 @@
       where={labelled.where}
       {way}
       spot={labelled.spot}
+      ring={onPin}
       box={labelled.box}
       sending={sendState(live, inbox, !!labelled.pin)}
       acked={inbox}
