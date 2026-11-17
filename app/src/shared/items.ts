@@ -161,3 +161,72 @@ export function coins(copper: number): [number, 'g' | 's' | 'c'][] {
 
 /** The colours the game gives the qualities, poor to heirloom. */
 export const QUALITY_COLORS = ['#9d9d9d', '#ffffff', '#1eff00', '#0070dd', '#a335ee', '#ff8000', '#e6cc80', '#00ccff']
+
+// The page of slots (M10-F14): what is worn in the places the game's character window gives it,
+// and the bags and the bank as grids, their items packed and the free slots at the end.
+
+/** The game's equipment slots as its character window lays them: left column, right column, weapons; with a word for an empty one. */
+export const WORN_LEFT: [number, string][] = [[1, 'Head'], [2, 'Neck'], [3, 'Shoulder'], [15, 'Back'], [5, 'Chest'], [4, 'Shirt'], [19, 'Tabard'], [9, 'Wrist']]
+export const WORN_RIGHT: [number, string][] = [[10, 'Hands'], [6, 'Waist'], [7, 'Legs'], [8, 'Feet'], [11, 'Ring'], [12, 'Ring'], [13, 'Trinket'], [14, 'Trinket']]
+export const WORN_WEAPONS: [number, string][] = [[16, 'Main'], [17, 'Off'], [18, 'Ranged']]
+
+export interface Worn {
+  item: number
+  /** Durability now and at most; undefined for what does not wear. */
+  now?: number
+  most?: number
+}
+
+/** What a sheet says is worn, by the game's slot. */
+export function wornOf(sheet: Sheet): Map<number, Worn> {
+  const out = new Map<number, Worn>()
+  for (const g of Array.isArray(sheet.pieces.gear) ? sheet.pieces.gear : []) {
+    if (!Array.isArray(g) || !Number.isInteger(g[0]) || !Number.isInteger(g[1]) || g[1] <= 0) continue
+    out.set(g[0], { item: g[1], ...(typeof g[2] === 'number' && typeof g[3] === 'number' && g[3] > 0 && { now: g[2], most: g[3] }) })
+  }
+  return out
+}
+
+/** One cell of a grid: an item and how many, or a free slot. */
+export type Cell = { item: number; n: number } | null
+
+export interface Grid {
+  cells: Cell[]
+  used: number
+  slots: number
+}
+
+/** Containers as one grid: their items in the game's order (container, then slot), then the free slots. */
+function gridOf(piece: unknown, take: (bag: number) => boolean): Grid {
+  const cells: Cell[] = []
+  let slots = 0
+  const containers = (Array.isArray(piece) ? (piece as Held[]) : []).filter((c) => take(Number(c?.b))).sort((a, b) => Number(a.b) - Number(b.b))
+  for (const c of containers) {
+    slots += Math.max(0, Number((c as { n?: unknown }).n) || 0)
+    const held = (Array.isArray(c.s) ? (c.s as unknown[]) : []).filter((s): s is number[] => Array.isArray(s) && Number.isInteger(s[1]) && (s[1] as number) > 0)
+    for (const s of held.sort((a, b) => a[0]! - b[0]!)) cells.push({ item: s[1]!, n: Number(s[2]) || 1 })
+  }
+  const used = cells.length
+  for (let i = used; i < slots; i++) cells.push(null)
+  return { cells, used, slots: Math.max(slots, used) }
+}
+
+/** The grids of a sheet: backpack and bags as one, the reagent bag, the keyring, and the bank with its bags (6 and after on Forever). */
+export function gridsOf(sheet: Sheet): { bags: Grid; reagents: Grid; keyring: Grid; bank: Grid } {
+  return {
+    bags: gridOf(sheet.pieces.bags, (b) => b >= 0 && b <= 4),
+    reagents: gridOf(sheet.pieces.bags, (b) => b === 5),
+    keyring: gridOf(sheet.pieces.bags, (b) => b === KEYRING),
+    // An older addon sent the keyring with the bank too: the bank is 6 and after.
+    bank: gridOf(sheet.pieces.bank, (b) => b >= 6),
+  }
+}
+
+/** Whether an item's name or type holds every word typed; everything matches nothing typed. */
+export function itemMatches(id: number, facts: ItemFacts, typed: string): boolean {
+  const words = typed.toLowerCase().split(/\s+/).filter(Boolean)
+  if (!words.length) return true
+  const [name, , , cls, sub] = facts[id] ?? [`Item ${id}`, 1, 0, -1, 0]
+  const type = typeOf(cls, sub).toLowerCase(), n = name.toLowerCase()
+  return words.every((w) => n.includes(w) || type.includes(w))
+}
