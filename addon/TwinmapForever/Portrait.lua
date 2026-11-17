@@ -4,6 +4,8 @@
 -- of the window, its width and its height. With the window closed, or a tooltip or the pointer over
 -- the model, the section is empty, and the app takes no picture. Sent in a fight too: a window
 -- closed there must not be left open in the app's eyes.
+-- The game's model reaches behind the slots of what is worn and under its own buttons (zoom, turn):
+-- what is told is the part between the two columns of slots, over the weapons and under the buttons.
 local _, ns = ...
 
 local function Ok(ok, ...) if ok then return ... end end
@@ -19,6 +21,24 @@ local function Edges(f)
   if l and r and t and b and s then return l * s, r * s, t * s, b * s end
 end
 
+local MARGIN = 4 -- units left free beside a slot: its border is drawn a little past it
+
+-- The model's edges drawn in by what the game lays over it.
+local function Clear(model, l, r, t, b)
+  local function Of(f)
+    if f and Try(f.IsVisible, f) == true then return Edges(f) end
+  end
+  local _, headRight = Of(CharacterHeadSlot)
+  local handsLeft = Of(CharacterHandsSlot)
+  local _, _, weaponTop = Of(CharacterMainHandSlot)
+  local _, _, _, buttonsFoot = Of(model.ControlFrame)
+  if headRight and headRight > l and headRight + MARGIN < r then l = headRight + MARGIN end
+  if handsLeft and handsLeft < r and handsLeft - MARGIN > l then r = handsLeft - MARGIN end
+  if weaponTop and weaponTop > b and weaponTop + MARGIN < t then b = weaponTop + MARGIN end
+  if buttonsFoot and buttonsFoot < t and buttonsFoot > b then t = buttonsFoot end
+  return l, r, t, b
+end
+
 local function Build()
   local model = CharacterModelScene or CharacterModelFrame
   if not model then return end -- the game has not made the window yet: nothing to say of it
@@ -27,6 +47,7 @@ local function Build()
   local l, r, t, b = Edges(model)
   local _, physH = GetPhysicalScreenSize()
   if not l or not Num(physH) then return {} end
+  l, r, t, b = Clear(model, l, r, t, b)
   for _, name in ipairs(TIPS) do
     local tip = _G[name]
     if tip and Try(tip.IsVisible, tip) == true then

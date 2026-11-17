@@ -66,3 +66,15 @@ test('the model is told in a fight too: a window closed there is not left open',
   addon.lua('GAME.combat, GAME.charOpen = true, false');
   assert.deepEqual(model(addon), []);
 });
+
+test('the slots of what is worn, the weapons and the buttons of the model are left out of what is told', () => {
+  const addon = enterWorld();
+  // Head on the left to 140, hands on the right from 291, weapons up to 620, the buttons down to 880.
+  addon.lua(`local function At(l, r, t, b) return { IsVisible = function() return true end, GetEffectiveScale = function() return 0.64 end,
+      GetLeft = function() return l end, GetRight = function() return r end, GetTop = function() return t end, GetBottom = function() return b end } end
+    CharacterHeadSlot, CharacterHandsSlot, CharacterMainHandSlot = At(100, 140, 900, 860), At(291, 331, 900, 860), At(180, 220, 620, 580)
+    CharacterModelScene.ControlFrame = At(170, 260, 900, 880)
+    GAME.charOpen = true`);
+  // 1.2 pixels a unit, and 4 units of the screen (7.5 pixels) free beside a slot: left 140 -> 168 + 7.5, right 291 -> 349 - 7.5, top 880 -> 1440 - 1056, foot 620 -> 744 + 7.5.
+  assert.deepEqual(model(addon), { key: 'Catubbio Sucameli', x: 176, y: 384, w: 166, h: 305 });
+});
