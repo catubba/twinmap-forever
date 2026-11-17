@@ -24,6 +24,7 @@ const CloseHandle = kernel32.func('int __stdcall CloseHandle(void *handle)')
 const IsIconic = user32.func('int __stdcall IsIconic(void *hwnd)')
 const GetClientRect = user32.func('int __stdcall GetClientRect(void *hwnd, _Out_ RECT *rect)')
 const ClientToScreen = user32.func('int __stdcall ClientToScreen(void *hwnd, _Inout_ POINT *point)')
+const WindowFromPoint = user32.func('void * __stdcall WindowFromPoint(POINT point)')
 const GetDC = user32.func('void * __stdcall GetDC(void *hwnd)')
 const CreateCompatibleDC = gdi32.func('void * __stdcall CreateCompatibleDC(void *dc)')
 const CreateCompatibleBitmap = gdi32.func('void * __stdcall CreateCompatibleBitmap(void *dc, int width, int height)')
@@ -91,43 +92,62 @@ info.writeInt32LE(1, 8) // height
 info.writeUInt16LE(1, 12) // planes
 info.writeUInt16LE(32, 14) // bits per pixel
 
+const processOf = (hwnd: WindowHandle | null): number => {
+  const pid = [0]
+  if (hwnd) GetWindowThreadProcessId(hwnd, pid)
+  return pid[0]!
+}
+
 /**
- * A square of the window's client area, as shown on screen: three bytes a pixel (red, green,
+ * A rectangle of the window's client area, as shown on screen: three bytes a pixel (red, green,
  * blue), rows from the top. x, y: its top left corner, in pixels of the window. Null when there is
- * nothing to read, or the square reaches past the window.
+ * nothing to read, or the rectangle reaches past the window. own: null too when anything of another
+ * program lies over its corners or its middle, so that what is read is the window's and nothing else's.
  */
-export function readBox(hwnd: WindowHandle, x: number, y: number, size: number): { size: number; rgb: Uint8Array } | null {
-  if (IsIconic(hwnd) || size <= 0) return null
+export function readRect(hwnd: WindowHandle, x: number, y: number, width: number, height: number, own = false): { width: number; height: number; rgb: Uint8Array } | null {
+  if (IsIconic(hwnd) || width <= 0 || height <= 0) return null
   const rect = { left: 0, top: 0, right: 0, bottom: 0 }
-  if (!GetClientRect(hwnd, rect) || x < 0 || y < 0 || x + size > rect.right || y + size > rect.bottom) return null
+  if (!GetClientRect(hwnd, rect) || x < 0 || y < 0 || x + width > rect.right || y + height > rect.bottom) return null
   const origin = { x, y }
   if (!ClientToScreen(hwnd, origin)) return null
+  if (own) {
+    const program = processOf(hwnd)
+    for (const [dx, dy] of [[0, 0], [width - 1, 0], [0, height - 1], [width - 1, height - 1], [width >> 1, height >> 1]]) {
+      if (processOf(WindowFromPoint({ x: origin.x + dx!, y: origin.y + dy! }) as WindowHandle | null) !== program) return null
+    }
+  }
   if (screenDC === undefined) {
     screenDC = GetDC(null) as bigint
     memoryDC = CreateCompatibleDC(screenDC) as bigint
   }
-  // Made and let go each time: the square is asked for twice a second at most.
-  const box = CreateCompatibleBitmap(screenDC, size, size) as bigint
+  // Made and let go each time: it is asked for twice a second at most.
+  const box = CreateCompatibleBitmap(screenDC, width, height) as bigint
   const head = Buffer.alloc(40)
   head.writeUInt32LE(40, 0)
-  head.writeInt32LE(size, 4)
-  head.writeInt32LE(-size, 8) // top row first
+  head.writeInt32LE(width, 4)
+  head.writeInt32LE(-height, 8) // top row first
   head.writeUInt16LE(1, 12)
   head.writeUInt16LE(32, 14)
   const previous = SelectObject(memoryDC, box)
-  const copied = BitBlt(memoryDC, 0, 0, size, size, screenDC, origin.x, origin.y, SRCCOPY)
+  const copied = BitBlt(memoryDC, 0, 0, width, height, screenDC, origin.x, origin.y, SRCCOPY)
   SelectObject(memoryDC, previous)
-  const pixels = Buffer.alloc(size * size * 4)
-  const read = copied && GetDIBits(screenDC, box, 0, size, pixels, head, 0) === size
+  const pixels = Buffer.alloc(width * height * 4)
+  const read = copied && GetDIBits(screenDC, box, 0, height, pixels, head, 0) === height
   DeleteObject(box)
   if (!read) return null
-  const rgb = new Uint8Array(size * size * 3)
-  for (let i = 0; i < size * size; i++) {
+  const rgb = new Uint8Array(width * height * 3)
+  for (let i = 0; i < width * height; i++) {
     rgb[i * 3] = pixels[i * 4 + 2]!
     rgb[i * 3 + 1] = pixels[i * 4 + 1]!
     rgb[i * 3 + 2] = pixels[i * 4]!
   }
-  return { size, rgb }
+  return { width, height, rgb }
+}
+
+/** A square of the window's client area, read the same way. */
+export function readBox(hwnd: WindowHandle, x: number, y: number, size: number): { size: number; rgb: Uint8Array } | null {
+  const read = readRect(hwnd, x, y, size, size)
+  return read && { size, rgb: read.rgb }
 }
 
 /**

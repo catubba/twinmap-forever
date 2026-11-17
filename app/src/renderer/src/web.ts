@@ -54,6 +54,9 @@ if (!inApp) {
     keep: call('keep', undefined),
     onSheets: on('sheets'),
     forgetSheet: call('forget-sheet', undefined),
+    onPortraits: on('portraits'),
+    retakePortrait: call('retake-portrait', undefined),
+    savePortrait: () => Promise.resolve(), // a browser downloads the picture by itself (Items.svelte)
     onTips: on('tips'),
     itemSources: call('item-sources', { sold: [], drops: [], found: [] }),
     // What belongs to the computer stays on the computer.

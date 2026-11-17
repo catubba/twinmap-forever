@@ -12,6 +12,7 @@
 TwinmapForever.lua
 Strip.lua
 Sheet.lua
+Portrait.lua
 Questie.lua
 Quests.lua
 Group.lua

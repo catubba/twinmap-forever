@@ -1,11 +1,12 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, protocol, screen, shell } from 'electron'
 import { randomBytes } from 'node:crypto'
-import { readFileSync, renameSync, writeFileSync } from 'node:fs'
-import { readFile, writeFile } from 'node:fs/promises'
+import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { copyFile, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { keep, keptFrom } from '../shared/kept'
+import { modelFrom, pictureDue, portraitsFrom, wornKey, type Portraits, type PortraitsTold } from '../shared/portrait'
 import { heldOf, mergeSheet, sheetNewsFrom, sheetsFrom, type Sheets } from '../shared/sheet'
-import { linkStatus, lostPercent } from '../shared/link'
+import { linkStatus, lostPercent, type LinkSnapshot } from '../shared/link'
 import { logFrom, shownFrom, type QuestsStatus } from '../shared/quests'
 import type { Found } from '../shared/search'
 import { tipsFrom, type ItemSources, type Tips } from '../shared/tips'
@@ -238,7 +239,21 @@ function createWindow(): void {
   let quests = startQuests(gameFolder, tellQuests)
   let walks = startWalks(gameFolder)
   // A file of the map, for the window and for a phone on the home network alike.
+  // The pictures of the characters (shared/portrait.ts): a PNG each beside the settings, named by the letters of the character's name.
+  const portraitsFolder = join(app.getPath('userData'), 'portraits')
+  const portraitFile = (key: string): string => join(portraitsFolder, `${Buffer.from(key).toString('hex')}.png`)
   const served = async (path: string): Promise<Served> => {
+    const portrait = /^\/portraits\/([^/]+)\.png$/.exec(path)
+    if (portrait) {
+      let key = ''
+      try {
+        key = decodeURIComponent(portrait[1]!)
+      } catch {
+        // not a name
+      }
+      const bytes = key ? await readFile(portraitFile(key)).catch(() => null) : null
+      return bytes ? { status: 200, type: 'image/png', bytes } : { status: 404 }
+    }
     const status = tiles.status()
     const file = status.state === 'ready' ? servedFile(status.folder, path) : null
     let bytes = file ? await readFile(file).catch(() => null) : null
@@ -367,6 +382,7 @@ function createWindow(): void {
     lan.tell('quests', questsNow)
     lan.tell('kept', kept)
     lan.tell('sheets', sheets)
+    lan.tell('portraits', portraitsTold())
     void lanUrl()
   }
   ipcMain.handle('set-lan', (_event, on: unknown) => {
@@ -458,12 +474,74 @@ function createWindow(): void {
     }
     tellHeld()
   }
+  // The pictures of the characters, read off the game's window while its character window shows the
+  // model: when there is none yet, when what is worn is no longer what the picture shows, and when
+  // the player asks for a new one (Retake), which waits for the window to be open.
+  const portraitsFile = join(app.getPath('userData'), 'portraits.json')
+  let portraits: Portraits = {}
+  try {
+    portraits = portraitsFrom(JSON.parse(readFileSync(portraitsFile, 'utf8')))
+  } catch {
+    // none taken yet
+  }
+  let retake: string | null = null
+  const portraitsTold = (): PortraitsTold => ({ taken: portraits, retake })
+  const tellPortraits = (): void => {
+    if (!win.isDestroyed()) win.webContents.send('portraits', portraitsTold())
+    lan?.tell('portraits', portraitsTold())
+  }
+  win.webContents.on('did-finish-load', tellPortraits)
+  const keepPortraits = (now: Portraits): void => {
+    portraits = now
+    try {
+      writeFileSync(`${portraitsFile}.new`, JSON.stringify(portraits))
+      renameSync(`${portraitsFile}.new`, portraitsFile)
+    } catch {
+      // kept for this run only
+    }
+    tellPortraits()
+  }
+  const PORTRAIT_EVERY = 250 // ms between two looks at whether a picture is to be taken
+  let portraitLooked = 0
+  const lookPortrait = (state: LinkSnapshot['state'], now: number): void => {
+    if (now - portraitLooked < PORTRAIT_EVERY) return
+    portraitLooked = now
+    // ponytail: a model told by a strip that then stopped (the addon paused with the window open) is still believed; only Retake can then take what is there
+    const box = modelFrom(state.sections.model), sheet = box ? sheets[box.key] : undefined
+    const gear = sheet && wornKey(sheet.pieces.gear)
+    if (!box || !pictureDue(box, now - (state.updatedAt.model ?? now), gear, portraits[box.key], retake)) return
+    const cut = link.cut(box.x, box.y, box.w, box.h)
+    if (!cut) return // the game is not on show there now: at the next look
+    try {
+      mkdirSync(portraitsFolder, { recursive: true })
+      writeFileSync(portraitFile(box.key), encodePng(cut.rgb, cut.width, cut.height))
+    } catch {
+      return
+    }
+    if (retake === box.key) retake = null
+    record.say('portrait taken') // never whose
+    keepPortraits({ ...portraits, [box.key]: { at: now, gear: gear! } })
+  }
+  // Retake: a new picture of this character as soon as its model is on show; null takes the asking back.
+  asks('retake-portrait', (key: unknown): void => {
+    retake = typeof key === 'string' && Object.hasOwn(sheets, key) ? key : null
+    tellPortraits()
+  })
+  // Save: a copy of the picture where the player says. The window's own: a browser on the home network downloads it.
+  ipcMain.handle('save-portrait', async (_event, key: unknown): Promise<void> => {
+    if (typeof key !== 'string' || !Object.hasOwn(portraits, key)) return
+    const picked = await dialog.showSaveDialog(win, { title: `Save the picture of ${key}`, defaultPath: `${key}.png`, filters: [{ name: 'PNG', extensions: ['png'] }] })
+    if (!picked.canceled && picked.filePath) await copyFile(portraitFile(key), picked.filePath).catch(() => {})
+  })
   // A character the player no longer wants listed. The one in game comes back whole at its next send.
   asks('forget-sheet', (key: unknown): void => {
     if (typeof key !== 'string' || !Object.hasOwn(sheets, key)) return
     sheets = Object.fromEntries(Object.entries(sheets).filter(([k]) => k !== key))
     writeSheets()
     tellHeld()
+    if (retake === key) retake = null
+    rmSync(portraitFile(key), { force: true })
+    keepPortraits(Object.fromEntries(Object.entries(portraits).filter(([k]) => k !== key)))
   })
   // My pins: the game draws them on its own map, so it is to have the points saved here and no
   // other. The window tells them at every change and when it loads; only what changed is sent.
@@ -582,6 +660,7 @@ function createWindow(): void {
     }
     quests.show(snapshot.state.sections.questie, snapshot.state.sections.quests)
     takeSheet(snapshot.state.sections.sheet)
+    lookPortrait(snapshot.state, Date.now())
     win.webContents.send('link', snapshot)
     win.webContents.send('tiles', tiles.status())
     win.webContents.send('setup', setup)
@@ -677,6 +756,7 @@ function createWindow(): void {
     ipcMain.removeHandler('open-feedback')
     ipcMain.removeHandler('set-on-top')
     ipcMain.removeHandler('set-lan')
+    ipcMain.removeHandler('save-portrait')
     for (const name of Object.keys(calls)) ipcMain.removeHandler(name)
     lan?.stop()
     if (marksTimer) clearTimeout(marksTimer)

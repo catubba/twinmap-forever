@@ -51,6 +51,7 @@ local function Key()
   name, surname = Str(name), Str(surname)
   return name and (surname and name .. " " .. surname or name)
 end
+ns.Key = Key -- Portrait.lua says whose picture it is by the same name
 
 -- An item's key: its link as "item:ID:enchant:...", with the level and the specialisation of whoever
 -- holds it left out, so that it stays the same as the character grows, and no empty fields at the end.

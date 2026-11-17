@@ -6,11 +6,12 @@
   // character window lays it and the bags and the bank as grids; Table, a row for each item.
   import { ago, type Known } from '../../shared/characters'
   import { coins, filterRows, gridsOf, itemMatches, itemRows, othersHolding, PLACES, QUALITY_COLORS, sortRows, wornOf, WORN_LEFT, WORN_RIGHT, WORN_WEAPONS, type Cell, type Column, type Grid, type ItemFacts, type ItemRow, type Place } from '../../shared/items'
+  import type { PortraitsTold } from '../../shared/portrait'
   import type { Sheets } from '../../shared/sheet'
   import { itemTip } from './item-tip.svelte'
-  import { TILES } from './web'
+  import { inApp, TILES } from './web'
 
-  let { sheets, shown, known, now, onpick }: { sheets: Sheets; shown: Known | null; known: Known[]; now: number; onpick: (key: string) => void } = $props()
+  let { sheets, portraits, shown, known, now, onpick }: { sheets: Sheets; portraits: PortraitsTold; shown: Known | null; known: Known[]; now: number; onpick: (key: string) => void } = $props()
 
   // What the game says of each item, made beside the map (tiles-worker.ts). Without it the items have their numbers and no prices.
   let facts = $state.raw<ItemFacts>({})
@@ -44,6 +45,9 @@
     if (c === column) up = !up
     else ((column = c), (up = c === 'name' || c === 'type' || c === 'place'))
   }
+  // The character's picture, taken off the game's character window (shared/portrait.ts): the address changes with each new one.
+  const portrait = $derived(shown ? portraits.taken[shown.key] : undefined)
+  const portraitUrl = $derived(shown && portrait ? `${TILES}/portraits/${encodeURIComponent(shown.key)}.png?${portrait.at}` : null)
   const when = $derived.by(() => {
     if (!sheet || !shown) return ''
     const bags = shown.live ? 'Bags as they are now' : `Bags as of ${ago(shown.seen, now)}`
@@ -132,7 +136,28 @@
           <div class="body">
             <div class="col">{#each WORN_LEFT as s (s[0])}{@render wornSlot(s)}{/each}</div>
             <div>
-              <div class="picture"><span>No picture of {shown.key.split(' ')[0]} yet</span></div>
+              <div class="picture" style:background-image={portraitUrl ? `url("${portraitUrl}")` : null}>
+                {#if portraits.retake === shown.key}
+                  <div class="wait">
+                    <p>Open the character window in game<br /><kbd>C</kbd> unless you changed the key</p>
+                    <small>The picture is taken as soon as it is open and nothing covers the character.</small>
+                    <span><button class="pbtn" onclick={() => void window.twinmap.retakePortrait(null)}>Cancel</button></span>
+                  </div>
+                {:else if portrait && portraitUrl}
+                  <div class="under">
+                    <span class="when">Taken {ago(portrait.at, now)}</span>
+                    {#if inApp}
+                      <button class="pbtn" onclick={() => void window.twinmap.savePortrait(shown.key)}>Save…</button>
+                    {:else}
+                      <a class="pbtn" href={portraitUrl} download="{shown.key}.png">Save…</a>
+                    {/if}
+                    {#if shown.live}<button class="pbtn" onclick={() => void window.twinmap.retakePortrait(shown.key)}>Retake</button>{/if}
+                  </div>
+                {:else}
+                  <span>No picture of {shown.key.split(' ')[0]} yet</span>
+                  <small>Open the character window in game and it is taken by itself.</small>
+                {/if}
+              </div>
               <div class="weapons">{#each WORN_WEAPONS as s (s[0])}{@render wornSlot(s)}{/each}</div>
             </div>
             <div class="col">{#each WORN_RIGHT as s (s[0])}{@render wornSlot(s)}{/each}</div>
@@ -295,14 +320,79 @@
     gap: 6px;
   }
   .picture {
+    position: relative;
     display: grid;
+    place-content: center;
     place-items: center;
+    gap: 6px;
     height: 394px;
+    padding: 0 16px;
+    overflow: hidden;
     border-radius: 3px;
-    background: radial-gradient(circle at 50% 40%, var(--stone-700), var(--stone-950));
+    background: radial-gradient(circle at 50% 40%, var(--stone-700), var(--stone-950)) center / cover;
     box-shadow: 0 0 0 1px #000, 0 0 0 2px var(--bronze-700);
     color: var(--text-off);
     font: var(--t-small);
+    text-align: center;
+  }
+  .picture .under {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 18px 8px 7px;
+    color: var(--text-dim);
+    text-align: left;
+    background: linear-gradient(transparent, #000d);
+  }
+  .picture .when {
+    margin-right: auto;
+  }
+  .pbtn {
+    display: inline-flex;
+    align-items: center;
+    height: 24px;
+    padding: 0 9px;
+    border: 0;
+    border-radius: 2px;
+    font: 500 13px/1 var(--font);
+    color: var(--text);
+    text-decoration: none;
+    cursor: pointer;
+    background: linear-gradient(var(--stone-600), var(--stone-800));
+    box-shadow: inset 0 1px 0 #ffffff1f, 0 0 0 1px #000, 0 0 0 2px var(--bronze-600);
+  }
+  .pbtn:hover {
+    color: var(--gold);
+  }
+  .picture .wait {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-content: center;
+    gap: 12px;
+    padding: 24px;
+    background: #0c0a08e6;
+  }
+  .picture .wait p {
+    margin: 0;
+    font: var(--t-body);
+    color: var(--text);
+  }
+  .picture .wait kbd {
+    display: inline-block;
+    min-width: 22px;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font: 600 14px/20px var(--font);
+    color: var(--gold);
+    box-shadow: 0 0 0 1px var(--bronze-500);
+  }
+  .picture .wait small {
+    color: var(--text-dim);
   }
   .weapons {
     display: flex;

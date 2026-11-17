@@ -29,6 +29,7 @@
   import ItemPopup from './ItemPopup.svelte'
   import NpcPanel from './NpcPanel.svelte'
   import { firstName, knownOf, shownOf } from '../../shared/characters'
+  import type { PortraitsTold } from '../../shared/portrait'
   import type { Sheets } from '../../shared/sheet'
 
   let link = $state<LinkSnapshot | null>(null)
@@ -136,6 +137,11 @@
   window.twinmap.onSheets((all) => {
     sheets = all
   })
+  // The pictures of the characters, and whose is awaited (Retake).
+  let portraits = $state.raw<PortraitsTold>({ taken: {}, retake: null })
+  window.twinmap.onPortraits((told) => {
+    portraits = told
+  })
   const inGame = $derived(live ? (char?.name ?? null) : null)
   let picked = $state<string | null>(null)
   let lastInGame: string | null = null
@@ -224,7 +230,7 @@
 {/if}
 {#if onItems && onSetup === false && !onSettings}
   <div class="over" in:fade={screen} out:fade={gone}>
-    <Items {sheets} {shown} known={characters} {now} onpick={(key) => (picked = key)} />
+    <Items {sheets} {portraits} {shown} known={characters} {now} onpick={(key) => (picked = key)} />
   </div>
 {/if}
 {#if onSetup === false}

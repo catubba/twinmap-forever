@@ -5,6 +5,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { FeedbackSent, FeedbackWay } from '../shared/feedback'
 import type { Kept, KeptKey } from '../shared/kept'
+import type { PortraitsTold } from '../shared/portrait'
 import type { Sheets } from '../shared/sheet'
 import type { ItemSources, Tips } from '../shared/tips'
 import type { LinkSnapshot } from '../shared/link'
@@ -38,6 +39,14 @@ contextBridge.exposeInMainWorld('twinmap', {
   },
   // Takes a character off the list.
   forgetSheet: (key: string): Promise<void> => ipcRenderer.invoke('forget-sheet', key),
+  // The pictures of the characters, and whose is awaited: told at load and at every change.
+  onPortraits: (listener: (told: PortraitsTold) => void) => {
+    ipcRenderer.on('portraits', (_event, told: PortraitsTold) => listener(told))
+  },
+  // A new picture of a character once its character window is open in game; null takes the asking back.
+  retakePortrait: (key: string | null): Promise<void> => ipcRenderer.invoke('retake-portrait', key),
+  // A copy of a character's picture, where the player says.
+  savePortrait: (key: string): Promise<void> => ipcRenderer.invoke('save-portrait', key),
   // The game's tooltips of the items met: told at load and at every change.
   onTips: (listener: (tips: Tips) => void) => {
     ipcRenderer.on('tips', (_event, tips: Tips) => listener(tips))
