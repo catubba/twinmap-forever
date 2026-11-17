@@ -10,7 +10,7 @@
   import { whereIs } from '../../shared/now'
   import { serves } from '../../shared/services'
   import type { Sheets } from '../../shared/sheet'
-  import { holdersOf, shownLines, tipKey, type ItemSources } from '../../shared/tips'
+  import { holdersOf, piecesOf, shownLines, tipKey, type ItemSources } from '../../shared/tips'
   import { hover, kept } from './item-tip.svelte'
   import { TILES } from './web'
 
@@ -73,6 +73,11 @@
   })
 </script>
 
+<!-- A line of the game in its colours: some carry colours inside ("Made by"). -->
+{#snippet text(line: string, color: string)}
+  {#each piecesOf(line, color) as p, i (i)}<span style:color={p.color ? `#${p.color}` : undefined}>{p.text}</span>{/each}
+{/snippet}
+
 {#snippet money(copper: number)}
   {#each coins(copper) as [n, coin] (coin)}{n}<i class="coin {coin}"></i>{/each}
 {/snippet}
@@ -82,8 +87,8 @@
     {#if lines}
       {#each shownLines(lines, shown.wear) as l, i (i)}
         <div class="tl" class:name={i === 0}>
-          <span style:color={l[1] ? `#${l[1]}` : undefined}>{l[0]}</span>
-          {#if l.length === 4}<span style:color={l[3] ? `#${l[3]}` : undefined}>{l[2]}</span>{/if}
+          <span>{@render text(l[0], l[1])}</span>
+          {#if l.length === 4}<span>{@render text(l[2], l[3])}</span>{/if}
         </div>
       {/each}
     {:else if fact}

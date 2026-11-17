@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest'
 import type { Sheet } from './sheet'
-import { holdersOf, shownLines, tipKey, tipsFrom } from './tips'
+import { holdersOf, piecesOf, shownLines, tipKey, tipsFrom } from './tips'
 
 test('the tooltips sent are taken as they are; a line or a key of another shape is left out', () => {
   expect(
@@ -39,4 +39,15 @@ test('who holds an item: bags with the keyring and the reagent bag, the bank (6 
     { key: 'Brunilde Ferrozampa', bags: 0, bank: 4, worn: 0 },
   ])
   expect(holdersOf(sheets, 1155)).toEqual([{ key: 'Catubbio Sucameli', bags: 0, bank: 0, worn: 1 }])
+})
+
+test('a line with colours inside is cut in pieces of one colour; pictures go, a link keeps its words', () => {
+  expect(piecesOf('|cff00ff00<Made by Catubbio Sucameli>|r', '')).toEqual([{ text: '<Made by Catubbio Sucameli>', color: '00ff00' }])
+  expect(piecesOf('Requires |cffFF2020Engineering (50)|r now', 'ffd200')).toEqual([
+    { text: 'Requires ', color: 'ffd200' },
+    { text: 'Engineering (50)', color: 'ff2020' },
+    { text: ' now', color: 'ffd200' },
+  ])
+  expect(piecesOf('|TInterface\Icons\coin:0|t 5 a || b |Hitem:1|h[Bolt]|h', '')).toEqual([{ text: ' 5 a | b [Bolt]', color: '' }])
+  expect(piecesOf('Plain', '')).toEqual([{ text: 'Plain', color: '' }])
 })

@@ -67,3 +67,36 @@ export interface ItemSources {
   drops: { name: string; area: number }[]
   found: { name: string; area: number }[]
 }
+
+/** A piece of a line in its colour ("rrggbb", "" for the line's own). */
+export interface Piece {
+  text: string
+  color: string
+}
+
+/**
+ * A line as the game writes it, in pieces of one colour each: "|cffRRGGBB" starts a colour and "|r"
+ * ends it ("Made by" is written so); pictures ("|T...|t", "|A...|a") are left out, a link keeps its
+ * words, "||" is a bar.
+ */
+export function piecesOf(text: string, color: string): Piece[] {
+  const out: Piece[] = []
+  let now = color
+  const put = (t: string): void => {
+    if (!t) return
+    const last = out.at(-1)
+    if (last && last.color === now) last.text += t
+    else out.push({ text: t, color: now })
+  }
+  const clean = text.replace(/\|T[^|]*\|t|\|A[^|]*\|a|\|H[^|]*\|h|\|h/g, '')
+  const marks = /\|c[0-9a-fA-F]{2}([0-9a-fA-F]{6})|\|r|\|\|/g
+  let from = 0
+  for (const m of clean.matchAll(marks)) {
+    put(clean.slice(from, m.index))
+    if (m[0] === '||') put('|')
+    else now = m[1] ? m[1].toLowerCase() : color
+    from = m.index + m[0].length
+  }
+  put(clean.slice(from))
+  return out
+}
