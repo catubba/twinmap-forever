@@ -31,10 +31,10 @@ test('a vendor sells by name, holiday items left out, with how many the characte
 const row = (spell: number, level: number, cost: number | null, more: Partial<TrainerRow> = {}): TrainerRow => ({ spell, name: `S${spell}`, rank: 0, level, skill: 0, cost, talent: false, races: 0, icon: 0, ...more })
 
 test('a trainer list: what is open now with its total, then each level still to reach, and the known apart', () => {
-  const rows = [row(348, 1, 10), row(695, 6, 100), row(1, 28, 500), row(2, 28, null), row(3, 24, 400, { talent: true }), row(4, 30, 600), row(5, 29, 50)]
+  const rows = [row(348, 1, 10), row(695, 6, 100), row(1, 28, 500), row(2, 28, null), row(3, 24, 400, { talent: true }), row(4, 30, 600), row(5, 29, 50), row(6, 20, 300, { quest: 'The Binding' })]
   const g = grouped(rows, (r) => r.level, 29, knownSpells(CATUBBIO))
-  expect(g.now.rows.map((r) => r.spell)).toEqual([1, 2, 3, 5])
-  expect(g.now.cost).toBe(550) // no price for a talent nor for a cost not known
+  expect(g.now.rows.map((r) => r.spell)).toEqual([1, 2, 3, 5, 6])
+  expect(g.now.cost).toBe(550) // no price for a talent, a quest's spell, nor a cost not known
   expect(g.later.map((x) => [x.at, x.cost, x.rows.length])).toEqual([[30, 600, 1]])
   expect(g.known.map((r) => r.spell)).toEqual([348, 695])
 })

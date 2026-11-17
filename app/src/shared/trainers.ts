@@ -7,13 +7,14 @@
 // CMaNGOS classic-db by way of One for All (profession-trainers.ts).
 // What the addon read at a trainer (its sheet piece "trainers", Sheet.lua) wins over both: what
 // that trainer teaches, and the costs and levels of every trainer of the same class or profession.
+import { CLASS_QUESTS } from './class-quests'
 import { PROFESSION_TRAINERS } from './profession-trainers'
 import type { Sheets } from './sheet'
 import { readTable, type Table } from './wdc5'
 
 export const TRAINERS_FILE = 'trainers.json'
 /** A file of another format was made by another app: made again. */
-export const TRAINERS_FORMAT = 3
+export const TRAINERS_FORMAT = 4
 
 const SKILL_LINE_ABILITY = 1266278, SPELL_LEVELS = 1140079, SPELL_NAME = 1990283, SPELL = 1140089, SPELL_MISC = 1003144
 const SKILL_RACE_CLASS = 1240406, TALENT = 1369062, SPELL_EFFECT = 1140088
@@ -82,6 +83,8 @@ export function trainerFacts(files: Files): TrainerFacts | null {
     const n = name.get(id), lv = level.get(id), sub = rank.get(id) ?? ''
     // What comes with another spell or with a form is no trainer's: passives and effects.
     if (!n || !lv || sub === 'Passive' || / Effect$|\(Passive\)$/.test(n)) continue
+    // A spell the game lists twice for a class (Consecration, Immolate 7) is one line.
+    if (classes[cls]?.some((s) => s[0] === id)) continue
     // ponytail: the low 32 bits of the races only; Forever's Skyborne (bits 32 and 33) see the spells of every race.
     ;(classes[cls] ??= []).push([id, lv, n, Number(/^Rank (\d+)$/.exec(sub)?.[1] ?? 0), r.int(SLA_RACES) >>> 0, talentNames.has(n) ? 1 : 0, icon.get(id) ?? 0])
   }
@@ -144,6 +147,8 @@ export interface TrainerRow {
   cost: number | null
   /** A talent must be taken first. */
   talent: boolean
+  /** Taught by a quest, not the trainer: the quest's name, "" when it has none known (One for All's Data/TrainerSpells.lua). */
+  quest?: string
   /** 0 all races; otherwise the game's bits of the races (Human 0, Orc 1, Dwarf 2, ...). */
   races: number
   icon: number
@@ -158,7 +163,8 @@ export function classTrainer(npc: number, cls: string, facts: TrainerFacts, read
   const byId = new Map(list.map((s) => [s[0], s]))
   const row = (s: ClassSpell): TrainerRow => {
     const l = reads.lines.get(s[0])
-    return { spell: s[0], name: s[2], rank: s[3], level: l?.[2] || s[1], skill: 0, cost: l ? l[1] : null, talent: s[5] === 1, races: s[4], icon: s[6] }
+    const quest = CLASS_QUESTS[s[0]]
+    return { spell: s[0], name: s[2], rank: s[3], level: l?.[2] || s[1], skill: 0, cost: l ? l[1] : null, talent: s[5] === 1, races: s[4], icon: s[6], ...(quest !== undefined && { quest }) }
   }
   const seen = reads.trainers.get(npc)
   if (!seen) return list.map(row)

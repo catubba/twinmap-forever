@@ -30,6 +30,10 @@ test("before any trainer is seen, a class trainer teaches the game's list, by le
   expect(classTrainer(5172, 'DEATHKNIGHT', FACTS, NONE)).toEqual([])
 })
 
+test('a spell a quest teaches says which quest, as One for All lists them', () => {
+  expect(classTrainer(5172, 'WARLOCK', FACTS, NONE).map((r) => r.quest)).toEqual([undefined, undefined, 'The Binding', undefined])
+})
+
 test('a trainer seen in the game says what it teaches; its costs go to every trainer of the class; the newest reading wins', () => {
   // Catubbio saw Briarthorn: the voidwalker is a quest's, not the trainer's; a spell the game's list lacks has its number. Another character saw him before, at other prices.
   const reads = trainerReads({
@@ -92,7 +96,15 @@ test.skipIf(!real)("the real game lists the warlock's spells by level, and Sprin
   )
   expect(warlock.every((r) => r.icon > 0)).toBe(true)
   // Every class has its list.
-  for (const cls of [1, 2, 3, 4, 5, 7, 8, 9, 11]) expect(facts.classes[cls]!.length, `class ${cls}`).toBeGreaterThan(100)
+  for (const cls of [1, 2, 3, 4, 5, 7, 8, 9, 11]) {
+    expect(facts.classes[cls]!.length, `class ${cls}`).toBeGreaterThan(100)
+    // Each spell once: the panel lists them by number.
+    expect(new Set(facts.classes[cls]!.map((s) => s[0])).size, `class ${cls} once`).toBe(facts.classes[cls]!.length)
+  }
+  // The quests' spells, as One for All lists them.
+  expect(classTrainer(906, 'WARLOCK', facts, NONE).filter((r) => r.quest !== undefined).map((r) => `${r.name} ${r.quest}`)).toEqual([
+    'Summon Voidwalker The Binding', 'Summon Incubus The Binding', 'Summon Succubus The Binding', 'Summon Felhunter The Binding', 'Inferno ', 'Ritual of Doom ',
+  ])
 
   const engineering = professionTrainer(5174, facts, NONE)!
   expect(engineering.ranks.map((r) => r.name)).toEqual(['Apprentice', 'Journeyman', 'Expert'])

@@ -31,7 +31,7 @@ export interface Grouped {
   known: TrainerRow[]
 }
 
-const priced = (r: TrainerRow): number => (r.talent ? 0 : (r.cost ?? 0))
+const priced = (r: TrainerRow): number => (r.talent || r.quest !== undefined ? 0 : (r.cost ?? 0))
 const group = (at: number, rows: TrainerRow[]): Group => ({ at, cost: rows.reduce((n, r) => n + priced(r), 0), rows })
 
 /** Rows in order of `at` (a level, a skill), split into known, open now (at reached) and the rest by `at`. */

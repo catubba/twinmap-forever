@@ -156,7 +156,9 @@ dungeon, the names of the dungeons and their split in wings
 (app/src/shared/dungeon-pins.ts, generated from Data\DungeonMaps.lua of
 One for All 6.2.2); and in the app, where a profession trainer's ranks, recipes
 and costs come from (app/src/shared/profession-trainers.ts, generated from
-Data\ProfessionFees.lua of One for All 6.2.10)
+Data\ProfessionFees.lua of One for All 6.2.10); and which class spells a quest teaches
+instead of the trainer (app/src/shared/class-quests.ts, generated from
+Data\TrainerSpells.lua of One for All 6.2.10)
 ================================================================================
 
 One for All is licensed under the GNU General Public License, version 3 or

@@ -78,7 +78,7 @@
   <div class="t">
     {@render pic(picture(r))}
     <span class="name" style:color={color(r, open)}>{r.name}{#if r.rank}<span class="rank">Rank {r.rank}</span>{/if}</span>
-    {#if r.talent}<span class="tag">Talent</span>{:else}{@render price(r.cost)}{/if}
+    {#if r.talent}<span class="tag">Talent</span>{:else if r.quest !== undefined}<span class="tag" title={r.quest ? `Taught by the quest ${r.quest}` : 'Taught by a class quest'}>Quest</span>{:else}{@render price(r.cost)}{/if}
   </div>
 {/snippet}
 
