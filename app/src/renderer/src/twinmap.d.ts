@@ -18,6 +18,8 @@ declare global {
       keep: (key: import('../../shared/kept').KeptKey, value: unknown) => Promise<void>
       onSheets: (listener: (sheets: import('../../shared/sheet').Sheets) => void) => void
       forgetSheet: (key: string) => Promise<void>
+      onTips: (listener: (tips: import('../../shared/tips').Tips) => void) => void
+      itemSources: (item: number) => Promise<import('../../shared/tips').ItemSources>
       onUpdate: (listener: (updating: import('../../main/update').Updating) => void) => void
       chooseGameFolder: () => Promise<string | null>
       openCurseForge: (addon?: import('../../shared/setup').Optional) => Promise<void>

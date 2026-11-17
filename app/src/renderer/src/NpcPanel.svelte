@@ -10,6 +10,7 @@
   import type { Sheets } from '../../shared/sheet'
   import { classTrainer, professionTrainer, trainerReads, type TrainerFacts, type TrainerRow } from '../../shared/trainers'
   import Glyph from './Glyph.svelte'
+  import { itemTip } from './item-tip.svelte'
   import { TILES } from './web'
 
   let { pin, sheets, shown, now, onclose }: { pin: FixedPin; sheets: Sheets; shown: Known | null; now: number; onclose: () => void } = $props()
@@ -75,7 +76,7 @@
 {/snippet}
 
 {#snippet line(r: TrainerRow, open: boolean)}
-  <div class="t">
+  <div class="t" use:itemTip={{ item: made(r) ?? 0 }}>
     {@render pic(picture(r))}
     <span class="name" style:color={color(r, open)}>{r.name}{#if r.rank}<span class="rank">Rank {r.rank}</span>{/if}</span>
     {#if r.talent}<span class="tag">Talent</span>{:else if r.quest !== undefined}<span class="tag" title={r.quest ? `Taught by the quest ${r.quest}` : 'Taught by a class quest'}>Quest</span>{:else}{@render price(r.cost)}{/if}
@@ -140,7 +141,7 @@
       {#if list}<h3 class="grp"><span>Sells · {goods.length}</span></h3>{/if}
       <div class="head"><span></span><span>Item</span><span>Price</span><span>Bags</span><span>Bank</span></div>
       {#each goods as g (g.id)}
-        <div class="r">
+        <div class="r" use:itemTip={{ item: g.id }}>
           {@render pic(`${TILES}/items/${g.id}.png`, g.perBuy)}
           <span class="name" style:color={QUALITY_COLORS[g.quality]}>{g.name}</span>
           {@render price(g.buy)}

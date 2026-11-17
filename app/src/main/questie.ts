@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { GameQuest, LogQuest, ObjectiveKind, QuestIcon, QuestieShown, QuestPin } from '../shared/quests'
 import { best, fold, wordsMatch, type Found } from '../shared/search'
+import type { ItemSources } from '../shared/tips'
 import { resourceOf, servicesOf, type FixedPin, type ServiceLayer } from '../shared/services'
 
 /** The file of QuestieDB this app reads, in a game folder. Questie without it gives the app nothing. */
@@ -447,4 +448,30 @@ export function questPins(db: Questie, shown: QuestieShown): QuestPin[] {
     }
   }
   return [...pins.values()]
+}
+
+/** Who sells an item, who drops it and where it is found, from QuestieDB: with a place each, a few of each (the popup of an item, M10-F15). */
+export function itemSources(db: Questie, item: number, most = 8): ItemSources {
+  const numbers = (t: unknown): number[] => list(t).filter((n): n is number => typeof n === 'number')
+  const name = (kind: 'Npc' | 'Object', id: number): string => {
+    const n = db.get(kind, id, kind === 'Npc' ? NPC.name : OBJECT.name)
+    return typeof n === 'string' ? n : ''
+  }
+  // Its own zone first when QuestieDB names one, the first place it has otherwise.
+  const spot = (kind: 'Npc' | 'Object', id: number): { area: number; x: number; y: number } | null => {
+    const places = db.places(kind, id), home = kind === 'Npc' ? db.get('Npc', id, NPC.zone) : undefined
+    const area = typeof home === 'number' && places[home]?.length ? String(home) : Object.keys(places).find((a) => places[a]!.length)
+    const first = area === undefined ? undefined : places[area]![0]
+    return first ? { area: +area!, x: first[0], y: first[1] } : null
+  }
+  const sold = numbers(db.get('Item', item, ITEM.vendors)).flatMap((npc) => {
+    const where = spot('Npc', npc), side = db.get('Npc', npc, NPC.friendly)
+    return where && name('Npc', npc) ? [{ npc, name: name('Npc', npc), ...where, ...(typeof side === 'string' && side && { side }) }] : []
+  })
+  const placed = (kind: 'Npc' | 'Object', ids: number[]): { name: string; area: number }[] =>
+    ids.flatMap((id) => {
+      const where = spot(kind, id)
+      return where && name(kind, id) ? [{ name: name(kind, id), area: where.area }] : []
+    }).slice(0, most)
+  return { sold, drops: placed('Npc', numbers(db.get('Item', item, ITEM.npcDrops))), found: placed('Object', numbers(db.get('Item', item, ITEM.objectDrops))) }
 }

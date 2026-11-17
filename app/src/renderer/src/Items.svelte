@@ -7,6 +7,7 @@
   import { ago, type Known } from '../../shared/characters'
   import { coins, filterRows, gridsOf, itemMatches, itemRows, othersHolding, PLACES, QUALITY_COLORS, sortRows, wornOf, WORN_LEFT, WORN_RIGHT, WORN_WEAPONS, type Cell, type Column, type Grid, type ItemFacts, type ItemRow, type Place } from '../../shared/items'
   import type { Sheets } from '../../shared/sheet'
+  import { itemTip } from './item-tip.svelte'
   import { TILES } from './web'
 
   let { sheets, shown, known, now, onpick }: { sheets: Sheets; shown: Known | null; known: Known[]; now: number; onpick: (key: string) => void } = $props()
@@ -68,7 +69,7 @@
     {@const q = facts[c.item]?.[1] ?? 1}
     {@const name = facts[c.item]?.[0] ?? `Item ${c.item}`}
     {@const left = wear?.most ? (wear.now ?? 0) / wear.most : 1}
-    <span class="cell" class:off={!itemMatches(c.item, facts, typed)} style:--q={q > 1 ? (QUALITY_COLORS[q] ?? null) : null} title={wear?.most ? `${name} · durability ${wear.now} / ${wear.most}` : name}>
+    <span class="cell" use:itemTip={{ item: c.item, key: c.key, n: c.n, wear }} class:off={!itemMatches(c.item, facts, typed)} style:--q={q > 1 ? (QUALITY_COLORS[q] ?? null) : null}>
       <img src="{TILES}/items/{c.item}.png" alt={name} onerror={(e) => e.currentTarget.remove()} />
       {#if c.n > 1}<span class="n">{c.n}</span>{/if}
       {#if left < 0.5}<span class="wear" class:broken={left === 0} style:width="{Math.max(3, 36 * left)}px"></span>{/if}
@@ -80,7 +81,7 @@
 
 {#snippet wornSlot([slot, label]: [number, string])}
   {@const w = worn.get(slot)}
-  {@render cell(w ? { item: w.item, n: 1 } : null, label, w)}
+  {@render cell(w ? { item: w.item, n: 1, key: w.key } : null, label, w)}
 {/snippet}
 
 {#snippet grid(name: string, g: Grid)}
@@ -151,7 +152,7 @@
       {@render heads(COLUMNS)}
       <tbody>
         {#each rows as r (r.place + r.id)}
-          <tr><td>{@render item(r)}</td><td class="dim">{r.type}</td><td>{r.place}</td><td class="num">{r.n}</td><td class="num">{@render money_(r.value)}</td></tr>
+          <tr use:itemTip={{ item: r.id, n: r.n }}><td>{@render item(r)}</td><td class="dim">{r.type}</td><td>{r.place}</td><td class="num">{r.n}</td><td class="num">{@render money_(r.value)}</td></tr>
         {:else}
           <tr><td colspan="5" class="none">{typed ? `${shown.key} has nothing like "${typed}".` : 'Nothing here.'}</td></tr>
         {/each}

@@ -6,6 +6,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type { FeedbackSent, FeedbackWay } from '../shared/feedback'
 import type { Kept, KeptKey } from '../shared/kept'
 import type { Sheets } from '../shared/sheet'
+import type { ItemSources, Tips } from '../shared/tips'
 import type { LinkSnapshot } from '../shared/link'
 import type { Updating } from '../main/update'
 import type { QuestsStatus } from '../shared/quests'
@@ -37,6 +38,12 @@ contextBridge.exposeInMainWorld('twinmap', {
   },
   // Takes a character off the list.
   forgetSheet: (key: string): Promise<void> => ipcRenderer.invoke('forget-sheet', key),
+  // The game's tooltips of the items met: told at load and at every change.
+  onTips: (listener: (tips: Tips) => void) => {
+    ipcRenderer.on('tips', (_event, tips: Tips) => listener(tips))
+  },
+  // Who sells an item, who drops it, where it is found.
+  itemSources: (item: number): Promise<ItemSources> => ipcRenderer.invoke('item-sources', item),
   onQuests: (listener: (status: QuestsStatus) => void) => {
     ipcRenderer.on('quests', (_event, status: QuestsStatus) => listener(status))
   },

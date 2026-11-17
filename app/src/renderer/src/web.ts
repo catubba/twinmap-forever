@@ -54,6 +54,8 @@ if (!inApp) {
     keep: call('keep', undefined),
     onSheets: on('sheets'),
     forgetSheet: call('forget-sheet', undefined),
+    onTips: on('tips'),
+    itemSources: call('item-sources', { sold: [], drops: [], found: [] }),
     // What belongs to the computer stays on the computer.
     chooseGameFolder: () => Promise.resolve('Choose the game folder in Twinmap on the computer.'),
     openCurseForge: (addon?: string) => Promise.resolve(void window.open(pageOf(addon), '_blank', 'noopener')),

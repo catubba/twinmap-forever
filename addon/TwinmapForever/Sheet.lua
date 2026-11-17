@@ -10,9 +10,14 @@
 -- than what the app holds; nothing at all when it holds everything.
 --   who   { name, race, class, level }   race and class as the game's tokens ("Gnome", "WARLOCK")
 --   money copper
---   bags  { { b = container, n = slots, s = { { slot, item, count }, ... } }, ... } backpack, bags, reagent bag, keyring
+--   bags  { { b = container, n = slots, s = { { slot, item, count, key }, ... } }, ... } backpack, bags, reagent bag, keyring
 --   bank  the same for the bank and its bags, as they were when last open
---   gear  { { slot, item, durability, most }, ... } durability missing for what does not wear
+--   gear  { { slot, item, durability, most, key }, ... } durability missing for what does not wear (0 and 0 before a key)
+--         key: the item's link (below) when it is more than "item:ID", as one with a suffix ("of the Bear") or an enchant
+--   tips  { [key] = { { left, colour, right, colour }, ... } } the lines of the game's own tooltip of each item met, read
+--         once (C_TooltipInfo) and sent until the app holds them, then no more: the app keeps them all. Colour "rrggbb",
+--         "" for white; right and its colour only where the line has a right side. Lines the game adds itself, as the
+--         sell price, are not among them.
 --   skills  { { skill, rank, most }, ... } every skill line by the game's number: professions, weapons, languages
 --   spells  { spell, ... } the spells in the spellbook, those not learned yet left out
 --   talents { free = points not spent, t = { { node, rank, spell }, ... } } the talents taken
@@ -47,8 +52,44 @@ local function Key()
   return name and (surname and name .. " " .. surname or name)
 end
 
+-- An item's key: its link as "item:ID:enchant:...", with the level and the specialisation of whoever
+-- holds it left out, so that it stays the same as the character grows, and no empty fields at the end.
+local function KeyOf(link)
+  local s = Str(link) and link:match("|H(item:[^|]+)|h")
+  if not s then return nil end
+  local f = {}
+  for v in (s .. ":"):gmatch("([^:]*):") do f[#f + 1] = v end
+  f[10], f[11] = "", "" -- "item", id, enchant, four gems, suffix, unique, level, specialisation, ...
+  return (table.concat(f, ":"):gsub(":+$", ""))
+end
+
+local function Hex(c)
+  if type(c) ~= "table" or not Num(c.r) or not Num(c.g) or not Num(c.b) then return "" end
+  local hex = string.format("%02x%02x%02x", math.floor(c.r * 255 + 0.5), math.floor(c.g * 255 + 0.5), math.floor(c.b * 255 + 0.5))
+  return hex == "ffffff" and "" or hex
+end
+
+-- The tooltips read since the last send, by key: those of items not met before (Tips, below).
+local tipsHave, tipsNew = {}, {}
+
+local function Meet(key, read)
+  if not key or tipsHave[key] or tipsNew[key] or not C_TooltipInfo then return end
+  local data = Try(read)
+  if type(data) ~= "table" or type(data.lines) ~= "table" then tipsHave[key] = true return end
+  local lines = {}
+  for _, l in ipairs(data.lines) do
+    local left = type(l) == "table" and Str(l.leftText)
+    if left then
+      local line = { left, Hex(l.leftColor) }
+      local right = Str(l.rightText)
+      if right then line[3], line[4] = right, Hex(l.rightColor) end
+      lines[#lines + 1] = line
+    end
+  end
+  if #lines > 0 then tipsNew[key] = lines else tipsHave[key] = true end -- one with no lines is not asked again this session
+end
+
 -- What a container holds, slot by slot; nothing for a container that is not there.
--- ponytail: the item's number only, so "of the Bear" and "of the Eagle" are one; the link when Items needs it.
 local function Container(bag)
   local size = C_Container and Num(Try(C_Container.GetContainerNumSlots, bag)) or 0
   if size <= 0 then return nil end
@@ -56,7 +97,11 @@ local function Container(bag)
   for slot = 1, size do
     local info = Try(C_Container.GetContainerItemInfo, bag, slot)
     local item = type(info) == "table" and Num(info.itemID)
-    if item then held[#held + 1] = { slot, item, Num(info.stackCount) or 1 } end
+    if item then
+      local key = KeyOf(info.hyperlink)
+      Meet(key, function() return C_TooltipInfo.GetBagItem(bag, slot) end)
+      held[#held + 1] = { slot, item, Num(info.stackCount) or 1, key ~= "item:" .. item and key or nil }
+    end
   end
   return { b = bag, n = size, s = held }
 end
@@ -73,7 +118,13 @@ local function Worn()
     local item = Num(Try(GetInventoryItemID, "player", slot))
     if item then
       local now, most = Try(GetInventoryItemDurability, slot)
-      out[#out + 1] = { slot, item, Num(now), Num(most) }
+      local key = KeyOf(Try(GetInventoryItemLink, "player", slot))
+      Meet(key, function() return C_TooltipInfo.GetInventoryItem("player", slot) end)
+      if key and key ~= "item:" .. item then
+        out[#out + 1] = { slot, item, Num(now) or 0, Num(most) or 0, key }
+      else
+        out[#out + 1] = { slot, item, Num(now), Num(most) }
+      end
     end
   end
   return out
@@ -297,6 +348,26 @@ ns.receivers = ns.receivers or {} -- Inbox.lua, which calls them, is loaded afte
 local told = {}
 ns.receivers.sheet = function(value) told = type(value) == "table" and value or {} end
 
+-- The tooltips the app does not hold yet: each one is kept with the revision it came at, and goes
+-- out while the app's revision is older. Once it holds them the piece is empty, and stays so.
+local function Tips(s, since)
+  s.tips = type(s.tips) == "table" and s.tips or {}
+  for key, lines in pairs(tipsNew) do
+    if not s.tips[key] then s.tips[key] = { at = s.rev + 1, lines = lines } end
+  end
+  tipsNew = {}
+  local out = {}
+  for key, t in pairs(s.tips) do
+    tipsHave[key] = true
+    if type(t) == "table" and Num(t.at) and t.at > since then out[key] = t.lines end
+  end
+  local held = s.pieces.tips
+  if not held or ns.Json(held.data) ~= ns.Json(out) then
+    s.rev = s.rev + 1
+    s.pieces.tips = { rev = s.rev, data = out }
+  end
+end
+
 local function Build()
   local key = ns.ready and Key()
   if not key then return end
@@ -313,6 +384,7 @@ local function Build()
       since = word.rev
     end
   end
+  Tips(s, since)
   if s.rev <= since then return end
   local p = {}
   for name, piece in pairs(s.pieces) do

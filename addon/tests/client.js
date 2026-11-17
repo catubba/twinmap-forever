@@ -66,9 +66,25 @@ const STUB = `
     GetContainerItemInfo = function(bag, slot)
       local c = GAME.bags and GAME.bags[bag]
       local it = c and c.items[slot]
-      if it then return { itemID = it[1], stackCount = it[2] } end
+      if it then return { itemID = it[1], stackCount = it[2], hyperlink = it[3] or ("|cffffffff|Hitem:" .. it[1] .. "::::::::" .. (GAME.level or 1) .. ":::::|h[x]|h|r") } end
     end,
   }
+  -- The game's tooltip of an item: GAME.tips[item] = { { left, "rrggbb", right, "rrggbb" }, ... }; GAME.tipReads counts the reads.
+  local function tipOf(item)
+    local lines = {}
+    for _, l in ipairs(GAME.tips and GAME.tips[item] or {}) do
+      local function colour(hex) if hex and #hex == 6 then return { r = tonumber(hex:sub(1, 2), 16) / 255, g = tonumber(hex:sub(3, 4), 16) / 255, b = tonumber(hex:sub(5, 6), 16) / 255 } end end
+      lines[#lines + 1] = { leftText = l[1], leftColor = colour(l[2]) or { r = 1, g = 1, b = 1 }, rightText = l[3], rightColor = colour(l[4]) }
+    end
+    lines[#lines + 1] = { type = 11 } -- a line with no text, as the sell price is
+    GAME.tipReads = (GAME.tipReads or 0) + 1
+    return { lines = lines }
+  end
+  C_TooltipInfo = {
+    GetBagItem = function(bag, slot) local c = GAME.bags and GAME.bags[bag] local it = c and c.items[slot] return it and tipOf(it[1]) end,
+    GetInventoryItem = function(_, slot) local w = GAME.worn and GAME.worn[slot] return w and tipOf(w[1]) end,
+  }
+  function GetInventoryItemLink(_, slot) local w = GAME.worn and GAME.worn[slot] return w and (w[4] or ("|cffffffff|Hitem:" .. w[1] .. "::::::::" .. (GAME.level or 1) .. ":::::|h[x]|h|r")) end
   -- Skills, spells, talents and recipes, as Forever has them. GAME.skills = { { skill, rank, most, header } },
   -- GAME.spells = { { spell, notYet } }, GAME.talents = { [node] = { rank, spell } } with GAME.free points,
   -- GAME.trade = { profession = n, recipes = { [spell] = learned }, linked = true }: the window of a profession.

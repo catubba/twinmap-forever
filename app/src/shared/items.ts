@@ -172,6 +172,8 @@ export const WORN_WEAPONS: [number, string][] = [[16, 'Main'], [17, 'Off'], [18,
 
 export interface Worn {
   item: number
+  /** The key of an item with a suffix or an enchant (Sheet.lua). */
+  key?: string
   /** Durability now and at most; undefined for what does not wear. */
   now?: number
   most?: number
@@ -182,13 +184,13 @@ export function wornOf(sheet: Sheet): Map<number, Worn> {
   const out = new Map<number, Worn>()
   for (const g of Array.isArray(sheet.pieces.gear) ? sheet.pieces.gear : []) {
     if (!Array.isArray(g) || !Number.isInteger(g[0]) || !Number.isInteger(g[1]) || g[1] <= 0) continue
-    out.set(g[0], { item: g[1], ...(typeof g[2] === 'number' && typeof g[3] === 'number' && g[3] > 0 && { now: g[2], most: g[3] }) })
+    out.set(g[0], { item: g[1], ...(typeof g[2] === 'number' && typeof g[3] === 'number' && g[3] > 0 && { now: g[2], most: g[3] }), ...(typeof g[4] === 'string' && { key: g[4] }) })
   }
   return out
 }
 
 /** One cell of a grid: an item and how many, or a free slot. */
-export type Cell = { item: number; n: number } | null
+export type Cell = { item: number; n: number; key?: string } | null
 
 export interface Grid {
   cells: Cell[]
@@ -203,8 +205,8 @@ function gridOf(piece: unknown, take: (bag: number) => boolean): Grid {
   const containers = (Array.isArray(piece) ? (piece as Held[]) : []).filter((c) => take(Number(c?.b))).sort((a, b) => Number(a.b) - Number(b.b))
   for (const c of containers) {
     slots += Math.max(0, Number((c as { n?: unknown }).n) || 0)
-    const held = (Array.isArray(c.s) ? (c.s as unknown[]) : []).filter((s): s is number[] => Array.isArray(s) && Number.isInteger(s[1]) && (s[1] as number) > 0)
-    for (const s of held.sort((a, b) => a[0]! - b[0]!)) cells.push({ item: s[1]!, n: Number(s[2]) || 1 })
+    const held = (Array.isArray(c.s) ? (c.s as unknown[]) : []).filter((s): s is [number, number, number, unknown] => Array.isArray(s) && Number.isInteger(s[1]) && (s[1] as number) > 0)
+    for (const s of held.sort((a, b) => a[0] - b[0])) cells.push({ item: s[1], n: Number(s[2]) || 1, ...(typeof s[3] === 'string' && { key: s[3] }) })
   }
   const used = cells.length
   for (let i = used; i < slots; i++) cells.push(null)

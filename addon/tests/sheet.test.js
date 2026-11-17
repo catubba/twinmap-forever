@@ -20,7 +20,17 @@ function enterWorld(before = WORLD) {
   addon.fire('PLAYER_ENTERING_WORLD');
   return addon;
 }
-const sheets = (addon) => addon.strips().map(decodeStrip).filter((b) => b.section === 'sheet').map((b) => JSON.parse(b.text));
+// Each send of the sheet, its parts put back together: a big one goes out in several blocks.
+const sheets = (addon) => {
+  const out = [], parts = new Map()
+  for (const b of addon.strips().map(decodeStrip).filter((b) => b.section === 'sheet')) {
+    const send = parts.get(b.version) ?? []
+    send[b.part - 1] = b.text
+    parts.set(b.version, send)
+    if (send.filter((t) => t !== undefined).length === b.total) out.push(JSON.parse(send.join(''))), parts.delete(b.version)
+  }
+  return out
+}
 // The app says it holds this character's sheet up to rev, under code.
 const appHolds = (addon, code, rev) => addon.lua(`local ns = ...; ns.receivers.sheet({ ["${KEY}"] = { code = "${code}", rev = ${rev} } })`);
 
@@ -39,6 +49,7 @@ test('the whole sheet goes out at first, with who, money, bags with the reagent 
     spells: [],
     recipes: { known: [], seen: [] },
     trainers: [],
+    tips: [],
   });
   assert.equal(sent.p.bank, undefined, 'the bank went out before it was ever open');
 });
@@ -125,14 +136,14 @@ test('an app that holds another sheet gets this one whole; an app ahead of it ge
   appHolds(addon, 'deadbeef', 50);
   addon.lua('GAME.money = 1');
   addon.run(4);
-  assert.deepEqual(Object.keys(sheets(addon).at(-1).p).sort(), ['bags', 'gear', 'money', 'recipes', 'skills', 'spells', 'trainers', 'who']);
+  assert.deepEqual(Object.keys(sheets(addon).at(-1).p).sort(), ['bags', 'gear', 'money', 'recipes', 'skills', 'spells', 'tips', 'trainers', 'who']);
 
   appHolds(addon, first.code, 50);
   addon.run(4);
   const again = sheets(addon).at(-1);
   assert.equal(again.code, first.code);
   assert.ok(again.rev > 50, `revision ${again.rev}`);
-  assert.deepEqual(Object.keys(again.p).sort(), ['bags', 'gear', 'money', 'recipes', 'skills', 'spells', 'trainers', 'who']);
+  assert.deepEqual(Object.keys(again.p).sort(), ['bags', 'gear', 'money', 'recipes', 'skills', 'spells', 'tips', 'trainers', 'who']);
 });
 
 test('in a fight the sheet waits', () => {
@@ -284,4 +295,56 @@ test('a window still empty when it opens is read once it is not', () => {
   addon.lua('GAME.trainer.lines = { { "Expert Engineer", "available", 4038, 4500, 20, 125, "available" } }');
   addon.run(4);
   assert.deepEqual(sheets(addon).at(-1).p.trainers, [{ n: 5174, s: [[4038, 4500, 20, 125]] }]);
+});
+
+// Tooltips: a staff of the Eagle worn, potions in the backpack, the game's lines of each.
+const TIPS = `GAME.tips = {
+    [159] = { { "Refreshing Spring Water" }, { "Use: Restores 151 mana over 18 sec.", "00ff00" } },
+    [4245] = { { "Small Silk Pack", "1eff00" }, { "Bag", "", "8 Slot" } },
+    [6948] = { { "Hearthstone" }, { "Soulbound" } },
+    [1155] = { { "Rod of the Sleepwalker of the Eagle", "1eff00" }, { "Two-Hand", "", "Staff" }, { "Durability 90 / 100" } },
+  }
+  GAME.worn[16] = { 1155, 90, 100, "|cff1eff00|Hitem:1155::::::853:1234567:24:::::|h[Rod of the Sleepwalker of the Eagle]|h|r" }`;
+
+test("the game's tooltip of each item goes out once, with its colours; an item with a suffix carries its key", () => {
+  const addon = enterWorld(WORLD + String.fromCharCode(10) + TIPS);
+  addon.run(10);
+  const [sent] = sheets(addon);
+  const key = 'item:1155::::::853:1234567';
+  assert.deepEqual(sent.p.tips, {
+    'item:159': [['Refreshing Spring Water', ''], ['Use: Restores 151 mana over 18 sec.', '00ff00']],
+    'item:4245': [['Small Silk Pack', '1eff00'], ['Bag', '', '8 Slot', '']],
+    'item:6948': [['Hearthstone', ''], ['Soulbound', '']],
+    [key]: [['Rod of the Sleepwalker of the Eagle', '1eff00'], ['Two-Hand', '', 'Staff', ''], ['Durability 90 / 100', '']],
+  });
+  assert.deepEqual(sent.p.gear, [[1, 4245, 30, 35], [5, 6097], [16, 1155, 90, 100, key]]);
+  assert.deepEqual(sent.p.bags[0].s, [[1, 6948, 1], [3, 159, 5]], 'a plain item carries no key');
+});
+
+test('once the app holds the tooltips they go no more, and are not read again; a new item sends its own alone', () => {
+  const addon = enterWorld(WORLD + String.fromCharCode(10) + TIPS);
+  addon.run(10);
+  const first = sheets(addon).at(-1);
+  appHolds(addon, first.code, first.rev);
+  addon.run(4);
+  const emptied = sheets(addon).at(-1);
+  assert.deepEqual(emptied.p, { tips: [] }, 'the piece is emptied once, and that is all');
+  appHolds(addon, emptied.code, emptied.rev);
+  const reads = Number(addon.lua('return GAME.tipReads'));
+  addon.lua('GAME.level = 25; GAME.tips[2449] = { { "Earthroot" } }; GAME.bags[0].items[5] = { 2449, 2 }');
+  addon.run(40);
+  assert.equal(Number(addon.lua('return GAME.tipReads')), reads + 1, 'a level up read the tooltips again, or the new item was not read');
+  const news = sheets(addon).filter((b) => b.p.tips && Object.keys(b.p.tips).length).at(-1);
+  assert.deepEqual(Object.keys(news.p.tips), ['item:2449']);
+});
+
+test('an app that holds another sheet gets every tooltip again', () => {
+  const addon = enterWorld(WORLD + String.fromCharCode(10) + TIPS);
+  addon.run(10);
+  const first = sheets(addon).at(-1);
+  appHolds(addon, first.code, first.rev);
+  addon.run(4);
+  appHolds(addon, 'deadbeef', 99);
+  addon.run(4);
+  assert.equal(Object.keys(sheets(addon).at(-1).p.tips).length, 4);
 });

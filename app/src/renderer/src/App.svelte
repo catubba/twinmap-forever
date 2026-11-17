@@ -26,6 +26,7 @@
   import Settings from './Settings.svelte'
   import Picker from './Picker.svelte'
   import Items from './Items.svelte'
+  import ItemPopup from './ItemPopup.svelte'
   import NpcPanel from './NpcPanel.svelte'
   import { firstName, knownOf, shownOf } from '../../shared/characters'
   import type { Sheets } from '../../shared/sheet'
@@ -312,6 +313,9 @@
   </aside>
 </div>
 {/if}
+
+<!-- The popup of the item under the pointer, over everything (M10-F15). -->
+<ItemPopup {sheets} known={characters} side={char?.side} {pos} />
 
 <style>
   /* Over everything, the top row too; it drags the window as the top row does. */

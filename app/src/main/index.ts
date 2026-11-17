@@ -8,6 +8,7 @@ import { heldOf, mergeSheet, sheetNewsFrom, sheetsFrom, type Sheets } from '../s
 import { linkStatus, lostPercent } from '../shared/link'
 import { logFrom, shownFrom, type QuestsStatus } from '../shared/quests'
 import type { Found } from '../shared/search'
+import { tipsFrom, type ItemSources, type Tips } from '../shared/tips'
 import { groupFrom } from '../shared/group'
 import { arrived, inboxFrom, marksNews, pinFrom, routeNewsFrom, stepFrom, takenFrom } from '../shared/send'
 import { feedbackLink, sendFeedback } from '../shared/feedback'
@@ -19,7 +20,7 @@ import { gameFolderFrom, registryInstallPath } from './client-files'
 import { homeAddress, LAN_PORT, startLan, type Lan, type Served } from './lan'
 import { startLink } from './link'
 import { startLog } from './log'
-import type { Answer, Asked } from './questie-worker'
+import type { Answer, Asked, Sources } from './questie-worker'
 import startQuestieWorker from './questie-worker?nodeWorker'
 import { addonHearsFonts, addonsFolder, readSettings, setupStatus, writeSettings } from './setup'
 import { hear, installChannel, send as sendSignal, sendOld, sentParts } from './signal'
@@ -80,14 +81,16 @@ function startTiles(gameFolder: string | null): { status: () => TilesStatus; ite
 
 // The quests on the map: the player's QuestieDB is opened once, and asked for the pins of what
 // Questie shows each time the addon tells something new. tell: called with every answer.
-function startQuests(gameFolder: string | null, tell: (status: QuestsStatus) => void): { show: (section: unknown, log?: unknown) => void; search: (typed: string) => Promise<Found[]>; stop: () => void } {
-  if (!gameFolder) return { show: () => {}, search: () => Promise.resolve([]), stop: () => {} }
+function startQuests(gameFolder: string | null, tell: (status: QuestsStatus) => void): { show: (section: unknown, log?: unknown) => void; search: (typed: string) => Promise<Found[]>; sources: (item: number) => Promise<ItemSources>; stop: () => void } {
+  const NONE: ItemSources = { sold: [], drops: [], found: [] }
+  if (!gameFolder) return { show: () => {}, search: () => Promise.resolve([]), sources: () => Promise.resolve(NONE), stop: () => {} }
   const worker = startQuestieWorker({ workerData: { gameFolder } })
   // A search waits for the answer that carries its number.
-  const asked = new Map<number, (found: Found[]) => void>()
+  const asked = new Map<number, (found: Found[]) => void>(), askedSources = new Map<number, (sources: ItemSources) => void>()
   let searches = 0
   const post = (message: Asked): void => worker.postMessage(message)
-  worker.on('message', (told: QuestsStatus | Answer) => {
+  worker.on('message', (told: QuestsStatus | Answer | Sources) => {
+    if ('sources' in told) return void (askedSources.get(told.id)?.(told.sources), askedSources.delete(told.id))
     if (!('found' in told)) return tell(told)
     asked.get(told.id)?.(told.found)
     asked.delete(told.id)
@@ -95,7 +98,9 @@ function startQuests(gameFolder: string | null, tell: (status: QuestsStatus) => 
   worker.on('error', () => {
     tell({ questie: null, pins: [], fixed: [] }) // no quests on the map; the rest of the app goes on
     for (const answer of asked.values()) answer([])
+    for (const answer of askedSources.values()) answer(NONE)
     asked.clear()
+    askedSources.clear()
   })
   let last = ''
   return {
@@ -111,6 +116,11 @@ function startQuests(gameFolder: string | null, tell: (status: QuestsStatus) => 
       new Promise((answer) => {
         asked.set(++searches, answer)
         post({ search: typed, id: searches })
+      }),
+    sources: (item) =>
+      new Promise((answer) => {
+        askedSources.set(++searches, answer)
+        post({ sources: item, id: searches })
       }),
     stop: () => void worker.terminate(),
   }
@@ -301,6 +311,8 @@ function createWindow(): void {
   })
   // The search of the top row: what was typed, cut to a sane length.
   asks('search', (typed: unknown): Promise<Found[]> => (typeof typed === 'string' ? quests.search(typed.slice(0, 80)) : Promise.resolve([])))
+  // Who sells an item, who drops it, where it is found: for its popup.
+  asks('item-sources', (item: unknown): Promise<ItemSources> => (Number.isInteger(item) && (item as number) > 0 ? quests.sources(item as number) : Promise.resolve({ sold: [], drops: [], found: [] })))
   // The way on foot between two points of a continent, for the line of the journey.
   asks('walk', (asked: unknown): Promise<WalkPath> => {
     const ask = walkAskFrom(asked)
@@ -393,6 +405,31 @@ function createWindow(): void {
     }
     tellSheets()
   }
+  // The tooltips of the items (M10-F15): sent once each with the sheet, kept here for good, every character's together.
+  const tipsFile = join(app.getPath('userData'), 'tips.json')
+  let tips: Tips = {}
+  try {
+    tips = tipsFrom(JSON.parse(readFileSync(tipsFile, 'utf8')))
+  } catch {
+    // none yet
+  }
+  const tellTips = (): void => {
+    if (!win.isDestroyed()) win.webContents.send('tips', tips)
+    lan?.tell('tips', tips)
+  }
+  win.webContents.on('did-finish-load', tellTips)
+  const takeTips = (sent: unknown): void => {
+    const news = tipsFrom(sent)
+    if (!Object.keys(news).some((key) => JSON.stringify(tips[key]) !== JSON.stringify(news[key]))) return
+    tips = { ...tips, ...news }
+    try {
+      writeFileSync(`${tipsFile}.new`, JSON.stringify(tips))
+      renameSync(`${tipsFile}.new`, tipsFile)
+    } catch {
+      // kept for this run only
+    }
+    tellTips()
+  }
   const tellHeld = (): void => {
     if (!gameFolder) return
     try {
@@ -407,12 +444,16 @@ function createWindow(): void {
     const text = JSON.stringify(section ?? null)
     if (text === sheetHeard) return
     sheetHeard = text
-    const news = sheetNewsFrom(section)
-    if (!news) return
+    const sent = sheetNewsFrom(section)
+    if (!sent) return
+    // The tooltips go to their own file: the sheet keeps none of them.
+    const { tips: sentTips, ...pieces } = sent.p
+    if (sentTips !== undefined) takeTips(sentTips)
+    const news = { ...sent, p: pieces }
     const now = mergeSheet(sheets, news, Date.now())
     if (now !== sheets) {
       sheets = now
-      record.note('sheet', `revision ${news.rev}: ${Object.keys(news.p).sort().join(', ')}`) // which pieces came, never what is in them
+      record.note('sheet', `revision ${news.rev}: ${Object.keys(sent.p).sort().join(', ')}`) // which pieces came, never what is in them
       writeSheets()
     }
     tellHeld()
