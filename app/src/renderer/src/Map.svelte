@@ -325,7 +325,8 @@
     }
     const pieces = world.pieces.filter((p) => buildings.has(p.building)), box = boxOf(pieces)
     // Not from far away: there a city is a few pixels, and its hundred pictures would be read for nothing.
-    if (box) cities = new RoomsLayer({ pieces, bounds: boundsOfBox(box), minZoom: 3, keepBuffer: 2, zIndex: 4 }).addTo(map)
+    // 2.5 and not 3: at the half level under a whole minZoom Leaflet draws these tiles while the map moves and takes them away when it stops.
+    if (box) cities = new RoomsLayer({ pieces, bounds: boundsOfBox(box), minZoom: 2.5, keepBuffer: 2, zIndex: 4 }).addTo(map)
   }
 
   // The caves and the mines of the continent on show, seen from outside: the rooms of the buildings
@@ -343,7 +344,16 @@
     const under = new Set(world && buried?.[continent])
     if (!map || !world || !under.size) return
     const pieces = world.pieces.filter((p) => under.has(p.building)), box = boxOf(pieces)
-    if (box) caves = new RoomsLayer({ pieces, bounds: boundsOfBox(box), minZoom: CAVES_ZOOM, keepBuffer: 2, zIndex: 4, opacity: CAVES_OPACITY, className: 'caves' }).addTo(map)
+    if (box) caves = new RoomsLayer({ pieces, bounds: boundsOfBox(box), keepBuffer: 2, zIndex: 4, opacity: CAVES_OPACITY, className: 'caves' })
+    fitCaves()
+  }
+  // On the map from CAVES_ZOOM up, and off it below, by hand. A layer's own minZoom is not used: half
+  // a level under it Leaflet draws the tiles of the level above while the map moves and takes them
+  // away when it stops, so the caves flickered while the map was dragged.
+  function fitCaves(): void {
+    if (!map || !caves) return
+    if (map.getZoom() < CAVES_ZOOM) caves.remove()
+    else if (!map.hasLayer(caves)) caves.addTo(map)
   }
   $effect(() => {
     void layers.caves
@@ -774,6 +784,7 @@
     made.on('zoomstart', () => (zooming = true))
     made.on('zoomend', () => (zooming = false))
     made.on('zoomend', () => (zoom = made.getZoom()))
+    made.on('zoomend', fitCaves)
     // A window made wider or narrower: the map that follows puts the character back in its middle.
     made.on('resize', () => {
       if (following) place(true)
