@@ -11,6 +11,10 @@ import type { Terrain } from './terrain3d'
 
 type Spot = { x: number; y: number; shows: number; away: number }
 type Painted = L.CircleMarkerOptions & { lozenge?: boolean; picture?: HTMLImageElement }
+/** A line that is a flight: on the 3D view an arc through the air from end to end, not a line along the ground. */
+export const ARC = { arc: true } as L.PolylineOptions
+/** A flight route of the net, not of the journey: an arc too, and gone in the distance as the pins are, a little farther. */
+export const ROUTE = { arc: true, thins: true } as L.PolylineOptions
 
 // A picture made smaller once, to the pixels it is drawn at: a thousand of them made smaller at
 // every frame, as the 3D view draws, took most of its time.
@@ -56,12 +60,21 @@ const POINTS_A_VIEW = 300
 /** Away from the camera, yards between two points of a line: its distance over this. */
 const FARTHER = 100
 /**
+ * An arc: a parabola as high over the straight line between its ends as this much of its length,
+ * and at most so many yards; points along it at least. Chosen by the user on 18 November 2026
+ * among seven (design/terrain3d/arcs-trial.js).
+ */
+const ARC_RISE = 0.25,
+  ARC_MOST = 1000,
+  ARC_POINTS = 24
+/**
  * The pins of a place fade out from this many times as far from the camera as the point looked at,
  * and are gone at twice that: from far away the 2D map does not show them either. Not the arrow,
- * the route, rings and lines.
+ * the route, rings and lines. The flight routes of the net do, from farther: CROWD_ROUTES.
  */
-const CROWD = 1.5
-const thinned = (s: Spot): number => s.shows * Math.max(0, Math.min(1, 2 - s.away / CROWD))
+const CROWD = 1.5,
+  CROWD_ROUTES = 2
+const thinned = (s: Spot, crowd = CROWD): number => s.shows * Math.max(0, Math.min(1, 2 - s.away / crowd))
 
 export class Pins3d {
   private canvas = document.createElement('canvas')
@@ -229,10 +242,12 @@ export class Pins3d {
       if (run.length < 2) continue
       // A line is drawn twice, a black edge under its colour: its points are found once.
       const key = `${run.length} ${run[0]!.lat} ${run[0]!.lng} ${run.at(-1)!.lat} ${run.at(-1)!.lng}`,
-        points = this.lines.get(key) ?? this.along(run, step)
+        points = this.lines.get(key) ?? this.along(run, step, (o as { arc?: boolean }).arc === true)
       this.lines.set(key, points)
       // Stretches as faded as each other in one stroke, the dashes going on from one to the next.
-      const faded = (i: number): number => Math.round(Math.min(points[i - 1]!.shows, points[i]!.shows) * 20) / 20 || 0
+      const thins = (o as { thins?: boolean }).thins === true,
+        shown = (s: Spot): number => (thins ? thinned(s, CROWD_ROUTES) : s.shows)
+      const faded = (i: number): number => Math.round(Math.min(shown(points[i - 1]!), shown(points[i]!)) * 20) / 20 || 0
       let along = 0
       for (let i = 1; i < points.length; ) {
         const shows = faded(i)
@@ -252,21 +267,34 @@ export class Pins3d {
 
   // The points of a line on the ground: step yards apart near the camera, farther apart away from
   // it (about as far apart on screen), and as few as can be past the fog.
-  private along(run: L.LatLng[], step: number): Spot[] {
+  private along(run: L.LatLng[], step: number, arc = false): Spot[] {
     const c = this.terrain.camera.position,
       reach = this.terrain.reach,
       points = [this.onGround(run[0]!)]
+    const height = (x: number, z: number): number => {
+      const g = this.terrain.groundAt(x, z)
+      return Number.isFinite(g) ? g : 0
+    }
     for (let i = 1; i < run.length; i++) {
       const ax = run[i - 1]!.lng * YARDS_PER_UNIT,
         az = -run[i - 1]!.lat * YARDS_PER_UNIT,
         dx = run[i]!.lng * YARDS_PER_UNIT - ax,
         dz = -run[i]!.lat * YARDS_PER_UNIT - az,
         length = Math.hypot(dx, dz)
+      // An arc: from the ground at one end to the ground at the other, over the straight line between
+      // them by its rise, and never under the ground it crosses (a mountain on the way).
+      const from = arc ? height(ax, az) : 0,
+        to = arc ? height(ax + dx, az + dz) : 0,
+        top = Math.min(ARC_MOST, ARC_RISE * length)
       for (let d = 0; ; ) {
         const far = Math.hypot(ax + (dx * d) / length - c.x, az + (dz * d) / length - c.z)
-        d += Math.max(step, far / FARTHER, far - reach)
+        d += Math.min(arc ? length / ARC_POINTS : Infinity, Math.max(step, far / FARTHER, far - reach))
         if (!(d < length)) break // a number gone wrong too: never a loop without end
-        points.push(this.terrain.spot(ax + (dx * d) / length, az + (dz * d) / length))
+        const x = ax + (dx * d) / length,
+          z = az + (dz * d) / length,
+          t = d / length,
+          bow = 4 * t * (1 - t)
+        points.push(this.terrain.spot(x, z, arc ? Math.max(from + (to - from) * t + top * bow - height(x, z), top * bow * 0.1) : 0))
       }
       points.push(this.onGround(run[i]!))
     }

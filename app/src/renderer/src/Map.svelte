@@ -6,7 +6,7 @@
   import type { Terrain } from './terrain3d'
   import { Arrow3d } from './arrow3d'
   import { Names3d } from './names3d'
-  import { paintFixed, Pins3d } from './pins3d'
+  import { ARC, paintFixed, Pins3d, ROUTE } from './pins3d'
   import L from 'leaflet'
   import 'leaflet/dist/leaflet.css'
   import { onMount, untrack } from 'svelte'
@@ -1153,7 +1153,7 @@
     for (const [a, b] of travel.routes) {
       const from = travel.nodes[a], to = travel.nodes[b]
       if (!from || !to || from.continent !== continent || !serves(from, side) || !serves(to, side)) continue
-      L.polyline([at(from), at(to)], { color: '#7fc8ff', weight: 1.5, opacity: 0.6, interactive: false }).addTo(travelLayers.routes)
+      L.polyline([at(from), at(to)], { color: '#7fc8ff', weight: 1.5, opacity: 0.6, interactive: false, ...ROUTE }).addTo(travelLayers.routes)
     }
   })
   $effect(() => {
@@ -1293,8 +1293,8 @@
   $effect(() => {
     journeyLayer.clearLayers()
     const goal = journeyGoal
-    const dashes = (line: L.LatLng[], colour: string, opacity = 1): void => {
-      for (const [color, weight] of [['#000', 7.5], [colour, 4.5]] as const) L.polyline(line, { color, weight, opacity, dashArray: '9 13', lineCap: 'round', lineJoin: 'round', interactive: false }).addTo(journeyLayer)
+    const dashes = (line: L.LatLng[], colour: string, opacity = 1, air = false): void => {
+      for (const [color, weight] of [['#000', 7.5], [colour, 4.5]] as const) L.polyline(line, { color, weight, opacity, dashArray: '9 13', lineCap: 'round', lineJoin: 'round', interactive: false, ...(air && ARC) }).addTo(journeyLayer)
     }
     // The legs after the one under way, and the one under way when it is no walk: fainter than the walk the character is on.
     ahead?.forEach((leg, i) => {
@@ -1311,7 +1311,7 @@
       for (const p of [...leg.points, null]) {
         if (p && p.continent === continent) run.push(at(p.at))
         else {
-          if (run.length > 1) dashes(run, colour, 0.85)
+          if (run.length > 1) dashes(run, colour, 0.85, leg.mode === 'flight' || leg.mode === 'zeppelin') // through the air: an arc on the 3D view
           run = []
         }
       }
