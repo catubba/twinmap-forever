@@ -1541,7 +1541,7 @@
     {#if inside}
       <span class="tag">{inside.name}</span>
     {/if}
-    {#each [0, 1] as const as which (which)}
+    {#each [1, 0] as const as which (which)}
       <button class="btn" aria-pressed={!inside && continent === which} onclick={() => choose(which)}>{NAMES[which]}</button>
     {/each}
     <button class="btn" aria-expanded={layersOpen} aria-controls="layers" title="Layers (L)" onclick={() => (layersOpen = !layersOpen)}>Layers</button>

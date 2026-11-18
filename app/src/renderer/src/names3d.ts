@@ -59,7 +59,7 @@ export class Names3d {
       boxes: NameBox[] = []
     const as = new Map<number, { put: string; faded: string }>()
     this.names.forEach((n, id) => {
-      const s = this.terrain.spot(n.x, n.z, LIFT[n.tier]),
+      const s = this.terrain.spot(n.x, n.z, LIFT[n.tier], true),
         far = s.away * looked
       if (!s.shows || (n.tier === 'region' ? far < REGIONS_FROM : far > WITHIN[n.tier])) return
       // Measured once, the first time it could show: not drawn yet, the next time.

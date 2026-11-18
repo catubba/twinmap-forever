@@ -156,15 +156,27 @@ function* over(p: Piece, step: number): Generator<[number, number]> {
 }
 
 /**
- * How high the floor of a room is. A piece comes with the bottom of its box, which is the bottom of
- * the pit where it has one (the chasm of Ironforge: up to 136 yards under where one walks). The
- * walking grid knows where one stands: the height most stood at inside the piece. Its bottom where
- * the grid has nothing there. heightsAt: every height one stands at on a place.
+ * The floors of the rooms of one building. A piece comes with the bottom of its box, which is the
+ * bottom of the pit where it has one (the chasm of Ironforge: up to 136 yards under where one
+ * walks). The walking grid knows where one stands: the floor is the height most stood at. The
+ * pieces with one same box are the pictures of one hall, cut in squares: one floor for them all,
+ * or a wall would run through the hall where two of them come out apart. A hall the grid tells
+ * nothing of is as far over the bottom of its box as the halls of its building are, the middle one
+ * of them; at its bottom in a building the grid knows nothing of (a dungeon behind its door).
+ * heightsAt: every height one stands at on a place.
  */
-export function floorOf(p: Piece, heightsAt: (u: number, v: number) => number[]): number {
-  const stood: number[] = []
-  for (const [u, v] of over(p, 4)) for (const z of heightsAt(u, v)) if (z > p.bottom - 3 && z < p.top + 3) stood.push(z)
-  return stood.length ? stood.sort((a, b) => a - b)[stood.length >> 1]! : p.bottom
+export function floorsOf(rooms: Piece[], heightsAt: (u: number, v: number) => number[]): number[] {
+  const halls = new Map<string, number[]>() // by box: the heights stood at in its pieces
+  const hallOf = (p: Piece): string => `${p.bottom} ${p.top}`
+  for (const p of rooms) {
+    const stood = halls.get(hallOf(p)) ?? halls.set(hallOf(p), []).get(hallOf(p))!
+    for (const [u, v] of over(p, 4)) for (const z of heightsAt(u, v)) if (z > p.bottom - 3 && z < p.top + 3) stood.push(z)
+  }
+  const middle = (list: number[]): number => list.sort((a, b) => a - b)[list.length >> 1]!
+  const told = rooms.map((p) => (halls.get(hallOf(p))!.length ? middle(halls.get(hallOf(p))!) : null)),
+    lifts = told.flatMap((f, i) => (f === null ? [] : [f - rooms[i]!.bottom])),
+    lift = lifts.length ? middle(lifts) : 0
+  return told.map((f, i) => f ?? rooms[i]!.bottom + lift)
 }
 
 /**

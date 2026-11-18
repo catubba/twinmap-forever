@@ -331,13 +331,14 @@ export class Terrain {
    * Where a point of the ground is on the view, in pixels from its top left corner; how much of it
    * shows: 1 in plain sight, less in the fog, HIDDEN behind a hill, 0 behind the camera or past the
    * fog; and how far it is from the camera, in distances of the point looked at. lift: yards over
-   * the ground, for what is written above its point (names3d.ts).
+   * the ground, for what is written above its point (names3d.ts); above: over the ground also where a
+   * room under it is open, as the name of a city in a mountain is.
    */
-  spot(x: number, z: number, lift = 0): { x: number; y: number; shows: number; away: number } {
+  spot(x: number, z: number, lift = 0, above = false): { x: number; y: number; shows: number; away: number } {
     const fog = this.scene.fog as THREE.Fog,
       out = Math.hypot(x - this.camera.position.x, z - this.camera.position.z) >= fog.far, // past the fog: the ground is not looked for
-      ground = out ? NaN : this.standAt(x, z),
-      inRoom = !out && (this.inside?.floorAt(x, z)?.open ?? 0) > 0.5,
+      ground = out ? NaN : above ? this.groundAt(x, z) : this.standAt(x, z),
+      inRoom = !out && !above && (this.inside?.floorAt(x, z)?.open ?? 0) > 0.5,
       p = new THREE.Vector3(x, (Number.isFinite(ground) ? ground : 0) + lift, z),
       far = out ? Infinity : p.distanceTo(this.camera.position)
     const on = p.clone().project(this.camera),

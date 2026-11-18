@@ -6,7 +6,7 @@ import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { inflateSync } from 'node:zlib'
 import { SIDE, STEP, unpackHeights } from '../shared/heights'
-import { buriedBuildings, floorOf, roofOf, type Interiors, type UnderRoom } from '../shared/inside'
+import { buriedBuildings, floorsOf, roofOf, type Interiors, type UnderRoom } from '../shared/inside'
 import { BLOCK_YARDS, WORLDS } from '../shared/world'
 import { heightsFile } from './heights'
 
@@ -58,7 +58,7 @@ export function makeCaves(base: string, inside: Interiors): Record<string, numbe
 }
 
 export const UNDER_FILE = 'under.json'
-const UNDER_VERSION = 1
+const UNDER_VERSION = 3
 
 /**
  * For the 3D view, which shows the rooms under the ground inside it (design/ui.md, section 4): the
@@ -80,11 +80,19 @@ export function makeUnder(base: string, inside: Interiors, caves: Record<string,
     const map = inside.maps.find((m) => m.kind === 'world' && m.id === world.continent), buried = new Set(caves[world.continent])
     if (!map) continue
     const groundAt = groundOf(join(base, world.name))
-    worlds[world.continent] = map.pieces.flatMap((p, index): UnderRoom[] => {
-      if (!buried.has(p.building)) return []
-      const floor = floorOf(p, (u, v) => heightsAt(world.continent, u, v)), under = roofOf(p, floor, groundAt)
-      return under === null ? [] : [[index, Math.round(floor * 10) / 10, Math.round(under)]]
+    const by = new Map<number, number[]>() // by building: where its rooms are in the list
+    map.pieces.forEach((p, index) => {
+      if (buried.has(p.building)) (by.get(p.building) ?? by.set(p.building, []).get(p.building)!).push(index)
     })
+    worlds[world.continent] = [...by.values()]
+      .flatMap((rooms) => {
+        const floors = floorsOf(rooms.map((i) => map.pieces[i]!), (u, v) => heightsAt(world.continent, u, v))
+        return rooms.flatMap((index, k): UnderRoom[] => {
+          const under = roofOf(map.pieces[index]!, floors[k]!, groundAt)
+          return under === null ? [] : [[index, Math.round(floors[k]! * 10) / 10, Math.round(under)]]
+        })
+      })
+      .sort((a, b) => a[0] - b[0])
   }
   writeFileSync(file + '.part', JSON.stringify({ version: UNDER_VERSION, worlds }))
   renameSync(file + '.part', file)
