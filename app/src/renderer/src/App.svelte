@@ -514,6 +514,12 @@
     font: var(--t-zone);
     color: var(--gold);
   }
+  /* On a narrow map the zone goes under the buttons of the map, which keep the top (Map.svelte). */
+  @container (max-width: 640px) {
+    .readout {
+      top: 108px;
+    }
+  }
 
   .making {
     position: absolute;

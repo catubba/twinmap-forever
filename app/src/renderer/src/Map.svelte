@@ -853,7 +853,7 @@
     syncing = false
   }
   // For the trials on a phone: the address ending in #fps shows how many times a second the 3D view is drawn while it moves.
-  const counting = location.hash === '#fps'
+  let counting = $state(location.hash === '#fps')
   let fps = $state(0)
   let counted = 0, since = 0, last = 0
   function count(): void {
@@ -1502,7 +1502,7 @@
   })
 </script>
 
-<svelte:window onkeydown={key} />
+<svelte:window onkeydown={key} onhashchange={() => (counting = location.hash === '#fps')} />
 
 <div class="map" class:under={threeD} bind:this={holder}></div>
 <div class="terrain" class:on={threeD} bind:this={terrainHost}><div class="map pins3d" bind:this={pinsHost}></div></div>
@@ -1789,13 +1789,10 @@
     overflow-y: auto;
   }
 
-  /* On a narrow map the buttons go under the zone and its coordinates, which they would cover. */
+  /* On a narrow map the buttons keep the top and the zone goes under them (App.svelte). */
   @container (max-width: 640px) {
-    .corner.top {
-      top: 84px;
-    }
-    .layers {
-      max-height: calc(100vh - 312px);
+    .fps {
+      top: 190px;
     }
   }
   /* The map draws its keyboard ring on the frame (App.svelte). */
