@@ -47,8 +47,8 @@ export interface TrackAsk {
   indoors?: boolean
 }
 
-/** How many other places to stand its cell has over the character and under it; null where the grid has none. */
-export type Floors = { over: number; under: number } | null
+/** How many other places to stand its cell has over the character and under it, and the height it stands at, in yards; null where the grid has none. */
+export type Floors = { over: number; under: number; z: number } | null
 
 /** What the window asked, checked. */
 export function trackAskFrom(asked: unknown): TrackAsk | null {

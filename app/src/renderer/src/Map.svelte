@@ -4,6 +4,7 @@
   // Inside a dungeon or a raid it shows that instead: its rooms, its bosses, its entrance.
   import { inApp, TILES } from './web'
   import type { Terrain } from './terrain3d'
+  import { Arrow3d } from './arrow3d'
   import { paintFixed, Pins3d } from './pins3d'
   import L from 'leaflet'
   import 'leaflet/dist/leaflet.css'
@@ -283,12 +284,15 @@
   // from point to point; an answer that comes after a newer point is dropped.
   const BELOW = 0.6
   let tracked = 0
+  let floorAt: number | null = null // the height the character stands at: on a bridge the 3D arrow is put there
   $effect(() => {
     const here = me
     const asked = ++tracked
-    if (!here) return void arrow.setOpacity(1)
+    if (!here) return void (arrow.setOpacity(1), (floorAt = null))
     void window.twinmap.walkTrack({ continent: here.continent, at: { x: here.units.x, y: here.units.y }, indoors: untrack(() => pos?.indoors === true) }).then((floors) => {
-      if (asked === tracked) arrow.setOpacity(floors && floors.over > 0 ? BELOW : 1)
+      if (asked !== tracked) return
+      arrow.setOpacity(floors && floors.over > 0 ? BELOW : 1)
+      floorAt = floors?.z ?? null
     })
   })
 
@@ -860,7 +864,9 @@
         terrain ??= new Terrain(terrainHost, compassHost)
         terrain.onGrab = () => (following = false)
         terrain.zoomAtCursor(!following)
-        pins3d ??= new Pins3d(map, terrain, pinsHost, terrainHost, arrow, () => turned)
+        const body = new Arrow3d(terrain)
+        terrain.onBefore = () => body.step(performance.now())
+        pins3d ??= new Pins3d(map, terrain, pinsHost, terrainHost, arrow, () => turned, body, () => floorAt)
         terrain.onFrame = onFrame
       }
       threeD = true

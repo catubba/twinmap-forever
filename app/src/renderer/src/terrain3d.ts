@@ -254,6 +254,14 @@ export class Terrain {
   /** Called when the camera is taken by hand. */
   onGrab: () => void = () => {}
 
+  /** Called before a frame is drawn: what is in the scene and moves by itself (arrow3d.ts) takes its place. True when the view must be drawn again for it. */
+  onBefore: () => boolean = () => false
+
+  /** Something of the scene that is not the ground: the character's arrow. */
+  add(object: THREE.Object3D): void {
+    this.scene.add(object)
+  }
+
   /** Called at every frame while the view runs, once it is drawn: what lies over it follows. */
   onFrame: () => void = () => {}
 
@@ -302,16 +310,6 @@ export class Terrain {
       return { x: o.x + d.x * b, z: o.z + d.z * b }
     }
     return null
-  }
-
-  /** The angle on the view, clockwise from up, of a heading on the ground at a point, in degrees clockwise from north. */
-  angleOf(x: number, z: number, degrees: number): number {
-    const ground = this.groundAt(x, z),
-      y = Number.isFinite(ground) ? ground : 0,
-      a = (degrees * Math.PI) / 180,
-      from = new THREE.Vector3(x, y, z).project(this.camera),
-      to = new THREE.Vector3(x + Math.sin(a), y, z - Math.cos(a)).project(this.camera)
-    return (Math.atan2((to.x - from.x) * this.width, (to.y - from.y) * this.height) * 180) / Math.PI
   }
 
   /** The view's size in pixels, as last measured: reading it off the page at every frame would make the page lay itself out again. */
@@ -491,6 +489,7 @@ export class Terrain {
     this.camera.far = distance * 4 + 2000
     this.camera.updateProjectionMatrix()
     this.compass.turn(this.controls.getPolarAngle() / 2, this.controls.getAzimuthalAngle())
+    if (this.onBefore()) this.dirty = true
     if (this.dirty) {
       this.dirty = false
       this.choose()
@@ -525,7 +524,7 @@ export class Terrain {
   }
 
   /** The height of the ground at a point, from the finest node there that is in; NaN where none is. */
-  private groundAt(x: number, z: number): number {
+  groundAt(x: number, z: number): number {
     if (!(x >= 0 && z >= 0 && x < WORLD && z < WORLD)) return NaN
     this.finest ??= this.indexFinest()
     const cells = 2 ** FINEST,

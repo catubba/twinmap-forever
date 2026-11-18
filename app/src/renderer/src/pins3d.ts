@@ -1,10 +1,12 @@
 // What the 2D map lays on the ground, on the 3D view too (M16-F7). The 2D map stays under the view
-// with all of it, and this follows it at every frame: the arrow and the pins drawn as elements are
-// copied as they are, and a click on a copy is a click on the pin; the pins painted on the map's
+// with all of it, and this follows it at every frame: the pins drawn as elements are copied as
+// they are, and a click on a copy is a click on the pin; the character's arrow is a body in the
+// scene (arrow3d.ts), told here where it is; the pins painted on the map's
 // canvas, its lines and its rings are painted again on a canvas over the view. Each point is put on
 // the ground under it. Past the fog nothing shows; behind a hill, a little.
 import L from 'leaflet'
 import { YARDS_PER_UNIT } from '../../shared/inside'
+import type { Arrow3d } from './arrow3d'
 import type { Terrain } from './terrain3d'
 
 type Spot = { x: number; y: number; shows: number; away: number }
@@ -65,11 +67,10 @@ export class Pins3d {
   private canvas = document.createElement('canvas')
   private copies = new Map<L.Marker, { from: HTMLElement; copy: HTMLElement }>()
   private painted: { layer: L.CircleMarker; x: number; y: number; r: number }[] = []
-  private turned = 0
   private lines = new Map<string, Spot[]>() // the points of the lines of this frame
   private down: { x: number; y: number } | null = null
 
-  /** host: the layer over the view the copies go in; events: what the clicks on the view reach. heading: where the arrow points, in degrees clockwise from north. */
+  /** host: the layer over the view the copies go in; events: what the clicks on the view reach. heading: where the arrow points, in degrees clockwise from north. floor: the height the character stands at, where the walking grid tells it. */
   constructor(
     private map: L.Map,
     private terrain: Terrain,
@@ -77,6 +78,8 @@ export class Pins3d {
     events: HTMLElement,
     private arrow: L.Marker,
     private heading: () => number,
+    private body: Arrow3d,
+    private floor: () => number | null,
   ) {
     this.canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%'
     host.append(this.canvas)
@@ -124,11 +127,18 @@ export class Pins3d {
     const lines: L.Polyline[] = [],
       marks: L.CircleMarker[] = [],
       seen = new Set<L.Marker>()
+    let me = false
     this.map.eachLayer((layer) => {
-      if (layer instanceof L.Marker) this.copy(layer, seen)
+      if (layer === this.arrow) {
+        // The arrow: not a copy, the body in the scene.
+        const ll = this.arrow.getLatLng()
+        this.body.set(ll.lng * YARDS_PER_UNIT, -ll.lat * YARDS_PER_UNIT, this.heading(), this.arrow.options.opacity ?? 1, this.floor())
+        me = true
+      } else if (layer instanceof L.Marker) this.copy(layer, seen)
       else if (layer instanceof L.CircleMarker) marks.push(layer)
       else if (layer instanceof L.Polyline) lines.push(layer)
     })
+    if (!me) this.body.hide()
     const step = this.terrain.looking().seen / POINTS_A_VIEW
     this.lines.clear()
     for (const line of lines) this.paintLine(ctx, line, step)
@@ -145,6 +155,7 @@ export class Pins3d {
   clear(): void {
     for (const c of this.copies.values()) c.copy.remove()
     this.copies.clear()
+    this.body.hide()
     this.painted = []
     this.canvas.getContext('2d')!.clearRect(0, 0, this.canvas.width, this.canvas.height)
   }
@@ -176,12 +187,6 @@ export class Pins3d {
     style.transform = `translate3d(${s.x}px,${s.y}px,0)`
     style.zIndex = String(Math.round(s.y) + (marker.options.zIndexOffset ?? 0))
     style.opacity = String(Number(from.style.opacity || 1) * shows)
-    if (marker !== this.arrow) return
-    // The arrow points on the view where the character faces on the ground.
-    const angle = this.terrain.angleOf(x, z, this.heading())
-    this.turned += ((((angle - this.turned) % 360) + 540) % 360) - 180 // the short way round
-    const svg = c.copy.firstElementChild as SVGElement | null
-    if (svg) svg.style.transform = `rotate(${this.turned}deg)`
   }
 
   // A line on the ground, as the map draws it: a point every step yards, faded where it is.

@@ -41,7 +41,7 @@ parentPort?.on('message', ({ id, ask }: { id: number; ask: WalkAsk | FarAsk | Tr
       const find = finder(ask.continent)
       if (find && !trackers.has(ask.continent)) trackers.set(ask.continent, find.track())
       const told = trackers.get(ask.continent)?.(yardsOf(ask.at), ask.indoors)
-      floors = told ? { over: told.over, under: told.under } : null
+      floors = told ? { over: told.over, under: told.under, z: told.z } : null
       // For trials in the game: TWINMAP_TRACK_LOG names a file that gets a line for each point followed.
       if (process.env.TWINMAP_TRACK_LOG) appendFileSync(process.env.TWINMAP_TRACK_LOG, JSON.stringify({ t: Date.now(), ...ask, told: told ?? null }) + '\n')
     } catch {
