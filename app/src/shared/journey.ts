@@ -13,6 +13,8 @@ export interface Leg {
   seconds: number
   /** Where it starts and ends, as Shortest Path planned it: absent when it did not tell both. */
   ends?: [Pin, Pin]
+  /** How high each end is, in yards (Shortest Path 1.43 and later): null where it did not tell. */
+  heights?: [number | null, number | null]
 }
 
 export type Journey =
@@ -23,6 +25,7 @@ export type Journey =
 
 const plain = (text: unknown, most: number): string =>
   typeof text === 'string' ? Array.from(text, (c) => (c < ' ' || c === '\x7f' ? ' ' : c)).join('').trim().slice(0, most) : ''
+const height = (v: unknown): number | null => (typeof v === 'number' && Math.abs(v) < 1e5 ? v : null)
 const seconds = (v: unknown): number => (typeof v === 'number' && v >= 0 && v < 1e6 ? Math.round(v) : 0)
 
 /** The section as it came off the strip, checked; null when the game guides no journey, or has no Shortest Path. */
@@ -32,12 +35,13 @@ export function journeyFrom(section: unknown): Journey | null {
   if (loading === true) return { loading: true }
   if (!Array.isArray(legs)) return null
   const read = legs.slice(0, 20).flatMap((leg: unknown): Leg[] => {
-    const { mode, text, s, p } = (typeof leg === 'object' && leg ? leg : {}) as Record<string, unknown>
+    const { mode, text, s, p, fz, tz } = (typeof leg === 'object' && leg ? leg : {}) as Record<string, unknown>
     const words = plain(text, 80)
     if (!words) return []
     const told: Leg = { mode: plain(mode, 20), text: words, seconds: seconds(s) }
     const [a, b] = Array.isArray(p) && p.length === 6 ? [pinFrom({ m: p[0], x: p[1], y: p[2], name: '' }), pinFrom({ m: p[3], x: p[4], y: p[5], name: '' })] : []
     if (a && b) told.ends = [a, b]
+    if (a && b && (height(fz) !== null || height(tz) !== null)) told.heights = [height(fz), height(tz)]
     return [told]
   })
   const title = plain(name, 80) || 'Journey'
@@ -60,7 +64,7 @@ export function span(s: number): string {
 /** A leg of the journey as it lies on the map: its mode, and where it starts and ends in map units. */
 export interface WayLeg {
   mode: string
-  points: { continent: Continent; at: Point }[]
+  points: { continent: Continent; at: Point; z?: number }[]
 }
 
 /** The legs still ahead on the map, when every one of them has its ends on a map Twinmap draws; else null. */
@@ -68,9 +72,9 @@ export function legsOn(journey: Journey | null, maps: GameMap[]): WayLeg[] | nul
   if (!journey || journey.loading || journey.legs.length === 0) return null
   const legs: WayLeg[] = []
   for (const leg of journey.legs) {
-    const points = (leg.ends ?? []).flatMap((end) => {
-      const on = maps.find((m) => m.id === end.m)
-      return on?.rect && on.continent !== null ? [{ continent: on.continent, at: unitsOfPlace(on.rect, end.x, end.y) }] : []
+    const points = (leg.ends ?? []).flatMap((end, i) => {
+      const on = maps.find((m) => m.id === end.m), z = leg.heights?.[i] ?? null
+      return on?.rect && on.continent !== null ? [{ continent: on.continent, at: unitsOfPlace(on.rect, end.x, end.y), ...(z !== null && { z }) }] : []
     })
     if (points.length !== 2) return null
     legs.push({ mode: leg.mode, points })

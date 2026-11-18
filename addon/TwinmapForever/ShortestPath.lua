@@ -34,6 +34,8 @@ local function Build()
     local from, to = type(leg.from) == "table" and leg.from, type(leg.to) == "table" and leg.to
     if from and to and Num(from.map) and Num(from.x) and Num(from.y) and Num(to.map) and Num(to.x) and Num(to.y) then
       legs[i].p = { from.map, from.x * 100, from.y * 100, to.map, to.x * 100, to.y * 100 }
+      -- How high each end is, in whole yards (Shortest Path 1.43 and later, where its planner holds it): the floor the leg starts and ends on.
+      legs[i].fz, legs[i].tz = Num(from.z) and math.floor(from.z + 0.5), Num(to.z) and math.floor(to.z + 0.5)
     end
   end
   local left = Num(journey.secondsLeft) or 0

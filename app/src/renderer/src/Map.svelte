@@ -1298,7 +1298,9 @@
     if (asking || Date.now() - askedAt < ASK_EVERY) return
     asking = true
     askedAt = Date.now()
-    void window.twinmap.walk({ continent: end.continent, from: { ...from }, to: { ...to } }).then((path) => {
+    // The floor at either end: the one the character is followed on now (the leg's own start is where it was planned from), and the one Shortest Path walks to.
+    const fromZ = floorAt ?? first?.points[0]!.z, toZ = 'z' in end ? end.z : undefined
+    void window.twinmap.walk({ continent: end.continent, from: { ...from }, to: { ...to }, fromZ, toZ }).then((path) => {
       asking = false
       // No way found (too far, or nothing to walk on there): a straight line.
       walked = { key, continent: end.continent, points: path?.points ?? [from, to] }
@@ -1313,7 +1315,7 @@
       const a = leg.points[0]!, b = leg.points.at(-1)!, key = walkKey(leg)
       if (leg.mode !== 'walk' || a.continent !== b.continent || laterAsked.has(key)) continue
       laterAsked.add(key)
-      void window.twinmap.walk({ continent: a.continent, from: { ...a.at }, to: { ...b.at } }).then((path) => {
+      void window.twinmap.walk({ continent: a.continent, from: { ...a.at }, to: { ...b.at }, fromZ: a.z, toZ: b.z }).then((path) => {
         if (path) laterWalks = { ...laterWalks, [key]: path.points }
       })
     }

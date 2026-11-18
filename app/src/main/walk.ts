@@ -108,9 +108,11 @@ const KEY = 65536 // a node of the continent: its cluster times this, plus its n
 /**
  * A finder of ways on one continent's grid: the way between two points, and with `far` how many
  * yards it is on foot from one point to each of many, in one search that spreads from the first
- * (null for those not reached within `reach` yards, or with nowhere to stand).
+ * (null for those not reached within `reach` yards, or with nowhere to stand). The way between two
+ * points takes the height of either end when it is known: where floors lie over one another it
+ * starts and ends on the one nearest that height, and not on whichever is cheapest to reach.
  */
-export type Walker = ((from: Yards, to: Yards) => Walk | null) & { far: (from: Yards, tos: Yards[], reach: number) => (number | null)[]; track: () => Tracker; wander: (from: Yards, count: number, random: () => number) => [Yards, number][]; heights: (at: Yards) => number[] }
+export type Walker = ((from: Yards, to: Yards, fromZ?: number, toZ?: number) => Walk | null) & { far: (from: Yards, tos: Yards[], reach: number) => (number | null)[]; track: () => Tracker; wander: (from: Yards, count: number, random: () => number) => [Yards, number][]; heights: (at: Yards) => number[] }
 
 /**
  * Where a character stands, point after point (yards of the world): its height, and how many
@@ -397,13 +399,15 @@ export function walker(nav: NavData): Walker {
   // One search from a point. To one end it is steered towards it; to many it spreads evenly, until
   // each is reached or the yards walked (as the search prices them) pass `reach`. goals: by end, the
   // place to stand the way arrives at, or -1.
-  function search(from: Yards, tos: Yards[], reach: number): { came: Map<number, number>; goals: number[] } {
+  function search(from: Yards, tos: Yards[], reach: number, fromZ?: number, toZ?: number): { came: Map<number, number>; goals: number[] } {
     const cost = new Map<number, number>(), came = new Map<number, number>(), done = new Set<number>()
-    const starts = snap(from), ends = new Map<number, number[]>(), goals = tos.map(() => -1)
+    // Of the places to stand on a cell, the one nearest a height that is known; all of them when it is not.
+    const at = (nodes: number[], z?: number): number[] => (z === undefined || nodes.length < 2 ? nodes : [nodes.reduce((a, b) => (Math.abs(zOf(b) - z) < Math.abs(zOf(a) - z) ? b : a))])
+    const starts = at(snap(from), fromZ), ends = new Map<number, number[]>(), goals = tos.map(() => -1)
     let left = 0
     tos.forEach((to, i) => {
       // An end farther than the reach as the crow flies would only keep the search going to its edge.
-      const nodes = Math.hypot(to[0] - from[0], to[1] - from[1]) > reach ? [] : snap(to)
+      const nodes = Math.hypot(to[0] - from[0], to[1] - from[1]) > reach ? [] : at(snap(to), toZ)
       if (nodes.length) left++
       for (const node of nodes) (ends.get(node) ?? ends.set(node, []).get(node)!).push(i)
     })
@@ -558,8 +562,8 @@ export function walker(nav: NavData): Walker {
     }
     return out
   }
-  const find = (from: Yards, to: Yards): Walk | null => {
-    const { came, goals } = search(from, [to], Infinity)
+  const find = (from: Yards, to: Yards, fromZ?: number, toZ?: number): Walk | null => {
+    const { came, goals } = search(from, [to], Infinity, fromZ, toZ)
     if (goals[0]! < 0) return null
     const { cells, yards } = wayBack(came, goals[0]!, from, to)
     // The line starts and ends at the very points asked for, not at the middles of their cells.

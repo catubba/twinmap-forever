@@ -39,3 +39,12 @@ test('the legs lie on the map when every one tells where it starts and ends', ()
   expect(legsOn(journey(leg('walk', [9999, 45, 80, 1415, 46, 78])), maps), 'an end on a map Twinmap does not draw').toBeNull()
   expect(legsOn({ loading: true }, maps)).toBeNull()
 })
+
+test('the height of the ends of a leg is read when Shortest Path tells it', () => {
+  const leg = { mode: 'walk', text: 'Walk to the bank', s: 40, p: [1455, 30, 60, 1455, 35, 65] }
+  const read = (more: object): unknown => { const j = journeyFrom({ name: 'Bank', legs: [{ ...leg, ...more }] }); return j && !j.loading ? j.legs[0]!.heights : null }
+  expect(read({ fz: 502, tz: 497 })).toEqual([502, 497])
+  expect(read({ tz: -12 }), 'one end alone').toEqual([null, -12])
+  expect(read({}), 'an older Shortest Path').toBeUndefined()
+  expect(read({ fz: 'high', tz: 1e9 }), 'not heights').toBeUndefined()
+})

@@ -107,3 +107,15 @@ test('a character in Stormwind is not put on the ground the grid keeps under the
   expect(track([-8792.0, 656.7])).toBeNull()
   expect(track([-8792.0, 648.8])).toMatchObject({ z: 96, over: 0 })
 })
+
+test('where floors lie over one another, the height of an end says which one the way ends on', () => {
+  // The Dun Algaz road: its tunnel, and the ridge over it.
+  const find = walker(shipped), south: Yards = [-4350.2, -2463.7], inTunnel: Yards = [-4220, -2464]
+  const heights = find.heights(inTunnel).sort((a, b) => a - b)
+  expect(heights.length, 'a floor under the ridge').toBeGreaterThan(1)
+  const low = find(south, inTunnel, undefined, heights[0]! - 1), high = find(south, inTunnel, undefined, heights.at(-1)! + 1)
+  expect(low!.yards, 'through the tunnel: nearly straight').toBeLessThan(crow(south, inTunnel) * 1.3)
+  expect(high === null || high.yards > low!.yards, 'onto the ridge: a longer way, or none').toBe(true)
+  expect(find(south, [-4180, -2464], undefined, 227), 'further in, the ridge is not walked onto').toBeNull()
+  expect(find(south, inTunnel)!.yards, 'with no height told, the cheapest').toBe(low!.yards)
+})

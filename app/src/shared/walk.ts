@@ -9,6 +9,9 @@ export interface WalkAsk {
   continent: Continent
   from: Point
   to: Point
+  /** The height of either end in yards, when it is known: which floor the way starts and ends on. */
+  fromZ?: number
+  toZ?: number
 }
 
 /** The way between them, in map units, and how long it is; null where none was found. */
@@ -20,8 +23,8 @@ const point = (v: unknown): v is Point => typeof v === 'object' && v !== null &&
 /** What the window asked, checked. */
 export function walkAskFrom(asked: unknown): WalkAsk | null {
   if (typeof asked !== 'object' || !asked) return null
-  const { continent, from, to } = asked as Record<string, unknown>
-  return (continent === 0 || continent === 1) && point(from) && point(to) ? { continent, from: { x: from.x, y: from.y }, to: { x: to.x, y: to.y } } : null
+  const { continent, from, to, fromZ, toZ } = asked as Record<string, unknown>
+  return (continent === 0 || continent === 1) && point(from) && point(to) ? { continent, from: { x: from.x, y: from.y }, to: { x: to.x, y: to.y }, ...(number(fromZ) && { fromZ }), ...(number(toZ) && { toZ }) } : null
 }
 
 /**

@@ -191,4 +191,6 @@ test('each leg goes out with where it starts and ends, when Shortest Path tells 
   const addon = enterWorld(SHORTEST_PATH + WITH_ENDS);
   addon.run(6);
   assert.deepEqual(told(addon).at(-1).legs.map((leg) => leg.p), [[1415, 45.12, 80, 1415, 46, 78], [1415, 46, 78, 1415, 47, 59], undefined, undefined]);
+  // The height of an end, in whole yards, where Shortest Path tells it (1.43 and later).
+  assert.deepEqual(told(addon).at(-1).legs.map((leg) => [leg.fz, leg.tz]), [[3, undefined], [undefined, undefined], [undefined, undefined], [undefined, undefined]]);
 });

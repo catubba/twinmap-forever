@@ -55,7 +55,7 @@ parentPort?.on('message', ({ id, ask }: { id: number; ask: WalkAsk | FarAsk | Tr
     const find = finder(ask.continent)
     if (find && many) path = find.far(yardsOf(ask.from), ask.to.map(yardsOf), ask.reach)
     else if (find && !many) {
-      const walk = find(yardsOf(ask.from), yardsOf(ask.to))
+      const walk = find(yardsOf(ask.from), yardsOf(ask.to), ask.fromZ, ask.toZ)
       if (walk) path = { points: walk.points.map(([x, y]) => unitsOfWorld(x, y)), yards: walk.yards }
     }
   } catch {
