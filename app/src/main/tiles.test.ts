@@ -157,6 +157,7 @@ test('the window is given only the files the converter writes', () => {
   expect(servedFile(base, '/kalimdor/5/12/7.png')).toBe(join(base, 'kalimdor', '5', '12', '7.png'))
   expect(servedFile(base, '/maps.json')).toBe(join(base, 'maps.json'))
   expect(servedFile(base, '/travel.json')).toBe(join(base, 'travel.json'))
+  expect(servedFile(base, '/items.json')).toBe(join(base, 'items.json'))
   // The insides: the list, a room's picture, the ground of a dungeon.
   expect(servedFile(base, '/interiors.json')).toBe(join(base, 'interiors.json'))
   expect(servedFile(base, '/rooms/211409.dxt')).toBe(join(base, 'rooms', '211409.dxt'))

@@ -10,13 +10,16 @@
   import { fade, scale } from 'svelte/transition'
   import Glyph from './Glyph.svelte'
   import { gone, pop } from './motion'
+  import { TILES } from './web'
 
   let {
     title,
+    item, // an item found: its picture from the player's game stands beside the name
     notes = [], // what the point is, when it is a pin of the map: whose quest, what service
     where, // zone coordinates, or nothing
     way, // distance, direction and time from the character, when it is on this map
     spot, // the point, in pixels of the map's box
+    ring = false, // the point is a pin of the map: a ring around it instead of a dot over it
     box, // the map's box
     sending, // whether the point can be sent to the game now, and why not
     acked, // what the addon tells of the sends it has
@@ -34,6 +37,8 @@
     ondungeon,
   }: {
     title: string
+    ring?: boolean
+    item?: number
     notes?: string[]
     where: string
     way: { far: string; time: string } | null
@@ -90,33 +95,43 @@
   const at = $derived(labelPlace(spot, box, { width, height }, GAP))
   // The line ends on the label's edge nearest to the point.
   const end = $derived({ x: Math.max(at.left, Math.min(spot.x, at.left + width)), y: Math.max(at.top, Math.min(spot.y, at.top + height)) })
+  // The line leaves the ring's edge, not the pin's middle.
+  const RING = 13
+  const start = $derived.by(() => {
+    const d = Math.hypot(end.x - spot.x, end.y - spot.y)
+    return ring && d > RING ? { x: spot.x + ((end.x - spot.x) * RING) / d, y: spot.y + ((end.y - spot.y) * RING) / d } : spot
+  })
 </script>
 
 <svg class="tie" aria-hidden="true" in:fade={gone} out:fade={gone}>
   <!-- Twice: a dark line under the gold one, so that it shows on any ground. -->
-  <line class="rim" x1={spot.x} y1={spot.y} x2={end.x} y2={end.y} />
-  <line x1={spot.x} y1={spot.y} x2={end.x} y2={end.y} />
-  <circle cx={spot.x} cy={spot.y} r="5.5" />
+  <line class="rim" x1={start.x} y1={start.y} x2={end.x} y2={end.y} />
+  <line x1={start.x} y1={start.y} x2={end.x} y2={end.y} />
+  {#if ring}
+    <circle class="ring rim" cx={spot.x} cy={spot.y} r={RING} />
+    <circle class="ring" cx={spot.x} cy={spot.y} r={RING} />
+  {:else}
+    <circle cx={spot.x} cy={spot.y} r="5.5" />
+  {/if}
 </svg>
 <div class="label" data-side={at.side} role="dialog" in:scale={pop()} out:fade={gone} aria-label={title} style:left="{at.left}px" style:top="{at.top}px" style:visibility={width ? 'visible' : 'hidden'} bind:offsetWidth={width} bind:offsetHeight={height}>
   <button class="close" aria-label="Close" onclick={onclose}><Glyph name="close" size={14} /></button>
   {#if saved}
     <input class="name" aria-label="Name of the pin" value={title} maxlength="60" spellcheck="false" onchange={(e) => onrename(e.currentTarget.value)} onkeydown={(e) => e.key === 'Enter' && e.currentTarget.blur()} />
   {:else}
-    <h3>{title}</h3>
+    <h3>{#if item}<img class="pic" src="{TILES}/items/{item}.png" alt="" onerror={(e) => e.currentTarget.remove()} />{/if}{title}</h3>
   {/if}
   {#each notes as note}<p>{note}</p>{/each}
   {#if where}<p class="dim">{where}</p>{/if}
   {#if way}<p>{way.far}, {way.time}</p>{/if}
-  <!-- One map behind the door: Dungeon Map, or Raid Map, first of the buttons. Several: a button each, by its name, on a row of their own. -->
-  {#if dungeons.length > 1}
-    <div class="go">
-      {#each dungeons as d (d.id)}<button class="btn" onclick={() => ondungeon?.(d.id)}>{d.name}</button>{/each}
+  <!-- The maps behind a door, on a row of their own above the others: one is Dungeon Map, or Raid Map; several, a button each by its name. -->
+  {#if dungeons.length}
+    <div class="go maps">
+      {#each dungeons as d (d.id)}<button class="btn" onclick={() => ondungeon?.(d.id)}>{dungeons.length > 1 ? d.name : d.raid ? 'Raid Map' : 'Dungeon Map'}</button>{/each}
     </div>
   {/if}
   <div class="go">
-    {#if dungeons.length === 1}<button class="btn" onclick={() => ondungeon?.(dungeons[0]!.id)}>{dungeons[0]!.raid ? 'Raid Map' : 'Dungeon Map'}</button>{/if}
-    <button class="btn" disabled={!sending.can} aria-busy={phase === 'sending'} onclick={go}>{phase === 'sending' ? 'Sending' : phase === 'sent' ? 'Sent' : following ? 'Stop following' : 'Send to game'}</button>
+    <button class="btn send" disabled={!sending.can} aria-busy={phase === 'sending'} onclick={go}>{phase === 'sending' ? 'Sending' : phase === 'sent' ? 'Sent' : following ? 'Stop following' : 'Send to game'}</button>
     <button class="btn" disabled={routed} onclick={onroute}>{routed ? 'In route' : 'Add to route'}</button>
     {#if saved}<button class="btn" onclick={onremove}>Remove</button>{:else}<button class="btn" onclick={onsave}>Save</button>{/if}
   </div>
@@ -146,6 +161,15 @@
     stroke: #000;
     stroke-width: 2;
   }
+  .ring {
+    fill: none;
+    stroke: var(--gold);
+    stroke-width: 3;
+  }
+  .ring.rim {
+    stroke: #000;
+    stroke-width: 6;
+  }
 
   .label {
     position: absolute;
@@ -165,6 +189,15 @@
     font: 400 18px/22px var(--display);
     color: var(--gold);
     text-shadow: 0 1px 0 #000;
+  }
+  .pic {
+    width: 22px;
+    height: 22px;
+    margin: 0 8px -5px 0;
+    border-radius: 2px;
+    box-shadow:
+      0 0 0 1px #000,
+      0 0 0 2px var(--bronze-700);
   }
   /* The name of a saved pin is written over: it looks like the title until it is pointed at or held. */
   .name {
@@ -194,7 +227,7 @@
     color: var(--text-dim);
   }
   /* Sending and Sent are shorter words: the button keeps its width, so the one beside it stays put. */
-  .go .btn:nth-last-child(3) {
+  .send {
     min-width: 112px;
   }
   .why {
@@ -205,6 +238,13 @@
     display: flex;
     gap: 8px;
     margin-top: 9px;
+  }
+  /* The maps take the whole row, and go on to the next one when there are many. */
+  .maps {
+    flex-wrap: wrap;
+  }
+  .maps .btn {
+    flex: 1;
   }
   .close {
     position: absolute;

@@ -183,7 +183,11 @@ by Smoergi (an addon for World of Warcraft: Forever, "OneForAll" in the game)
 Used in: the app, where the bosses and the entrance are on the map of each
 dungeon, the names of the dungeons and their split in wings
 (app/src/shared/dungeon-pins.ts, generated from Data\DungeonMaps.lua of
-One for All 6.2.2)
+One for All 6.2.2); and in the app, where a profession trainer's ranks, recipes
+and costs come from (app/src/shared/profession-trainers.ts, generated from
+Data\ProfessionFees.lua of One for All 6.2.10); and which class spells a quest teaches
+instead of the trainer (app/src/shared/class-quests.ts, generated from
+Data\TrainerSpells.lua of One for All 6.2.10)
 ================================================================================
 
 One for All is licensed under the GNU General Public License, version 3 or
@@ -201,7 +205,10 @@ design/interiors/cmangos-pins.ts): the spawns of Ras Frostwhisper, Malor the
 Zealous and Ribbly Screwspigot and the place of the Brazier of the Herald, from
 the classic-db database; where the scripts summon Darkmaster Gandling and Timmy
 the Cruel, from scholomance.h and stratholme.h of mangos-classic. Only these
-places are taken, no code.
+places are taken, no code. Also in the app, by way of One for All (above): which
+trainer teaches which profession rank and recipe, and at what cost, from the
+npc_trainer and npc_trainer_template tables of classic-db
+(app/src/shared/profession-trainers.ts).
 ================================================================================
 
 The classic-db database is licensed under the GNU General Public License,

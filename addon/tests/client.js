@@ -48,9 +48,95 @@ const STUB = `
     return "Catubbio", "Sucameli"
   end
   function UnitClass(unit)
+    if unit == "player" then return GAME.class, GAME.class end
     local other = GAME.party and GAME.party[unit]
     return other and other.class, other and other.class
   end
+  -- The sheet, once GAME.surname is set (the full name is the key of a sheet). GAME.race and GAME.class as the game's tokens, GAME.money in copper,
+  -- GAME.bags[container] = { size = n, items = { [slot] = { item, count } } } (6 to 12: the bank),
+  -- GAME.worn[slot] = { item, durability, most }.
+  -- The numbers of the containers as Forever has them: four bags and the reagent bag, the keyring -1,
+  -- no BANK_CONTAINER nor NUM_BANKBAGSLOTS (the bank is 6, its bags after).
+  BACKPACK_CONTAINER, KEYRING_CONTAINER, NUM_BAG_SLOTS, NUM_TOTAL_EQUIPPED_BAG_SLOTS = 0, -1, 4, 5
+  function UnitFullName(unit) if unit == "player" and GAME.surname then return "Catubbio", GAME.surname end end
+  function UnitRace(unit) if unit == "player" then return GAME.race, GAME.race end end
+  function GetMoney() return GAME.money end
+  C_Container = {
+    GetContainerNumSlots = function(bag) local c = GAME.bags and GAME.bags[bag] return c and c.size or 0 end,
+    GetContainerItemInfo = function(bag, slot)
+      local c = GAME.bags and GAME.bags[bag]
+      local it = c and c.items[slot]
+      if it then return { itemID = it[1], stackCount = it[2], hyperlink = it[3] or ("|cffffffff|Hitem:" .. it[1] .. "::::::::" .. (GAME.level or 1) .. ":::::|h[x]|h|r") } end
+    end,
+  }
+  -- The game's tooltip of an item: GAME.tips[item] = { { left, "rrggbb", right, "rrggbb" }, ... }; GAME.tipReads counts the reads.
+  local function tipOf(item)
+    local lines = {}
+    for _, l in ipairs(GAME.tips and GAME.tips[item] or {}) do
+      local function colour(hex) if hex and #hex == 6 then return { r = tonumber(hex:sub(1, 2), 16) / 255, g = tonumber(hex:sub(3, 4), 16) / 255, b = tonumber(hex:sub(5, 6), 16) / 255 } end end
+      lines[#lines + 1] = { leftText = l[1], leftColor = colour(l[2]) or { r = 1, g = 1, b = 1 }, rightText = l[3], rightColor = colour(l[4]) }
+    end
+    lines[#lines + 1] = { type = 11 } -- a line with no text, as the sell price is
+    GAME.tipReads = (GAME.tipReads or 0) + 1
+    return { lines = lines }
+  end
+  C_TooltipInfo = {
+    GetBagItem = function(bag, slot) local c = GAME.bags and GAME.bags[bag] local it = c and c.items[slot] return it and tipOf(it[1]) end,
+    GetInventoryItem = function(_, slot) local w = GAME.worn and GAME.worn[slot] return w and tipOf(w[1]) end,
+  }
+  function GetInventoryItemLink(_, slot) local w = GAME.worn and GAME.worn[slot] return w and (w[4] or ("|cffffffff|Hitem:" .. w[1] .. "::::::::" .. (GAME.level or 1) .. ":::::|h[x]|h|r")) end
+  -- Skills, spells, talents and recipes, as Forever has them. GAME.skills = { { skill, rank, most, header } },
+  -- GAME.spells = { { spell, notYet } }, GAME.talents = { [node] = { rank, spell } } with GAME.free points,
+  -- GAME.trade = { profession = n, recipes = { [spell] = learned }, linked = true }: the window of a profession.
+  Enum = { SpellBookSpellBank = { Player = 0 }, SpellBookItemType = { Spell = 1, FutureSpell = 2 } }
+  C_SkillInfo = {
+    GetNumSkillLines = function() return GAME.skills and #GAME.skills or 0 end,
+    GetSkillLineInfo = function(i) local l = GAME.skills[i] return l and { skillID = l[1], rank = l[2], maxRank = l[3], isHeader = l[4] == true } end,
+  }
+  C_SpellBook = {
+    GetNumSpellBookSkillLines = function() return GAME.spells and 1 or 0 end,
+    GetSpellBookSkillLineInfo = function() return { itemIndexOffset = 0, numSpellBookItems = #GAME.spells } end,
+    GetSpellBookItemInfo = function(i) local sp = GAME.spells[i] return sp and { spellID = sp[1], itemType = sp[2] and 2 or 1 } end,
+  }
+  C_ClassTalents = { GetActiveConfigID = function() return GAME.talents and 7 end }
+  C_Traits = {
+    GetConfigInfo = function() return { treeIDs = { 1 } } end,
+    GetTreeNodes = function() local out = {} for node in pairs(GAME.talents) do out[#out + 1] = node end table.sort(out) return out end,
+    GetNodeInfo = function(_, node) return { currentRank = GAME.talents[node][1], entryIDs = { node * 10 } } end,
+    GetEntryInfo = function(_, entry) return { definitionID = entry } end,
+    GetDefinitionInfo = function(definition) local t = GAME.talents[definition // 10] return { spellID = t and t[2] } end,
+    GetTreeCurrencyInfo = function() return { { quantity = GAME.free or 0 } } end,
+  }
+  function UnitCharacterPoints() return 0 end
+  -- An open trainer: GAME.trainer = { npc = 5174, trade = true, lines = { { name, kind, spell, cost, level, skill, filter }, ... } },
+  -- filter "available", "unavailable" or "used"; the window shows a line only while its filter is on (GAME.filters, the
+  -- game's own choice: available only). The spell is told only by a tooltip set on the line.
+  function UnitGUID(unit) if unit == "npc" and GAME.trainer then return "Creature-0-5250-0-11-" .. GAME.trainer.npc .. "-0000ABCDEF" end end
+  local function shown()
+    local out = {}
+    for _, l in ipairs(GAME.trainer and GAME.trainer.lines or {}) do if (GAME.filters or { available = true })[l[7]] then out[#out + 1] = l end end
+    return out
+  end
+  function GetNumTrainerServices() return #shown() end
+  function GetTrainerServiceInfo(i) local l = shown()[i] if l then return l[1], nil, l[2] end end
+  function GetTrainerServiceCost(i) local l = shown()[i] return l and l[4] or 0 end
+  function GetTrainerServiceLevelReq(i) local l = shown()[i] return l and l[5] or 0 end
+  function GetTrainerServiceSkillReq(i) local l = shown()[i] if l and l[6] then return "Engineering", l[6], true end end
+  function GetTrainerServiceTypeFilter(f) return (GAME.filters or { available = true })[f] == true end
+  function SetTrainerServiceTypeFilter(f, on)
+    if on ~= true and on ~= false then error("Missing on/off parameter") end
+    GAME.filters = GAME.filters or { available = true }
+    GAME.filters[f] = on or nil
+  end
+  function IsTradeskillTrainer() return GAME.trainer and GAME.trainer.trade == true end
+  C_TradeSkillUI = {
+    GetAllRecipeIDs = function() local out = {} for id in pairs(GAME.trade and GAME.trade.recipes or {}) do out[#out + 1] = id end table.sort(out) return out end,
+    GetRecipeInfo = function(id) return { learned = GAME.trade.recipes[id] } end,
+    IsTradeSkillLinked = function() return GAME.trade and GAME.trade.linked == true end,
+    GetBaseProfessionInfo = function() return { professionID = GAME.trade and GAME.trade.profession } end,
+  }
+  function GetInventoryItemID(_, slot) local w = GAME.worn and GAME.worn[slot] return w and w[1] end
+  function GetInventoryItemDurability(slot) local w = GAME.worn and GAME.worn[slot] if w then return w[2], w[3] end end
   function UnitGroupRolesAssigned(unit)
     local other = GAME.party and GAME.party[unit]
     return other and other.role or "NONE"
@@ -179,6 +265,8 @@ const STUB = `
 
   function CreateFrame(_, name)
     local f, cells = setmetatable({ events = {} }, Widget), {}
+    function f:SetTrainerService(i) self.service = i end
+    function f:GetSpell() local l = shown()[self.service] if l then return l[1], l[3] end end
     if name then _G[name] = f end
     function f:RegisterEvent(e) self.events[e] = true end
     function f:SetScript(kind, fn) self[kind] = fn end

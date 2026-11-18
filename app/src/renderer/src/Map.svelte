@@ -29,7 +29,7 @@
   import { drop, gone, still } from './motion'
   import PointLabel from './PointLabel.svelte'
   import { inRoute, noRoute, type Route, type Stop } from '../../shared/route'
-  import type { Journey, WayLeg } from '../../shared/journey'
+  import { legsOn, type Journey, type WayLeg } from '../../shared/journey'
   import { ahead as restOf } from '../../shared/walk'
   import { deathPlaces, type Death, type Place as DeathPlace } from '../../shared/death'
   import { feet } from './feet.svelte'
@@ -40,7 +40,7 @@
 
   // at: when the position was read off the game, in milliseconds.
   // insideReady: the rooms of the buildings are converted, and their list can be asked for.
-  let { pos, group = [], at: readAt, insideReady, quests = [], fixed = [], side, live = false, inbox = null, removed = [], set = [], gameFollows = null, journey = null, ahead = null, route = noRoute(), onroute, kills, death = null, back = $bindable(null), looking = $bindable(null) }: { kills?: unknown; death?: Death | null; back?: (DeathPlace & { name: string; door: boolean }) | null; looking?: { zone: string; where: string } | null; journey?: Journey | null; ahead?: WayLeg[] | null; pos: Position | undefined; at: number | undefined; insideReady: boolean; quests?: QuestPin[]; fixed?: FixedPin[]; side?: string; live?: boolean; inbox?: Inbox | null; removed?: string[]; set?: GameMark[]; gameFollows?: Pin | null; route?: Route; onroute?: (stop: Stop) => void; group?: Companion[] } = $props()
+  let { pos, group = [], at: readAt, insideReady, quests = [], fixed = [], side, live = false, inbox = null, removed = [], set = [], gameFollows = null, journey = null, route = noRoute(), onroute, onnpc, kills, death = null, back = $bindable(null), looking = $bindable(null) }: { kills?: unknown; death?: Death | null; back?: (DeathPlace & { name: string; door: boolean }) | null; looking?: { zone: string; where: string } | null; journey?: Journey | null; pos: Position | undefined; at: number | undefined; insideReady: boolean; quests?: QuestPin[]; fixed?: FixedPin[]; side?: string; live?: boolean; inbox?: Inbox | null; removed?: string[]; set?: GameMark[]; gameFollows?: Pin | null; route?: Route; onroute?: (stop: Stop) => void; onnpc?: (pin: FixedPin | null) => void; group?: Companion[] } = $props()
 
   const TOP_ZOOM = 7 // the game's own detail: a block's picture is four tiles
   const BLANK = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=='
@@ -80,7 +80,10 @@
   let layersOpen = $state(false)
   // The point the player clicked, with its label: in map units, and where that is in the map's box now.
   // pin: the same point as the game names it, a zone map and a place on it; none where no zone is.
-  let labelled = $state<{ units: Point; continent: Continent; title: string; where: string; spot: Point; box: Size; pin: { m: number; x: number; y: number } | null; plain?: boolean; notes?: string[]; dungeons?: { id: number; name: string; raid: boolean }[] } | null>(null)
+  let labelled = $state<{ units: Point; continent: Continent; title: string; where: string; spot: Point; box: Size; pin: { m: number; x: number; y: number } | null; plain?: boolean; notes?: string[]; dungeons?: { id: number; name: string; raid: boolean }[]; wing?: string; item?: number; npc?: FixedPin } | null>(null)
+  // A vendor or a trainer labelled: its panel opens at the top of the side panel (NpcPanel.svelte).
+  const labelledNpc = $derived(labelled?.npc ?? null)
+  $effect(() => onnpc?.(labelledNpc))
   // Where the character is on the world map, for the distance on the label.
   let me = $state<{ units: Point; continent: Continent } | null>(null)
   // The yards and the time are those of the way on foot, where one is found: asked for the one point, again every few dozen yards.
@@ -345,8 +348,41 @@
     }
     const pieces = world.pieces.filter((p) => buildings.has(p.building)), box = boxOf(pieces)
     // Not from far away: there a city is a few pixels, and its hundred pictures would be read for nothing.
-    if (box) cities = new RoomsLayer({ pieces, bounds: boundsOfBox(box), minZoom: 3, keepBuffer: 2, zIndex: 4 }).addTo(map)
+    // 2.5 and not 3: at the half level under a whole minZoom Leaflet draws these tiles while the map moves and takes them away when it stops.
+    if (box) cities = new RoomsLayer({ pieces, bounds: boundsOfBox(box), minZoom: 2.5, keepBuffer: 2, zIndex: 4 }).addTo(map)
   }
+
+  // The caves and the mines of the continent on show, seen from outside: the rooms of the buildings
+  // that lie under the ground (caves.json, main/caves.ts), over the terrain and see-through. Only
+  // from close up: from far away a mine is a few pixels. A layer of its own, Caves. Where the
+  // character is, under a roof, the rooms of that building are drawn whole over these.
+  const CAVES_ZOOM = 7 // about a pixel a yard: a mine is a hundred pixels across
+  const CAVES_OPACITY = 0.65 // the hill over the cave shows through
+  let buried: Record<string, number[]> | undefined
+  let caves: L.Layer | undefined
+  function showCaves(): void {
+    caves?.remove()
+    caves = undefined
+    const world = inside || !layers.caves ? undefined : interiors?.maps.find((m) => m.kind === 'world' && m.id === continent)
+    const under = new Set(world && buried?.[continent])
+    if (!map || !world || !under.size) return
+    const pieces = world.pieces.filter((p) => under.has(p.building)), box = boxOf(pieces)
+    if (box) caves = new RoomsLayer({ pieces, bounds: boundsOfBox(box), keepBuffer: 2, zIndex: 4, opacity: CAVES_OPACITY, className: 'caves' })
+    fitCaves()
+  }
+  // On the map from CAVES_ZOOM up, and off it below, by hand. A layer's own minZoom is not used: half
+  // a level under it Leaflet draws the tiles of the level above while the map moves and takes them
+  // away when it stops, so the caves flickered while the map was dragged.
+  function fitCaves(): void {
+    if (!map || !caves) return
+    if (map.getZoom() < CAVES_ZOOM) caves.remove()
+    else if (!map.hasLayer(caves)) caves.addTo(map)
+  }
+  $effect(() => {
+    void layers.caves
+    void inside
+    showCaves()
+  })
 
   // What the middle of the map shows, for the readout, while the map does not follow the character:
   // someone moving the map to explore reads what is being looked at, not where the character stands.
@@ -433,6 +469,7 @@
     continent = which
     writeNames()
     showCities()
+    showCaves()
     const whole = maps.find((m) => m.level === 'continent' && m.continent === which && m.parent !== 0)
     // At once: a zoom still running would end by putting this view back over whatever came after it.
     if (fit && whole?.rect) map.fitBounds(boundsOf(whole), { animate: false })
@@ -487,6 +524,7 @@
     inside = m
     labelled = null
     showCities()
+    showCaves()
     levels = Math.max(0, ...m.pieces.map((p) => p.level))
     upTo = levels
     showRooms(m.pieces)
@@ -579,10 +617,8 @@
    * Takes the map to a place and opens the label on it: for a row chosen in the panel, for a
    * result of the search. zoom: how near to look, when the map is farther than that.
    */
-  export function goTo(to: { continent: Continent; at: Point; title: string; where?: string; zoom?: number; whole?: GameMap; dungeon?: { id: number; wing?: string } }): void {
+  export function goTo(to: { continent: Continent; at: Point; title: string; where?: string; zoom?: number; whole?: GameMap; dungeon?: { id: number; wing?: string }; item?: number }): void {
     if (!map || !maps.length) return
-    // A dungeon: its own map, or its door where the app has no rooms of it.
-    if (to.dungeon && openDungeon(to.dungeon.id, to.dungeon.wing)) return
     following = false
     if (inside || continent !== to.continent) show(to.continent, false)
     const view = map
@@ -590,6 +626,12 @@
     if (to.whole?.rect) view.fitBounds(boundsOf(to.whole), { animate: false })
     else view.setView(at(to.at), Math.max(view.getZoom(), to.zoom ?? 5), { animate: false })
     const found = zoneAt(maps, to.continent, to.at)
+    // A dungeon: its door, labelled as a click on it labels it; Dungeon Map opens the wing that was found.
+    const door = to.dungeon && travel.doors.find((d) => d.continent === to.continent && d.x === to.at.x && d.y === to.at.y)
+    if (door) {
+      labelPin(to.at, door.names.join(', '), ['Entrance'], found, behindDoor(door), to.dungeon!.wing)
+      return
+    }
     labelled = {
       units: to.at,
       continent: to.continent,
@@ -599,12 +641,16 @@
       spot: spotOf(at(to.at)),
       box: frameSize(),
       pin: found ? { m: found.zone.id, ...found.place } : null,
+      ...(to.item && { item: to.item }), // an item found: its picture beside the name
     }
+    // A vendor or a trainer found: its panel opens as for a click on its pin.
+    const target = at(to.at), npc = laid.find((l) => l.pin.npc && l.pin.name === to.title && view.distance(target, l.at) < 1)?.pin
+    if (npc) labelled.npc = { ...npc }
   }
 
   // A click on a pin opens the label on it, as on any point of the map: its name, and under it what
   // the pin is. on: the zone the pin was placed by, since where two maps overlap the point alone does not tell.
-  function labelPin(units: Point, title: string, notes: string[], on = zoneAt(maps, continent, units), dungeons?: { id: number; name: string; raid: boolean }[]): void {
+  function labelPin(units: Point, title: string, notes: string[], on = zoneAt(maps, continent, units), dungeons?: { id: number; name: string; raid: boolean }[], wing?: string): void {
     if (!map) return
     if (holder.clientWidth < 640) layersOpen = false // on a narrow map the menu would lie over the label
     labelled = {
@@ -617,6 +663,7 @@
       box: frameSize(),
       pin: on ? { m: on.zone.id, ...on.place } : null,
       dungeons,
+      wing,
     }
   }
 
@@ -867,6 +914,7 @@
     made.on('zoomstart', () => (zooming = true))
     made.on('zoomend', () => (zooming = false))
     made.on('zoomend', () => (zoom = made.getZoom()))
+    made.on('zoomend', fitCaves)
     // A window made wider or narrower: the map that follows puts the character back in its middle.
     made.on('resize', () => {
       if (following) place(true)
@@ -876,8 +924,10 @@
       for (const n of named) n.sizes = {}
       layout()
     })
-    // A click on the world map puts the label on that point. Inside a dungeon there is nothing to say of a point yet.
+    // A click on the world map puts the label on that point; with a label open, it only closes it. Inside a dungeon
+    // there is nothing to say of a point yet.
     made.on('click', (e) => {
+      if (labelled) return void (labelled = null)
       if (inside) return
       if (holder.clientWidth < 640) layersOpen = false // on a narrow map the menu would lie over the label
       const units = { x: e.latlng.lng, y: -e.latlng.lat }, found = zoneAt(maps, continent, units)
@@ -1006,6 +1056,8 @@
   }) as unknown as new (at: L.LatLng, options: L.CircleMarkerOptions & { lozenge: boolean; picture: HTMLImageElement }) => L.CircleMarker
   const fixedGroup = L.layerGroup()
   let laid: { pin: FixedPin; at: L.LatLng; zone: GameMap }[] = []
+  // The label is open on a pin of the map: a ring around the pin instead of the dot, which would hide it.
+  const onPin = $derived(!!labelled && labelled.continent === continent && !inside && laid.some((l) => at(labelled!.units).equals(l.at, 1e-6)))
   // What is drawn now: more than the view, so that the map can move a little (it does all the time
   // while it follows the character) without the pins being made again.
   let drawnFor: { view: L.LatLngBounds; far: number } | null = null
@@ -1019,11 +1071,14 @@
     fixedGroup.addTo(map)
     const view = map.getBounds().pad(threeD ? 2 : 0.5), far = map.getZoom() // the 3D view sees farther, to the fog
     drawnFor = { view, far }
+    // What the label is open on is drawn even with its layers off: the search or a panel led there, and the line points at it.
+    const here = labelled && labelled.continent === continent ? at(labelled.units) : null
+    const labelledAt = (where: L.LatLng): boolean => !!here && here.equals(where, 1e-6)
     // Ore and herbs first, so that who offers a service is painted over them.
     for (const service of [false, true]) {
       for (const { pin: p, at: where, zone } of laid) {
         const shown = (layer: FixedLayer): boolean => layers[layer] && far >= FIXED_ZOOM[layer]
-        if ((p.side !== undefined) !== service || !p.layers.some(shown) || !view.contains(where)) continue
+        if ((p.side !== undefined) !== service || !(p.layers.some(shown) || labelledAt(where)) || !view.contains(where)) continue
         // The radius is what the pointer feels, smaller than the picture: two people a few yards apart both answer.
         new FixedPinMark(where, { renderer: fixedCanvas, radius: 7, lozenge: !service, fillColor: service ? '#7fc8ff' : '#d9a066', picture: pictureOf(iconOf(p, shown)), bubblingMouseEvents: false })
           // Made when the pointer comes over the pin, not for every pin. Names come from the
@@ -1038,7 +1093,10 @@
             },
             { direction: 'top', offset: [0, -9], className: 'tip' },
           )
-          .on('click', () => labelPin({ x: where.lng, y: -where.lat }, p.name, [...(p.sub ? [p.sub] : []), p.layers.map((layer) => LAYER_NAMES[layer]).join(', ')], { zone, place: { x: p.x, y: p.y } }))
+          .on('click', () => {
+            labelPin({ x: where.lng, y: -where.lat }, p.name, [...(p.sub ? [p.sub] : []), p.layers.map((layer) => LAYER_NAMES[layer]).join(', ')], { zone, place: { x: p.x, y: p.y } })
+            if (labelled && p.npc) labelled.npc = { ...p }
+          })
           .addTo(fixedGroup)
       }
     }
@@ -1059,6 +1117,9 @@
   // The doors of the dungeons and the flight routes of the character's side, from the game's own tables.
   let travel = $state.raw<Travel>({ doors: [], nodes: [], routes: [] })
   const travelLayers = { dungeons: L.layerGroup(), routes: L.layerGroup() }
+  // The maps behind a door the app has the rooms of: a button each on its label.
+  const behindDoor = (door: Travel['doors'][number]): { id: number; name: string; raid: boolean }[] =>
+    (door.maps ?? []).flatMap((id, i) => (interiors?.maps.some((m) => m.id === id) ? [{ id, name: door.names[i] ?? door.names[0]!, raid: door.raid === true }] : []))
   $effect(() => {
     for (const group of Object.values(travelLayers)) group.clearLayers()
     for (const door of travel.doors) {
@@ -1066,9 +1127,7 @@
       L.marker(at(door), { keyboard: false, zIndexOffset: 200, icon: doorIcon(door.raid === true) })
         .bindTooltip(door.names.join(', '), { direction: 'top', offset: [0, -13], className: 'tip' })
         .on('click', () => {
-          // The maps behind the door the app has the rooms of: a button each on the label.
-          const behind = (door.maps ?? []).flatMap((id, i) => (interiors?.maps.some((m) => m.id === id) ? [{ id, name: door.names[i] ?? door.names[0]!, raid: door.raid === true }] : []))
-          labelPin({ x: door.x, y: door.y }, door.names.join(', '), ['Entrance'], undefined, behind)
+          labelPin({ x: door.x, y: door.y }, door.names.join(', '), ['Entrance'], undefined, behindDoor(door))
         })
         .addTo(travelLayers.dungeons)
     }
@@ -1165,10 +1224,11 @@
   // The journey Shortest Path guides in the game: a ring on its goal, and the way there. A walk is a
   // dashed gold line, found here on the same grid (main/walk.ts): from the character to where the
   // walk ends, again when that changes or the character leaves it, and shortened as the character
-  // walks. The game's API tells no points: where the addon could read the legs off Shortest Path's
-  // own line (ahead), every leg is drawn, a flight or a boat in its own colour through its points;
-  // otherwise only a journey that is all on foot has a line, to its goal.
+  // walks. Where Shortest Path tells where every leg starts and ends (ahead), every leg is drawn, a
+  // flight or a boat in its own colour from end to end; otherwise only a journey that is all on foot
+  // has a line, to its goal.
   const OFF_THE_WAY = 40 // yards
+  const ahead = $derived(legsOn(journey, maps))
   const ASK_EVERY = 2000 // ms between two askings at least
   const journeyGoal = $derived.by(() => {
     if (!journey || journey.loading || !journey.goal) return null
@@ -1372,7 +1432,15 @@
       .then((list) => {
         interiors = list
         showCities()
+    showCaves()
         place()
+        // Which of its buildings are caves: made right after the list.
+        return fetch(`${TILES}/caves.json`)
+      })
+      .then((answer) => (answer.ok ? (answer.json() as Promise<{ worlds: Record<string, number[]> }>) : undefined))
+      .then((list) => {
+        buried = list?.worlds
+        showCaves()
       })
       .catch(() => {})
   })
@@ -1387,10 +1455,12 @@
   {#key labelled.units}
     <PointLabel
       title={savedIndex >= 0 ? pointName : labelled.title}
+      item={labelled.item}
       notes={labelled.notes}
       where={labelled.where}
       {way}
       spot={labelled.spot}
+      ring={onPin}
       box={labelled.box}
       sending={sendState(live, inbox, !!labelled.pin)}
       acked={inbox}
@@ -1415,7 +1485,7 @@
       onremove={() => setPins(removePin(myPins, savedIndex))}
       onclose={() => (labelled = null)}
       dungeons={labelled.dungeons}
-      ondungeon={(id) => openDungeon(id)}
+      ondungeon={(id) => openDungeon(id, labelled?.wing)}
     />
   {/key}
 {/if}

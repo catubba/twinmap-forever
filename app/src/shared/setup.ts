@@ -1,6 +1,6 @@
 // The first run: its pages, one thing each, and what each says.
 import type { LinkStatus } from './link'
-import { tilesHelp, type TilesStatus } from './tiles-status'
+import { BUILT_ONCE, tilesHelp, type TilesStatus } from './tiles-status'
 
 /** What the main process tells the window about the game folder and the addons in it. */
 export interface SetupStatus {
@@ -83,7 +83,7 @@ export function setupPages(setup: SetupStatus, tiles: TilesStatus | null, link: 
       : tiles.state === 'looking'
         ? { state: 'working', lines: ["Opening the game's files."], progress: 0 }
         : tiles.state === 'converting'
-          ? { state: 'working', lines: ["Reading the game's own pictures of the world."], progress: tiles.percent }
+          ? { state: 'working', lines: ["Reading the game's own pictures of the world.", BUILT_ONCE], progress: tiles.percent }
           : tiles.state === 'failed'
             ? { state: 'problem', lines: ['The map could not be built.', tiles.message, tilesHelp(tiles)!], action: 'retry' }
             : { state: 'done', lines: ['The map is ready.', `${count(tiles.tiles)} tiles from game version ${tiles.version}.`] }),

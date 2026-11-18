@@ -9,7 +9,7 @@ export type NavField = 'graph' | 'grid' | 'height' | 'floor' | 'terrain'
 const FIELDS: NavField[] = ['graph', 'grid', 'height', 'floor', 'terrain']
 
 /** The format of the grid this app reads: any other is a file for a newer or an older reader. */
-export const NAV_FORMAT = 2
+export const NAV_FORMAT = 3
 
 export interface NavData {
   /** The game's number of the continent: 0 Eastern Kingdoms, 1 Kalimdor. */

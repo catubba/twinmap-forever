@@ -219,7 +219,7 @@ test('the game folder is found from a path inside it, and only if it holds Forev
 
 // On a PC with the game: the real archive. UiMap is the table of the 60 maps; 1957206 is its file number.
 const real = gameFolderFrom([registryInstallPath()])
-test.skipIf(!real)('the real game opens and gives UiMap in under a second', () => {
+test.skipIf(!real)('the real game opens and gives UiMap in under two seconds', () => {
   const started = performance.now()
   const client = openClientFiles(real!)
   const table = client.read(1957206)!
@@ -227,7 +227,7 @@ test.skipIf(!real)('the real game opens and gives UiMap in under a second', () =
   console.log(`real client ${client.version}: ${client.count} files, UiMap ${table.length} bytes, ${ms.toFixed(0)} ms`)
   expect(table.toString('latin1', 0, 4)).toBe('WDC5')
   expect(table.readUInt32LE(136)).toBe(60) // records
-  expect(ms).toBeLessThan(1000)
+  expect(ms).toBeLessThan(2000) // about 0.8 s alone, more beside the other tests
 })
 
 // On a PC whose game has been sent the key of the dungeons that came out in November 2026: the world file of The Drowned City.

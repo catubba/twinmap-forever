@@ -1,8 +1,10 @@
 // Makes the map tiles on a thread of its own: a minute or two of work the first time, which would
 // stop the reading of the strip if it ran with it. Tells its progress in whole percents.
-import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parentPort, workerData } from 'node:worker_threads'
+import { FACTS, gameItemFacts, type ItemFacts, ITEMS_FILE } from '../shared/items'
+import { trainerFacts, TRAINERS_FILE, TRAINERS_FORMAT } from '../shared/trainers'
 import { gameMaps, UI_MAP_ASSIGNMENT_FILE, UI_MAP_FILE, type GameMap } from '../shared/maps'
 import { AREA_POI_FILE, AREA_TABLE_FILE, places, UI_MAP_X_MAP_ART_FILE, WORLD_MAP_OVERLAY_FILE } from '../shared/places'
 import { TAXI_NODES_FILE, TAXI_PATH_FILE, travel, TRAVEL_FORMAT, type Travel } from '../shared/services'
@@ -14,7 +16,9 @@ import { installedBuild, openClientFiles, type ClientFiles } from './client-file
 import { convertInteriors, ENCOUNTERS_FILE, finishedInteriors, INTERIORS_FILE, MAP_FILE, mapEntries, ROOM_PICTURES_FILE, roomPictures } from './interiors'
 import { sentKeys } from './keys'
 import { convertHeights, heightsDone } from './heights'
+import { makeCaves } from './caves'
 import { ICONS_MADE, writeIcons } from './icons'
+import { gamePictures, itemIcons } from './item-icons'
 import { convertWorld, dropOtherBuilds, finished, ICONS_FOLDER, MAPS_FILE, PLACES_FILE, tilesFolder, TRAVEL_FILE } from './tiles'
 
 const { gameFolder, base } = workerData as { gameFolder: string; base: string }
@@ -46,6 +50,12 @@ try {
   // and a few hundred megabytes, and on most starts the tiles are already there.
   let client: ClientFiles | undefined
   const open = (): ClientFiles => (client ??= openClientFiles(gameFolder, keys))
+  // The picture of an item, or of a spell by its file, when a screen asks for one the folder does not have yet (item-icons.ts).
+  // Asked while the map is being made, it is answered once the making is done.
+  const makers = { items: itemIcons(open, folder), pictures: gamePictures(open, folder) }
+  parentPort?.on('message', (asked: { kind?: unknown; id?: unknown }) => {
+    if ((asked.kind === 'items' || asked.kind === 'pictures') && typeof asked.id === 'number') parentPort?.postMessage({ asked: `${asked.kind}/${asked.id}`, made: makers[asked.kind](asked.id) })
+  })
   const table = (b: Buffer) => readTable(b, (keyName) => open().opens(keyName))
   const progress = (percent: number): void => {
     if (Math.floor(percent) !== told) tell({ state: 'converting', percent: Math.floor(percent) })
@@ -115,6 +125,44 @@ try {
   }
   // The pictures of the pins. A folder made before the app knew of them, or of some of them, gets them now.
   if (!existsSync(join(folder, ICONS_FOLDER, ICONS_MADE))) writeIcons(open(), folder)
+  // What the game says of each item, for the Items section and the vendors (shared/items.ts): made
+  // again when the server has sent rows since, which the game keeps in its cache beside the keys
+  // (keys.ts), or when an older app made it with fewer facts.
+  try {
+    const caches = join(gameFolder, '_forever_', 'Cache', 'ADB')
+    const sent = existsSync(caches) ? readdirSync(caches).map((language) => join(caches, language, 'DBCache.bin')).filter((f) => existsSync(f)) : []
+    const itemsFile = join(folder, ITEMS_FILE)
+    const made = existsSync(itemsFile) ? statSync(itemsFile).mtimeMs : 0
+    const older = (): boolean => {
+      try {
+        return Object.values(JSON.parse(readFileSync(itemsFile, 'utf8')) as ItemFacts)[0]?.length !== FACTS
+      } catch {
+        return true
+      }
+    }
+    if (!made || sent.some((f) => statSync(f).mtimeMs > made) || older()) {
+      const facts = gameItemFacts(open(), sent.map((f) => readFileSync(f)))
+      if (facts) writeFileSync(itemsFile, JSON.stringify(facts))
+    }
+  } catch {
+    // Items shows numbers and no prices; tried again at the next start.
+  }
+  // What the class trainers teach (shared/trainers.ts): made once for each build, and again for an older format.
+  try {
+    const trainersFile = join(folder, TRAINERS_FILE)
+    let format = 0
+    try {
+      format = (JSON.parse(readFileSync(trainersFile, 'utf8')) as { format?: number }).format ?? 0
+    } catch {
+      // Not there yet.
+    }
+    if (format !== TRAINERS_FORMAT) {
+      const facts = trainerFacts(open())
+      if (facts) writeFileSync(trainersFile, JSON.stringify(facts))
+    }
+  } catch {
+    // The trainer panel goes without the game's lists; tried again at the next start.
+  }
   const ready = { state: 'ready', folder, version: build.version, tiles, missing, seconds: (Date.now() - started) / 1000, converted } as const
   tell(ready)
 
@@ -131,6 +179,12 @@ try {
       const maps = files.read(MAP_FILE, true), rooms = files.read(ROOM_PICTURES_FILE, true), fights = files.read(ENCOUNTERS_FILE, true)
       if (!maps || !rooms || !fights) throw new Error('the game has no table of its maps, of its room pictures or of its bosses')
       inside = convertInteriors(mapEntries(table(maps), table(fights)), roomPictures(table(rooms)), (id) => files.read(id), folder)
+    }
+    // Which of the continents' buildings are caves and mines: for the layer that shows them from outside. Without it the map goes on as before.
+    try {
+      makeCaves(folder, inside)
+    } catch {
+      // tried again at the next start
     }
     // Now the map holds all these keys could open. One it was made with and the cache has lost stays listed.
     writeFileSync(keysFile, JSON.stringify([...new Set([...usedKeys, ...keys.keys()])].sort((a, b) => a - b)))

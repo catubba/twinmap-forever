@@ -55,3 +55,9 @@ test('in a fight the position says so, and experience waits for its end', () => 
   assert.equal(blocks(addon, 'pos').at(-1).combat, undefined);
   assert.equal(blocks(addon, 'char').at(-1).xp, 8500);
 });
+
+test('the full name goes out with the level, as the sheet calls the character', () => {
+  const addon = enterWorld('GAME.level, GAME.surname = 13, "Sucameli"');
+  addon.run(10);
+  assert.deepEqual(blocks(addon, 'char'), [{ level: 13, name: 'Catubbio Sucameli' }]);
+});

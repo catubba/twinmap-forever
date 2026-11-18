@@ -2,6 +2,52 @@
 
 What changed in each version of Twinmap, newest first. The section of a version is also the text of its release on GitHub and of the addon's file on CurseForge.
 
+## 0.11.1 - 2026-11-18
+
+### New
+
+- **Caves and mines from outside.** A new layer, Caves, under World in Layers, on by default. Zoom in on a zone and the galleries of its caves and mines show through the ground, wherever your character is: you can look into a mine before you go in. Houses keep their roofs. Buildings dug into a hill, as the dwarves' in Dun Morogh, show their inside too.
+
+### Fixed
+
+- **The inside of Ironforge** no longer flickers while you drag the map at one zoom level.
+
+## 0.11.0 - 2026-11-18
+
+### New
+
+- **Your characters.** Twinmap now keeps a sheet of every character you play with the addon on: money, bags, bank, what is worn, statistics, skills, spells and recipes. The character in game is named at the start of the top row; click the name to look at another one. It all reads the same with the game closed. The bank is read when you open it in game, so open it once.
+- **Items.** A new section beside Now. On the left, what the character wears, laid out as in the game's character window, with a picture of the character in the middle and its statistics below, the same lines the game shows. On the right, bags, reagent bag, keyring and bank as grids of slots. A filter dims what does not match, and tells you which other character holds what you are looking for. Table shows the same items as a list, with what they are worth at a vendor.
+- **The picture of your character.** It is taken off your screen the first time you open the character window in game, and again when you open it wearing something else. Retake takes a new one, Save writes it as a PNG.
+- **Item popups.** Hover an item in Items, in a vendor's list or on a trainer's recipe: the game's own tooltip, how worn it is today, who holds it, the nearest vendors that sell it with their price, and who drops it.
+- **Vendors and trainers.** Open the label of a vendor or a trainer, from its pin or from the search, and a panel shows what the vendor sells and at what price, with how many you already hold. A class trainer shows what you can learn now, what comes at the next levels and what it costs; a profession trainer shows its recipes, and which you know.
+- **Pictures of items.** Items have the game's own picture in the search, in labels and in every list.
+
+### Changed
+
+- **The pin of an open label.** The NPC a label is open on keeps its pin on the map even when its layer is off, with a gold ring around it.
+
+This version needs the new addon too: update Twinmap Forever from CurseForge.
+
+## 0.10.0 - 2026-11-17
+
+### New
+
+- **Relief.** The map shows the shape of the ground: hills, valleys and mountain faces in soft shade, with the light from the north-west. It is a layer of its own, Relief, under World in Layers, and it is on by default. The first start after the update reads the heights from the game's files once: about half a minute, and 80 MB more on disk.
+- **The whole journey on the map.** With Shortest Path Forever 1.39 or later, a journey with a flight, a boat, a zeppelin or the tram is drawn on the map leg by leg, each in the colour the game gives it, and the walks between them follow the paths. You no longer need to open the game's world map once for that. With an older Shortest Path the In game band says what to update.
+
+### Changed
+
+- **A dungeon from the search.** A dungeon or a raid chosen in the search now takes the map to its door and opens its label there, as a click on the door does. Dungeon Map, in the label, opens its map, on the wing you searched for.
+- **Closing a label.** With a label open, a click elsewhere on the map only closes it. The next click opens a label on its point, as before.
+- **Walks on the map** follow the walking grid of Shortest Path Forever 1.41, the one it guides with in the game, and no longer climb faces steeper than the game lets you walk up.
+- **Building the map.** While the map is made from the game's files, the app says that this happens only the first time, and again after a game update.
+
+### Fixed
+
+- **The buttons of a dungeon's label.** On a door with one dungeon, the buttons ran out of the label. Dungeon Map now has a row of its own.
+- **Walks with the newest Shortest Path.** Since Shortest Path Forever 1.37 the app could not read its walking grid and fell back on an older copy of its own. It reads it again.
+
 ## 0.9.0 - 2026-11-16
 
 ### New

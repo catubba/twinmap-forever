@@ -34,6 +34,10 @@ export interface FixedPin {
   layers: FixedLayer[]
   /** Whom an NPC serves: "A", "H" or "AH". Missing for ore and herbs. */
   side?: string
+  /** The NPC's number in QuestieDB, for a vendor or a trainer: what its panel shows. */
+  npc?: number
+  /** What a vendor sells: items by number. */
+  sells?: number[]
 }
 
 /** Whether a pin is for a character of this side. With the side not known yet, every pin is. */

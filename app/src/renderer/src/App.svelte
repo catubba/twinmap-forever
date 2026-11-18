@@ -13,7 +13,7 @@
   import { kept } from './kept.svelte'
   import { inApp } from './web'
   import { followFrom, goneFrom, inboxFrom, setFrom } from '../../shared/send'
-  import { journeyFrom, legsAhead, wayFrom } from '../../shared/journey'
+  import { journeyFrom } from '../../shared/journey'
   import Now from './Now.svelte'
   import Search from './Search.svelte'
   import { ADDON_MISSING, type SetupStatus } from '../../shared/setup'
@@ -24,6 +24,13 @@
   import Map from './Map.svelte'
   import { drop, gone, opened, screen } from './motion'
   import Settings from './Settings.svelte'
+  import Picker from './Picker.svelte'
+  import Items from './Items.svelte'
+  import ItemPopup from './ItemPopup.svelte'
+  import NpcPanel from './NpcPanel.svelte'
+  import { firstName, knownOf, shownOf } from '../../shared/characters'
+  import type { PortraitsTold } from '../../shared/portrait'
+  import type { Sheets } from '../../shared/sheet'
 
   let link = $state<LinkSnapshot | null>(null)
   let now = $state(Date.now())
@@ -62,6 +69,8 @@
   let onSetup = $state<boolean | null>(null)
   // Settings lie over the map, which stays as it was underneath.
   let onSettings = $state(false)
+  // Items lies over the map as Settings does, as wide as the window.
+  let onItems = $state(false)
   // Feedback is a small window over whatever is on show.
   let onFeedback = $state(false)
   window.twinmap.onSetup((told) => {
@@ -114,14 +123,36 @@
     if (route.sent) void window.twinmap.sendRoute(false)
     setRoute(noRoute())
   }
-  // The journey Shortest Path guides in the game, and its legs as they lie on the map when the addon could read them.
+  // The journey Shortest Path guides in the game.
   const journey = $derived(live ? journeyFrom(link?.state.sections.journey) : null)
-  const ahead = $derived(live ? legsAhead(journey, wayFrom(link?.state.sections.line)) : null)
   // The companions of the group, where the game tells: gone with the strip, and with a group no longer told of.
   const group = $derived(live ? groupFrom(link?.state.sections.group, now - (link?.state.updatedAt.group ?? 0)) : [])
   const death = $derived(live ? deathFrom(link?.state.sections.dead, now - (link?.state.updatedAt.dead ?? 0)) : null)
   let back = $state.raw<(DeathPlace & { name: string; door: boolean }) | null>(null) // where the ghost walks to, as the map places it
   const xp = $derived(char ? experience(char) : null)
+  // The characters the app keeps a sheet of, and the one shown. Picking another changes what the app
+  // keeps of a character (bags, bank, spells), never the map, which is the one in game. A character
+  // coming into the game is shown again.
+  let sheets = $state.raw<Sheets>({})
+  window.twinmap.onSheets((all) => {
+    sheets = all
+  })
+  // The pictures of the characters, and whose is awaited (Retake).
+  let portraits = $state.raw<PortraitsTold>({ taken: {}, retake: null })
+  window.twinmap.onPortraits((told) => {
+    portraits = told
+  })
+  const inGame = $derived(live ? (char?.name ?? null) : null)
+  let picked = $state<string | null>(null)
+  let lastInGame: string | null = null
+  $effect(() => {
+    if (inGame && inGame !== lastInGame) picked = null
+    if (inGame) lastInGame = inGame
+  })
+  const characters = $derived(knownOf(sheets, inGame))
+  // The vendor or trainer whose label is open on the map: its panel tops the side panel until closed.
+  let npc = $state.raw<FixedPin | null>(null)
+  const shown = $derived(shownOf(characters, picked))
   const mapReady = $derived(tiles?.state === 'ready')
   const insideReady = $derived(tiles?.state === 'ready' && !!tiles.interiors && !tiles.interiors.problem)
   const count = (n: number): string => n.toLocaleString('en-US')
@@ -152,13 +183,17 @@
 
 <!-- The top row is the window's title bar too: it drags the window, a double click maximizes it. -->
 <header class="top">
+  {#if onSetup === false}
+    <Picker known={characters} {shown} {now} onpick={(key) => (picked = key)} onforget={(key) => void window.twinmap.forgetSheet(key)} />
+  {/if}
   {#if !onSetup}
     <nav aria-label="Sections">
-      <button class="tab" aria-current={onSettings ? undefined : 'page'} onclick={() => (onSettings = false)}>Now</button>
+      <button class="tab" aria-current={onSettings || onItems ? undefined : 'page'} onclick={() => ((onSettings = false), (onItems = false))}>Now</button>
+      <button class="tab" aria-current={onItems && !onSettings ? 'page' : undefined} onclick={() => ((onSettings = false), (onItems = true))}>Items</button>
     </nav>
   {/if}
   {#if onSetup === false && !onSettings && mapReady}
-    <Search ready={mapReady} {pos} side={char?.side} onpick={(place) => mapView?.goTo(place)} />
+    <Search ready={mapReady} {pos} side={char?.side} onpick={(place) => ((onItems = false), mapView?.goTo(place))} />
   {/if}
   {#if status}
     <p class="status" class:alone={onSetup !== false || onSettings || !mapReady}><i class={status.tone} title={status.word}></i><span class="word">{status.word}</span>{#if inbox && !inbox.off && inbox.id === undefined}<span class="left" class:low={inbox.left < 5}>{inbox.left} sends left</span>{/if}</p>
@@ -193,11 +228,16 @@
     <Settings {setup} {tiles} link={status} onback={() => (onSettings = false)} onfeedback={() => (onFeedback = true)} onfirstrun={() => ((onSettings = false), (onSetup = true))} />
   </div>
 {/if}
+{#if onItems && onSetup === false && !onSettings}
+  <div class="over" in:fade={screen} out:fade={gone}>
+    <Items {sheets} {portraits} {shown} known={characters} {now} onpick={(key) => (picked = key)} />
+  </div>
+{/if}
 {#if onSetup === false}
-<div class="work" class:shut={!panelOpen} in:fade={screen} inert={onSettings} style:--peek="{peek}px">
+<div class="work" class:shut={!panelOpen} in:fade={screen} inert={onSettings || onItems} style:--peek="{peek}px">
   <div class="mapbox">
     {#if mapReady}
-      <Map {pos} {group} {death} bind:back kills={live ? link?.state.sections.kills : undefined} bind:looking at={link?.state.updatedAt.pos} bind:this={mapView} {insideReady} {quests} {fixed} side={char?.side} {live} {inbox} removed={live ? goneFrom(link?.state.sections.marks) : []} set={live ? setFrom(link?.state.sections.marks) : []} gameFollows={live ? followFrom(link?.state.sections.follow) : null} {journey} {ahead} {route} onroute={(stop) => setRoute(addStop(route, stop))} />
+      <Map {pos} {group} {death} bind:back kills={live ? link?.state.sections.kills : undefined} bind:looking at={link?.state.updatedAt.pos} bind:this={mapView} {insideReady} {quests} {fixed} side={char?.side} {live} {inbox} removed={live ? goneFrom(link?.state.sections.marks) : []} set={live ? setFrom(link?.state.sections.marks) : []} gameFollows={live ? followFrom(link?.state.sections.follow) : null} {journey} {route} onroute={(stop) => setRoute(addStop(route, stop))} onnpc={(pin) => (npc = pin)} />
     {:else if tiles}
       <div class="making" class:failed={tiles.state === 'failed' || tiles.state === 'no-game'}>
         <p>{tilesLine(tiles)}</p>
@@ -233,6 +273,16 @@
 
   <aside class="panel surface" class:closed={!panelOpen} aria-label="Now" bind:clientHeight={panelHeight}>
     <button class="grip" aria-expanded={panelOpen} onclick={togglePanel}><Glyph name="menu" turn={panelOpen ? 0 : 180} />{panelOpen ? 'Close' : 'Quests and nearby'}</button>
+    {#if inGame && shown && !shown.live}
+      <!-- Another character than the one in game: said where its bags and spells will show, with the way back. -->
+      <p class="viewing" role="status">
+        <span>Showing <b style:color={shown.color}>{shown.key}</b></span>
+        <button class="btn back" onclick={() => (picked = null)}>Back to {firstName(inGame)}</button>
+      </p>
+    {/if}
+    {#if npc}
+      {#key npc}<NpcPanel pin={npc} {sheets} {shown} {now} onclose={() => (npc = null)} />{/key}
+    {/if}
     <Now
       {pos}
       {quests}
@@ -246,7 +296,6 @@
       inGame={route.sent && gameRoute?.t === route.t}
       {journey}
       back={death ? back : null}
-      wayKnown={!!ahead}
       onsent={(t) => setRoute({ ...route, sent: true, t })}
       onskip={skip}
       onarrive={() => setRoute(advance(route))}
@@ -270,6 +319,9 @@
   </aside>
 </div>
 {/if}
+
+<!-- The popup of the item under the pointer, over everything (M10-F15). -->
+<ItemPopup {sheets} known={characters} side={char?.side} {pos} />
 
 <style>
   /* Over everything, the top row too; it drags the window as the top row does. */
@@ -587,7 +639,33 @@
       -4px 0 0 #000,
       0 -10px 24px #000a;
   }
+  /* Another character shown: a band of the blue of what is on, along the top of the panel. */
+  .viewing {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    padding: 7px 12px 7px 16px;
+    background: linear-gradient(var(--disc-low), #072a40);
+    box-shadow:
+      inset 0 -1px 0 #000,
+      inset 0 1px 0 #ffffff1f;
+    font: var(--t-small);
+  }
+  .viewing b {
+    font-weight: 600;
+  }
+  .viewing .back {
+    margin-left: auto;
+    padding: 0 10px;
+    height: 24px;
+    font: 400 13px/20px var(--display);
+    white-space: nowrap;
+  }
   /* Closed: the next stop, as a sign reads it, and nothing to press but the way to open. */
+  .panel.closed .viewing,
+  .panel.closed :global(.npc),
   .panel.closed footer,
   .panel.closed :global(.now > :not(.plate, .none)),
   .panel.closed :global(.plate > :not(h2, .sign, .sheen)) {

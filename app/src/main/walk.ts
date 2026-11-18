@@ -19,6 +19,7 @@ import { navFrom, type NavData, type NavField } from '../shared/nav-data'
 import { BLOCK_YARDS } from '../shared/world'
 
 const OFFROAD = 1.5 // a yard off the road counts as this many on it
+const CLIMB = Math.tan((50 * Math.PI) / 180) // the steepest rise a character walks up, a yard for each yard on
 const SNAP = 6 // cells around a point searched for one that can be walked
 const LIMIT = 400_000 // cells a search looks at before it gives up
 const TRACK_SLACK = 6 // steps a tracker searches past twice the cells between two points: a ramp, a stair that turns
@@ -220,33 +221,32 @@ export function walker(nav: NavData): Walker {
     return c
   }
 
-  function countFloors(s: string): number {
-    let total = 0, pos = 3
-    for (let i = num(s, 0, 3); i > 0; i--) {
-      const count = sym(s, pos + 3)
-      total += count
-      pos += 4 + count * 5
-    }
-    return total
+  const countFloors = (s: string): number => num(s, 0, 3)
+  // The bits set in a step mask: a floor has a landing layer for each.
+  const bitsOf = (mask: number): number => {
+    let n = 0
+    for (; mask; mask >>= 1) n += mask & 1
+    return n
   }
+  // A cell or a node, as a delta from the one before: a symbol under 63 is the delta, 63 is followed by the delta - 63 in three.
+  const delta = (s: string, pos: number): [number, number] => (sym(s, pos) < 63 ? [sym(s, pos), pos + 1] : [63 + num(s, pos + 1, 3), pos + 4])
 
   // The floors of a cluster, and the steps to and from them. A step both ways take is a bit on the
-  // floor it leaves, to the surface that way nearest its height; every other is a record of its own.
+  // floor it leaves, landing on the layer the floor names for it; every other is a record of its own.
   function unpackFloors(k: number, c: Cluster, s: string): void {
-    let node = N, pos = 3
-    const masks: number[] = []
+    let node = N, pos = 3, lc = 0
+    const masks: number[] = [], landings: number[] = []
     for (let i = num(s, 0, 3); i > 0; i--) {
-      const lc = num(s, pos, 3), count = sym(s, pos + 3)
-      pos += 4
-      c.first[lc] = node
-      for (let j = 0; j < count; j++) {
-        c.val[node] = sym(s, pos)
-        c.z[node] = num(s, pos + 1, 2) - 2048
-        c.cell[node] = lc
-        masks[node] = num(s, pos + 3, 2)
-        pos += 5
-        node++
-      }
+      const [d, at] = delta(s, pos)
+      lc += d
+      if (c.first[lc]! < 0) c.first[lc] = node
+      c.val[node] = sym(s, at)
+      c.z[node] = num(s, at + 1, 2) - 2048
+      c.cell[node] = lc
+      masks[node] = num(s, at + 3, 2)
+      landings[node] = at + 5
+      pos = at + 5 + bitsOf(masks[node]!)
+      node++
     }
     const add = (at: number, link: Link): void => void (c.links[at] ??= []).push(link)
     const link = (from: number, dx: number, dy: number, layer: number, cost: number, both: boolean): void => {
@@ -260,41 +260,56 @@ export function walker(nav: NavData): Walker {
       if (target >= 0) add(target, { dx: -dx, dy: -dy, layer: from < N ? 0 : from - c.first[lc]! + 1, cost })
     }
     for (let from = N; from < node; from++) {
-      for (let d = 0, bits = masks[from]!; d < 8; d++, bits >>= 1) if (bits & 1) link(from, DX[d]!, DY[d]!, -1, 0, true)
+      let landing = landings[from]!
+      for (let d = 0, bits = masks[from]!; d < 8; d++, bits >>= 1) if (bits & 1) link(from, DX[d]!, DY[d]!, sym(s, landing++), 0, true)
     }
     const steps = num(s, pos, 3)
     pos += 3
-    for (let i = 0; i < steps; i++, pos += 5) {
-      const kind = sym(s, pos + 3)
-      link(num(s, pos, 3), DX[kind % 8]!, DY[kind % 8]!, sym(s, pos + 4), 0, kind < 8)
+    for (let i = 0, record = 0; i < steps; i++) {
+      const [d, at] = delta(s, pos)
+      record += d
+      const kind = sym(s, at)
+      link(record, DX[kind % 8]!, DY[kind % 8]!, sym(s, at + 1), 0, kind < 8)
+      pos = at + 2
     }
     const drops = num(s, pos, 3)
     pos += 3
-    for (let i = 0; i < drops; i++, pos += 8) link(num(s, pos, 3), sym(s, pos + 3) - 8, sym(s, pos + 4) - 8, sym(s, pos + 5), num(s, pos + 6, 2), false)
-  }
+    for (let i = 0; i < drops; i++, pos += 8) link(num(s, pos, 3), sym(s, pos + 3) - 8, sym(s, pos + 4) - 8, sym(s, pos + 5), num(s, pos + 6, 2), false)  }
 
   const clusterAt = (gx: number, gy: number): number => Math.floor(gx / C) * nav.ny + Math.floor(gy / C)
   const local = (gx: number, gy: number): number => (gx % C) * C + (gy % C)
   const inside = (gx: number, gy: number): boolean => gx >= 0 && gy >= 0 && gx < GX && gy < GY
   const value = (gx: number, gy: number): number => (inside(gx, gy) ? (cluster(clusterAt(gx, gy))?.val[local(gx, gy)] ?? 0) : 0)
   const flagsAt = (gx: number, gy: number): number => cluster(clusterAt(gx, gy))?.flags[local(gx, gy)] ?? 0
-  // A step with steep ground at either end is taken downhill only.
-  const downhill = (a: Cluster, from: number, b: Cluster, to: number): boolean => (a.val[from] !== 3 && b.val[to] !== 3) || b.z[to]! <= a.z[from]!
-  const legalBetween = (ax: number, ay: number, bx: number, by: number): boolean => {
-    const a = cluster(clusterAt(ax, ay)), b = cluster(clusterAt(bx, by))
-    return !!a && !!b && downhill(a, local(ax, ay), b, local(bx, by))
+  // A step the game lets a character take: no steeper than 50 degrees up, and with steep ground at either end downhill only.
+  const climbable = (a: Cluster, from: number, b: Cluster, to: number, yards: number): boolean => {
+    const rise = b.z[to]! - a.z[from]!
+    return rise <= CLIMB * yards && ((a.val[from] !== 3 && b.val[to] !== 3) || rise <= 0)
   }
-  // A step north, south, east or west on the base surface: its bit sits on the cell with the lower x or y.
-  function stepLegal(gx: number, gy: number, dx: number, dy: number): boolean {
+  const base = (gx: number, gy: number): [Cluster | null, number] => [cluster(clusterAt(gx, gy)), local(gx, gy)]
+  const legalBetween = (ax: number, ay: number, bx: number, by: number): boolean => {
+    const [a, from] = base(ax, ay), [b, to] = base(bx, by)
+    return !!a && !!b && climbable(a, from, b, to, cell * Math.hypot(bx - ax, by - ay))
+  }
+  // A step north, south, east or west on the base surface, open in the data: its bit sits on the cell with the lower x or y.
+  function stepOpen(gx: number, gy: number, dx: number, dy: number): boolean {
     const ax = dx < 0 ? gx + dx : gx, ay = dy < 0 ? gy + dy : gy
     if (value(ax, ay) === 0 || value(ax + (dx !== 0 ? 1 : 0), ay + (dy !== 0 ? 1 : 0)) === 0) return false
     const f = flagsAt(ax, ay)
-    return (dx !== 0 ? (f & 1) === 0 : (f & 2) === 0) && legalBetween(gx, gy, gx + dx, gy + dy)
+    return dx !== 0 ? (f & 1) === 0 : (f & 2) === 0
   }
-  // A diagonal one: either way round its corner, both legs walked as a step is, or the data's own diagonal.
+  const stepLegal = (gx: number, gy: number, dx: number, dy: number): boolean => stepOpen(gx, gy, dx, dy) && legalBetween(gx, gy, gx + dx, gy + dy)
+  // A leg round a diagonal's corner: a step, and with steep ground at either end only between two cells of the same height.
+  function detourLegal(gx: number, gy: number, dx: number, dy: number): boolean {
+    if (!stepOpen(gx, gy, dx, dy)) return false
+    const [a, from] = base(gx, gy), [b, to] = base(gx + dx, gy + dy)
+    if (!a || !b) return false
+    return a.val[from] !== 3 && b.val[to] !== 3 ? climbable(a, from, b, to, cell) : a.z[from] === b.z[to]
+  }
+  // A diagonal one: either way round its corner, or the data's own diagonal.
   function diagonalLegal(gx: number, gy: number, dx: number, dy: number): boolean {
     if (value(gx + dx, gy + dy) === 0) return false
-    if ((stepLegal(gx, gy, dx, 0) && stepLegal(gx + dx, gy, 0, dy)) || (stepLegal(gx, gy, 0, dy) && stepLegal(gx, gy + dy, dx, 0))) return true
+    if ((detourLegal(gx, gy, dx, 0) && detourLegal(gx + dx, gy, 0, dy)) || (detourLegal(gx, gy, 0, dy) && detourLegal(gx, gy + dy, dx, 0))) return true
     const ax = dx < 0 ? gx + dx : gx, ay = dx < 0 ? gy + dy : gy, up = dx < 0 ? dy < 0 : dy > 0
     if (value(ax, ay) === 0) return false
     const f = flagsAt(ax, ay)
@@ -339,14 +354,14 @@ export function walker(nav: NavData): Walker {
       const tx = gx + link.dx, ty = gy + link.dy
       if (!inside(tx, ty)) continue
       const tk = clusterAt(tx, ty), into = cluster(tk), target = into ? surface(into, local(tx, ty), link.layer, c.z[node]!) : -1
-      if (target >= 0 && downhill(c, node, into!, target)) visit(tk * KEY + target, tx, ty, into!, target, link.cost)
+      if (target >= 0 && climbable(c, node, into!, target, cell * Math.hypot(link.dx, link.dy))) visit(tk * KEY + target, tx, ty, into!, target, link.cost)
     }
     // At the edge of a cluster: the steps that come in from the floors of the next one.
     if (lx === 0 || ly === 0 || lx === C - 1 || ly === C - 1) {
       mirrorInto(k)
       for (const next of across.get(here) ?? []) {
         const [tx, ty, into, target] = placeOf(next)
-        if (downhill(c, node, into, target)) visit(next, tx, ty, into, target, 0)
+        if (climbable(c, node, into, target, cell * Math.hypot(tx - gx, ty - gy))) visit(next, tx, ty, into, target, 0)
       }
     }
   }

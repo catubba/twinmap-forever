@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { boxOf, buildingsAt, inPiece, killedIn, nameOfBoss, piecesIn, RARE_BOSSES, roomPixels, yardsInside, YARDS_PER_UNIT, type Piece } from './inside'
+import { boxOf, buildingsAt, inPiece, killedIn, nameOfBoss, piecesIn, RARE_BOSSES, roomPixels, yardsInside, YARDS_PER_UNIT, type Piece, buriedBuildings } from './inside'
 import { DUNGEON_PINS } from './dungeon-pins'
 import { MORE_BOSS_PINS } from './more-boss-pins'
 
@@ -103,4 +103,19 @@ test('a kill in a game in another language marks its boss by the number of the f
   expect(killedIn({ map: 36, list: [], ids: [999999, 'x'] }, 36).size).toBe(0)
   // An addon before the numbers: the names alone, as before.
   expect(killedIn({ map: 36, list: ['Cookie'] }, 36).has('cookie')).toBe(true)
+})
+
+test('a building counts as under the ground when half of its floor has the terrain over its ceiling', () => {
+  const room = (building: number, u: number, top: number, width = 10): Piece => ({ file: 1, u, v: 0, width, height: 10, angle: 0, bottom: top - 5, top, building, level: 0 })
+  // The terrain: 100 yards high everywhere, 60 east of u = 500, none at all east of u = 900.
+  const groundAt = (u: number): number | null => (u >= 900 ? null : u >= 500 ? 60 : 100)
+  const pieces = [
+    room(0, 0, 80), room(0, 20, 85), // a mine: both rooms under 100
+    room(1, 100, 105), room(1, 120, 110), // a house on the ground
+    room(2, 480, 80), room(2, 490, 80), room(2, 510, 80, 5), // a mine with its mouth where the terrain falls away
+    room(3, 300, 80), room(3, 320, 110, 30), // a cellar under a large house
+    room(4, 950, 0), // out at sea, where there is no terrain
+    room(5, 200, 99.5), // level with the ground, less than a yard under: not buried
+  ]
+  expect(buriedBuildings(pieces, groundAt)).toEqual([0, 2])
 })

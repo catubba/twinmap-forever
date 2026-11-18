@@ -62,7 +62,8 @@ export const ICONS_FOLDER = 'icons'
  * The file the window may have for a path it asks, or null: only what the converters write, nothing
  * else on the disk. base: the folder of the build. path: as in "/azeroth/blocks/31/49.dxt". A
  * ground is a continent by its name or a dungeon by "i" and its number, with its shaded relief
- * under "shade/"; the rest is the four lists and the pictures of the rooms (interiors.ts).
+ * under "shade/"; the rest is the lists, the pictures of the rooms (interiors.ts), of the items and
+ * of the spells by their file (item-icons.ts).
  */
 export function servedFile(base: string, path: string): string | null {
   const icon = /^\/icons\/([a-z0-9-]{1,40})\.png$/.exec(path)
@@ -70,7 +71,9 @@ export function servedFile(base: string, path: string): string | null {
   // The ground of the 3D view (heights.ts), a continent's only.
   const levels = /^\/([a-z]+)\/levels\/(\d)\/(\d{1,2})\/(\d{1,2})\.bin$/.exec(path)
   if (levels) return joinPath(base, levels[1]!, 'levels', levels[2]!, levels[3]!, `${levels[4]}.bin`)
-  const m = /^\/(?:(maps|places|travel|interiors)\.json|rooms\/(\d{1,9})\.dxt|([a-z]+|i\d{1,5})\/(?:blocks\/(\d{1,2})\/(\d{1,2})\.dxt|(shade\/)?(\d)\/(\d{1,3})\/(\d{1,3})\.png))$/.exec(path)
+  const item = /^\/(items|pictures)\/(\d{1,7})\.png$/.exec(path)
+  if (item) return joinPath(base, item[1]!, `${item[2]}.png`)
+  const m = /^\/(?:(maps|places|travel|interiors|caves|items|trainers)\.json|rooms\/(\d{1,9})\.dxt|([a-z]+|i\d{1,5})\/(?:blocks\/(\d{1,2})\/(\d{1,2})\.dxt|(shade\/)?(\d)\/(\d{1,3})\/(\d{1,3})\.png))$/.exec(path)
   if (!m) return null
   if (m[1]) return joinPath(base, `${m[1]}.json`)
   if (m[2]) return joinPath(base, 'rooms', `${m[2]}.dxt`)

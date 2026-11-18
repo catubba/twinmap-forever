@@ -1,9 +1,12 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, test } from 'vitest'
 import { logFrom, shownFrom } from '../shared/quests'
-import { cbor, doerIndex, fixedPins, ITEM, NPC, OBJECT, openQuestie, QUEST, questLog, questPins, search, searchIndex, shownFromLog } from './questie'
+import { gameItemFacts, shopRows } from '../shared/items'
+import { gameFolderFrom, openClientFiles, registryInstallPath } from './client-files'
+import { sentKeys } from './keys'
+import { cbor, doerIndex, fixedPins, ITEM, NPC, OBJECT, openQuestie, QUEST, questLog, questPins, search, searchIndex, shops, shownFromLog } from './questie'
 
 // Writes a value the way QuestieDB does: CBOR, then base64. Only what these tests need.
 function enc(v: unknown): Buffer {
@@ -112,12 +115,15 @@ test('who offers a service is pinned where they stand, and so are ore and herbs'
     `## X-Object-901-${OBJECT.spawns}: ${b64({ 12: [[30, 30], [31, 32]] })}`,
     `## X-Object-902-S: ${b64({ [OBJECT.name]: 'Peacebloom' })}`,
     `## X-Object-902-${OBJECT.spawns}: ${b64({ 40: [[70, 70]] })}`,
+    `## X-Item-60-S: ${b64({ [ITEM.name]: 'Copper Shortsword' })}`,
+    `## X-Item-60-${ITEM.vendors}: ${b64([105])}`,
   ]))!
+  // A vendor or a trainer carries its number for its panel, and a vendor what it sells.
   expect(fixedPins(db)).toEqual([
     // Miller Odo sells (flags 4) in the two zones he stands in; the place inside an instance is left out.
-    { area: 12, x: 42.5, y: 65.25, name: 'Miller Odo', layers: ['vendors'], side: 'A' },
-    { area: 40, x: 10, y: 20, name: 'Miller Odo', layers: ['vendors'], side: 'A' },
-    { area: 40, x: 55, y: 45, name: 'Smith Hale', sub: 'Armorer', layers: ['vendors', 'repair'], side: 'AH' },
+    { area: 12, x: 42.5, y: 65.25, name: 'Miller Odo', layers: ['vendors'], side: 'A', npc: 101 },
+    { area: 40, x: 10, y: 20, name: 'Miller Odo', layers: ['vendors'], side: 'A', npc: 101 },
+    { area: 40, x: 55, y: 45, name: 'Smith Hale', sub: 'Armorer', layers: ['vendors', 'repair'], side: 'AH', npc: 105, sells: [60] },
     { area: 12, x: 30, y: 30, name: 'Copper Vein', layers: ['ore'] },
     { area: 12, x: 31, y: 32, name: 'Copper Vein', layers: ['ore'] },
     { area: 40, x: 70, y: 70, name: 'Peacebloom', layers: ['herbs'] },
@@ -210,6 +216,12 @@ test('with QuestieDB in the game folder, quests, NPCs and objects are read with 
   expect(db.zoneIndex.Object.get('12')).toEqual([900])
 })
 
+test('who sells an item, turned round: what each NPC sells', () => {
+  const sells = (id: number, name: string, npcs: number[]): string[] => [`## X-Item-${id}-S: ${b64({ [ITEM.name]: name })}`, `## X-Item-${id}-${ITEM.vendors}: ${b64(npcs)}`]
+  const db = openQuestie(game([...LINES, ...sells(56, 'Fresh Bread', [101, 103]), ...sells(57, 'Mild Spices', [101]), `## X-Item-58-S: ${b64({ [ITEM.name]: 'Rat Tail' })}`]))!
+  expect(shops(db)).toEqual(new Map([[101, [56, 57]], [103, [56]]]))
+})
+
 test('without QuestieDB there is nothing to read, and that is not a fault', () => {
   expect(openQuestie(mkdtempSync(join(tmpdir(), 'twinmap-no-questie-')))).toBeNull()
   expect(openQuestie(game(['## X-Mode: baked'])), 'a QuestieDB with no quests in it').toBeNull()
@@ -287,3 +299,25 @@ test('without Questie the pins of the log are made here: where to hand in what i
   expect(logFrom(undefined)).toBeNull()
   expect(logFrom({ log: {} })).toEqual([])
 })
+
+// The player's game and its QuestieDB: what a vendor sells at what price, the server's rows of
+// ItemSparse over the game's own. Prices as the trial of 17 November 2026 read them (design/vendors).
+const real = gameFolderFrom([registryInstallPath()])
+// The names are the game's, where QuestieDB has some of its own (Flagon of Mead).
+test.skipIf(!real)('the innkeeper of Ironforge sells his 17 goods at the prices of the game, and an item only the server knows has its price', () => {
+  const db = openQuestie(real!)!
+  const caches = join(real!, '_forever_', 'Cache', 'ADB')
+  const sent = readdirSync(caches).map((language) => join(caches, language, 'DBCache.bin')).filter((f) => existsSync(f)).map((f) => readFileSync(f))
+  const files = openClientFiles(real!, sentKeys(real!))
+  const facts = gameItemFacts(files, sent)!
+  const sold = shops(db)
+  const firebrew = shopRows(sold.get(5111)!, facts).map((r) => `${r.name} ${r.buy}/${r.perBuy}`)
+  expect(firebrew).toEqual([
+    'Bottle of Dalaran Noir 50/1', 'Cured Ham Steak 2000/5', 'Flagon of Dwarven Honeymead 1500/1', 'Flask of Stormwind Tawny 150/1', 'Haunch of Meat 125/5', 'Ice Cold Milk 125/5',
+    'Jug of Badlands Bourbon 2000/1', 'Melon Juice 500/5', 'Moonberry Juice 2000/5', 'Morning Glory Dew 4000/5', 'Mutton Chop 500/5', 'Refreshing Spring Water 25/5',
+    'Roasted Quail 4000/5', 'Skin of Dwarven Stout 120/1', 'Sweet Nectar 1000/5', 'Tough Jerky 25/5', 'Wild Hog Shank 1000/5',
+  ])
+  // Toxic Skullcap, from Tawny Grisette: the game has no row of it, the server sent one.
+  expect(gameItemFacts(files, [])![281246]).toBeUndefined()
+  expect(shopRows(sold.get(4554)!, facts).find((r) => r.id === 281246)).toEqual({ id: 281246, name: 'Toxic Skullcap', quality: expect.any(Number), buy: 150, perBuy: 1 })
+}, 60_000)

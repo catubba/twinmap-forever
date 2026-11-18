@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { afterAll, beforeAll, expect, test } from 'vitest'
-import { findWindow, findWindowOf, readBox, readRow, type WindowHandle } from './capture'
+import { findWindow, findWindowOf, readBox, readRect, readRow, type WindowHandle } from './capture'
 
 // A real window on the real screen, drawn by capture.test.ps1 with the same formulas as below. It
 // passes for a Chinese client of the game: PowerShell copied to a _forever_ folder as Wow.exe, and
@@ -80,4 +80,13 @@ test('a square of the window is read too: its first row is the top row, red firs
   expect(readBox(hwnd!, WIDTH - 8, 0, 16)).toBeNull()
   expect(readBox(hwnd!, -1, 0, 16)).toBeNull()
   expect(readBox(0x7fff_fff0n, 0, 0, 16)).toBeNull()
+})
+
+test('a rectangle is read only off the window itself when asked so: not off what lies over it', () => {
+  // The test window is over all others at the top left of the screen: its own pixels are read, the desktop's under it are not.
+  expect(readRect(hwnd!, 0, 0, 20, 10, true)?.rgb.length).toBe(20 * 10 * 3)
+  const desktop = findWindow('Program Manager')
+  expect(desktop, 'the desktop was not found').not.toBeNull()
+  expect(readRect(desktop!, 0, 0, 20, 10)).not.toBeNull()
+  expect(readRect(desktop!, 0, 0, 20, 10, true)).toBeNull()
 })

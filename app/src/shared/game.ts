@@ -32,6 +32,8 @@ export interface Character {
   rested?: number
   /** "A" for the Alliance, "H" for the Horde. */
   side?: string
+  /** Name and surname, as the character sheets are kept by (shared/sheet.ts). */
+  name?: string
 }
 
 export interface Instance {

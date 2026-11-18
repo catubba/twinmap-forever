@@ -18,6 +18,8 @@ export interface Found {
   does?: true
   /** Whom an NPC found so serves: "A", "H" or "AH". */
   side?: string
+  /** The item found, by the game's number: its picture is shown beside it. */
+  item?: number
 }
 
 /**

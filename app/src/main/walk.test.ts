@@ -27,16 +27,19 @@ test('out of Northshire Valley the way goes through the gate, not over the wall'
   expect(find(from, to)!.yards).toBeGreaterThan(crow(from, to) * 1.15)
 })
 
-test('from one point to many in one search: past the wall of Northshire Valley is further on foot than inside it', () => {
-  // The character by the gate of the valley; Dane Winslow in the abbey, Herbalist Pomeroy in her house west of the wall.
-  const find = walker(shipped), me = elwynn(45.5, 48.2), inside = elwynn(50.0, 42.7), past = elwynn(40.0, 48.4), goldshire = elwynn(42.1, 65.9)
-  expect(crow(me, past), 'nearer as the crow flies').toBeLessThan(crow(me, inside))
-  const [toInside, toPast, toGoldshire, atSea] = find.far(me, [inside, past, goldshire, [0, 30000]], 1200)
-  expect(toPast!, 'further on foot').toBeGreaterThan(toInside!)
-  expect(toInside!).toBeGreaterThanOrEqual(Math.round(crow(me, inside)))
-  expect(toGoldshire, 'the same way the search for one end finds').toBe(find(me, goldshire)!.yards)
+// Places of Shortest Path Forever's own checks of its grid (tests/path_spec.lua), in yards of the world.
+const GOLDSHIRE: Yards = [-9459, 43], NORTHSHIRE: Yards = [-8914, -135], STORMWIND_FLIGHT: Yards = [-8840.56, 489.7]
+
+test('from one point to many in one search: behind the wall of Stormwind is further on foot than out in the forest', () => {
+  const find = walker(shipped), forest: Yards = [-9459, -850], south: Yards = [-9900, 43]
+  expect(crow(GOLDSHIRE, STORMWIND_FLIGHT), 'nearer as the crow flies').toBeLessThan(crow(GOLDSHIRE, forest))
+  const [toForest, toStormwind, toNorthshire, atSea] = find.far(GOLDSHIRE, [forest, STORMWIND_FLIGHT, NORTHSHIRE, [0, 30000]], 1400)
+  expect(toStormwind!, 'further on foot').toBeGreaterThan(toForest!)
+  expect(toForest!).toBeGreaterThanOrEqual(Math.round(crow(GOLDSHIRE, forest)))
+  expect(toNorthshire, 'the same way the search for one end finds').toBe(find(GOLDSHIRE, NORTHSHIRE)!.yards)
   expect(atSea).toBeNull()
-  expect(find.far(me, [inside, goldshire], 400), 'not past the reach').toEqual([toInside, null])
+  const [toSouth] = find.far(GOLDSHIRE, [south], 600)
+  expect(find.far(GOLDSHIRE, [south, NORTHSHIRE], 600), 'not past the reach').toEqual([toSouth, null])
 })
 
 test('where nothing can be walked there is no way', () => {
@@ -62,16 +65,18 @@ test('a folder with no Shortest Path Forever in it gives no grid', () => {
   expect(readAddonNav(join(__dirname, 'nowhere'), 0)).toBeNull()
 })
 
-// Stormwind is walked on the floors of its buildings: the streets, the bridges over the canals.
-const STORMWIND = { minX: -9154.2, minY: -14.6, maxX: -7995.8, maxY: 1722.9 }
-const stormwind = (px: number, py: number): Yards => [STORMWIND.maxX - (py / 100) * (STORMWIND.maxX - STORMWIND.minX), STORMWIND.maxY - (px / 100) * (STORMWIND.maxY - STORMWIND.minY)]
-
-test('across Stormwind the way goes by its streets and bridges, which are floors and not the base surface', () => {
-  const find = walker(shipped), from = stormwind(62, 72), to = stormwind(38, 80)
-  const walk = find(from, to)!
-  expect(walk.yards).toBeGreaterThan(crow(from, to) * 1.2)
-  expect(walk.yards).toBeLessThan(crow(from, to) * 2)
-  expect(find(stormwind(62, 72), stormwind(50, 45))!.yards).toBeGreaterThan(crow(stormwind(62, 72), stormwind(50, 45)))
+test('Stormwind is walked into by its gate, and the Dun Algaz road through its tunnel, a floor under the ridge', () => {
+  const find = walker(shipped), passes = (points: Yards[], at: Yards): number => Math.min(...points.slice(1).map((b, i) => {
+    const a = points[i]!, dx = b[0] - a[0], dy = b[1] - a[1], t = Math.max(0, Math.min(1, ((at[0] - a[0]) * dx + (at[1] - a[1]) * dy) / (dx * dx + dy * dy || 1)))
+    return Math.hypot(a[0] + t * dx - at[0], a[1] + t * dy - at[1])
+  }))
+  const town = find(GOLDSHIRE, STORMWIND_FLIGHT)!
+  expect(town.yards).toBeGreaterThan(crow(GOLDSHIRE, STORMWIND_FLIGHT) * 1.3)
+  expect(town.yards).toBeLessThan(1300)
+  expect(passes(town.points, [-9068, 417]), 'by the gate').toBeLessThan(30)
+  const south: Yards = [-4350.2, -2463.7], north: Yards = [-4087.6, -2463.7]
+  for (const [a, b] of [[south, north], [north, south]] as const) expect(passes(find(a, b)!.points, [-4220, -2464]), 'through the tunnel').toBeLessThan(30)
+  expect(find(NORTHSHIRE, GOLDSHIRE)!.yards).toBeLessThan(740) // Shortest Path finds 580 to 700, smoothed
 })
 
 test('a character followed through Fargodeep Mine is told the floor it stands on, under the hill', () => {

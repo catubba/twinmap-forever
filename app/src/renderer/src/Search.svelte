@@ -1,7 +1,7 @@
 <script lang="ts">
   // The search of the top row: zones from the game's own maps, NPCs, quests and items from the
   // player's QuestieDB, dungeons and raids from the doors of the world map, and My pins. The results open under
-  // the field; one chosen takes the map to its place, or a dungeon's to its own map.
+  // the field; one chosen takes the map to its place and opens its label there, a dungeon's on its door.
   import { TILES } from './web'
   import { unitsOfPlace, type Point } from '../../shared/geo'
   import type { Continent, GameMap } from '../../shared/maps'
@@ -15,7 +15,7 @@
   import { kept as keptByApp } from './kept.svelte'
   import { savedFrom } from '../../shared/saved'
 
-  export interface Place { continent: Continent; at: Point; title: string; where?: string; whole?: GameMap; dungeon?: { id: number; wing?: string } }
+  export interface Place { continent: Continent; at: Point; title: string; where?: string; whole?: GameMap; dungeon?: { id: number; wing?: string }; item?: number }
   let { ready, onpick, pos, side }: { ready: boolean; onpick: (place: Place) => void; pos?: { map?: number; x?: number; y?: number }; side?: string } = $props()
 
   const MOST = 14 // results under the field
@@ -86,7 +86,7 @@
       const at = unitsOfPlace(zone.rect!, f.x, f.y)
       // How far, when the character is on the same continent: there is no walking to the other.
       const yards = me && me.continent === zone.continent ? wayOf(me.at, at).yards : undefined
-      ;(f.does ? doers : named).push({ continent: zone.continent!, at, title: f.name, where: `${zone.name} ${f.x.toFixed(1)}, ${f.y.toFixed(1)}`, note: `${f.note}, ${zone.name}`, yards })
+      ;(f.does ? doers : named).push({ continent: zone.continent!, at, title: f.name, where: `${zone.name} ${f.x.toFixed(1)}, ${f.y.toFixed(1)}`, note: `${f.note}, ${zone.name}`, yards, ...(f.item && { item: f.item }) })
     }
     // Who does what was typed comes first, the nearest first; then what is called so, unless it is one of them.
     // A result with a way on foot known tells its yards, the others those of the crow.
@@ -110,7 +110,7 @@
 
   function pick(result: Result | undefined): void {
     if (!result) return
-    onpick({ continent: result.continent, at: result.at, title: result.title, where: result.where, whole: result.whole, dungeon: result.dungeon })
+    onpick({ continent: result.continent, at: result.at, title: result.title, where: result.where, whole: result.whole, dungeon: result.dungeon, item: result.item })
     open = false
   }
 
@@ -152,6 +152,8 @@
       {#each results as result, i (i)}
         <li role="presentation">
           <button class="item" class:is-hover={i === chosen} id="search-result-{i}" role="option" aria-selected={i === chosen} tabindex="-1" onclick={() => pick(result)}>
+            <!-- The item's picture, from the player's game; where the game has none the row reads the same without it. -->
+            {#if result.item}<img class="pic" src="{TILES}/items/{result.item}.png" alt="" onerror={(e) => e.currentTarget.remove()} />{/if}
             <span class="name">{result.title}</span>
             <span class="num">{result.note}</span>
             {#if result.yards !== undefined}<span class="far">{Math.round(result.yards).toLocaleString('en-US')} yd</span>{/if}
@@ -194,6 +196,15 @@
     z-index: 2500;
     width: 520px;
     white-space: nowrap;
+  }
+  .pic {
+    flex: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 2px;
+    box-shadow:
+      0 0 0 1px #000,
+      0 0 0 2px var(--bronze-700);
   }
   .name {
     flex: none;

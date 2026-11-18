@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { GameQuest, LogQuest, ObjectiveKind, QuestIcon, QuestieShown, QuestPin } from '../shared/quests'
 import { best, fold, wordsMatch, type Found } from '../shared/search'
+import type { ItemSources } from '../shared/tips'
 import { resourceOf, servicesOf, type FixedPin, type ServiceLayer } from '../shared/services'
 
 /** The file of QuestieDB this app reads, in a game folder. Questie without it gives the app nothing. */
@@ -165,6 +166,19 @@ export function openQuestie(gameFolder: string): Questie | null {
   return { version: /^## Version: *(.+)$/m.exec(text)?.[1]?.trim() ?? 'unknown', ids, get, places, zoneIndex }
 }
 
+/** What each vendor sells, by the NPC's number: QuestieDB lists the sellers of each item, turned round here. Prices and names are the game's (shopRows in shared/items.ts). */
+export function shops(db: Questie): Map<number, number[]> {
+  const out = new Map<number, number[]>()
+  for (const item of db.ids.Item)
+    for (const npc of list(db.get('Item', item, ITEM.vendors))) {
+      if (typeof npc !== 'number') continue
+      const sold = out.get(npc)
+      if (sold) sold.push(item)
+      else out.set(npc, [item])
+    }
+  return out
+}
+
 /** Every name the search looks through: NPCs, quests and items, each once for all that share it. */
 export interface SearchIndex { kind: Found['kind']; name: string; lower: string; ids: number[] }
 
@@ -247,7 +261,7 @@ export function search(db: Questie, index: SearchIndex[], typed: string, most = 
       } else {
         const sellers = numbers(db.get('Item', id, ITEM.vendors)).flatMap((npc): Found[] => {
           const where = spot('Npc', npc), side = db.get('Npc', npc, NPC.friendly)
-          return where ? [{ kind: 'item', name: entry.name, note: `Sold by ${text(db.get('Npc', npc, NPC.name))}`, ...where, does: true, ...(typeof side === 'string' ? { side } : {}) }] : []
+          return where ? [{ kind: 'item', name: entry.name, note: `Sold by ${text(db.get('Npc', npc, NPC.name))}`, ...where, does: true, item: id, ...(typeof side === 'string' ? { side } : {}) }] : []
         })
         if (sellers.length > 1) {
           shops.push(...sellers.slice(0, DOERS_MOST - shops.length))
@@ -257,7 +271,7 @@ export function search(db: Questie, index: SearchIndex[], typed: string, most = 
         const seller = firstOf('Npc', numbers(db.get('Item', id, ITEM.vendors))), dropper = seller ? null : firstOf('Npc', numbers(db.get('Item', id, ITEM.npcDrops)))
         const holder = seller || dropper ? null : firstOf('Object', numbers(db.get('Item', id, ITEM.objectDrops)))
         const who = seller ?? dropper ?? holder
-        if (who) hit = { kind: 'item', name: entry.name, note: `${seller ? 'Sold by' : dropper ? 'Dropped by' : 'Found in'} ${who.name}`, ...who.where }
+        if (who) hit = { kind: 'item', name: entry.name, note: `${seller ? 'Sold by' : dropper ? 'Dropped by' : 'Found in'} ${who.name}`, ...who.where, item: id }
       }
       if (hit) {
         found.push(hit)
@@ -289,12 +303,14 @@ export function fixedPins(db: Questie): FixedPin[] {
   const add = (kind: 'Npc' | 'Object', id: number, pin: Omit<FixedPin, 'area' | 'x' | 'y'>): void => {
     for (const [area, spots] of Object.entries(db.places(kind, id))) for (const [x, y] of spots) pins.push({ area: +area, x, y, ...pin })
   }
+  const sold = shops(db)
   for (const id of db.ids.Npc) {
     const flags = db.get('Npc', id, NPC.flags), side = db.get('Npc', id, NPC.friendly), name = db.get('Npc', id, NPC.name), sub = db.get('Npc', id, NPC.sub)
     const layers = typeof flags === 'number' ? servicesOf(flags) : []
     // Someone friendly to no side serves no player.
     if (!layers.length || typeof side !== 'string' || !side || typeof name !== 'string') continue
-    add('Npc', id, { name, ...(typeof sub === 'string' && sub ? { sub } : {}), layers, side })
+    const panel = layers.includes('vendors') || layers.includes('trainers')
+    add('Npc', id, { name, ...(typeof sub === 'string' && sub ? { sub } : {}), layers, side, ...(panel && { npc: id }), ...(sold.has(id) && { sells: sold.get(id) }) })
   }
   for (const id of db.ids.Object) {
     const name = db.get('Object', id, OBJECT.name), layer = typeof name === 'string' ? resourceOf(name) : null
@@ -432,4 +448,30 @@ export function questPins(db: Questie, shown: QuestieShown): QuestPin[] {
     }
   }
   return [...pins.values()]
+}
+
+/** Who sells an item, who drops it and where it is found, from QuestieDB: with a place each, a few of each (the popup of an item, M10-F15). */
+export function itemSources(db: Questie, item: number, most = 8): ItemSources {
+  const numbers = (t: unknown): number[] => list(t).filter((n): n is number => typeof n === 'number')
+  const name = (kind: 'Npc' | 'Object', id: number): string => {
+    const n = db.get(kind, id, kind === 'Npc' ? NPC.name : OBJECT.name)
+    return typeof n === 'string' ? n : ''
+  }
+  // Its own zone first when QuestieDB names one, the first place it has otherwise.
+  const spot = (kind: 'Npc' | 'Object', id: number): { area: number; x: number; y: number } | null => {
+    const places = db.places(kind, id), home = kind === 'Npc' ? db.get('Npc', id, NPC.zone) : undefined
+    const area = typeof home === 'number' && places[home]?.length ? String(home) : Object.keys(places).find((a) => places[a]!.length)
+    const first = area === undefined ? undefined : places[area]![0]
+    return first ? { area: +area!, x: first[0], y: first[1] } : null
+  }
+  const sold = numbers(db.get('Item', item, ITEM.vendors)).flatMap((npc) => {
+    const where = spot('Npc', npc), side = db.get('Npc', npc, NPC.friendly)
+    return where && name('Npc', npc) ? [{ npc, name: name('Npc', npc), ...where, ...(typeof side === 'string' && side && { side }) }] : []
+  })
+  const placed = (kind: 'Npc' | 'Object', ids: number[]): { name: string; area: number }[] =>
+    ids.flatMap((id) => {
+      const where = spot(kind, id)
+      return where && name(kind, id) ? [{ name: name(kind, id), area: where.area }] : []
+    }).slice(0, most)
+  return { sold, drops: placed('Npc', numbers(db.get('Item', item, ITEM.npcDrops))), found: placed('Object', numbers(db.get('Item', item, ITEM.objectDrops))) }
 }

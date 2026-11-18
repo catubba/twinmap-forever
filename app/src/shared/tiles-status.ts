@@ -28,8 +28,12 @@ export interface InteriorsStatus {
 }
 
 /** One line for the window. */
-/** What the player can do about a map that is not there, or nothing when there is nothing to do. */
+/** Said while the map is built: that it is not so at every start, or one might think the app too slow to keep. */
+export const BUILT_ONCE = 'This happens only the first time, and again after a game update.'
+
+/** What the player can do about a map that is not there, or should know while it is made; nothing when there is nothing to say. */
 export function tilesHelp(status: TilesStatus): string | null {
+  if (status.state === 'converting') return BUILT_ONCE
   if (status.state === 'no-game') return 'Choose the folder where World of Warcraft: Forever is installed, the one that holds _forever_.'
   if (status.state === 'failed')
     return "Twinmap could not read the game's files. Close the game's launcher if it is updating or repairing the game, then try again. If it fails again, repair the game from the launcher and tell us with Feedback."

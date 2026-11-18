@@ -125,6 +125,25 @@ export function buildingsAt(pieces: Piece[], u: number, v: number): Set<number> 
   return found
 }
 
+/**
+ * The buildings that lie under the ground: caves, mines, tunnels. One counts when the rooms whose
+ * ceiling is under the terrain over their middle make at least half of its floor. A house stands on
+ * the ground and has none; a mine dug into a hill has nearly all, less the rooms at its mouth, where
+ * the terrain falls away. groundAt: the height of the terrain over a place, null where there is none.
+ */
+export function buriedBuildings(pieces: Piece[], groundAt: (u: number, v: number) => number | null): number[] {
+  const floors = new Map<number, { all: number; under: number }>()
+  for (const p of pieces) {
+    const ground = groundAt(p.u, p.v)
+    if (ground === null) continue
+    const floor = floors.get(p.building) ?? { all: 0, under: 0 }
+    floor.all += p.width * p.height
+    if (p.top < ground - 1) floor.under += p.width * p.height
+    floors.set(p.building, floor)
+  }
+  return [...floors].filter(([, f]) => f.under >= f.all / 2).map(([building]) => building).sort((a, b) => a - b)
+}
+
 /** What holds every piece, or null for none. */
 export function boxOf(pieces: Piece[]): Box | null {
   if (!pieces.length) return null

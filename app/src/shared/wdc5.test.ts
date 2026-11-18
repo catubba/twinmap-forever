@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { readTable } from './wdc5'
+import { readHotfixes, readTable } from './wdc5'
 
 // A small table built to the layout wdc5.ts reads: two sections, the second "encrypted".
 // Columns: 0 text, 1 id, 2 two decimals, 3 a pallet value (4 bits), 4 a packed signed number
@@ -115,4 +115,79 @@ test('a copied row has its own id and the values of the row it copies', () => {
 
 test('what is not a table is refused', () => {
   expect(() => readTable(Buffer.from('BLP2 and so on'))).toThrow(/not a WDC5 table/)
+})
+
+// A sparse table: each row at its own size, a text inside it, then a whole number, a short one and two bytes.
+const SPARSE = [
+  { id: 25, name: 'Worn Shortsword', price: 35, quality: 1, pair: [3, 4] },
+  { id: 6948, name: 'Hearthstone', price: 0, quality: 1, pair: [0, 9] },
+]
+const sparseRecord = (r: (typeof SPARSE)[number]): Buffer => {
+  const nums = Buffer.alloc(8)
+  nums.writeUInt32LE(r.price, 0)
+  nums.writeUInt16LE(r.quality, 4)
+  nums[6] = r.pair[0]!
+  nums[7] = r.pair[1]!
+  return Buffer.concat([Buffer.from(r.name + '\0'), nums])
+}
+function fakeSparse(): Buffer {
+  const fields = [
+    { bits: 32, size: 0 },
+    { bits: 32, size: 0 },
+    { bits: 16, size: 16 },
+    { bits: 16, size: 24 }, // two elements of 8 bits
+  ]
+  const records = SPARSE.map(sparseRecord)
+  const head = Buffer.alloc(204)
+  head.write('WDC5', 'latin1')
+  head.writeUInt16LE(1, 172) // sparse
+  head.writeUInt32LE(fields.length, 176)
+  head.writeUInt32LE(fields.length * 24, 188)
+  head.writeUInt32LE(1, 200)
+  const sizes = Buffer.alloc(fields.length * 4), storage = Buffer.alloc(fields.length * 24)
+  fields.forEach((f, i) => {
+    sizes.writeInt16LE(f.size, i * 4)
+    storage.writeUInt16LE(f.bits, i * 24 + 2)
+  })
+  const before = 204 + 40 + sizes.length + storage.length
+  const data = Buffer.concat(records), end = before + data.length
+  const ids = Buffer.alloc(SPARSE.length * 4), map = Buffer.alloc(SPARSE.length * 6)
+  let at = before
+  SPARSE.forEach((r, i) => {
+    ids.writeUInt32LE(r.id, i * 4)
+    map.writeUInt32LE(at, i * 6)
+    map.writeUInt16LE(records[i]!.length, i * 6 + 4)
+    at += records[i]!.length
+  })
+  const section = Buffer.alloc(40)
+  section.writeUInt32LE(before, 8)
+  section.writeUInt32LE(SPARSE.length, 12)
+  section.writeUInt32LE(end, 20)
+  section.writeUInt32LE(ids.length, 24)
+  section.writeUInt32LE(SPARSE.length, 32)
+  return Buffer.concat([head, section, sizes, storage, data, ids, map])
+}
+
+test('a sparse table reads its rows, texts inside them included', () => {
+  const t = readTable(fakeSparse(), undefined, [0])
+  expect(t.rows.map((r) => [r.id, r.text(0), r.int(1), r.int(2), r.int(3, 0), r.int(3, 1)])).toEqual(SPARSE.map((r) => [r.id, r.name, r.price, r.quality, ...r.pair]))
+})
+
+test('the server rows for a table: the latest wins, a taken away row is null, other tables are left out', () => {
+  const entry = (push: number, table: number, id: number, state: number, record: Buffer): Buffer => {
+    const h = Buffer.alloc(32)
+    h.write('XFTH', 'latin1')
+    h.writeInt32LE(push, 8)
+    h.writeUInt32LE(table, 16)
+    h.writeUInt32LE(id, 20)
+    h.writeUInt32LE(record.length, 24)
+    h[28] = state
+    return Buffer.concat([h, record])
+  }
+  const sword = sparseRecord({ ...SPARSE[0]!, price: 40 })
+  const cache = Buffer.concat([Buffer.alloc(44), entry(1, 7, 25, 1, sparseRecord(SPARSE[0]!)), entry(2, 7, 25, 1, sword), entry(3, 8, 25, 1, Buffer.alloc(3)), entry(4, 7, 6948, 2, Buffer.alloc(0))])
+  const sent = readHotfixes(cache, 7)
+  expect([...sent.keys()]).toEqual([25, 6948])
+  expect(sent.get(6948)).toBeNull()
+  expect(readTable(fakeSparse(), undefined, [0]).rowOf!(25, sent.get(25)!).int(1)).toBe(40)
 })

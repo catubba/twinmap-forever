@@ -5,6 +5,10 @@
 //
 // Layout: header, section headers, field sizes, field storage, pallet data, common data, then
 // for each section its records, texts, id list, copy table and parent ids.
+//
+// A sparse table (ItemSparse) keeps each row at its own size: the columns one after the other at
+// their full width, texts inside the row ending with a zero, and a list of where each row starts.
+// The file does not say which columns are texts: the caller does.
 
 const HEADER = 204
 const SECTION = 40
@@ -28,6 +32,8 @@ export interface Table {
   rows: Row[]
   /** Rows the game keeps encrypted and this PC has no key for: not read. */
   encryptedRows: number
+  /** A row given apart, as the server sends it (hotfixes), read like the table's own: sparse tables only. */
+  rowOf?: (id: number, record: Buffer) => Row
 }
 
 interface Field {
@@ -43,19 +49,22 @@ interface Field {
 
 const float32 = new Float32Array(1), bits32 = new Uint32Array(float32.buffer)
 
-/** opens: whether the sections locked with the key of this name came opened; by default none did. */
-export function readTable(b: Buffer, opens: (keyName: string) => boolean = () => false): Table {
+/**
+ * opens: whether the sections locked with the key of this name came opened; by default none did.
+ * texts: in a sparse table, the columns that are texts.
+ */
+export function readTable(b: Buffer, opens: (keyName: string) => boolean = () => false, texts: number[] = []): Table {
   if (b.toString('latin1', 0, 4) !== 'WDC5') throw new Error('not a WDC5 table')
   const u32 = (at: number): number => b.readUInt32LE(at)
   const recordSize = u32(144), flags = b.readUInt16LE(172), idIndex = b.readUInt16LE(174)
   const totalFields = u32(176), storageSize = u32(188), palletSize = u32(196), sectionCount = u32(200)
-  if (flags & 1) throw new Error('this table stores its rows at variable sizes: not supported')
+  const sparse = (flags & 1) !== 0
 
   let at = HEADER
   const sections = Array.from({ length: sectionCount }, (_, i) => {
     const p = at + i * SECTION
     const key = b.readBigUInt64LE(p)
-    return { encrypted: key !== 0n && !opens(key.toString(16).padStart(16, '0')), offset: u32(p + 8), rows: u32(p + 12), texts: u32(p + 16), ids: u32(p + 24), parents: u32(p + 28), offsetMap: u32(p + 32), copies: u32(p + 36) }
+    return { encrypted: key !== 0n && !opens(key.toString(16).padStart(16, '0')), offset: u32(p + 8), rows: u32(p + 12), texts: u32(p + 16), end: u32(p + 20), ids: u32(p + 24), parents: u32(p + 28), offsetMap: u32(p + 32), copies: u32(p + 36) }
   })
   at += sectionCount * SECTION
   const sizes = Array.from({ length: totalFields }, (_, i) => 32 - b.readInt16LE(at + i * 4))
@@ -88,6 +97,37 @@ export function readTable(b: Buffer, opens: (keyName: string) => boolean = () =>
     return Number((value >> BigInt(bit & 7)) & ((1n << BigInt(Math.min(count, 32))) - 1n))
   }
 
+  // A row of a sparse table: where each column starts is found walking the row, the first time it is asked.
+  const bytes = fields.map((f) => Math.max(1, f.elementBits >> 3))
+  const sparseRow = (r: Buffer, start: number, id: number): Row => {
+    let starts: number[] | undefined
+    const at = (field: number): number => {
+      if (!starts) {
+        starts = []
+        for (let f = 0, q = start; f < fields.length; f++) {
+          starts.push(q)
+          q = texts.includes(f) ? r.indexOf(0, q) + 1 : q + bytes[f]! * Math.max(1, fields[f]!.bits / fields[f]!.elementBits)
+        }
+      }
+      if (starts[field] === undefined) throw new Error(`no column ${field}`)
+      return starts[field]!
+    }
+    const raw = (field: number, k: number): number => {
+      const w = bytes[field]!, p = at(field) + k * w
+      return w >= 4 ? r.readUInt32LE(p) : w === 2 ? r.readUInt16LE(p) : r[p]!
+    }
+    return {
+      id,
+      parent: undefined,
+      int: (field, k = 0) => raw(field, k) | 0,
+      float: (field, k = 0) => {
+        bits32[0] = raw(field, k)
+        return float32[0]!
+      },
+      text: (field) => r.toString('utf8', at(field), r.indexOf(0, at(field))),
+    }
+  }
+
   const allRows = sections.reduce((n, s) => n + s.rows, 0)
   const rows: Row[] = []
   let encryptedRows = 0, rowsBefore = 0, textsBefore = 0
@@ -99,13 +139,18 @@ export function readTable(b: Buffer, opens: (keyName: string) => boolean = () =>
       encryptedRows += s.rows
       continue
     }
-    const texts = s.offset + s.rows * recordSize, idList = texts + s.texts
-    const copyTable = idList + s.ids, parentsAt = copyTable + s.copies * 8 + s.offsetMap * 6
+    const strings = s.offset + s.rows * recordSize, idList = sparse ? s.end : strings + s.texts
+    const copyTable = idList + s.ids, offsetMap = copyTable + s.copies * 8, parentsAt = offsetMap + s.offsetMap * 6
     const parents = new Map<number, number>()
     if (s.parents) for (let i = 0, n = u32(parentsAt); i < n; i++) parents.set(u32(parentsAt + 12 + i * 8 + 4), u32(parentsAt + 12 + i * 8))
 
     const made = new Map<number, Row>()
-    for (let i = 0; i < s.rows; i++) {
+    for (let i = 0; sparse && i < s.rows; i++) {
+      const row = sparseRow(b, u32(offsetMap + i * 6), u32(idList + i * 4))
+      rows.push(row)
+      made.set(row.id, row)
+    }
+    for (let i = 0; !sparse && i < s.rows; i++) {
       const record = s.offset + i * recordSize
       const raw = (field: number, k: number, id: number): number => {
         const f = fields[field]
@@ -134,7 +179,7 @@ export function readTable(b: Buffer, opens: (keyName: string) => boolean = () =>
           if (!f) throw new Error(`no column ${field}`)
           const distance = raw(field, 0, id)
           if (!distance) return ''
-          const start = texts + ((firstRow + i) * recordSize + (f.offset >> 3) + distance - allRows * recordSize - firstText)
+          const start = strings + ((firstRow + i) * recordSize + (f.offset >> 3) + distance - allRows * recordSize - firstText)
           const end = b.indexOf(0, start)
           return b.toString('utf8', start, end < 0 ? b.length : end)
         },
@@ -148,5 +193,25 @@ export function readTable(b: Buffer, opens: (keyName: string) => boolean = () =>
       if (source) rows.push({ ...source, id: u32(copyTable + i * 8) })
     }
   }
-  return { fields: fields.length, rows, encryptedRows }
+  return { fields: fields.length, rows, encryptedRows, ...(sparse && { rowOf: (id: number, record: Buffer) => sparseRow(record, 0, id) }) }
+}
+
+/**
+ * The rows the server has sent for one table, kept in the game's cache (_forever_/Cache/ADB/<language>/DBCache.bin):
+ * the row's number -> its record, or null where the server took the row away. table: the game's number for the table.
+ * The latest sent wins.
+ */
+export function readHotfixes(cache: Buffer, table: number): Map<number, Buffer | null> {
+  const best = new Map<number, { push: number; record: Buffer | null }>()
+  // After the head (XFTH, version, build, a 32 byte hash) the rows: XFTH, region, push, unique id, table, row, size, state (1 = the row as sent), the record.
+  for (let p = 44; p + 32 <= cache.length; ) {
+    if (cache.toString('latin1', p, p + 4) !== 'XFTH') break
+    const push = cache.readInt32LE(p + 8), size = cache.readUInt32LE(p + 24)
+    if (cache.readUInt32LE(p + 16) === table) {
+      const id = cache.readUInt32LE(p + 20), was = best.get(id)
+      if (!was || push >= was.push) best.set(id, { push, record: cache[p + 28] === 1 ? cache.subarray(p + 32, p + 32 + size) : null })
+    }
+    p += 32 + size
+  }
+  return new Map([...best].map(([id, e]) => [id, e.record]))
 }

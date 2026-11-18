@@ -1,12 +1,15 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, protocol, screen, shell } from 'electron'
 import { randomBytes } from 'node:crypto'
-import { readFileSync, renameSync, writeFileSync } from 'node:fs'
-import { readFile, writeFile } from 'node:fs/promises'
+import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { copyFile, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { keep, keptFrom } from '../shared/kept'
-import { linkStatus, lostPercent } from '../shared/link'
+import { modelFrom, pictureDue, portraitsFrom, wornKey, type Portraits, type PortraitsTold } from '../shared/portrait'
+import { heldOf, mergeSheet, sheetNewsFrom, sheetsFrom, type Sheets } from '../shared/sheet'
+import { linkStatus, lostPercent, type LinkSnapshot } from '../shared/link'
 import { logFrom, shownFrom, type QuestsStatus } from '../shared/quests'
 import type { Found } from '../shared/search'
+import { tipsFrom, type ItemSources, type Tips } from '../shared/tips'
 import { groupFrom } from '../shared/group'
 import { arrived, inboxFrom, marksNews, pinFrom, routeNewsFrom, stepFrom, takenFrom } from '../shared/send'
 import { feedbackLink, sendFeedback } from '../shared/feedback'
@@ -18,7 +21,7 @@ import { gameFolderFrom, registryInstallPath } from './client-files'
 import { homeAddress, LAN_PORT, startLan, type Lan, type Served } from './lan'
 import { startLink } from './link'
 import { startLog } from './log'
-import type { Answer, Asked } from './questie-worker'
+import type { Answer, Asked, Sources } from './questie-worker'
 import startQuestieWorker from './questie-worker?nodeWorker'
 import { addonHearsFonts, addonsFolder, readSettings, setupStatus, writeSettings } from './setup'
 import { hear, installChannel, send as sendSignal, sendOld, sentParts } from './signal'
@@ -49,26 +52,46 @@ function findGameFolder(picked: string | undefined): string | null {
 
 // Makes the map tiles from the game's files, once per build of the game, and keeps the latest word on it.
 // The folder: TWINMAP_DATA when set (for trials), or Twinmap under the local application data.
-function startTiles(gameFolder: string | null): { status: () => TilesStatus; stop: () => void } {
+type Picture = 'items' | 'pictures'
+function startTiles(gameFolder: string | null): { status: () => TilesStatus; item: (kind: Picture, id: number) => Promise<boolean>; stop: () => void } {
   let status: TilesStatus = { state: 'looking' }
-  if (!gameFolder) return { status: () => ({ state: 'no-game' }), stop: () => {} }
+  if (!gameFolder) return { status: () => ({ state: 'no-game' }), item: () => Promise.resolve(false), stop: () => {} }
   const base = process.env.TWINMAP_DATA ?? join(process.env.LOCALAPPDATA ?? app.getPath('userData'), 'Twinmap')
   const worker = startTilesWorker({ workerData: { gameFolder, base } })
-  worker.on('message', (told: TilesStatus) => (status = told))
-  worker.on('error', (e) => (status = { state: 'failed', message: e instanceof Error ? e.message : String(e) }))
-  return { status: () => status, stop: () => void worker.terminate() }
+  // The picture of an item, or of a spell by its file, the folder does not have yet is made by the worker, which has the game's archive (item-icons.ts).
+  const items = new Map<string, ((made: boolean) => void)[]>()
+  worker.on('message', (told: TilesStatus | { asked: string; made: boolean }) => {
+    if (!('asked' in told)) return void (status = told)
+    for (const answer of items.get(told.asked) ?? []) answer(told.made)
+    items.delete(told.asked)
+  })
+  worker.on('error', (e) => {
+    status = { state: 'failed', message: e instanceof Error ? e.message : String(e) }
+    for (const answers of items.values()) for (const answer of answers) answer(false)
+    items.clear()
+  })
+  const item = (kind: Picture, id: number): Promise<boolean> =>
+    new Promise((answer) => {
+      const asked = `${kind}/${id}`, waiting = items.get(asked)
+      if (waiting) return void waiting.push(answer)
+      items.set(asked, [answer])
+      worker.postMessage({ kind, id })
+    })
+  return { status: () => status, item, stop: () => void worker.terminate() }
 }
 
 // The quests on the map: the player's QuestieDB is opened once, and asked for the pins of what
 // Questie shows each time the addon tells something new. tell: called with every answer.
-function startQuests(gameFolder: string | null, tell: (status: QuestsStatus) => void): { show: (section: unknown, log?: unknown) => void; search: (typed: string) => Promise<Found[]>; stop: () => void } {
-  if (!gameFolder) return { show: () => {}, search: () => Promise.resolve([]), stop: () => {} }
+function startQuests(gameFolder: string | null, tell: (status: QuestsStatus) => void): { show: (section: unknown, log?: unknown) => void; search: (typed: string) => Promise<Found[]>; sources: (item: number) => Promise<ItemSources>; stop: () => void } {
+  const NONE: ItemSources = { sold: [], drops: [], found: [] }
+  if (!gameFolder) return { show: () => {}, search: () => Promise.resolve([]), sources: () => Promise.resolve(NONE), stop: () => {} }
   const worker = startQuestieWorker({ workerData: { gameFolder } })
   // A search waits for the answer that carries its number.
-  const asked = new Map<number, (found: Found[]) => void>()
+  const asked = new Map<number, (found: Found[]) => void>(), askedSources = new Map<number, (sources: ItemSources) => void>()
   let searches = 0
   const post = (message: Asked): void => worker.postMessage(message)
-  worker.on('message', (told: QuestsStatus | Answer) => {
+  worker.on('message', (told: QuestsStatus | Answer | Sources) => {
+    if ('sources' in told) return void (askedSources.get(told.id)?.(told.sources), askedSources.delete(told.id))
     if (!('found' in told)) return tell(told)
     asked.get(told.id)?.(told.found)
     asked.delete(told.id)
@@ -76,7 +99,9 @@ function startQuests(gameFolder: string | null, tell: (status: QuestsStatus) => 
   worker.on('error', () => {
     tell({ questie: null, pins: [], fixed: [] }) // no quests on the map; the rest of the app goes on
     for (const answer of asked.values()) answer([])
+    for (const answer of askedSources.values()) answer(NONE)
     asked.clear()
+    askedSources.clear()
   })
   let last = ''
   return {
@@ -92,6 +117,11 @@ function startQuests(gameFolder: string | null, tell: (status: QuestsStatus) => 
       new Promise((answer) => {
         asked.set(++searches, answer)
         post({ search: typed, id: searches })
+      }),
+    sources: (item) =>
+      new Promise((answer) => {
+        askedSources.set(++searches, answer)
+        post({ sources: item, id: searches })
       }),
     stop: () => void worker.terminate(),
   }
@@ -223,10 +253,28 @@ function createWindow(): void {
   let quests = startQuests(gameFolder, tellQuests)
   let walks = startWalks(gameFolder)
   // A file of the map, for the window and for a phone on the home network alike.
+  // The pictures of the characters (shared/portrait.ts): a PNG each beside the settings, named by the letters of the character's name.
+  const portraitsFolder = join(app.getPath('userData'), 'portraits')
+  const portraitFile = (key: string): string => join(portraitsFolder, `${Buffer.from(key).toString('hex')}.png`)
   const served = async (path: string): Promise<Served> => {
+    const portrait = /^\/portraits\/([^/]+)\.png$/.exec(path)
+    if (portrait) {
+      let key = ''
+      try {
+        key = decodeURIComponent(portrait[1]!)
+      } catch {
+        // not a name
+      }
+      const bytes = key ? await readFile(portraitFile(key)).catch(() => null) : null
+      return bytes ? { status: 200, type: 'image/png', bytes } : { status: 404 }
+    }
     const status = tiles.status()
     const file = status.state === 'ready' ? servedFile(status.folder, path) : null
-    const bytes = file ? await readFile(file).catch(() => null) : null
+    let bytes = file ? await readFile(file).catch(() => null) : null
+    // The picture of an item is made the first time it is asked for; one the game has none of is no picture at all.
+    const item = /^\/(items|pictures)\/(\d+)\.png$/.exec(path)
+    if (item && file && !bytes) bytes = (await tiles.item(item[1] as Picture, Number(item[2]))) ? await readFile(file).catch(() => null) : null
+    if (item && !bytes) return { status: 404 }
     // Where the game has no picture there is no file. That is the sea, not a fault: an empty picture for
     // a tile and an empty answer for a block, so the page logs no error for it.
     if (!bytes) return file?.endsWith('.png') ? { status: 200, type: 'image/gif', bytes: BLANK } : { status: file ? 204 : 404 }
@@ -292,6 +340,8 @@ function createWindow(): void {
   })
   // The search of the top row: what was typed, cut to a sane length.
   asks('search', (typed: unknown): Promise<Found[]> => (typeof typed === 'string' ? quests.search(typed.slice(0, 80)) : Promise.resolve([])))
+  // Who sells an item, who drops it, where it is found: for its popup.
+  asks('item-sources', (item: unknown): Promise<ItemSources> => (Number.isInteger(item) && (item as number) > 0 ? quests.sources(item as number) : Promise.resolve({ sold: [], drops: [], found: [] })))
   // The way on foot between two points of a continent, for the line of the journey.
   asks('walk', (asked: unknown): Promise<WalkPath> => {
     const ask = walkAskFrom(asked)
@@ -350,6 +400,8 @@ function createWindow(): void {
     lan = started
     lan.tell('quests', questsNow)
     lan.tell('kept', kept)
+    lan.tell('sheets', sheets)
+    lan.tell('portraits', portraitsTold())
     void lanUrl()
   }
   ipcMain.handle('set-lan', (_event, on: unknown) => {
@@ -362,6 +414,154 @@ function createWindow(): void {
   // The way back to the game: once the addon is there, the bank of font names and the slots go next
   // to it, by themselves and once. Where that fails (a folder that cannot be written) the map works all the same.
   let channel: Promise<unknown> | null = null
+  // The character sheets (Sheet.lua): one for each character seen, in a file beside the settings,
+  // written whole and then put in place, as the pins are. The addon sends what changed after the
+  // revision the app holds; the app tells that revision back, the part "sheet", and the addon stops.
+  // It is told too when the channel is ready, with the sync: what changed while the app was closed then comes.
+  const sheetsFile = join(app.getPath('userData'), 'sheets.json')
+  let sheets: Sheets = {}
+  try {
+    sheets = sheetsFrom(JSON.parse(readFileSync(sheetsFile, 'utf8')))
+  } catch {
+    // no character seen yet
+  }
+  // Every screen is told the sheets, for the picker of the character: at load, and at every change.
+  const tellSheets = (): void => {
+    if (!win.isDestroyed()) win.webContents.send('sheets', sheets)
+    lan?.tell('sheets', sheets)
+  }
+  win.webContents.on('did-finish-load', tellSheets)
+  const writeSheets = (): void => {
+    try {
+      writeFileSync(`${sheetsFile}.new`, JSON.stringify(sheets))
+      renameSync(`${sheetsFile}.new`, sheetsFile)
+    } catch {
+      // kept for this run only: the addon is told all the same, and sends again what is lost when the app opens next
+    }
+    tellSheets()
+  }
+  // The tooltips of the items (M10-F15): sent once each with the sheet, kept here for good, every character's together.
+  const tipsFile = join(app.getPath('userData'), 'tips.json')
+  let tips: Tips = {}
+  try {
+    tips = tipsFrom(JSON.parse(readFileSync(tipsFile, 'utf8')))
+  } catch {
+    // none yet
+  }
+  const tellTips = (): void => {
+    if (!win.isDestroyed()) win.webContents.send('tips', tips)
+    lan?.tell('tips', tips)
+  }
+  win.webContents.on('did-finish-load', tellTips)
+  const takeTips = (sent: unknown): void => {
+    const news = tipsFrom(sent)
+    if (!Object.keys(news).some((key) => JSON.stringify(tips[key]) !== JSON.stringify(news[key]))) return
+    tips = { ...tips, ...news }
+    try {
+      writeFileSync(`${tipsFile}.new`, JSON.stringify(tips))
+      renameSync(`${tipsFile}.new`, tipsFile)
+    } catch {
+      // kept for this run only
+    }
+    tellTips()
+  }
+  const tellHeld = (): void => {
+    if (!gameFolder) return
+    try {
+      const addons = addonsFolder(gameFolder), held = heldOf(sheets)
+      if (JSON.stringify(sentParts(addons).sheet) !== JSON.stringify(held)) send(addons, { sheet: held }, addonHearsFonts(gameFolder))
+    } catch {
+      // the way to the game is not there yet: the addon sends again until it is
+    }
+  }
+  let sheetHeard = ''
+  const takeSheet = (section: unknown): void => {
+    const text = JSON.stringify(section ?? null)
+    if (text === sheetHeard) return
+    sheetHeard = text
+    const sent = sheetNewsFrom(section)
+    if (!sent) return
+    // The tooltips go to their own file: the sheet keeps none of them.
+    const { tips: sentTips, ...pieces } = sent.p
+    if (sentTips !== undefined) takeTips(sentTips)
+    const news = { ...sent, p: pieces }
+    const now = mergeSheet(sheets, news, Date.now())
+    if (now !== sheets) {
+      sheets = now
+      record.note('sheet', `revision ${news.rev}: ${Object.keys(sent.p).sort().join(', ')}`) // which pieces came, never what is in them
+      writeSheets()
+    }
+    tellHeld()
+  }
+  // The pictures of the characters, read off the game's window while its character window shows the
+  // model: when there is none yet, when what is worn is no longer what the picture shows, and when
+  // the player asks for a new one (Retake), which waits for the window to be open.
+  const portraitsFile = join(app.getPath('userData'), 'portraits.json')
+  let portraits: Portraits = {}
+  try {
+    portraits = portraitsFrom(JSON.parse(readFileSync(portraitsFile, 'utf8')))
+  } catch {
+    // none taken yet
+  }
+  let retake: string | null = null
+  const portraitsTold = (): PortraitsTold => ({ taken: portraits, retake })
+  const tellPortraits = (): void => {
+    if (!win.isDestroyed()) win.webContents.send('portraits', portraitsTold())
+    lan?.tell('portraits', portraitsTold())
+  }
+  win.webContents.on('did-finish-load', tellPortraits)
+  const keepPortraits = (now: Portraits): void => {
+    portraits = now
+    try {
+      writeFileSync(`${portraitsFile}.new`, JSON.stringify(portraits))
+      renameSync(`${portraitsFile}.new`, portraitsFile)
+    } catch {
+      // kept for this run only
+    }
+    tellPortraits()
+  }
+  const PORTRAIT_EVERY = 250 // ms between two looks at whether a picture is to be taken
+  let portraitLooked = 0
+  const lookPortrait = (state: LinkSnapshot['state'], now: number): void => {
+    if (now - portraitLooked < PORTRAIT_EVERY) return
+    portraitLooked = now
+    // ponytail: a model told by a strip that then stopped (the addon paused with the window open) is still believed; only Retake can then take what is there
+    const box = modelFrom(state.sections.model), sheet = box ? sheets[box.key] : undefined
+    const gear = sheet && wornKey(sheet.pieces.gear)
+    if (!box || !pictureDue(box, now - (state.updatedAt.model ?? now), gear, portraits[box.key], retake)) return
+    const cut = link.cut(box.x, box.y, box.w, box.h)
+    if (!cut) return // the game is not on show there now: at the next look
+    try {
+      mkdirSync(portraitsFolder, { recursive: true })
+      writeFileSync(portraitFile(box.key), encodePng(cut.rgb, cut.width, cut.height))
+    } catch {
+      return
+    }
+    if (retake === box.key) retake = null
+    record.say('portrait taken') // never whose
+    keepPortraits({ ...portraits, [box.key]: { at: now, gear: gear! } })
+  }
+  // Retake: a new picture of this character as soon as its model is on show; null takes the asking back.
+  asks('retake-portrait', (key: unknown): void => {
+    retake = typeof key === 'string' && Object.hasOwn(sheets, key) ? key : null
+    tellPortraits()
+  })
+  // Save: a copy of the picture where the player says. The window's own: a browser on the home network downloads it.
+  ipcMain.handle('save-portrait', async (_event, key: unknown): Promise<void> => {
+    if (typeof key !== 'string' || !Object.hasOwn(portraits, key)) return
+    const picked = await dialog.showSaveDialog(win, { title: `Save the picture of ${key}`, defaultPath: `${key}.png`, filters: [{ name: 'PNG', extensions: ['png'] }] })
+    if (!picked.canceled && picked.filePath) await copyFile(portraitFile(key), picked.filePath).catch(() => {})
+  })
+  // A character the player no longer wants listed. The one in game comes back whole at its next send.
+  asks('forget-sheet', (key: unknown): void => {
+    if (typeof key !== 'string' || !Object.hasOwn(sheets, key)) return
+    sheets = Object.fromEntries(Object.entries(sheets).filter(([k]) => k !== key))
+    writeSheets()
+    tellHeld()
+    if (retake === key) retake = null
+    rmSync(portraitFile(key), { force: true })
+    keepPortraits(Object.fromEntries(Object.entries(portraits).filter(([k]) => k !== key)))
+  })
   // My pins: the game draws them on its own map, so it is to have the points saved here and no
   // other. The window tells them at every change and when it loads; only what changed is sent.
   // A send the addon has not read yet when the next one leaves costs one of its slots, and it reads
@@ -392,7 +592,7 @@ function createWindow(): void {
     // app, which is the newest the addon can be: an older addon says so in the game's chat.
     // Small enough to ride the font.
     channel = installChannel(addons)
-      .then(() => void send(addons, { sync: Date.now(), latest: app.getVersion() }, addonHearsFonts(gameFolder!)))
+      .then(() => void send(addons, { sync: Date.now(), latest: app.getVersion(), sheet: heldOf(sheets) }, addonHearsFonts(gameFolder!)))
       .then(() => (marksTimer ??= setTimeout(sendMarks, MARKS_WAIT)))
       .catch(() => {})
   }
@@ -478,6 +678,8 @@ function createWindow(): void {
       }
     }
     quests.show(snapshot.state.sections.questie, snapshot.state.sections.quests)
+    takeSheet(snapshot.state.sections.sheet)
+    lookPortrait(snapshot.state, Date.now())
     win.webContents.send('link', snapshot)
     win.webContents.send('tiles', tiles.status())
     win.webContents.send('setup', setup)
@@ -573,6 +775,7 @@ function createWindow(): void {
     ipcMain.removeHandler('open-feedback')
     ipcMain.removeHandler('set-on-top')
     ipcMain.removeHandler('set-lan')
+    ipcMain.removeHandler('save-portrait')
     for (const name of Object.keys(calls)) ipcMain.removeHandler(name)
     lan?.stop()
     if (marksTimer) clearTimeout(marksTimer)
