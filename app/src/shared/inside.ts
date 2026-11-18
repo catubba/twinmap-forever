@@ -12,7 +12,9 @@ import { BLOCK_YARDS, BLOCKS } from './world'
 export const YARDS_PER_UNIT = BLOCK_YARDS / UNITS_PER_BLOCK
 /** A room's picture has this many pixels a yard: its own detail is at zoom 8 of the map. */
 export const ROOM_PIXELS_PER_YARD = 2
-const MIDDLE = (BLOCKS / 2) * BLOCK_YARDS
+/** Yards from a corner of the square to its middle, where the game counts from. */
+export const MIDDLE_YARDS = (BLOCKS / 2) * BLOCK_YARDS
+const MIDDLE = MIDDLE_YARDS
 
 /** A picture of a room, laid on the map. */
 export interface Piece {
@@ -142,6 +144,44 @@ export function buriedBuildings(pieces: Piece[], groundAt: (u: number, v: number
     floors.set(p.building, floor)
   }
   return [...floors].filter(([, f]) => f.under >= f.all / 2).map(([building]) => building).sort((a, b) => a - b)
+}
+
+/** A room inside the ground, for the 3D view: its place in the list of the continent's pieces, the height of its floor, the yards of ground over it. */
+export type UnderRoom = [index: number, floor: number, roof: number]
+
+// The places of a piece asked about: a grid over it, a point every few yards.
+function* over(p: Piece, step: number): Generator<[number, number]> {
+  const cos = Math.cos(p.angle), sin = Math.sin(p.angle)
+  for (let i = -p.width / 2 + step / 2; i < p.width / 2; i += step) for (let j = -p.height / 2 + step / 2; j < p.height / 2; j += step) yield [p.u + i * cos + j * sin, p.v - i * sin + j * cos]
+}
+
+/**
+ * How high the floor of a room is. A piece comes with the bottom of its box, which is the bottom of
+ * the pit where it has one (the chasm of Ironforge: up to 136 yards under where one walks). The
+ * walking grid knows where one stands: the height most stood at inside the piece. Its bottom where
+ * the grid has nothing there. heightsAt: every height one stands at on a place.
+ */
+export function floorOf(p: Piece, heightsAt: (u: number, v: number) => number[]): number {
+  const stood: number[] = []
+  for (const [u, v] of over(p, 4)) for (const z of heightsAt(u, v)) if (z > p.bottom - 3 && z < p.top + 3) stood.push(z)
+  return stood.length ? stood.sort((a, b) => a - b)[stood.length >> 1]! : p.bottom
+}
+
+/**
+ * The yards of ground over a room's floor, at most; null for a room that is not inside the ground:
+ * the ground is over its floor on less than a quarter of it (the mouth of a cave, a city in a
+ * canyon: those are on the ground's own picture already).
+ */
+export function roofOf(p: Piece, floor: number, groundAt: (u: number, v: number) => number | null): number | null {
+  let all = 0, under = 0, roof = 0
+  for (const [u, v] of over(p, Math.max(2, Math.min(p.width, p.height) / 10))) {
+    const ground = groundAt(u, v)
+    all++
+    if (ground === null) continue
+    roof = Math.max(roof, ground - floor)
+    if (ground > floor + 3) under++
+  }
+  return under >= all / 4 ? roof : null
 }
 
 /** What holds every piece, or null for none. */

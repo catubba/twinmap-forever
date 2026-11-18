@@ -57,7 +57,7 @@ function startTiles(gameFolder: string | null): { status: () => TilesStatus; ite
   let status: TilesStatus = { state: 'looking' }
   if (!gameFolder) return { status: () => ({ state: 'no-game' }), item: () => Promise.resolve(false), stop: () => {} }
   const base = process.env.TWINMAP_DATA ?? join(process.env.LOCALAPPDATA ?? app.getPath('userData'), 'Twinmap')
-  const worker = startTilesWorker({ workerData: { gameFolder, base } })
+  const worker = startTilesWorker({ workerData: { gameFolder, base, nav: navFolder() } })
   // The picture of an item, or of a spell by its file, the folder does not have yet is made by the worker, which has the game's archive (item-icons.ts).
   const items = new Map<string, ((made: boolean) => void)[]>()
   worker.on('message', (told: TilesStatus | { asked: string; made: boolean }) => {

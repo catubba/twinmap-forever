@@ -14,6 +14,7 @@ import { BLOCK_ZOOM, HOLE, unpackLevels, type Levels } from '../../shared/levels
 import { pictureOfBlock } from '../../shared/pixels'
 import { DRY, TAR } from '../../shared/water'
 import { BLOCK_YARDS } from '../../shared/world'
+import { ROOF_STEP } from './inside3d'
 import { TILES } from './web'
 
 /** Yards a side of the world's grid. */
@@ -53,6 +54,21 @@ const LOOKS = 8
 const FRAME_MS = 1000 / 60 - 4
 /** Pixels past the edge of the view where what lies on the ground still counts as on it. */
 const OFF = 60
+/** The ground over a room it is the roof of: how much of it stays (ui.md, "Interni e grotte in 3D"). */
+const ROOF_KEPT = 0.05
+/** Yards past a room's roof, along the look, that the ground still opens for it. */
+const ROOF_MARGIN = 60
+/** How much of a room shows through a mountain that is not its roof. */
+const ROOF_GHOST = 0.1
+
+/** What lies inside the ground (inside3d.ts), as the view asks it. */
+export interface Under {
+  roofOver(x0: number, z0: number, x1: number, z1: number): ((x: number, z: number) => number) | null
+  floorAt(x: number, z: number): { y: number; open: number } | null
+  step(camera: THREE.Vector3, dt: number): boolean
+  seenPass(on: boolean): void
+  readonly any: boolean
+}
 
 /** A node's key: a number, as groundAt asks for thousands a frame (no node is wider than 2 ** 8 a side). */
 const keyOf = (z: number, x: number, y: number): number => (z << 16) | (y << 8) | x
@@ -76,7 +92,7 @@ interface Node {
 }
 
 // A file of the map as the converter keeps it, deflated; null where there is none.
-const inflated = (url: string): Promise<Uint8Array<ArrayBuffer> | null> =>
+export const inflated = (url: string): Promise<Uint8Array<ArrayBuffer> | null> =>
   fetch(url)
     .then(async (answer) => (answer.ok && answer.body && answer.status !== 204 ? new Uint8Array(await new Response(answer.body.pipeThrough(new DecompressionStream('deflate'))).arrayBuffer()) : null))
     .catch(() => null)
@@ -148,7 +164,23 @@ export class Terrain {
     liquids: THREE.Material[]
   }
   private observer: ResizeObserver
-  private s3tc: boolean
+  readonly s3tc: boolean
+  // What is inside the ground is drawn before it, from a scene of its own; and first of all alone, on a
+  // picture (seen) the ground asks pixel by pixel: is a room behind me, how much ground has it over it,
+  // how far is it. The ground that is its roof goes see-through; a mountain far in front of it stays.
+  private below = new THREE.Scene()
+  private sunk = new THREE.Group()
+  private inside: Under | null = null
+  private seen = new THREE.WebGLRenderTarget(2, 2, { depthTexture: new THREE.DepthTexture(2, 2) })
+  private seenClear = false // not yet: a picture never drawn on reads as solid
+  private roofs = {
+    uSeen: { value: this.seen.texture },
+    uSeenDepth: { value: this.seen.depthTexture },
+    uSize: { value: new THREE.Vector2(2, 2) },
+    uNear: { value: 1 },
+    uFar: { value: 2 },
+    uDown: { value: 1 },
+  }
   private width = 1
   private height = 1
   // Where the controls put the camera, while it is lifted over the ground to be drawn (hold): what
@@ -171,8 +203,9 @@ export class Terrain {
     this.renderer.setPixelRatio(devicePixelRatio)
     host.append(this.renderer.domElement)
     this.s3tc = this.renderer.extensions.has('WEBGL_compressed_texture_s3tc')
-    this.scene.background = new THREE.Color(SKY)
     this.scene.fog = new THREE.Fog(SKY, 1, 2)
+    this.renderer.autoClear = false // a frame is the inside, then the ground over it (draw)
+    this.below.add(this.sunk)
     // Half of the light from all round, half from a sun fixed to the north-west, 45 degrees up: level ground as bright as the minimap.
     const sun = new THREE.DirectionalLight(0xffffff, (Math.PI * 0.5) / Math.sin(Math.PI / 4))
     sun.position.set(-Math.SQRT1_2, 1, -Math.SQRT1_2)
@@ -262,6 +295,35 @@ export class Terrain {
     this.scene.add(object)
   }
 
+  /** What is inside the ground: its rooms, and what tells of them. */
+  under(rooms: THREE.Object3D, inside: Under): void {
+    this.below.add(rooms)
+    this.inside = inside
+  }
+
+  /** Something of the scene that is in a room under the ground, or out of it again: drawn with the rooms, before the ground. */
+  sink(object: THREE.Object3D, on: boolean): void {
+    if ((object.parent === this.sunk) !== on) (on ? this.sunk : this.scene).add(object)
+  }
+
+  /** The floor of an open room over a place, and how open it is; null where there is none. */
+  floorAt(x: number, z: number): { y: number; open: number } | null {
+    return this.inside?.floorAt(x, z) ?? null
+  }
+
+  // Where what lies on the ground at a place is put: on the ground, or on the floor of the room under it as it opens.
+  private standAt(x: number, z: number): number {
+    const ground = this.groundAt(x, z),
+      floor = this.inside?.floorAt(x, z)
+    return floor && Number.isFinite(ground) ? ground + (floor.y - ground) * floor.open : ground
+  }
+
+  /** The tiles of the ground are made again: what they must know of the inside has changed. */
+  reload(): void {
+    for (const n of this.nodes.values()) this.unload(n)
+    this.dirty = true
+  }
+
   /** Called at every frame while the view runs, once it is drawn: what lies over it follows. */
   onFrame: () => void = () => {}
 
@@ -274,7 +336,8 @@ export class Terrain {
   spot(x: number, z: number, lift = 0): { x: number; y: number; shows: number; away: number } {
     const fog = this.scene.fog as THREE.Fog,
       out = Math.hypot(x - this.camera.position.x, z - this.camera.position.z) >= fog.far, // past the fog: the ground is not looked for
-      ground = out ? NaN : this.groundAt(x, z),
+      ground = out ? NaN : this.standAt(x, z),
+      inRoom = !out && (this.inside?.floorAt(x, z)?.open ?? 0) > 0.5,
       p = new THREE.Vector3(x, (Number.isFinite(ground) ? ground : 0) + lift, z),
       far = out ? Infinity : p.distanceTo(this.camera.position)
     const on = p.clone().project(this.camera),
@@ -283,7 +346,7 @@ export class Terrain {
     if (on.z > 1 || far >= fog.far) return { ...at, shows: 0, away }
     const clear = Math.min(1, (fog.far - far) / (fog.far - fog.near)),
       off = at.x < -OFF || at.y < -OFF || at.x > this.width + OFF || at.y > this.height + OFF // off the view: no hill looked for
-    return { ...at, shows: off || !this.behindHill(p) ? clear : clear * HIDDEN, away }
+    return { ...at, shows: off || inRoom || !this.behindHill(p) ? clear : clear * HIDDEN, away }
   }
 
   /** The point of the ground under a pixel of the view, in yards; null where the ray meets none before the fog. The sea is at 0. */
@@ -417,6 +480,7 @@ export class Terrain {
     this.observer.disconnect()
     this.drop()
     this.controls.dispose()
+    this.seen.dispose()
     this.renderer.dispose()
     this.renderer.domElement.remove()
     this.compass.dispose()
@@ -436,6 +500,8 @@ export class Terrain {
     this.width = w
     this.height = h
     this.renderer.setSize(w, h)
+    this.renderer.getDrawingBufferSize(this.roofs.uSize.value)
+    this.seen.setSize(this.roofs.uSize.value.x, this.roofs.uSize.value.y)
     this.camera.aspect = w / h
     this.camera.updateProjectionMatrix()
     this.dirty = true
@@ -496,10 +562,11 @@ export class Terrain {
     this.camera.updateProjectionMatrix()
     this.compass.turn(this.controls.getPolarAngle() / 2, this.controls.getAzimuthalAngle())
     if (this.onBefore()) this.dirty = true
+    if (this.inside?.step(this.camera.position, Math.min(0.1, FRAME_MS / 1000 + 0.004))) this.dirty = true
     if (this.dirty) {
       this.dirty = false
       this.choose()
-      this.renderer.render(this.scene, this.camera)
+      this.draw()
       this.drawnFrom.copy(this.camera.position)
       this.compass.render()
       this.evict()
@@ -507,19 +574,49 @@ export class Terrain {
     this.onFrame()
   }
 
+  private draw(): void {
+    const r = this.renderer
+    if (this.inside?.any) {
+      // What is inside, alone: no blending, the numbers as they are.
+      this.roofs.uNear.value = this.camera.near
+      this.roofs.uFar.value = this.camera.far
+      this.roofs.uDown.value = Math.max(0.3, -this.camera.getWorldDirection(new THREE.Vector3()).y)
+      this.inside.seenPass(true)
+      this.sunk.visible = false
+      r.setRenderTarget(this.seen)
+      r.setClearColor(0x000000, 0)
+      r.clear()
+      r.render(this.below, this.camera)
+      r.setRenderTarget(null)
+      this.inside.seenPass(false)
+      this.sunk.visible = true
+      this.seenClear = false
+    } else if (!this.seenClear) {
+      r.setRenderTarget(this.seen)
+      r.setClearColor(0x000000, 0)
+      r.clear()
+      r.setRenderTarget(null)
+      this.seenClear = true
+    }
+    r.setClearColor(SKY, 1)
+    r.clear()
+    if (!this.seenClear) r.render(this.below, this.camera)
+    r.render(this.scene, this.camera)
+  }
+
   // The point looked at stays on the ground as it rises and falls under it, and the camera never
   // goes into the ground: it is drawn from over hills and mountains (ui.md), the controls left where they were.
   private hold(): void {
     const t = this.controls.target,
       c = this.camera.position
-    const under = this.groundAt(t.x, t.z)
+    const under = this.standAt(t.x, t.z)
     if (Number.isFinite(under) && Math.abs(under - t.y) > 0.05) {
       const dy = (under - t.y) * 0.2
       t.y += dy
       c.y += dy
       this.dirty = true
     }
-    const below = this.groundAt(c.x, c.z),
+    const below = this.standAt(c.x, c.z),
       clear = Math.max(6, c.distanceTo(t) * 0.04)
     if (Number.isFinite(below) && c.y < below + clear) {
       this.logical.copy(c)
@@ -775,9 +872,19 @@ export class Terrain {
     ground.setAttribute('uv', new THREE.BufferAttribute(uv, 2))
     ground.setAttribute('normal', new THREE.BufferAttribute(normal, 3))
     ground.setIndex(index)
-    const material = texture ? this.groundWith(texture) : this.materials.ground
-    const group = new THREE.Group()
-    group.add(new THREE.Mesh(ground, material))
+    // Near a room under the ground: each point told how much it is the roof of one, and a ground that can open.
+    const roofed = this.inside?.roofOver(x0, z0, x0 + size, z0 + size)
+    if (roofed) {
+      const roof = new Float32Array(count)
+      for (let k = 0; k < N * N; k++) roof[k] = roofed(pos[k * 3]!, pos[k * 3 + 2]!)
+      ring.forEach((v, r) => (roof[N * N + r] = roof[v]!))
+      ground.setAttribute('roofed', new THREE.BufferAttribute(roof, 1))
+    }
+    const material = texture ? this.groundWith(texture, !!roofed) : this.materials.ground
+    const group = new THREE.Group(),
+      land = new THREE.Mesh(ground, material)
+    if (roofed) land.renderOrder = -1 // see-through, yet before everything else that is: the ground is under it all
+    group.add(land)
     if (pit.length) {
       const dark = new THREE.BufferGeometry()
       dark.setAttribute('position', ground.getAttribute('position'))
@@ -854,19 +961,38 @@ export class Terrain {
     return new THREE.Group().add(new THREE.Mesh(geo, this.materials.liquids[4]))
   }
 
-  // The ground's material with a picture: one a picture, shared by the nodes that use it.
+  // The ground's material with a picture: one a picture, shared by the nodes that use it; and one more where the ground can open over a room.
   private withPicture = new WeakMap<THREE.Texture, THREE.MeshLambertMaterial>()
-  private groundWith(texture: THREE.Texture): THREE.MeshLambertMaterial {
-    let m = this.withPicture.get(texture)
-    if (!m)
-      this.withPicture.set(
-        texture,
-        (m = new THREE.MeshLambertMaterial({
-          map: texture,
-          side: THREE.DoubleSide,
-        })),
-      )
+  private withRoof = new WeakMap<THREE.Texture, THREE.MeshLambertMaterial>()
+  private groundWith(texture: THREE.Texture, opens: boolean): THREE.MeshLambertMaterial {
+    const kept = opens ? this.withRoof : this.withPicture
+    let m = kept.get(texture)
+    if (!m) {
+      kept.set(texture, (m = new THREE.MeshLambertMaterial({ map: texture, side: THREE.DoubleSide, transparent: opens })))
+      if (opens) m.onBeforeCompile = (shader) => this.opening(shader)
+    }
     return m
+  }
+
+  // The ground that opens over a room: see-through where a room is behind it on the screen and it is that room's
+  // roof, which is the ground over the room seen from above (roofed), or no farther before it than the ground the
+  // room has over it, seen aslant, and a margin. Any other ground in front lets the room through as a ghost.
+  private opening(shader: THREE.WebGLProgramParametersWithUniforms): void {
+    Object.assign(shader.uniforms, this.roofs)
+    shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nattribute float roofed;\nvarying float vRoofed;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvRoofed = roofed;')
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform sampler2D uSeen, uSeenDepth;\nuniform vec2 uSize;\nuniform float uNear, uFar, uDown;\nvarying float vRoofed;')
+      .replace(
+        '#include <dithering_fragment>',
+        `#include <dithering_fragment>
+        vec2 at = gl_FragCoord.xy / uSize;
+        vec4 behind = texture2D(uSeen, at);
+        float gap = uNear * uFar / (uFar - texture2D(uSeenDepth, at).x * (uFar - uNear)) - vViewPosition.z;
+        float reach = ${ROOF_MARGIN.toFixed(1)} + behind.r * ${(255 * ROOF_STEP).toFixed(1)} / uDown;
+        float roof = max(1.0 - smoothstep(reach, reach + ${(ROOF_MARGIN / 2).toFixed(1)}, gap), vRoofed);
+        gl_FragColor.a *= 1.0 - behind.a * mix(${ROOF_GHOST.toFixed(2)}, ${(1 - ROOF_KEPT).toFixed(2)}, roof);
+        if (gl_FragColor.a < 0.02) discard;`,
+      )
   }
 
   // Past KEPT, the nodes and pictures not on show the longest go from the graphics card.
@@ -876,7 +1002,8 @@ export class Terrain {
     const inUse = new Set([...this.nodes.values()].filter((n) => n.group).map((n) => n.picture))
     for (const [key, p] of this.pictures) {
       if (inUse.has(key) || p.used >= this.frame || !p.made) continue
-      if (this.withPicture.get(p.made)) this.withPicture.get(p.made)!.dispose()
+      this.withPicture.get(p.made)?.dispose()
+      this.withRoof.get(p.made)?.dispose()
       p.made.dispose()
       this.pictures.delete(key)
     }

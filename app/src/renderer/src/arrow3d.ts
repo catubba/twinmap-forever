@@ -158,8 +158,11 @@ export class Arrow3d {
       return this.show(false, '')
     }
     // On a floor over the ground (a bridge): at its height and level. Else on the ground, as it slopes.
+    // In a room under the ground, as it opens: down on its floor, level, and drawn with the rooms, before the ground.
     const lifted = w.floor !== null && w.floor > ground + FLOOR,
-      y = lifted ? w.floor! : ground
+      room = w.floor !== null && w.floor < ground - FLOOR ? this.terrain.floorAt(w.x, w.z) : null,
+      y = lifted ? w.floor! : room ? ground + (w.floor! - ground) * room.open : ground
+    for (const o of [this.group, this.shadow, this.stem]) this.terrain.sink(o, !!room && room.open > 0.5)
     const camera = this.terrain.camera,
       distance = camera.position.distanceTo(new THREE.Vector3(w.x, y, w.z)),
       least = (LEAST * 2 * distance * Math.tan((camera.fov * Math.PI) / 360)) / this.terrain.size.height,
@@ -170,7 +173,7 @@ export class Arrow3d {
         const g = this.terrain.groundAt(w.x + dx, w.z + dz)
         return Number.isFinite(g) ? g : ground
       }
-    const slope = lifted ? UP : new THREE.Vector3(-(at(reach, 0) - at(-reach, 0)) / (2 * reach), 1, -(at(0, reach) - at(0, -reach)) / (2 * reach)).normalize()
+    const slope = lifted || room ? UP : new THREE.Vector3(-(at(reach, 0) - at(-reach, 0)) / (2 * reach), 1, -(at(0, reach) - at(0, -reach)) / (2 * reach)).normalize()
     const k = this.y === null ? 1 : 1 - Math.exp(-dt / EASE)
     this.up.lerp(slope, k).normalize()
     this.y = this.y === null ? y : this.y + (y - this.y) * (1 - Math.exp(-dt / (EASE / 2)))
@@ -188,7 +191,7 @@ export class Arrow3d {
     for (let i = 0; i < this.sheet.count; i++) {
       const dx = this.flatSheet[i * 3]! * size * 1.5,
         dz = this.flatSheet[i * 3 + 2]! * size * 1.5
-      this.sheet.setXYZ(i, w.x + dx, at(dx, dz) + 0.05 + (lifted ? 0 : this.y - ground), w.z + dz)
+      this.sheet.setXYZ(i, w.x + dx, room ? this.y + 0.05 : at(dx, dz) + 0.05 + (lifted ? 0 : this.y - ground), w.z + dz)
     }
     this.sheet.needsUpdate = true
     // From afar, kept at its least size: a stem over it, to find it by.

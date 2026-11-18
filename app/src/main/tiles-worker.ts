@@ -16,12 +16,15 @@ import { installedBuild, openClientFiles, type ClientFiles } from './client-file
 import { convertInteriors, ENCOUNTERS_FILE, finishedInteriors, INTERIORS_FILE, MAP_FILE, mapEntries, ROOM_PICTURES_FILE, roomPictures } from './interiors'
 import { sentKeys } from './keys'
 import { convertHeights, heightsDone } from './heights'
-import { makeCaves } from './caves'
+import { makeCaves, makeUnder } from './caves'
+import { navFrom } from '../shared/nav-data'
+import { walker, type Walker } from './walk'
+import { MIDDLE_YARDS } from '../shared/inside'
 import { ICONS_MADE, writeIcons } from './icons'
 import { gamePictures, itemIcons } from './item-icons'
 import { convertWorld, dropOtherBuilds, finished, ICONS_FOLDER, MAPS_FILE, PLACES_FILE, tilesFolder, TRAVEL_FILE } from './tiles'
 
-const { gameFolder, base } = workerData as { gameFolder: string; base: string }
+const { gameFolder, base, nav } = workerData as { gameFolder: string; base: string; nav: string }
 const tell = (status: TilesStatus): void => parentPort?.postMessage(status)
 /** In the folder of the build: the game's numbers of the keys the map was made with. */
 const KEYS_FILE = 'keys.json'
@@ -182,7 +185,17 @@ try {
     }
     // Which of the continents' buildings are caves and mines: for the layer that shows them from outside. Without it the map goes on as before.
     try {
-      makeCaves(folder, inside)
+      const caves = makeCaves(folder, inside)
+      // And for the 3D view the rooms inside the ground, each with its floor as the walking grid shipped with the app tells it.
+      const walkers = new Map<number, Walker | null>()
+      const walk = (continent: number): Walker | null => {
+        if (!walkers.has(continent)) {
+          const data = navFrom(readFileSync(join(nav, `nav${continent}.json`), 'utf8'))
+          walkers.set(continent, data && walker(data))
+        }
+        return walkers.get(continent)!
+      }
+      if (caves) makeUnder(folder, inside, caves, (continent, u, v) => walk(continent)?.heights([MIDDLE_YARDS - v, MIDDLE_YARDS - u]) ?? [])
     } catch {
       // tried again at the next start
     }

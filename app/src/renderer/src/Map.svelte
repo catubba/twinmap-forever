@@ -5,6 +5,7 @@
   import { inApp, TILES } from './web'
   import type { Terrain } from './terrain3d'
   import { Arrow3d } from './arrow3d'
+  import type { Inside3d } from './inside3d'
   import { Names3d } from './names3d'
   import { ARC, paintFixed, Pins3d, ROUTE } from './pins3d'
   import L from 'leaflet'
@@ -17,7 +18,7 @@
   import { coloursFor, type Companion } from '../../shared/group'
   import { unitsOfPlace, unitsOfRect, type Point } from '../../shared/geo'
   import { addFix, BEHIND, PERIOD, whereAt, type Fix } from '../../shared/glide'
-  import { boxOf, buildingsAt, killedIn, nameOfBoss, piecesIn, RARE_BOSSES, roomPixels, yardsInside, YARDS_PER_UNIT, type Box, type InteriorMap, type Interiors, type Piece, type Yards } from '../../shared/inside'
+  import { boxOf, buildingsAt, killedIn, nameOfBoss, piecesIn, RARE_BOSSES, roomPixels, yardsInside, YARDS_PER_UNIT, type Box, type InteriorMap, type Interiors, type Piece, type UnderRoom, type Yards } from '../../shared/inside'
   import type { Continent, GameMap } from '../../shared/maps'
   import type { QuestPin } from '../../shared/quests'
   import { iconOf, serves, type FixedLayer, type FixedPin, type Travel } from '../../shared/services'
@@ -865,6 +866,20 @@
       if (threeD) mapAsTheView()
     }, 200)
   }
+  // The rooms inside the ground of the continent on show, for the 3D view (inside3d.ts; under.json, main/caves.ts).
+  let inside3d: Inside3d | undefined
+  let underRooms: Record<string, UnderRoom[]> | undefined
+  let underOf = -1
+  function inside3dSet(): void {
+    const world = interiors?.maps.find((m) => m.kind === 'world' && m.id === continent)
+    if (!inside3d || !world || !underRooms || underOf === continent) return
+    underOf = continent
+    inside3d.set(world.pieces, underRooms[continent] ?? [])
+  }
+  $effect(() => {
+    void continent
+    untrack(inside3dSet)
+  })
   async function view3d(on: boolean): Promise<void> {
     const folder = worldShown()
     if (on === threeD || !map || (on && !folder)) return
@@ -872,12 +887,16 @@
       if (!terrain) {
         const { Terrain } = await import('./terrain3d')
         terrain ??= new Terrain(terrainHost, compassHost)
+        // For the trials (design/terrain3d): the view within reach of a script, when the page is told so.
+        if (localStorage.getItem('trial')) (window as unknown as { terrain3d: unknown }).terrain3d = terrain
         terrain.onGrab = () => (following = false)
         terrain.zoomAtCursor(!following)
         const body = new Arrow3d(terrain)
         terrain.onBefore = () => body.step(performance.now())
         pins3d ??= new Pins3d(map, terrain, pinsHost, terrainHost, arrow, () => turned, body, () => floorAt)
         names3d ??= new Names3d(terrain, pinsHost)
+        inside3d ??= new (await import('./inside3d')).Inside3d(terrain)
+        inside3dSet()
         names3dSet()
         terrain.onFrame = onFrame
       }
@@ -1460,6 +1479,12 @@
       .then((list) => {
         buried = list?.worlds
         showCaves()
+        return fetch(`${TILES}/under.json`)
+      })
+      .then((answer) => (answer.ok ? (answer.json() as Promise<{ worlds: Record<string, UnderRoom[]> }>) : undefined))
+      .then((list) => {
+        underRooms = list?.worlds
+        inside3dSet()
       })
       .catch(() => {})
   })
