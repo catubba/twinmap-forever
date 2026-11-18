@@ -25,6 +25,7 @@ const LIMIT = 400_000 // cells a search looks at before it gives up
 const TRACK_SLACK = 6 // steps a tracker searches past twice the cells between two points: a ramp, a stair that turns
 const LEVEL = 3 // yards between two places to stand for one to be another floor
 const HIGH = 10 // yards a place must be over a character on foot in the open to be over its head (see the tracker)
+const NEAR = 1 // cells from the last place within which a place with no way to it is not believed (see the tracker)
 const AREA = 25 // places to stand a floor over the character must lead to: the top of a tree or a lamp is an island
 const B64 = new Uint8Array(128)
 Array.from('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/').forEach((c, i) => (B64[c.charCodeAt(0)] = i))
@@ -513,6 +514,12 @@ export function walker(nav: NavData): Walker {
               queue.push(next)
             })
           }
+        }
+        // No way there, one cell on, and every place far over or under the last: the cell is a wall
+        // in the grid, with only the ground it keeps under a city. Nothing to say, the last place kept.
+        if (found < 0 && at !== null) {
+          const [ax, ay] = placeOf(at), z0 = zOf(at)
+          if (Math.max(Math.abs(gx - ax), Math.abs(gy - ay)) <= NEAR && here.every((n) => Math.abs(zOf(n) - z0) > HIGH)) return null
         }
         // None: a flight, a portal, a first point. The surface nearest the last height; with none,
         // under a roof the highest that has another over it (a mine under its hill, the ground

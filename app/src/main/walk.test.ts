@@ -99,3 +99,11 @@ test('a character followed through Fargodeep Mine is told the floor it stands on
   expect(right / layered, `${right} of ${layered}`).toBeGreaterThan(0.9) // the bar of M16-F4; 95% in this run
   expect(below).toBeGreaterThan(0) // in the mine, the hill is over the character
 })
+
+test('a character in Stormwind is not put on the ground the grid keeps under the city', () => {
+  // A street of the Trade District, then a cell on: a wall in the grid, with only the ground 36 yards under.
+  const track = walker(shipped).track()
+  expect(track([-8792.0, 648.8])).toMatchObject({ z: 96, over: 0 })
+  expect(track([-8792.0, 656.7])).toBeNull()
+  expect(track([-8792.0, 648.8])).toMatchObject({ z: 96, over: 0 })
+})
