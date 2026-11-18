@@ -285,7 +285,9 @@ export class Pins3d {
       // them by its rise, and never under the ground it crosses (a mountain on the way).
       const from = arc ? height(ax, az) : 0,
         to = arc ? height(ax + dx, az + dz) : 0,
-        top = Math.min(ARC_MOST, ARC_RISE * length)
+        top = Math.min(ARC_MOST, ARC_RISE * length),
+        high = run[i - 1]!.alt,
+        higher = run[i]!.alt ?? high
       for (let d = 0; ; ) {
         const far = Math.hypot(ax + (dx * d) / length - c.x, az + (dz * d) / length - c.z)
         d += Math.min(arc ? length / ARC_POINTS : Infinity, Math.max(step, far / FARTHER, far - reach))
@@ -294,7 +296,7 @@ export class Pins3d {
           z = az + (dz * d) / length,
           t = d / length,
           bow = 4 * t * (1 - t)
-        points.push(this.terrain.spot(x, z, arc ? Math.max(from + (to - from) * t + top * bow - height(x, z), top * bow * 0.1) : 0))
+        points.push(this.terrain.spot(x, z, arc ? Math.max(from + (to - from) * t + top * bow - height(x, z), top * bow * 0.1) : 0, !arc && high !== undefined && this.terrain.overRoom(x, z, high + (higher! - high) * t)))
       }
       points.push(this.onGround(run[i]!))
     }
@@ -330,7 +332,11 @@ export class Pins3d {
     if (o.interactive !== false) this.painted.push({ layer: mark, x: s.x, y: s.y, r: mark.getRadius() + 3 })
   }
 
+  // A point of the 2D map that tells how high it is (a way on foot, Map.svelte) stays on the ground over an open
+  // room when that is where it is: without a height, what is over a room goes down to its floor.
   private onGround(p: L.LatLng): Spot {
-    return this.terrain.spot(p.lng * YARDS_PER_UNIT, -p.lat * YARDS_PER_UNIT)
+    const x = p.lng * YARDS_PER_UNIT,
+      z = -p.lat * YARDS_PER_UNIT
+    return this.terrain.spot(x, z, 0, p.alt !== undefined && this.terrain.overRoom(x, z, p.alt))
   }
 }

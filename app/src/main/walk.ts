@@ -80,6 +80,8 @@ export interface Walk {
   /** The way, from the first point to the last, in yards of the world; thinned to its turns. */
   points: Yards[]
   yards: number
+  /** How high the way is at each of its points, in yards: the floor it walks where several lie over one another. */
+  heights: number[]
 }
 
 // What a cluster unpacks to. A node is a place to stand: the base surface of a cell (its number is
@@ -468,16 +470,17 @@ export function walker(nav: NavData): Walker {
   }
   // The way a search found to one of its goals: the middles of its cells, and its yards. Never
   // fewer than the crow flies: the two ends are somewhere in their cells, not at the middles.
-  function wayBack(came: Map<number, number>, goal: number, from: Yards, to: Yards): { cells: Yards[]; yards: number } {
-    const cells: Yards[] = []
+  function wayBack(came: Map<number, number>, goal: number, from: Yards, to: Yards): { cells: Yards[]; yards: number; high: Map<Yards, number> } {
+    const cells: Yards[] = [], high = new Map<Yards, number>()
     for (let at: number | undefined = goal; at !== undefined; at = came.get(at)) {
-      const [gx, gy] = placeOf(at)
-      cells.push(middle(gx, gy))
+      const [gx, gy] = placeOf(at), cell = middle(gx, gy)
+      cells.push(cell)
+      high.set(cell, zOf(at))
     }
     cells.reverse()
     let yards = 0
     for (let i = 1; i < cells.length; i++) yards += Math.hypot(cells[i]![0] - cells[i - 1]![0], cells[i]![1] - cells[i - 1]![1])
-    return { cells, yards: Math.round(Math.max(yards, Math.hypot(to[0] - from[0], to[1] - from[1]))) }
+    return { cells, yards: Math.round(Math.max(yards, Math.hypot(to[0] - from[0], to[1] - from[1]))), high }
   }
 
   const zOf = (key: number): number => {
@@ -565,9 +568,9 @@ export function walker(nav: NavData): Walker {
   const find = (from: Yards, to: Yards, fromZ?: number, toZ?: number): Walk | null => {
     const { came, goals } = search(from, [to], Infinity, fromZ, toZ)
     if (goals[0]! < 0) return null
-    const { cells, yards } = wayBack(came, goals[0]!, from, to)
+    const { cells, yards, high } = wayBack(came, goals[0]!, from, to), turns = thin(cells, cell / 2)
     // The line starts and ends at the very points asked for, not at the middles of their cells.
-    return { points: [from, ...thin(cells, cell / 2), to], yards }
+    return { points: [from, ...turns, to], yards, heights: [high.get(cells[0]!)!, ...turns.map((p) => high.get(p)!), high.get(cells.at(-1)!)!] }
   }
   const far = (from: Yards, tos: Yards[], reach: number): (number | null)[] => {
     const { came, goals } = search(from, tos, reach)

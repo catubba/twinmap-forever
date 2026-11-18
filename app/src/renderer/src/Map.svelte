@@ -163,7 +163,8 @@
   const asStop = (): Stop | null => labelled && { name: pointName, continent: labelled.continent, at: { ...labelled.units }, pin: labelled.pin && { ...labelled.pin } }
 
   // Leaflet's plain coordinates: a map unit is a pixel of zoom 0, north is up.
-  const at = (p: Point): L.LatLng => L.latLng(-p.y, p.x)
+  // A point of a way on foot keeps how high the way is there: the 3D view puts the line on that floor (pins3d.ts).
+  const at = (p: Point & { z?: number }): L.LatLng => L.latLng(-p.y, p.x, p.z)
   const atYards = (y: Yards): L.LatLng => at({ x: y.u / YARDS_PER_UNIT, y: y.v / YARDS_PER_UNIT })
   const boundsOf = (m: GameMap): L.LatLngBounds => {
     const [a, b] = unitsOfRect(m.rect!)
@@ -1284,7 +1285,9 @@
     if (!journey || journey.loading || !journey.goal) return null
     const goal = journey.goal, on = maps.find((m) => m.id === goal.m)
     if (!on?.rect || on.continent === null) return null
-    return { continent: on.continent, at: unitsOfPlace(on.rect, goal.x, goal.y), name: journey.name, walked: journey.legs.every((leg) => leg.mode === 'walk') }
+    // As high as the last leg ends, when Shortest Path tells it: the goal is where that leg leads.
+    const z = journey.legs.at(-1)?.heights?.[1] ?? undefined
+    return { continent: on.continent, at: { ...unitsOfPlace(on.rect, goal.x, goal.y), z }, name: journey.name, walked: journey.legs.every((leg) => leg.mode === 'walk') }
   })
   let walked = $state<{ key: string; continent: Continent; points: Point[] } | null>(null)
   let asking = false, askedAt = 0
@@ -1299,7 +1302,7 @@
     asking = true
     askedAt = Date.now()
     // The floor at either end: the one the character is followed on now (the leg's own start is where it was planned from), and the one Shortest Path walks to.
-    const fromZ = floorAt ?? first?.points[0]!.z, toZ = 'z' in end ? end.z : undefined
+    const fromZ = floorAt ?? first?.points[0]!.z, toZ = 'z' in end ? end.z : (end.at as { z?: number }).z
     void window.twinmap.walk({ continent: end.continent, from: { ...from }, to: { ...to }, fromZ, toZ }).then((path) => {
       asking = false
       // No way found (too far, or nothing to walk on there): a straight line.

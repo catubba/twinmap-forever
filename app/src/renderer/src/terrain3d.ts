@@ -347,6 +347,13 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
     return this.inside?.floorAt(x, z) ?? null
   }
 
+  /** Whether something this high is on the ground over an open room there, and not on the room's floor. */
+  overRoom(x: number, z: number, high: number): boolean {
+    const floor = this.inside?.floorAt(x, z),
+      ground = this.groundAt(x, z)
+    return !!floor && Number.isFinite(ground) && Math.abs(high - ground) < Math.abs(high - floor.y)
+  }
+
   // Where what lies on the ground at a place is put: on the ground, or on the floor of the room under it as it opens.
   private standAt(x: number, z: number): number {
     const ground = this.groundAt(x, z),

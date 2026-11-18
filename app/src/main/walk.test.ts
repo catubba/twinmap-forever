@@ -119,3 +119,14 @@ test('where floors lie over one another, the height of an end says which one the
   expect(find(south, [-4180, -2464], undefined, 227), 'further in, the ridge is not walked onto').toBeNull()
   expect(find(south, inTunnel)!.yards, 'with no height told, the cheapest').toBe(low!.yards)
 })
+
+test('a way tells how high it is at each of its points: into Fargodeep Mine it goes down, onto the hill over it it stays up', () => {
+  const find = walker(shipped), outside: Yards = [-9740, 120], over: Yards = [-9828, 124]
+  const [mine, hill] = find.heights(over).sort((a, b) => a - b) as [number, number]
+  expect(hill - mine, 'the hill is well over the mine').toBeGreaterThan(30)
+  const down = find(outside, over, undefined, mine)!, up = find(outside, over, undefined, hill)!
+  for (const way of [down, up]) expect(way.heights.length).toBe(way.points.length)
+  expect(down.heights.at(-1)).toBeCloseTo(mine, 0)
+  expect(up.heights.at(-1)).toBeCloseTo(hill, 0)
+  expect(Math.min(...up.heights), 'never down in the mine').toBeGreaterThan(mine + 20)
+})

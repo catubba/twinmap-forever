@@ -14,8 +14,11 @@ export interface WalkAsk {
   toZ?: number
 }
 
+/** A point of a way, with how high the way is there in yards, where that is known. */
+export type WayPoint = Point & { z?: number }
+
 /** The way between them, in map units, and how long it is; null where none was found. */
-export type WalkPath = { points: Point[]; yards: number } | null
+export type WalkPath = { points: WayPoint[]; yards: number } | null
 
 const number = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v)
 const point = (v: unknown): v is Point => typeof v === 'object' && v !== null && number((v as Point).x) && number((v as Point).y)
@@ -88,13 +91,13 @@ export const YARDS_PER_UNIT = BLOCK_YARDS / UNITS_PER_BLOCK
  * What is left of a way for a character at `me`: from the nearest place on it to its end. off: how
  * many yards the character is from the way, which tells when to look for a new one.
  */
-export function ahead(points: Point[], me: Point): { rest: Point[]; off: number } {
+export function ahead<P extends Point>(points: P[], me: Point): { rest: P[]; off: number } {
   if (points.length < 2) return { rest: points, off: points[0] ? Math.hypot(me.x - points[0].x, me.y - points[0].y) * YARDS_PER_UNIT : 0 }
   let best = { at: 0, on: points[0]!, d: Infinity }
   for (let i = 0; i + 1 < points.length; i++) {
     const a = points[i]!, b = points[i + 1]!, dx = b.x - a.x, dy = b.y - a.y, length = dx * dx + dy * dy
     const t = length ? Math.max(0, Math.min(1, ((me.x - a.x) * dx + (me.y - a.y) * dy) / length)) : 0
-    const on = { x: a.x + dx * t, y: a.y + dy * t }, d = Math.hypot(me.x - on.x, me.y - on.y)
+    const on = { ...a, x: a.x + dx * t, y: a.y + dy * t }, d = Math.hypot(me.x - on.x, me.y - on.y) // as high as the point before it
     if (d < best.d) best = { at: i, on, d }
   }
   return { rest: [best.on, ...points.slice(best.at + 1)], off: best.d * YARDS_PER_UNIT }

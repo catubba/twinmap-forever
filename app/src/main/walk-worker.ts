@@ -56,7 +56,7 @@ parentPort?.on('message', ({ id, ask }: { id: number; ask: WalkAsk | FarAsk | Tr
     if (find && many) path = find.far(yardsOf(ask.from), ask.to.map(yardsOf), ask.reach)
     else if (find && !many) {
       const walk = find(yardsOf(ask.from), yardsOf(ask.to), ask.fromZ, ask.toZ)
-      if (walk) path = { points: walk.points.map(([x, y]) => unitsOfWorld(x, y)), yards: walk.yards }
+      if (walk) path = { points: walk.points.map(([x, y], i) => ({ ...unitsOfWorld(x, y), z: Math.round(walk.heights[i]!) })), yards: walk.yards }
     }
   } catch {
     // a grid that does not read as it should: no way, rather than a thread that dies
