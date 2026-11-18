@@ -69,6 +69,9 @@ export class Pins3d {
   private painted: { layer: L.CircleMarker; x: number; y: number; r: number }[] = []
   private lines = new Map<string, Spot[]>() // the points of the lines of this frame
   private down: { x: number; y: number } | null = null
+  // The name of a pin under the pointer, as the 2D map's own: one for the whole view, on the pins that have one there.
+  private tip = Object.assign(document.createElement('div'), { className: 'leaflet-tooltip leaflet-tooltip-top tip' })
+  private tipped: { marker: L.Marker; dx: number; dy: number } | null = null
 
   /** host: the layer over the view the copies go in; events: what the clicks on the view reach. heading: where the arrow points, in degrees clockwise from north. floor: the height the character stands at, where the walking grid tells it. */
   constructor(
@@ -82,7 +85,8 @@ export class Pins3d {
     private floor: () => number | null,
   ) {
     this.canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%'
-    host.append(this.canvas)
+    this.tip.style.cssText = 'left:0;top:0;z-index:200000;visibility:hidden'
+    host.append(this.canvas, this.tip)
     // A click, not the end of a drag, on a painted pin is a click on it; on the bare ground, a click
     // on the 2D map at that point, which puts the label there.
     events.addEventListener('pointerdown', (e) => (this.down = { x: e.clientX, y: e.clientY }))
@@ -149,12 +153,29 @@ export class Pins3d {
       c.copy.remove()
       this.copies.delete(marker)
     }
+    if (this.tipped && !seen.has(this.tipped.marker)) this.untip()
+  }
+
+  // The name over a copy while the pointer is on it: what the 2D map would show over the pin.
+  private tipOf(marker: L.Marker): void {
+    const from = marker.getTooltip(),
+      says = from?.getContent()
+    if (!from || !says || typeof says === 'function') return
+    if (typeof says === 'string') this.tip.innerHTML = says
+    else this.tip.replaceChildren(says.cloneNode(true))
+    const off = L.point(from.options.offset ?? [0, 0])
+    this.tipped = { marker, dx: off.x, dy: off.y }
+  }
+  private untip(): void {
+    this.tipped = null
+    this.tip.style.visibility = 'hidden'
   }
 
   /** Nothing over the view: it is off. */
   clear(): void {
     for (const c of this.copies.values()) c.copy.remove()
     this.copies.clear()
+    this.untip()
     this.body.hide()
     this.painted = []
     this.canvas.getContext('2d')!.clearRect(0, 0, this.canvas.width, this.canvas.height)
@@ -172,6 +193,8 @@ export class Pins3d {
         e.stopPropagation()
         marker.fire('click')
       })
+      copy.addEventListener('mouseenter', () => this.tipOf(marker))
+      copy.addEventListener('mouseleave', () => this.tipped?.marker === marker && this.untip())
       this.host.append(copy)
       this.copies.set(marker, (c = { from, copy }))
     }
@@ -183,6 +206,10 @@ export class Pins3d {
       shows = from.classList.contains('door') ? thinned(s) : s.shows,
       style = c.copy.style
     style.visibility = shows > 0 ? '' : 'hidden'
+    if (this.tipped?.marker === marker) {
+      this.tip.style.visibility = shows > 0 ? '' : 'hidden'
+      this.tip.style.transform = `translate3d(${s.x + this.tipped.dx}px,${s.y + this.tipped.dy}px,0) translate(-50%,-100%)`
+    }
     if (!shows) return
     style.transform = `translate3d(${s.x}px,${s.y}px,0)`
     style.zIndex = String(Math.round(s.y) + (marker.options.zIndexOffset ?? 0))

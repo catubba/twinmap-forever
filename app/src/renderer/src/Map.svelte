@@ -5,6 +5,7 @@
   import { inApp, TILES } from './web'
   import type { Terrain } from './terrain3d'
   import { Arrow3d } from './arrow3d'
+  import { Names3d } from './names3d'
   import { paintFixed, Pins3d } from './pins3d'
   import L from 'leaflet'
   import 'leaflet/dist/leaflet.css'
@@ -23,7 +24,7 @@
   import { pictureOfBlock, tileOfPicture } from '../../shared/pixels'
   import { WORLDS } from '../../shared/world'
   import { LAYER_GROUPS, layersFrom, type LayerId } from '../../shared/layers'
-  import { fitNames, tierRank, tierShows, type NameBox, type NameTier, type Place } from '../../shared/places'
+  import { fitNames, tierRank, tierShows, type Avoid, type NameBox, type NameTier, type Place } from '../../shared/places'
   import { wayTo, zoneAt, type Size } from '../../shared/point-label'
   import { fade, fly } from 'svelte/transition'
   import Glyph from './Glyph.svelte'
@@ -266,7 +267,11 @@
   let rooms: L.Layer | undefined
   // The names written over the map, the most important first; layout() decides which of them show.
   const labels = L.layerGroup()
-  let named: { tier: NameTier; at: L.LatLng; marker: L.Marker; sizes: Record<string, [number, number]> }[] = []
+  let named: { tier: NameTier; text: string; at: L.LatLng; marker: L.Marker; sizes: Record<string, [number, number]> }[] = []
+  // The same names on the 3D view (names3d.ts), and what they keep clear of there: the buttons and the readout.
+  let names3d: Names3d | undefined
+  let avoid3d: Avoid[] = []
+  const names3dSet = (): void => names3d?.set(named.map((n) => ({ tier: n.tier, text: n.text, x: n.at.lng * YARDS_PER_UNIT, z: -n.at.lat * YARDS_PER_UNIT })))
   let places: Place[] = []
   const pins = L.layerGroup()
   const arrow = L.marker([0, 0], {
@@ -406,7 +411,7 @@
     named = []
     const name = (tier: NameTier, text: string, at: L.LatLng): void => {
       const html = `<span>${text.replace(/[&<>]/g, (c) => `&#${c.charCodeAt(0)};`)}</span>`
-      named.push({ tier, at, sizes: {}, marker: L.marker(at, { interactive: false, keyboard: false, icon: L.divIcon({ className: `place ${tier}`, html, iconSize: [0, 0] }) }).addTo(labels) })
+      named.push({ tier, text, at, sizes: {}, marker: L.marker(at, { interactive: false, keyboard: false, icon: L.divIcon({ className: `place ${tier}`, html, iconSize: [0, 0] }) }).addTo(labels) })
     }
     const zones = maps.filter((m) => m.level === 'zone' && m.continent === continent && m.rect)
     // ponytail: a city is told from a region by the size of its map (Stormwind, the largest, is 2.0 million
@@ -414,6 +419,7 @@
     for (const m of zones) if ((m.rect!.maxX - m.rect!.minX) * (m.rect!.maxY - m.rect!.minY) > CITY_UNDER) name('region', m.name, boundsOf(m).getCenter())
     for (const p of places) if (p.continent === continent) name(p.kind, p.name, at(p))
     named.sort((a, b) => tierRank(a.tier) - tierRank(b.tier))
+    names3dSet()
     layout()
   }
 
@@ -445,6 +451,7 @@
       const r = el.getBoundingClientRect()
       return { left: r.left - frame.left, top: r.top - frame.top, right: r.right - frame.left, bottom: r.bottom - frame.top }
     })
+    avoid3d = [...clear]
     const me = view.hasLayer(arrow) ? view.latLngToContainerPoint(arrow.getLatLng()) : null
     if (me) clear.push({ left: me.x - 18, top: me.y - 18, right: me.x + 18, bottom: me.y + 18 })
     const shown = fitNames(boxes, clear)
@@ -846,6 +853,9 @@
   }
   function onFrame(): void {
     pins3d!.draw()
+    // The names: off with their layer; clear of the buttons and of the arrow, where it is on this view.
+    const me = map!.hasLayer(arrow) ? pins3d!.spot(arrow.getLatLng()) : null
+    names3d!.draw(layers.zones && !inside ? [...avoid3d, ...(me ? [{ left: me.x - 18, top: me.y - 18, right: me.x + 18, bottom: me.y + 18 }] : [])] : null)
     if (labelled) {
       const spot = spotOf(at(labelled.units))
       if (spot.x !== labelled.spot.x || spot.y !== labelled.spot.y) labelled.spot = spot
@@ -867,6 +877,8 @@
         const body = new Arrow3d(terrain)
         terrain.onBefore = () => body.step(performance.now())
         pins3d ??= new Pins3d(map, terrain, pinsHost, terrainHost, arrow, () => turned, body, () => floorAt)
+        names3d ??= new Names3d(terrain, pinsHost)
+        names3dSet()
         terrain.onFrame = onFrame
       }
       threeD = true
@@ -891,6 +903,7 @@
     for (const layer of shown) layer.addTo(map)
     terrain.stop()
     pins3d?.clear()
+    names3d?.clear()
   }
   // Inside a dungeon there is no ground to show: back to 2D.
   $effect(() => {

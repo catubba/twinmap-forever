@@ -268,13 +268,14 @@ export class Terrain {
   /**
    * Where a point of the ground is on the view, in pixels from its top left corner; how much of it
    * shows: 1 in plain sight, less in the fog, HIDDEN behind a hill, 0 behind the camera or past the
-   * fog; and how far it is from the camera, in distances of the point looked at.
+   * fog; and how far it is from the camera, in distances of the point looked at. lift: yards over
+   * the ground, for what is written above its point (names3d.ts).
    */
-  spot(x: number, z: number): { x: number; y: number; shows: number; away: number } {
+  spot(x: number, z: number, lift = 0): { x: number; y: number; shows: number; away: number } {
     const fog = this.scene.fog as THREE.Fog,
       out = Math.hypot(x - this.camera.position.x, z - this.camera.position.z) >= fog.far, // past the fog: the ground is not looked for
       ground = out ? NaN : this.groundAt(x, z),
-      p = new THREE.Vector3(x, Number.isFinite(ground) ? ground : 0, z),
+      p = new THREE.Vector3(x, (Number.isFinite(ground) ? ground : 0) + lift, z),
       far = out ? Infinity : p.distanceTo(this.camera.position)
     const on = p.clone().project(this.camera),
       at = { x: ((on.x + 1) / 2) * this.width, y: ((1 - on.y) / 2) * this.height }
@@ -315,6 +316,11 @@ export class Terrain {
   /** The view's size in pixels, as last measured: reading it off the page at every frame would make the page lay itself out again. */
   get size(): { width: number; height: number } {
     return { width: this.width, height: this.height }
+  }
+
+  /** Yards from the camera to the point looked at. */
+  get looked(): number {
+    return this.eye.distanceTo(this.controls.target)
   }
 
   /** Yards from the camera to where the fog hides everything. */
