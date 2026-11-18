@@ -215,8 +215,13 @@ export class Terrain {
       pit: new THREE.MeshBasicMaterial({ color: PIT }),
       // Water, lava, fel, tar: in the order water.ts numbers them, from 1; then the open sea.
       liquids: [
-        // Its colour a vertex, by how deep it is (meshes).
-        new THREE.MeshPhongMaterial({ vertexColors: true, specular: 0x8899aa, shininess: 60, transparent: true, depthWrite: false }),
+        // Its colour a vertex, by how deep it is (meshes). The sun shines on shallow water only: deep water is the open sea, which has no shine.
+        Object.assign(new THREE.MeshPhongMaterial({ vertexColors: true, specular: 0x8899aa, shininess: 60, transparent: true, depthWrite: false }), {
+          onBeforeCompile: (shader: { fragmentShader: string }) => {
+            shader.fragmentShader = shader.fragmentShader.replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
+reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
+          },
+        }),
         new THREE.MeshBasicMaterial({
           color: 0xff5a14,
           transparent: true,
@@ -895,7 +900,8 @@ export class Terrain {
 
     // Liquids: a square a liquid, at the levels of its corners, grouped by kind.
     const lpos = new Float32Array(N * N * 3),
-      byKind: number[][] = [[], [], [], [], []]
+      byKind: number[][] = [[], [], [], [], []],
+      wet = new Uint8Array(N * N) // the points of the squares of water
     for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) lpos.set([x0 + j * step, Number.isFinite(g.water[i * N + j]!) ? g.water[i * N + j]! : 0, z0 + i * step], (i * N + j) * 3)
     for (let i = 0; i < N - 1; i++) {
       for (let j = 0; j < N - 1; j++) {
@@ -913,7 +919,26 @@ export class Terrain {
         if (!corners.every(Number.isFinite)) continue
         high = Math.max(high, ...corners)
         byKind[kind - 1]!.push(a, a + N, a + 1, a + 1, a + N, a + N + 1)
+        if (kind === 1) for (const c of [a, a + 1, a + N, a + N + 1]) wet[c] = 1
       }
+    }
+    // The shore: a dry square beside water, with ground lower than that water, has it too. The water then ends where
+    // it meets the ground and not at the side of a square, which from far is a flight of steps along the coast.
+    const shore: number[] = []
+    for (let i = 0; i < N - 1; i++) {
+      for (let j = 0; j < N - 1; j++) {
+        const a = i * N + j,
+          corners = [a, a + 1, a + N, a + N + 1]
+        if ((g.kinds[i * (N - 1) + j]! & ~HOLE) !== DRY || !corners.every((c) => Number.isFinite(h[c]!))) continue
+        const level = Math.max(...corners.map((c) => (wet[c] ? lpos[c * 3 + 1]! : -Infinity)))
+        if (corners.some((c) => h[c]! < level)) shore.push(a, level)
+      }
+    }
+    for (let s = 0; s < shore.length; s += 2) {
+      const a = shore[s]!
+      for (const c of [a, a + 1, a + N, a + N + 1]) if (!wet[c]) lpos[c * 3 + 1] = shore[s + 1]!
+      high = Math.max(high, shore[s + 1]!)
+      byKind[0]!.push(a, a + N, a + 1, a + 1, a + N, a + N + 1)
     }
     if (byKind.some((list) => list.length)) {
       const liquid = new THREE.BufferGeometry()
