@@ -8,6 +8,7 @@
   import { coins, filterRows, gridsOf, itemMatches, itemRows, othersHolding, PLACES, QUALITY_COLORS, sortRows, wornOf, WORN_LEFT, WORN_RIGHT, WORN_WEAPONS, type Cell, type Column, type Grid, type ItemFacts, type ItemRow, type Place } from '../../shared/items'
   import type { PortraitsTold } from '../../shared/portrait'
   import type { Sheets } from '../../shared/sheet'
+  import { statsOf } from '../../shared/stats'
   import { itemTip } from './item-tip.svelte'
   import { inApp, TILES } from './web'
 
@@ -48,6 +49,8 @@
   // The character's picture, taken off the game's character window (shared/portrait.ts): the address changes with each new one.
   const portrait = $derived(shown ? portraits.taken[shown.key] : undefined)
   const portraitUrl = $derived(shown && portrait ? `${TILES}/portraits/${encodeURIComponent(shown.key)}.png?${portrait.at}` : null)
+  // The statistics of the game's character window, as the addon read them last.
+  const stats = $derived(statsOf(sheet?.pieces.stats))
   const when = $derived.by(() => {
     if (!sheet || !shown) return ''
     const bags = shown.live ? 'Bags as they are now' : `Bags as of ${ago(shown.seen, now)}`
@@ -162,6 +165,17 @@
             </div>
             <div class="col">{#each WORN_RIGHT as s (s[0])}{@render wornSlot(s)}{/each}</div>
           </div>
+          {#if stats.length}
+            <div class="stats">
+              {#each stats as group (group.name)}
+                <h4>{group.name}</h4>
+                {#each group.lines as line (line.label)}
+                  <div>{line.label} <b style:color={line.color}>{line.value}</b></div>
+                {/each}
+                {#if group.lines.length % 2}<div></div>{/if}
+              {/each}
+            </div>
+          {/if}
         </section>
         <section class="held" aria-label="Bags and bank">
           <h2>Bags<span>{shown.live ? 'as they are now' : `as of ${ago(shown.seen, now)}`}</span></h2>
@@ -393,6 +407,33 @@
   }
   .picture .wait small {
     color: var(--text-dim);
+  }
+  .stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 22px;
+    margin-top: 14px;
+    padding-top: 10px;
+    box-shadow: 0 -1px 0 #ffffff14;
+  }
+  .stats h4 {
+    grid-column: span 2;
+    margin: 6px 0 2px;
+    font: 600 12px/16px var(--font);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--gold);
+  }
+  .stats div {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    height: 22px;
+    color: var(--text-dim);
+  }
+  .stats b {
+    font-weight: 500;
+    color: var(--text);
   }
   .weapons {
     display: flex;

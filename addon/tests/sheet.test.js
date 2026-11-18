@@ -348,3 +348,43 @@ test('an app that holds another sheet gets every tooltip again', () => {
   addon.run(4);
   assert.equal(Object.keys(sheets(addon).at(-1).p.tips).length, 4);
 });
+
+// The game's own list of statistics and the functions that write each line, as Forever has them (read in the game, 18 November 2026).
+const PAPERDOLL = `
+  local function Line(label, text, number) return { updateFunc = function(row, unit) row.Label:SetText(label .. ":"); row.Value:SetText(text); row.numericValue = number; row:Show() end } end
+  PAPERDOLL_STATINFO = {
+    HEALTH = Line("Health", "1,099", 1099),
+    STAMINA = { updateFunc = function(row) row.Label:SetText("Stamina:"); row.Value:SetText("|cff19ff19" .. GAME.stamina .. "|r"); row.numericValue = GAME.stamina; wipe(row.lines); row.Bar:SetValue(3) end },
+    OFFHAND_DAMAGE = { updateFunc = function(row) row:Hide() end },
+    EXPERTISE = Line("Expertise", "0.0%", "0.0%"),
+    HASTE = Line("Haste", "15.0%", "15.0%"),
+    BLOCK = Line("Block", "12%", 12),
+    BROKEN = { updateFunc = function() error("no") end },
+  }
+  PAPERDOLL_STATCATEGORIES = {
+    { categoryName = "General", unit = "player", stats = { { stat = "HEALTH" }, { stat = "STAMINA" }, { stat = "BROKEN" } } },
+    { categoryName = "Weapons", unit = "player", stats = { { stat = "OFFHAND_DAMAGE", hideAt = 0 } } },
+    { categoryName = "Modifiers", unit = "player", stats = { { stat = "EXPERTISE", hideAt = 0 }, { stat = "HASTE", hideAt = 0 }, { stat = "BLOCK", hideAt = 0, showFunc = function() return false end } } },
+    { categoryName = "General", unit = "pet", stats = { { stat = "HEALTH" } } },
+  }
+  function wipe(t) for k in pairs(t) do t[k] = nil end end
+  function UnitResistance(unit, school) return 0, school == 2 and 7 or 0, 0, 0 end
+  GAME.stamina = 60`;
+
+test('the statistics are the game\'s own lines, in its order, without those it hides; changing them sends them again', () => {
+  const addon = enterWorld(WORLD + PAPERDOLL);
+  addon.run(10);
+  const [sent] = sheets(addon);
+  assert.deepEqual(sent.p.stats, [
+    ['General', [['Health', '1,099'], ['Stamina', '60', '19ff19']]], // the colour of a value raised; the line that fails is left out
+    ['Modifiers', [['Haste', '15.0%']]], // Expertise is at the value it hides at, Block's own check says no, the off hand writes nothing
+    ['Resistances', [['Arcane', '0'], ['Fire', '7'], ['Frost', '0'], ['Nature', '0'], ['Shadow', '0']]],
+  ]);
+  appHolds(addon, sent.code, sent.rev);
+  addon.run(5);
+  addon.lua('GAME.stamina = 64');
+  addon.fire('PLAYER_EQUIPMENT_CHANGED');
+  addon.run(5);
+  const news = sheets(addon).at(-1);
+  assert.deepEqual(news.p.stats[0], ['General', [['Health', '1,099'], ['Stamina', '64', '19ff19']]]);
+});

@@ -23,6 +23,8 @@
 --   talents { free = points not spent, t = { { node, rank, spell }, ... } } the talents taken
 --   recipes { known = { spell, ... }, seen = { profession, ... } } the recipes a profession's window
 --           showed learned, and those learned since; seen: the professions whose window was opened
+--   stats   { { category, { { label, value, colour }, ... } }, ... } the statistics of the game's character window, as it
+--           words them and in its order; colour "rrggbb" where the game colours the value (green for one raised), else missing
 --   trainers { { n = npc, c = class token of a class trainer, s = { { spell, cost, level, skill }, ... } }, ... }
 --           what each trainer seen teaches, all of it, learned or not: copper, level and skill it asks
 local _, ns = ...
@@ -190,8 +192,68 @@ local function Talents()
   return { free = points > 0 and points or spare, t = taken }
 end
 
--- Skills, spells and talents change seldom and take longer to read: again when the game says they
--- changed, and every half minute besides.
+-- The statistics of the character window, worked out by the game itself: its own list of categories
+-- (PAPERDOLL_STATCATEGORIES) and, for each line, its own function, which writes the label and the value
+-- on the row it is given. Here the row is a stand-in that only keeps what it is told. A line the game
+-- hides is left out: one it writes nothing on, one whose showFunc says no, one at its hideAt value.
+-- Then the resistances, which the window adds by itself. Nothing where the game has no such list.
+local function Row()
+  local got = {}
+  -- Whatever else the game asks of the row is there, as something it can call or empty.
+  local any
+  any = setmetatable({}, { __call = function() end, __index = function() return any end })
+  local function Text(key)
+    return setmetatable({}, { __index = function(_, method)
+      if method == "SetText" then return function(_, text) got[key] = text end end
+      if method == "SetFormattedText" then return function(_, ...) got[key] = Ok(pcall(string.format, ...)) end end
+      return any
+    end })
+  end
+  return setmetatable({ Label = Text("label"), Value = Text("value") }, { __index = function() return any end }), got
+end
+
+local SCHOOLS = { { 6, "Arcane" }, { 2, "Fire" }, { 4, "Frost" }, { 3, "Nature" }, { 5, "Shadow" } }
+
+local function Stats()
+  if type(PAPERDOLL_STATCATEGORIES) ~= "table" or type(PAPERDOLL_STATINFO) ~= "table" then return nil end
+  local out = {}
+  for _, cat in ipairs(PAPERDOLL_STATCATEGORIES) do
+    if type(cat) == "table" and cat.unit == "player" and type(cat.stats) == "table" then
+      local rows = {}
+      for _, stat in ipairs(cat.stats) do
+        local info = type(stat) == "table" and PAPERDOLL_STATINFO[stat.stat]
+        if type(info) == "table" and info.updateFunc and (not stat.showFunc or Try(stat.showFunc)) then
+          local row, got = Row()
+          pcall(info.updateFunc, row, "player")
+          local label, value = got.label, got.value
+          -- A value hidden from addons (in a fight): the statistics stay as they were.
+          if IsSecret(label) or IsSecret(value) or IsSecret(rawget(row, "numericValue")) then return nil end
+          label, value = Str(label), Str(value)
+          if label and value then
+            local colour, plain = value:match("^|c%x%x(%x%x%x%x%x%x)(.-)|r$")
+            if plain then value, colour = plain, colour:lower() end
+            local number = Num(rawget(row, "numericValue")) or tonumber((value:gsub("[%%,]", "")))
+            if stat.hideAt == nil or number ~= stat.hideAt then
+              rows[#rows + 1] = { (label:gsub(":%s*$", "")), value, colour }
+            end
+          end
+        end
+      end
+      if #rows > 0 then out[#out + 1] = { Str(cat.categoryName) or "", rows } end
+    end
+  end
+  local resist = {}
+  for _, school in ipairs(SCHOOLS) do
+    local _, total = Try(UnitResistance, "player", school[1])
+    if IsSecret(total) then return nil end
+    if Num(total) then resist[#resist + 1] = { Str(_G["SPELL_SCHOOL" .. school[1] .. "_CAP"]) or school[2], tostring(total) } end
+  end
+  if #resist > 0 then out[#out + 1] = { Str(RESISTANCE_LABEL) or "Resistances", resist } end
+  return #out > 0 and out or nil
+end
+
+-- Skills, spells, talents and statistics change seldom and take longer to read: again when the game
+-- says they changed, and every half minute besides.
 local AGAIN = 30
 local slow, slowAt = {}, 0
 
@@ -313,9 +375,9 @@ local function Read(s)
   if bankOpen then pieces.bank = Containers(BANK) end
   local now = GetTime()
   if now >= slowAt then
-    slow, slowAt = { skills = Skills(), spells = Spells(), talents = Talents() }, now + AGAIN
+    slow, slowAt = { skills = Skills(), spells = Spells(), talents = Talents(), stats = Stats() or slow.stats }, now + AGAIN
   end
-  pieces.skills, pieces.spells, pieces.talents = slow.skills, slow.spells, slow.talents
+  pieces.skills, pieces.spells, pieces.talents, pieces.stats = slow.skills, slow.spells, slow.talents, slow.stats
   pieces.recipes = Recipes(s)
   pieces.trainers = Trainers(s)
   return pieces
@@ -400,7 +462,7 @@ frame:RegisterEvent("BANKFRAME_CLOSED")
 frame:RegisterEvent("TRAINER_SHOW")
 frame:RegisterEvent("TRAINER_CLOSED")
 for _, event in ipairs({ "SPELLS_CHANGED", "LEARNED_SPELL_IN_TAB", "SKILL_LINES_CHANGED", "CHAT_MSG_SKILL", "TRAIT_CONFIG_UPDATED",
-  "CHARACTER_POINTS_CHANGED", "PLAYER_LEVEL_UP", "TRADE_SKILL_SHOW", "TRADE_SKILL_LIST_UPDATE", "TRADE_SKILL_DATA_SOURCE_CHANGED", "NEW_RECIPE_LEARNED" }) do
+  "CHARACTER_POINTS_CHANGED", "PLAYER_LEVEL_UP", "PLAYER_EQUIPMENT_CHANGED", "TRADE_SKILL_SHOW", "TRADE_SKILL_LIST_UPDATE", "TRADE_SKILL_DATA_SOURCE_CHANGED", "NEW_RECIPE_LEARNED" }) do
   pcall(frame.RegisterEvent, frame, event) -- one the game does not have is left out
 end
 frame:SetScript("OnEvent", function(_, event, recipe)
