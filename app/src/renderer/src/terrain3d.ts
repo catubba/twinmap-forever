@@ -34,6 +34,8 @@ const SHARPNESS = 1.5
 const KEPT = 200
 const LOADING = 6
 const SKY = 0x7f97ab
+/** The dark of a hole in the ground: chosen by the user on 18 November 2026 over leaving it open to the sky. */
+const PIT = 0x14110d
 /** The open sea, where the world has no blocks: as the ocean looks over its bed. */
 const SEA = 0x1f4b6e
 /** Water over its bed, as ui.md has it: this colour at half see-through where it is shallow, turning to the open sea where it is deep. */
@@ -142,6 +144,7 @@ export class Terrain {
   private compass: Compass
   private materials: {
     ground: THREE.MeshLambertMaterial
+    pit: THREE.MeshBasicMaterial
     liquids: THREE.Material[]
   }
   private observer: ResizeObserver
@@ -176,6 +179,7 @@ export class Terrain {
     this.scene.add(new THREE.AmbientLight(0xffffff, Math.PI * 0.5), sun)
     this.materials = {
       ground: new THREE.MeshLambertMaterial({ side: THREE.DoubleSide }),
+      pit: new THREE.MeshBasicMaterial({ color: PIT }),
       // Water, lava, fel, tar: in the order water.ts numbers them, from 1; then the open sea.
       liquids: [
         // Its colour a vertex, by how deep it is (meshes).
@@ -732,13 +736,14 @@ export class Terrain {
         normal.set(Number.isFinite(ex + ez) ? [-ex / len, 1 / len, -ez / len] : [0, 1, 0], k * 3)
       }
     }
-    const index: number[] = []
+    const index: number[] = [],
+      pit: number[] = []
     for (let i = 0; i < N - 1; i++) {
       for (let j = 0; j < N - 1; j++) {
-        // No ground, or a hole in it: the mouth of a cave, left open.
-        if (!ok(i, j) || !ok(i, j + 1) || !ok(i + 1, j) || !ok(i + 1, j + 1) || g.kinds[i * (N - 1) + j]! & HOLE) continue
+        if (!ok(i, j) || !ok(i, j + 1) || !ok(i + 1, j) || !ok(i + 1, j + 1)) continue
         const a = i * N + j
-        index.push(a, a + N, a + 1, a + 1, a + N, a + N + 1)
+        // A hole in the ground, the mouth of a cave or the floor of a building: dark, not the picture of the roof over it.
+        ;(g.kinds[i * (N - 1) + j]! & HOLE ? pit : index).push(a, a + N, a + 1, a + 1, a + N, a + N + 1)
       }
     }
     // The skirt: the ring of edge vertices again, lower, joined to the edge.
@@ -768,6 +773,12 @@ export class Terrain {
     const material = texture ? this.groundWith(texture) : this.materials.ground
     const group = new THREE.Group()
     group.add(new THREE.Mesh(ground, material))
+    if (pit.length) {
+      const dark = new THREE.BufferGeometry()
+      dark.setAttribute('position', ground.getAttribute('position'))
+      dark.setIndex(pit)
+      group.add(new THREE.Mesh(dark, this.materials.pit))
+    }
 
     // Liquids: a square a liquid, at the levels of its corners, grouped by kind.
     const lpos = new Float32Array(N * N * 3),
