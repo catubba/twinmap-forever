@@ -110,7 +110,7 @@ const KEY = 65536 // a node of the continent: its cluster times this, plus its n
  * yards it is on foot from one point to each of many, in one search that spreads from the first
  * (null for those not reached within `reach` yards, or with nowhere to stand).
  */
-export type Walker = ((from: Yards, to: Yards) => Walk | null) & { far: (from: Yards, tos: Yards[], reach: number) => (number | null)[]; track: () => Tracker; wander: (from: Yards, count: number, random: () => number) => [Yards, number][] }
+export type Walker = ((from: Yards, to: Yards) => Walk | null) & { far: (from: Yards, tos: Yards[], reach: number) => (number | null)[]; track: () => Tracker; wander: (from: Yards, count: number, random: () => number) => [Yards, number][]; heights: (at: Yards) => number[] }
 
 /**
  * Where a character stands, point after point (yards of the world): its height, and how many
@@ -569,7 +569,9 @@ export function walker(nav: NavData): Walker {
     const { came, goals } = search(from, tos, reach)
     return goals.map((goal, i) => (goal < 0 ? null : wayBack(came, goal, from, tos[i]!).yards))
   }
-  return Object.assign(find, { far, track, wander })
+  // Every height there is to stand at on the cell of a point: none where nothing is walked.
+  const heights = ([x, y]: Yards): number[] => standing(Math.floor((x - nav.cx0 * BLOCK_YARDS) / cell), Math.floor((y - nav.cy0 * BLOCK_YARDS) / cell)).map(zOf)
+  return Object.assign(find, { far, track, wander, heights })
 }
 
 
