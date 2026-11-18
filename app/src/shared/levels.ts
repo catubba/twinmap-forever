@@ -3,7 +3,8 @@
 // liquids over it (water.ts) and what each square of the grid holds: a block's full grid of 129 x
 // 129 at zoom 6, 65 x 65 taken from its blocks at every other vertex, every fourth, ... below.
 // Kept as whole quarters of a yard, two bytes each, -32768 where there is none: heights, then
-// levels, then a byte a square.
+// levels, then a byte a square: its liquid, and HOLE where the ground has a hole (below a block,
+// only where every square under it has one).
 import { SIDE } from './heights'
 import type { BlockWater } from './water'
 
@@ -11,6 +12,8 @@ import type { BlockWater } from './water'
 export const BLOCK_ZOOM = 6
 /** Vertices a side of a tile below BLOCK_ZOOM. */
 export const SPARSE = 65
+/** In a square's byte: the ground has a hole here. The rest of the byte is its liquid. */
+export const HOLE = 0x80
 
 export interface Levels {
   side: number
@@ -53,7 +56,7 @@ export function unpackLevels(b: Uint8Array): Levels | null {
  * The tile of this zoom (BLOCK_ZOOM or below), from its blocks; null when none of them is there.
  * block: a block's heights and liquids by its column and row.
  */
-export function levelsOfTile(zoom: number, column: number, row: number, block: (column: number, row: number) => { heights: Float32Array; water: BlockWater | null } | null): Levels | null {
+export function levelsOfTile(zoom: number, column: number, row: number, block: (column: number, row: number) => { heights: Float32Array; water: BlockWater | null; holes?: Uint8Array | null } | null): Levels | null {
   const blocks = 2 ** (BLOCK_ZOOM - zoom),
     side = zoom >= BLOCK_ZOOM ? SIDE : SPARSE
   const squares = SIDE - 1,
@@ -80,9 +83,15 @@ export function levelsOfTile(zoom: number, column: number, row: number, block: (
         b = block(bc, br)
       if (!b) continue
       out.heights[i * side + j] = b.heights[r * SIDE + c]!
-      if (!b.water) continue
-      out.water[i * side + j] = b.water.levels[r * SIDE + c]!
-      if (i < side - 1 && j < side - 1) out.kinds[i * (side - 1) + j] = b.water.kinds[r * squares + c]!
+      const square = i < side - 1 && j < side - 1 ? i * (side - 1) + j : -1
+      if (b.water) {
+        out.water[i * side + j] = b.water.levels[r * SIDE + c]!
+        if (square >= 0) out.kinds[square] = b.water.kinds[r * squares + c]!
+      }
+      if (square < 0 || !b.holes) continue
+      let hole = true
+      for (let dr = 0; dr < step && hole; dr++) for (let dc = 0; dc < step && hole; dc++) hole = b.holes[(r + dr) * squares + c + dc] === 1
+      if (hole) out.kinds[square]! |= HOLE
     }
   }
   return out

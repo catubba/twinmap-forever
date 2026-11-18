@@ -8,7 +8,7 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join as joinPath } from 'node:path'
 import { deflateSync } from 'node:zlib'
-import { blockHeights, FLAT, packHeights, shadeOfBlock, SHADE_PIXELS } from '../shared/heights'
+import { blockHeights, blockHoles, FLAT, packHeights, shadeOfBlock, SHADE_PIXELS } from '../shared/heights'
 import { BLOCK_ZOOM, levelsOfTile, packLevels } from '../shared/levels'
 import { blockWater, type BlockWater } from '../shared/water'
 import { halve, join } from '../shared/pixels'
@@ -26,8 +26,8 @@ export const RELIEF_STRENGTH = 1
  */
 export const RELIEF_VERSION = 2
 const SHADE_ZOOM = 6
-/** The layout of the 3D tiles: change it when they are made otherwise, and they are made again at the next start, alone. */
-export const LEVELS_VERSION = 1
+/** The layout of the 3D tiles: change it when they are made otherwise, and they are made again at the next start, alone. 2: with the holes in the ground. */
+export const LEVELS_VERSION = 2
 
 interface Marker {
   blocks?: number
@@ -71,7 +71,7 @@ export function convertHeights(
   // A relief or 3D tiles made another way: they go, or the ones already there would be kept. The heights stay.
   if (marker && shade) rmSync(joinPath(folder, 'shade'), { recursive: true, force: true })
   if (marker && levels) rmSync(joinPath(folder, 'levels'), { recursive: true, force: true })
-  const files = terrainFiles(wdt), all = new Map<number, Float32Array>(), waters = new Map<number, BlockWater>()
+  const files = terrainFiles(wdt), all = new Map<number, Float32Array>(), waters = new Map<number, BlockWater>(), holes = new Map<number, Uint8Array>()
   let missing = 0, done = 0
   const total = files.size * (1 + (shade ? 1 : 0) + (levels ? 1 : 0)) // read, then shaded, then the 3D tiles
   for (const [block, file] of files) {
@@ -82,6 +82,8 @@ export function convertHeights(
       h = adt && blockHeights(adt, column, row)
       const water = adt && h && levels ? blockWater(adt, liquid) : null
       if (water) waters.set(block, water)
+      const open = adt && h && levels ? blockHoles(adt, column, row) : null
+      if (open) holes.set(block, open)
     } catch {
       h = null
     }
@@ -119,9 +121,9 @@ export function convertHeights(
 
   // The 3D tiles: every block, then each zoom below from them.
   if (levels) {
-    const block = (column: number, row: number): { heights: Float32Array; water: BlockWater | null } | null => {
+    const block = (column: number, row: number): { heights: Float32Array; water: BlockWater | null; holes: Uint8Array | null } | null => {
       const heights = get(column, row)
-      return heights && { heights, water: waters.get(row * BLOCKS + column) ?? null }
+      return heights && { heights, water: waters.get(row * BLOCKS + column) ?? null, holes: holes.get(row * BLOCKS + column) ?? null }
     }
     for (let zoom = BLOCK_ZOOM; zoom >= 0; zoom--) {
       const tiles = 2 ** zoom

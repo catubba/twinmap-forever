@@ -5,8 +5,8 @@
 // row first, west column first. The middle ones are left out: for shade and shape a grid of 4
 // yards is plenty, and it halves what is kept.
 //
-// ponytail: holes in the ground (cave mouths, under some buildings) are not read; the grid goes
-// over them. Read the chunk's hole bits when the 3D view shows a lid on a cave.
+// A chunk also says which of its 8 x 8 squares are a hole in the ground (the mouth of a cave or a
+// mine, under some buildings): a bit a square, or a bit for each 2 x 2 of them (blockHoles).
 import { BLOCK_YARDS } from './world'
 
 /** Heights a side of a block. */
@@ -41,6 +41,32 @@ export function blockHeights(adt: Buffer, column: number, row: number): Float32A
     at = end
   }
   return chunks ? out : null
+}
+
+/**
+ * The squares of a block that are a hole in the ground: (SIDE - 1) x (SIDE - 1), north row first,
+ * 1 a hole. null when it has none.
+ */
+export function blockHoles(adt: Buffer, column: number, row: number): Uint8Array | null {
+  const north = (32 - row) * BLOCK_YARDS, west = (32 - column) * BLOCK_YARDS, squares = SIDE - 1
+  const out = new Uint8Array(squares * squares)
+  let any = false
+  for (let at = 0; at + 8 <= adt.length; at += 8 + adt.readUInt32LE(at + 4)) {
+    if (adt.toString('latin1', at, at + 4) !== 'KNCM' || adt.readUInt32LE(at + 4) < 128) continue
+    // In the chunk's head: flags at 0 (0x10000: a bit a square, a byte a row, at 0x14), else 16 bits at 0x3c, one for each 2 x 2 squares.
+    const h = at + 8, fine = (adt.readUInt32LE(h) & 0x10000) !== 0, coarse = adt.readUInt16LE(h + 0x3c)
+    const r0 = Math.round((north - adt.readFloatLE(h + 0x68)) / STEP), c0 = Math.round((west - adt.readFloatLE(h + 0x6c)) / STEP)
+    for (let r = 0; r < 8; r++) {
+      for (let c = 0; c < 8; c++) {
+        const hole = fine ? (adt[h + 0x14 + r]! >> c) & 1 : (coarse >> ((r >> 1) * 4 + (c >> 1))) & 1
+        const gr = r0 + r, gc = c0 + c
+        if (!hole || gr < 0 || gr >= squares || gc < 0 || gc >= squares) continue
+        out[gr * squares + gc] = 1
+        any = true
+      }
+    }
+  }
+  return any ? out : null
 }
 
 /** A block's heights as kept on disk: whole quarters of a yard, two bytes each, -32768 where there is none. */

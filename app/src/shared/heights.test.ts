@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest'
-import { blockHeights, FLAT, heightAt, packHeights, shadeOfBlock, SHADE_PIXELS, SIDE, STEP, unpackHeights } from './heights'
+import { blockHeights, blockHoles, FLAT, heightAt, packHeights, shadeOfBlock, SHADE_PIXELS, SIDE, STEP, unpackHeights } from './heights'
+import { HOLE, levelsOfTile } from './levels'
 import { BLOCK_YARDS, terrainFiles } from './world'
 
 const chunk = (tag: string, data: Buffer): Buffer => {
@@ -11,8 +12,9 @@ const chunk = (tag: string, data: Buffer): Buffer => {
 
 // A terrain file with one chunk, the third down and the fourth across of block 32, 48 (Elwynn), 100 yards up; its grid
 // heights are 10 a row down and 1 a column across, the ones in the middle of its squares 999 (left out).
-function oneChunk(): Buffer {
+function oneChunk(holes?: (head: Buffer) => void): Buffer {
   const head = Buffer.alloc(128)
+  holes?.(head)
   head.writeFloatLE((32 - 48) * BLOCK_YARDS - 2 * 8 * STEP, 0x68)
   head.writeFloatLE(-3 * 8 * STEP, 0x6c)
   head.writeFloatLE(100, 0x70)
@@ -67,4 +69,22 @@ test('the light comes from the north-west: ground rising to the east or the sout
   // Lit from the side (rising to the north-east): as level ground, however steep, so the map keeps its brightness.
   expect(middle(plane(1, -1))).toBe(FLAT)
   expect(middle(plane(3, -3))).toBe(FLAT)
+})
+
+test('the holes of a chunk land on its squares: a bit for each 2 x 2, or a bit a square', () => {
+  const S = SIDE - 1
+  expect(blockHoles(oneChunk(), 32, 48)).toBeNull()
+  // The second pair of rows, the third pair of columns.
+  const coarse = blockHoles(oneChunk((head) => head.writeUInt16LE(1 << (1 * 4 + 2), 0x3c)), 32, 48)!
+  expect(coarse.reduce((n, v) => n + v, 0)).toBe(4)
+  for (const [r, c] of [[2, 4], [2, 5], [3, 4], [3, 5]]) expect(coarse[(16 + r!) * S + 24 + c!]).toBe(1)
+  // The fourth row, the sixth column.
+  const fine = blockHoles(oneChunk((head) => (head.writeUInt32LE(0x10000, 0), head.writeUInt8(1 << 5, 0x14 + 3))), 32, 48)!
+  expect(fine.reduce((n, v) => n + v, 0)).toBe(1)
+  expect(fine[(16 + 3) * S + 24 + 5]).toBe(1)
+  // In the 3D tiles: on the block's own, and below it only where every square under one is a hole.
+  const heights = new Float32Array(SIDE * SIDE), block = (holes: Uint8Array) => (c: number, r: number) => (c === 32 && r === 48 ? { heights, water: null, holes } : null)
+  expect(levelsOfTile(6, 32, 48, block(fine))!.kinds[(16 + 3) * S + 24 + 5]).toBe(HOLE)
+  expect(levelsOfTile(5, 16, 24, block(coarse))!.kinds.some((k) => k & HOLE)).toBe(false)
+  expect(levelsOfTile(5, 16, 24, block(new Uint8Array(S * S).fill(1)))!.kinds[0]).toBe(HOLE)
 })

@@ -10,7 +10,7 @@
 // east, z to the south (Yards u and v in shared/inside.ts), y up.
 import * as THREE from 'three'
 import { MapControls } from 'three/examples/jsm/controls/MapControls.js'
-import { BLOCK_ZOOM, unpackLevels, type Levels } from '../../shared/levels'
+import { BLOCK_ZOOM, HOLE, unpackLevels, type Levels } from '../../shared/levels'
 import { pictureOfBlock } from '../../shared/pixels'
 import { DRY, TAR } from '../../shared/water'
 import { BLOCK_YARDS } from '../../shared/world'
@@ -95,7 +95,12 @@ function gridOf(l: Levels, z: number, x: number, y: number): Grid {
       const from = (r0 + i * step) * l.side + c0 + j * step
       g.heights[i * N + j] = l.heights[from]!
       g.water[i * N + j] = l.water[from]!
-      if (i < N - 1 && j < N - 1) g.kinds[i * (N - 1) + j] = l.kinds[(r0 + i * step) * (l.side - 1) + c0 + j * step]!
+      if (i === N - 1 || j === N - 1) continue
+      // A square's liquid is its first square's; a hole only where every square under it is one.
+      const under = (di: number, dj: number): number => l.kinds[(r0 + i * step + di) * (l.side - 1) + c0 + j * step + dj]!
+      let hole = HOLE
+      for (let di = 0; di < step; di++) for (let dj = 0; dj < step; dj++) hole &= under(di, dj)
+      g.kinds[i * (N - 1) + j] = (under(0, 0) & ~HOLE) | hole
     }
   }
   return g
@@ -730,7 +735,8 @@ export class Terrain {
     const index: number[] = []
     for (let i = 0; i < N - 1; i++) {
       for (let j = 0; j < N - 1; j++) {
-        if (!ok(i, j) || !ok(i, j + 1) || !ok(i + 1, j) || !ok(i + 1, j + 1)) continue
+        // No ground, or a hole in it: the mouth of a cave, left open.
+        if (!ok(i, j) || !ok(i, j + 1) || !ok(i + 1, j) || !ok(i + 1, j + 1) || g.kinds[i * (N - 1) + j]! & HOLE) continue
         const a = i * N + j
         index.push(a, a + N, a + 1, a + 1, a + N, a + N + 1)
       }
@@ -769,7 +775,7 @@ export class Terrain {
     for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) lpos.set([x0 + j * step, Number.isFinite(g.water[i * N + j]!) ? g.water[i * N + j]! : 0, z0 + i * step], (i * N + j) * 3)
     for (let i = 0; i < N - 1; i++) {
       for (let j = 0; j < N - 1; j++) {
-        const kind = g.kinds[i * (N - 1) + j]!,
+        const kind = g.kinds[i * (N - 1) + j]! & ~HOLE,
           a = i * N + j
         // A square with no ground: open sea, at 0.
         if (!ok(i, j) || !ok(i, j + 1) || !ok(i + 1, j) || !ok(i + 1, j + 1)) {
