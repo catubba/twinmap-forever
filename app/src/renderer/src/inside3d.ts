@@ -22,6 +22,10 @@ const ROOF_EDGE = 12
 export const ROOF_REACH = 400
 /** Yards between two rooms of a building that lie over one another at one height: else their pictures flicker. */
 const APART = 0.3
+/** The earth under the rooms, for the camera that has gone down among them: its colour, how far round a building it lies, the side of its squares. */
+const UNDER = 0x241e18
+const UNDER_ROUND = 152
+const UNDER_SQUARE = 8
 /** The roof of a room is told to the ground in a byte: this many yards a step. */
 export const ROOF_STEP = 4
 
@@ -49,6 +53,7 @@ interface Building {
   nx?: number
   shown?: THREE.Material[]
   seen?: THREE.ShaderMaterial[]
+  earth?: THREE.Mesh | null // null: looked for, and there is none
 }
 
 const reach = (p: Piece): number => Math.hypot(p.width, p.height) / 2
@@ -159,6 +164,9 @@ export class Inside3d {
         continue
       }
       b.group!.visible = b.open > 0.02
+      // Made once it is open: by then the ground round it is read, and tells where it is over the earth.
+      if (b.open > 0.5 && b.earth === undefined) b.earth = this.earthUnder(b)
+      if (b.earth) b.earth.visible = b.open > 0.5
       for (const m of b.shown!) m.opacity = b.open
       for (const m of b.seen!) m.uniforms.open!.value = b.open
       if (b.open > 0) as += b.open.toFixed(3)
@@ -280,6 +288,29 @@ export class Inside3d {
     Object.assign(b, { group, floors, nx, shown, seen, state: 'in' })
   }
 
+  private earthUnder(b: Building): THREE.Mesh | null {
+    // The earth under it: seen from in there, between one room and the next, where the sky under the ground would
+    // show. Under the lowest floor of the buildings round it (under its own it would lie over the rooms of a deeper
+    // one beside it), and only where the ground is over it. With the ground, not with the rooms: from outside the
+    // ground hides it.
+    const y = Math.min(...this.buildings.filter((o) => o.x0 - UNDER_ROUND < b.x1 && o.x1 + UNDER_ROUND > b.x0 && o.z0 - UNDER_ROUND < b.z1 && o.z1 + UNDER_ROUND > b.z0).map((o) => o.low)) - 0.6
+    const under: number[] = [],
+      S = UNDER_SQUARE,
+      buried = (x: number, z: number): boolean => this.terrain.groundAt(x, z) > y + 2 // not where it is not read yet
+    for (let z = b.z0 - UNDER_ROUND; z < b.z1 + UNDER_ROUND; z += S) {
+      for (let x = b.x0 - UNDER_ROUND; x < b.x1 + UNDER_ROUND; x += S) {
+        if (buried(x, z) && buried(x + S, z) && buried(x, z + S) && buried(x + S, z + S)) under.push(x, y, z, x, y, z + S, x + S, y, z, x + S, y, z, x, y, z + S, x + S, y, z + S)
+      }
+    }
+    if (!under.length) return null
+    const geo = new THREE.BufferGeometry()
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(under, 3))
+    const earth = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: UNDER, side: THREE.DoubleSide, fog: false }))
+    earth.visible = false
+    this.terrain.add(earth)
+    return earth
+  }
+
   private unload(b: Building): void {
     b.state = 'out'
     b.open = 0
@@ -287,6 +318,9 @@ export class Inside3d {
     for (const m of b.shown ?? []) ((m as THREE.MeshBasicMaterial).map?.dispose(), m.dispose())
     for (const m of b.seen ?? []) m.dispose()
     if (b.group) this.group.remove(b.group)
-    b.group = b.floors = b.shown = b.seen = undefined
+    b.earth?.removeFromParent()
+    b.earth?.geometry.dispose()
+    ;(b.earth?.material as THREE.Material | undefined)?.dispose()
+    b.group = b.floors = b.shown = b.seen = b.earth = undefined
   }
 }
