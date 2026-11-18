@@ -1614,9 +1614,11 @@
     display: block;
   }
   /* Under the 3D view the 2D map is not drawn: it keeps its pins for the view to copy, but its
-     thousands of elements made the page sort its layers out again at every frame of the view. */
+     thousands of elements made the page sort its layers out again at every frame of the view.
+     Not content-visibility: after a change of continent it left the browser with the styles of the
+     names and pins beside it never worked out again, so they stayed where they were. */
   .map.under {
-    content-visibility: hidden;
+    visibility: hidden;
   }
   /* The pins over the 3D view: the 2D map's look (.map), without its ground. */
   .pins3d {
