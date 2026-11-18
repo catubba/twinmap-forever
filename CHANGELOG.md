@@ -2,6 +2,23 @@
 
 What changed in each version of Twinmap, newest first. The section of a version is also the text of its release on GitHub and of the addon's file on CurseForge.
 
+## 0.11.0 - 2026-11-18
+
+### New
+
+- **Your characters.** Twinmap now keeps a sheet of every character you play with the addon on: money, bags, bank, what is worn, statistics, skills, spells and recipes. The character in game is named at the start of the top row; click the name to look at another one. It all reads the same with the game closed. The bank is read when you open it in game, so open it once.
+- **Items.** A new section beside Now. On the left, what the character wears, laid out as in the game's character window, with a picture of the character in the middle and its statistics below, the same lines the game shows. On the right, bags, reagent bag, keyring and bank as grids of slots. A filter dims what does not match, and tells you which other character holds what you are looking for. Table shows the same items as a list, with what they are worth at a vendor.
+- **The picture of your character.** It is taken off your screen the first time you open the character window in game, and again when you open it wearing something else. Retake takes a new one, Save writes it as a PNG.
+- **Item popups.** Hover an item in Items, in a vendor's list or on a trainer's recipe: the game's own tooltip, how worn it is today, who holds it, the nearest vendors that sell it with their price, and who drops it.
+- **Vendors and trainers.** Open the label of a vendor or a trainer, from its pin or from the search, and a panel shows what the vendor sells and at what price, with how many you already hold. A class trainer shows what you can learn now, what comes at the next levels and what it costs; a profession trainer shows its recipes, and which you know.
+- **Pictures of items.** Items have the game's own picture in the search, in labels and in every list.
+
+### Changed
+
+- **The pin of an open label.** The NPC a label is open on keeps its pin on the map even when its layer is off, with a gold ring around it.
+
+This version needs the new addon too: update Twinmap Forever from CurseForge.
+
 ## 0.10.0 - 2026-11-17
 
 ### New

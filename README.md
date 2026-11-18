@@ -29,6 +29,8 @@ Twinmap is an interactive map of World of Warcraft: Forever for your second scre
 - **Your group.** The companions of your party are on the map with you, each in a colour of their own, with their role on the disc. Inside dungeons and raids too, when they have Twinmap.
 - **When you die.** The map marks your corpse, the graveyard and the way back on foot, or the door of the dungeon you died in.
 - **Search.** NPCs, items, quests, zones, dungeons and your own pins, with the distance on foot.
+- **Your characters.** Bags, bank, gear and statistics of every character you play, with a picture of each. Readable with the game closed.
+- **Vendors and trainers.** What a vendor sells and at what price, what a trainer teaches, what you can learn now and what it costs.
 - **From the map to the game.** Mark a point or build a route on Twinmap, and it appears in the game.
 - **Phone and tablet.** No second monitor? Open the same map in the browser of a phone, a tablet or a laptop on your home network.
 
@@ -64,9 +66,10 @@ You do not have to take our word for it: the code is all here, every release can
 
 Twinmap never touches the game's memory and never plays for you.
 
-- **From the game to the app.** The addon draws a line one pixel tall at the edge of the game window and writes your position, zone and quests in the colors of its pixels. The app reads that line from the screen.
+- **From the game to the app.** The addon draws a line one pixel tall at the edge of the game window and writes your position, your zone, your quests and what your character carries, wears and knows in the colors of its pixels. The app reads that line from the screen.
 - **The map.** The app builds the map from the files of your own game, so it always matches your version of the game. No map is downloaded.
 - **Inside dungeons.** The game does not tell addons where you are in a dungeon, so the app reads your place from the game's minimap on the screen. Keep the minimap visible and not rotating.
+- **The picture of your character.** When you open the character window, the app reads the picture of your character from the screen, as it does the minimap.
 - **From the app to the game.** Points and routes go back through a few small files next to the addon, which the game reads by itself.
 - **Your group.** The game tells the addon where your companions are. From far away it tells it only every few seconds, so in a group each Twinmap addon also tells the others where its own character is, through the game. Inside a dungeon the game tells nothing at all: there each Twinmap tells the group the place it reads from its own minimap.
 
@@ -97,7 +100,7 @@ Here is what is planned, in no particular order. These are plans, not promises: 
 - **Quests**: your whole quest log, chains, rewards, and a plan for the session
 - **Character**: experience per hour, professions, reputations, a reminder when your trainer has something new
 - **Alerts**: full bags, broken gear, a disconnected game, and why you died
-- **Items**: bags, bank and gear, readable with the game closed, and a shopping list
+- **Items**: a shopping list
 - **Tools**: a macro builder, your action bars, a talent calculator, a screenshot gallery
 - **Guides**: leveling guides that turn into routes on the map
 - **Global shortcuts** and a **signed installer**
@@ -109,6 +112,7 @@ Something missing? [Tell us](https://github.com/catubba/twinmap-forever/issues/n
 - The app sends nothing by itself. There is no account and no tracking.
 - It connects to the internet to look for a newer version of itself, on GitHub, and when you press Send in the Feedback window. What a message carries and where it goes: [twinmap.app/privacy.html](https://twinmap.app/privacy.html).
 - The map on your home network is off until you turn it on.
+- What the app keeps of your characters, their picture included, stays on your computer.
 
 ## Not affiliated with Blizzard
 
