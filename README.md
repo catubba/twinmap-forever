@@ -24,6 +24,7 @@ Twinmap is an interactive map of World of Warcraft: Forever for your second scre
 
 - **Real-time position.** Your arrow moves on the map as you move in the game, a few times a second.
 - **Even inside dungeons.** In dungeons and raids the arrow moves through the rooms, with the bosses marked. Open a dungeon's map from its door, before you go in.
+- **Caves and mines.** Zoom in on a zone and the galleries of its caves and mines show through the ground, before you go in.
 - **Your quests.** Where to hand in what is done and where to find what is left, for every quest of your log. With Questie installed, the same quests Questie shows to your character, the ones to take as well.
 - **Services and resources.** Flight masters, inns, vendors, repair, trainers, banks, ore and herbs, each one a layer you turn on or off.
 - **Your group.** The companions of your party are on the map with you, each in a colour of their own, with their role on the disc. Inside dungeons and raids too, when they have Twinmap.

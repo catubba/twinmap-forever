@@ -2,6 +2,16 @@
 
 What changed in each version of Twinmap, newest first. The section of a version is also the text of its release on GitHub and of the addon's file on CurseForge.
 
+## 0.11.1 - 2026-11-18
+
+### New
+
+- **Caves and mines from outside.** A new layer, Caves, under World in Layers, on by default. Zoom in on a zone and the galleries of its caves and mines show through the ground, wherever your character is: you can look into a mine before you go in. Houses keep their roofs. Buildings dug into a hill, as the dwarves' in Dun Morogh, show their inside too.
+
+### Fixed
+
+- **The inside of Ironforge** no longer flickers while you drag the map at one zoom level.
+
 ## 0.11.0 - 2026-11-18
 
 ### New
