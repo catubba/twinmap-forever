@@ -2,7 +2,7 @@
   // The map: the game's own pictures of the two continents, the names of the zones, and the
   // character as an arrow. It follows the character until the player drags the map away.
   // Inside a dungeon or a raid it shows that instead: its rooms, its bosses, its entrance.
-  import { inApp, TILES } from './web'
+  import { TILES } from './web'
   import type { Terrain } from './terrain3d'
   import { Arrow3d } from './arrow3d'
   import type { Inside3d } from './inside3d'
@@ -852,7 +852,19 @@
     map.setView(at({ x: now.x / YARDS_PER_UNIT, y: now.z / YARDS_PER_UNIT }), zoomFor(now.seen), { animate: false })
     syncing = false
   }
+  // For the trials on a phone: the address ending in #fps shows how many times a second the 3D view is drawn while it moves.
+  const counting = location.hash === '#fps'
+  let fps = $state(0)
+  let counted = 0, since = 0, last = 0
+  function count(): void {
+    const now = performance.now()
+    if (now - last > 250) ((counted = 0), (since = now)) // the view was still: a new count
+    last = now
+    counted++
+    if (now - since >= 1000) ((fps = Math.round((counted * 1000) / (now - since))), (counted = 0), (since = now))
+  }
   function onFrame(): void {
+    if (counting) count()
     pins3d!.draw()
     // The names: off with their layer; clear of the buttons and of the arrow, where it is on this view.
     const me = map!.hasLayer(arrow) ? pins3d!.spot(arrow.getLatLng()) : null
@@ -1449,7 +1461,7 @@
       else layersOpen = false
     } else if (e.key === 'l' || e.key === 'L') layersOpen = !layersOpen
     else if (e.key === 'f' || e.key === 'F') follow()
-    else if (e.key === '3' && inApp && !inside) void view3d(!threeD)
+    else if (e.key === '3' && !inside) void view3d(!threeD)
     else if (e.target === holder && e.key.startsWith('Arrow')) following = false // moved by hand, like a drag
     else if (e.key === ' ' && e.target === holder && map) {
       e.preventDefault()
@@ -1494,6 +1506,7 @@
 
 <div class="map" class:under={threeD} bind:this={holder}></div>
 <div class="terrain" class:on={threeD} bind:this={terrainHost}><div class="map pins3d" bind:this={pinsHost}></div></div>
+{#if counting && threeD}<p class="fps">{fps} fps</p>{/if}
 <button class="compass" class:on={threeD} bind:this={compassHost} tabindex={threeD ? 0 : -1} aria-hidden={!threeD} title="North up" aria-label="North up" onclick={() => terrain?.north()}></button>
 {#if labelled}
   {#key labelled.units}
@@ -1545,8 +1558,7 @@
       <button class="btn" aria-pressed={!inside && continent === which} onclick={() => choose(which)}>{NAMES[which]}</button>
     {/each}
     <button class="btn" aria-expanded={layersOpen} aria-controls="layers" title="Layers (L)" onclick={() => (layersOpen = !layersOpen)}>Layers</button>
-    <!-- ponytail: the app's window only; whether the phone gets the 3D view is M16-F8's to decide. -->
-    {#if inApp && !inside}
+    {#if !inside}
       <button class="view" role="switch" aria-checked={threeD} aria-label="3D view" title="2D or 3D view (3)" onclick={() => view3d(!threeD)}><i class="knob"></i><span class="two">2D</span><span class="three">3D</span></button>
     {/if}
   </div>
@@ -1626,6 +1638,18 @@
     background: none;
     pointer-events: none;
     overflow: hidden;
+  }
+  .fps {
+    position: absolute;
+    left: 12px;
+    top: 124px;
+    z-index: 1200;
+    margin: 0;
+    padding: 2px 8px;
+    background: rgb(0 0 0 / 0.6);
+    color: #fff;
+    font: 14px monospace;
+    pointer-events: none;
   }
   /* The compass: bottom left, in 3D only; a click turns the north up. */
   .compass {

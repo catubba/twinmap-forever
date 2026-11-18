@@ -15,7 +15,7 @@ import { pictureOfBlock } from '../../shared/pixels'
 import { DRY, TAR } from '../../shared/water'
 import { BLOCK_YARDS } from '../../shared/world'
 import { ROOF_STEP } from './inside3d'
-import { TILES } from './web'
+import { inApp, TILES } from './web'
 
 /** Yards a side of the world's grid. */
 const WORLD = 64 * BLOCK_YARDS
@@ -32,7 +32,7 @@ export const MAX_TILT = (70 * Math.PI) / 180
 /** A node splits when a pixel of its picture (a square of its grid, a quarter of it at a block) would be wider than this many pixels on screen. */
 const SHARPNESS = 1.5
 /** Nodes and pictures kept on the graphics card beyond the ones on show. */
-const KEPT = 200
+const KEPT = inApp ? 200 : 60 // a phone on the home network has less room on its graphics card
 const LOADING = 6
 const SKY = 0x7f97ab
 /** The dark of a hole in the ground: chosen by the user on 18 November 2026 over leaving it open to the sky. */
@@ -200,7 +200,8 @@ export class Terrain {
       antialias: true,
       powerPreference: 'high-performance',
     })
-    this.renderer.setPixelRatio(devicePixelRatio)
+    // On a phone two points of the view a point of the page are enough: three are nine times the work of one.
+    this.renderer.setPixelRatio(inApp ? devicePixelRatio : Math.min(devicePixelRatio, 2))
     host.append(this.renderer.domElement)
     this.s3tc = this.renderer.extensions.has('WEBGL_compressed_texture_s3tc')
     this.scene.fog = new THREE.Fog(SKY, 1, 2)
