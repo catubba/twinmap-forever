@@ -15,6 +15,7 @@ import { installedBuild, openClientFiles, type ClientFiles } from './client-file
 import { convertInteriors, ENCOUNTERS_FILE, finishedInteriors, INTERIORS_FILE, MAP_FILE, mapEntries, ROOM_PICTURES_FILE, roomPictures } from './interiors'
 import { sentKeys } from './keys'
 import { convertHeights, heightsDone } from './heights'
+import { makeCaves } from './caves'
 import { ICONS_MADE, writeIcons } from './icons'
 import { gamePictures, itemIcons } from './item-icons'
 import { convertWorld, dropOtherBuilds, finished, ICONS_FOLDER, MAPS_FILE, PLACES_FILE, tilesFolder, TRAVEL_FILE } from './tiles'
@@ -170,6 +171,12 @@ try {
       const maps = files.read(MAP_FILE, true), rooms = files.read(ROOM_PICTURES_FILE, true), fights = files.read(ENCOUNTERS_FILE, true)
       if (!maps || !rooms || !fights) throw new Error('the game has no table of its maps, of its room pictures or of its bosses')
       inside = convertInteriors(mapEntries(table(maps), table(fights)), roomPictures(table(rooms)), (id) => files.read(id), folder)
+    }
+    // Which of the continents' buildings are caves and mines: for the layer that shows them from outside. Without it the map goes on as before.
+    try {
+      makeCaves(folder, inside)
+    } catch {
+      // tried again at the next start
     }
     // Now the map holds all these keys could open. One it was made with and the cache has lost stays listed.
     writeFileSync(keysFile, JSON.stringify([...new Set([...usedKeys, ...keys.keys()])].sort((a, b) => a - b)))

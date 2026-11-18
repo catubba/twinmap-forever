@@ -328,6 +328,29 @@
     if (box) cities = new RoomsLayer({ pieces, bounds: boundsOfBox(box), minZoom: 3, keepBuffer: 2, zIndex: 4 }).addTo(map)
   }
 
+  // The caves and the mines of the continent on show, seen from outside: the rooms of the buildings
+  // that lie under the ground (caves.json, main/caves.ts), over the terrain and see-through. Only
+  // from close up: from far away a mine is a few pixels. A layer of its own, Caves. Where the
+  // character is, under a roof, the rooms of that building are drawn whole over these.
+  const CAVES_ZOOM = 7 // about a pixel a yard: a mine is a hundred pixels across
+  const CAVES_OPACITY = 0.65 // the hill over the cave shows through
+  let buried: Record<string, number[]> | undefined
+  let caves: L.Layer | undefined
+  function showCaves(): void {
+    caves?.remove()
+    caves = undefined
+    const world = inside || !layers.caves ? undefined : interiors?.maps.find((m) => m.kind === 'world' && m.id === continent)
+    const under = new Set(world && buried?.[continent])
+    if (!map || !world || !under.size) return
+    const pieces = world.pieces.filter((p) => under.has(p.building)), box = boxOf(pieces)
+    if (box) caves = new RoomsLayer({ pieces, bounds: boundsOfBox(box), minZoom: CAVES_ZOOM, keepBuffer: 2, zIndex: 4, opacity: CAVES_OPACITY, className: 'caves' }).addTo(map)
+  }
+  $effect(() => {
+    void layers.caves
+    void inside
+    showCaves()
+  })
+
   // What the middle of the map shows, for the readout, while the map does not follow the character:
   // someone moving the map to explore reads what is being looked at, not where the character stands.
   function look(): void {
@@ -413,6 +436,7 @@
     continent = which
     writeNames()
     showCities()
+    showCaves()
     const whole = maps.find((m) => m.level === 'continent' && m.continent === which && m.parent !== 0)
     // At once: a zoom still running would end by putting this view back over whatever came after it.
     if (fit && whole?.rect) map.fitBounds(boundsOf(whole), { animate: false })
@@ -467,6 +491,7 @@
     inside = m
     labelled = null
     showCities()
+    showCaves()
     levels = Math.max(0, ...m.pieces.map((p) => p.level))
     upTo = levels
     showRooms(m.pieces)
@@ -1284,7 +1309,15 @@
       .then((list) => {
         interiors = list
         showCities()
+    showCaves()
         place()
+        // Which of its buildings are caves: made right after the list.
+        return fetch(`${TILES}/caves.json`)
+      })
+      .then((answer) => (answer.ok ? (answer.json() as Promise<{ worlds: Record<string, number[]> }>) : undefined))
+      .then((list) => {
+        buried = list?.worlds
+        showCaves()
       })
       .catch(() => {})
   })
