@@ -271,6 +271,36 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
       down = null
       this.onGrab()
     })
+    // Two fingers turned round each other turn the view with them, as a map on a phone does. MapControls alone turns
+    // it only as far as both fingers slide sideways: while two fingers are down the turn is set from here.
+    const fingers = new Map<number, { x: number; y: number }>()
+    let twist: { from: number; azimuth: number } | null = null
+    const slant = (): number => {
+      const [a, b] = [...fingers.values()]
+      return Math.atan2(b!.y - a!.y, b!.x - a!.x)
+    }
+    const lifted = (e: PointerEvent): void => {
+      fingers.delete(e.pointerId)
+      if (!twist) return
+      twist = null
+      this.controls.minAzimuthAngle = -Infinity
+      this.controls.maxAzimuthAngle = Infinity
+    }
+    canvas.addEventListener('pointerdown', (e) => {
+      if (e.pointerType !== 'touch') return
+      fingers.set(e.pointerId, { x: e.clientX, y: e.clientY })
+      if (fingers.size === 2 && this.controls.enableRotate) twist = { from: slant(), azimuth: this.controls.getAzimuthalAngle() }
+    })
+    canvas.addEventListener('pointermove', (e) => {
+      if (!fingers.has(e.pointerId)) return
+      fingers.set(e.pointerId, { x: e.clientX, y: e.clientY })
+      if (!twist || fingers.size !== 2) return
+      const to = twist.azimuth + (slant() - twist.from)
+      this.controls.minAzimuthAngle = this.controls.maxAzimuthAngle = Math.atan2(Math.sin(to), Math.cos(to))
+      this.dirty = true
+    })
+    canvas.addEventListener('pointerup', lifted)
+    canvas.addEventListener('pointercancel', lifted)
     this.compass = new Compass(compassHost)
     this.observer = new ResizeObserver(() => this.resize())
     this.observer.observe(host)
