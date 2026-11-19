@@ -392,6 +392,11 @@
   .over :global(main) {
     pointer-events: auto;
   }
+  /* The sections and the entries keep their width: the search and the name of the character give (Search, Picker). */
+  nav,
+  .entry {
+    flex: none;
+  }
   nav {
     display: flex;
   }
@@ -704,6 +709,21 @@
         0 -3px 0 var(--bronze-600),
         0 -4px 0 #000,
         0 -10px 24px #000a;
+    }
+  }
+  /* The app's window narrower than its top row at full size: nothing may go under the three buttons of Windows.
+     Feedback leaves first, being reached from the settings too; then the state of the link is its light alone. */
+  @media (max-width: 1100px) {
+    :global(html:not(.web)) .entry.feedback {
+      display: none;
+    }
+  }
+  @media (max-width: 900px) {
+    :global(html:not(.web)) .status .word {
+      display: none;
+    }
+    :global(html:not(.web)) .status {
+      height: 33px; /* the light alone keeps the line of the words it stands for */
     }
   }
   /* The top row of a narrow screen: the search between the section and the state of the link. */

@@ -171,10 +171,13 @@
     position: relative;
     align-self: center;
     margin: 0 0 0 auto;
+    /* As wide as it likes while the top row has the room, and no narrower than a word or two. */
+    flex: 0 1 240px;
+    min-width: 110px;
     -webkit-app-region: no-drag;
   }
   .field {
-    width: 240px;
+    width: 100%;
     padding-left: 28px;
   }
   /* The cross a search field draws by itself is not one of ours. */
@@ -233,9 +236,6 @@
       flex: 1;
       min-width: 0;
       margin-left: 0;
-    }
-    .field {
-      width: 100%;
     }
     .menu {
       position: fixed;

@@ -67,6 +67,7 @@
 <style>
   .picker {
     position: relative;
+    min-width: 0; /* in a top row short of room the name is cut, with three dots */
     -webkit-app-region: no-drag;
   }
   /* As an entry of the top row: no relief at rest, the edge of a tab under the mouse and while open. */
@@ -84,6 +85,11 @@
     color: var(--class);
     text-shadow: 0 1px 0 #000;
     cursor: pointer;
+    max-width: 100%;
+  }
+  .name {
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .who:hover,
   .who.open {
@@ -188,14 +194,16 @@
     color: var(--text-dim);
   }
   /* A narrow top row: the name alone, cut short if it must be. */
+  /* When it was last seen is in the list too: in the app's window it leaves the row before the name is cut. */
+  @media (max-width: 1200px) {
+    :global(html:not(.web)) .seen {
+      display: none;
+    }
+  }
   @media (max-width: 760px) {
     .who {
       padding: 0 8px;
       max-width: 40vw;
-    }
-    .name {
-      overflow: hidden;
-      text-overflow: ellipsis;
     }
     .level,
     .seen {
