@@ -97,8 +97,17 @@ interface Cluster {
   cell: Int32Array
   /** By cell: its first floor, or -1. */
   first: Int32Array
-  /** By node: the steps besides the base grid's. layer: 0 the base surface, i the cell's ith floor, -1 the surface nearest the node's height. cost: whole yards for a drop, 0 for a step. */
-  links: (Link[] | undefined)[]
+  /**
+   * The steps besides the base grid's, four numbers each: dx, dy, layer, cost. layer: 0 the base
+   * surface, i the cell's ith floor, -1 the surface nearest the node's height. cost: whole yards for
+   * a drop, 0 for a step. Those of a node lie together: linkAt says where they begin, and the node
+   * after it where they end. Numbers in a row and not a thing for each step: a continent has
+   * millions of them, and as things they took some 120 bytes each (560 MB for half the Eastern
+   * Kingdoms, measured on 19 November 2026).
+   */
+  links: Int16Array
+  /** By node, and one more: where its steps begin in links, counted in steps. Null for a cluster with no floors, which has none. */
+  linkAt: Int32Array | null
   /** By cell: 1 on a road. */
   road: Uint8Array
 }
@@ -106,6 +115,7 @@ interface Link { dx: number; dy: number; layer: number; cost: number }
 
 const DX = [1, -1, 0, 0, 1, 1, -1, -1], DY = [0, 0, 1, -1, 1, -1, 1, -1]
 const KEY = 65536 // a node of the continent: its cluster times this, plus its number there
+const NO_LINKS = new Int16Array(0)
 
 /**
  * A finder of ways on one continent's grid: the way between two points, and with `far` how many
@@ -221,7 +231,7 @@ export function walker(nav: NavData): Walker {
         on = !on
       }
     }
-    const c: Cluster = { val, flags, z, cell: cellOf, first, links: [], road }
+    const c: Cluster = { val, flags, z, cell: cellOf, first, links: NO_LINKS, linkAt: null, road }
     if (floors) unpackFloors(k, c, floors)
     return c
   }
@@ -253,16 +263,17 @@ export function walker(nav: NavData): Walker {
       pos = at + 5 + bitsOf(masks[node]!)
       node++
     }
-    const add = (at: number, link: Link): void => void (c.links[at] ??= []).push(link)
+    // The steps as they are read, five numbers each (the node they leave, then the four kept); put in the order of their nodes at the end.
+    const read: number[] = []
+    const add = (at: number, dx: number, dy: number, layer: number, cost: number): void => void read.push(at, dx, dy, layer, cost)
     const link = (from: number, dx: number, dy: number, layer: number, cost: number, both: boolean): void => {
-      const made = { dx, dy, layer, cost }
-      add(from, made)
+      add(from, dx, dy, layer, cost)
       if (!both) return
       const lc = from < N ? from : c.cell[from]!, tx = Math.floor(lc / C) + dx, ty = (lc % C) + dy
       // Into another cluster: mirrored once that one is unpacked too.
-      if (tx < 0 || ty < 0 || tx >= C || ty >= C) return void (pending.get(k) ?? pending.set(k, []).get(k)!).push({ node: from, link: made })
+      if (tx < 0 || ty < 0 || tx >= C || ty >= C) return void (pending.get(k) ?? pending.set(k, []).get(k)!).push({ node: from, link: { dx, dy, layer, cost } })
       const target = surface(c, tx * C + ty, layer, c.z[from]!)
-      if (target >= 0) add(target, { dx: -dx, dy: -dy, layer: from < N ? 0 : from - c.first[lc]! + 1, cost })
+      if (target >= 0) add(target, -dx, -dy, from < N ? 0 : from - c.first[lc]! + 1, cost)
     }
     for (let from = N; from < node; from++) {
       let landing = landings[from]!
@@ -279,7 +290,16 @@ export function walker(nav: NavData): Walker {
     }
     const drops = num(s, pos, 3)
     pos += 3
-    for (let i = 0; i < drops; i++, pos += 8) link(num(s, pos, 3), sym(s, pos + 3) - 8, sym(s, pos + 4) - 8, sym(s, pos + 5), num(s, pos + 6, 2), false)  }
+    for (let i = 0; i < drops; i++, pos += 8) link(num(s, pos, 3), sym(s, pos + 3) - 8, sym(s, pos + 4) - 8, sym(s, pos + 5), num(s, pos + 6, 2), false)
+    // Each node's steps together, in the order they were read.
+    const nodes = c.val.length, linkAt = new Int32Array(nodes + 1), links = new Int16Array((read.length / 5) * 4)
+    for (let i = 0; i < read.length; i += 5) linkAt[read[i]! + 1]!++
+    for (let at = 0; at < nodes; at++) linkAt[at + 1]! += linkAt[at]!
+    const next = linkAt.slice(0, nodes)
+    for (let i = 0; i < read.length; i += 5) links.set(read.slice(i + 1, i + 5), next[read[i]!]!++ * 4)
+    c.links = links
+    c.linkAt = linkAt
+  }
 
   const clusterAt = (gx: number, gy: number): number => Math.floor(gx / C) * nav.ny + Math.floor(gy / C)
   const local = (gx: number, gy: number): number => (gx % C) * C + (gy % C)
@@ -355,11 +375,11 @@ export function walker(nav: NavData): Walker {
         visit(tk * KEY + local(tx, ty), tx, ty, cluster(tk)!, local(tx, ty), 0)
       }
     }
-    for (const link of c.links[node] ?? []) {
-      const tx = gx + link.dx, ty = gy + link.dy
+    for (let i = c.linkAt ? c.linkAt[node]! * 4 : 0, end = c.linkAt ? c.linkAt[node + 1]! * 4 : 0; i < end; i += 4) {
+      const dx = c.links[i]!, dy = c.links[i + 1]!, tx = gx + dx, ty = gy + dy
       if (!inside(tx, ty)) continue
-      const tk = clusterAt(tx, ty), into = cluster(tk), target = into ? surface(into, local(tx, ty), link.layer, c.z[node]!) : -1
-      if (target >= 0 && climbable(c, node, into!, target, cell * Math.hypot(link.dx, link.dy))) visit(tk * KEY + target, tx, ty, into!, target, link.cost)
+      const tk = clusterAt(tx, ty), into = cluster(tk), target = into ? surface(into, local(tx, ty), c.links[i + 2]!, c.z[node]!) : -1
+      if (target >= 0 && climbable(c, node, into!, target, cell * Math.hypot(dx, dy))) visit(tk * KEY + target, tx, ty, into!, target, c.links[i + 3]!)
     }
     // At the edge of a cluster: the steps that come in from the floors of the next one.
     if (lx === 0 || ly === 0 || lx === C - 1 || ly === C - 1) {
