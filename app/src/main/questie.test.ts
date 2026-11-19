@@ -216,6 +216,32 @@ test('with QuestieDB in the game folder, quests, NPCs and objects are read with 
   expect(db.zoneIndex.Object.get('12')).toEqual([900])
 })
 
+// Zone 1 is Dun Morogh. A Lua table whose keys are 1, or 1 and 2, is written as a list, not as a map.
+test('a place in zone 1 is read in zone 1, though QuestieDB writes its zones as a list there', () => {
+  const db = openQuestie(
+    game([
+      ...LINES,
+      `## X-Npc-110-S: ${b64({ [NPC.name]: 'Innkeeper Belm', [NPC.friendly]: 'A', [NPC.flags]: 128 })}`,
+      `## X-Npc-110-${NPC.spawns}: ${b64([[[47.38, 52.52]]])}`,
+      `## X-Npc-111-S: ${b64({ [NPC.name]: 'Border Guard' })}`,
+      `## X-Npc-111-${NPC.spawns}: ${b64([[[80, 50]], [[5, 50]]])}`,
+      `## X-Npc-112-S: ${b64({ [NPC.name]: 'Mountaineer' })}`,
+      `## X-Npc-112-${NPC.waypoints}: ${b64([[[[30.5, 40.5], [31, 41]]]])}`,
+      `## X-Object-910-S: ${b64({ [OBJECT.name]: 'Copper Vein' })}`,
+      `## X-Object-910-${OBJECT.spawns}: ${b64([[[60, 61]]])}`,
+      `## X-Quest-10-${QUEST.triggerEnd}: ${b64(['Scout the pass', [[[70, 71]]]])}`,
+    ]),
+  )!
+  expect(db.places('Npc', 110)).toEqual({ 1: [[47.38, 52.52]] })
+  expect(db.places('Npc', 111)).toEqual({ 1: [[80, 50]], 2: [[5, 50]] })
+  expect(db.places('Npc', 112)).toEqual({ 1: [[30.5, 40.5]] })
+  expect(db.places('Object', 910)).toEqual({ 1: [[60, 61]] })
+  expect(db.zoneIndex.Npc.get('1')).toEqual([110, 111, 112])
+  expect(db.zoneIndex.Npc.has('0')).toBe(false)
+  expect(fixedPins(db).filter((p) => p.name === 'Innkeeper Belm' || p.name === 'Copper Vein').map((p) => p.area)).toEqual([1, 1])
+  expect(shownFromLog(db, [{ id: 10, done: false, objectives: [] }]).icons.objective).toEqual([{ quest: 10, area: 1, x: 70, y: 71, kind: 'event' }])
+})
+
 test('who sells an item, turned round: what each NPC sells', () => {
   const sells = (id: number, name: string, npcs: number[]): string[] => [`## X-Item-${id}-S: ${b64({ [ITEM.name]: name })}`, `## X-Item-${id}-${ITEM.vendors}: ${b64(npcs)}`]
   const db = openQuestie(game([...LINES, ...sells(56, 'Fresh Bread', [101, 103]), ...sells(57, 'Mild Spices', [101]), `## X-Item-58-S: ${b64({ [ITEM.name]: 'Rat Tail' })}`]))!

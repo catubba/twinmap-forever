@@ -89,6 +89,8 @@ export function cbor(buf: Buffer): unknown {
 // A Lua table comes back as a list, or as a map when it has holes. at() counts from 1, as Lua does.
 export const at = (t: unknown, i: number): unknown => (Array.isArray(t) ? t[i - 1] : t && typeof t === 'object' ? (t as Record<string, unknown>)[i] : undefined)
 export const list = (t: unknown): unknown[] => (Array.isArray(t) ? t : t && typeof t === 'object' ? Object.values(t) : [])
+/** A table with its keys, as Lua has them: a list is keyed from 1 (the zones of Dun Morogh, zone 1, are written as one). */
+export const keyed = (t: unknown): [string, unknown][] => (Array.isArray(t) ? t.map((v, i): [string, unknown] => [String(i + 1), v]) : t && typeof t === 'object' ? Object.entries(t) : [])
 
 /** Opens the QuestieDB in a game folder; null when the player has none, or it is not one this app can read. */
 export function openQuestie(gameFolder: string): Questie | null {
@@ -140,12 +142,10 @@ export function openQuestie(gameFolder: string): Questie | null {
   }
   function places(kind: 'Npc' | 'Object', id: number): Places {
     const out: Places = {}
-    const spawns = (get(kind, id, kind === 'Npc' ? NPC.spawns : OBJECT.spawns) ?? {}) as Record<string, unknown>
-    for (const zone of Object.keys(spawns)) out[zone] = list(spawns[zone]).map(spot).filter((p) => p !== null)
-    const paths = (kind === 'Npc' ? (get(kind, id, NPC.waypoints) ?? {}) : {}) as Record<string, unknown>
-    for (const zone of Object.keys(paths)) {
+    for (const [zone, spots] of keyed(get(kind, id, kind === 'Npc' ? NPC.spawns : OBJECT.spawns))) out[zone] = list(spots).map(spot).filter((p) => p !== null)
+    for (const [zone, paths] of kind === 'Npc' ? keyed(get(kind, id, NPC.waypoints)) : []) {
       if (out[zone]?.length) continue
-      const first = spot(at(list(paths[zone])[0], 1))
+      const first = spot(at(list(paths)[0], 1))
       if (first) out[zone] = [first]
     }
     return out
@@ -369,7 +369,7 @@ export function shownFromLog(db: Questie, log: GameQuest[]): QuestieShown {
       if (!quest.objectives.some((o) => o.kind >= 1 && o.kind <= 3)) for (const kind of [1, 2, 3]) for (const row of list(at(groups, kind))) for (const id of numbers([at(row, 1)])) targets.push(...of(kind, id))
       stand(targets)
       // A place to go to, for a quest that asks for nothing else.
-      for (const [area, places] of Object.entries((at(db.get('Quest', quest.id, QUEST.triggerEnd), 2) ?? {}) as Record<string, unknown>)) {
+      for (const [area, places] of keyed(at(db.get('Quest', quest.id, QUEST.triggerEnd), 2))) {
         for (const place of list(places)) {
           const [x, y] = numbers(place)
           if (x !== undefined && y !== undefined) put(+area, x, y, 'event')
