@@ -100,6 +100,13 @@ export class Pins3d {
     this.canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%'
     this.tip.style.cssText = 'left:0;top:0;z-index:200000;visibility:hidden'
     host.append(this.canvas, this.tip)
+    // The arrow is a body in the scene, under this layer: a hole is kept in the layer where it is, so that no pin and no line
+    // lies over it, as none does on the 2D map.
+    // ponytail: the hole is round and cuts whatever is there, a tooltip too. A second scene drawn over this layer if a cut pin ever looks wrong.
+    body.onscreen = (at) => {
+      const mask = at ? `radial-gradient(circle at ${at.x.toFixed(1)}px ${at.y.toFixed(1)}px, transparent ${(at.r * 1.15).toFixed(1)}px, #000 ${(at.r * 1.15 + 1.5).toFixed(1)}px)` : ''
+      host.style.maskImage = host.style.webkitMaskImage = mask
+    }
     // A click, not the end of a drag, on a painted pin is a click on it; on the bare ground, a click
     // on the 2D map at that point, which puts the label there.
     events.addEventListener('pointerdown', (e) => (this.down = { x: e.clientX, y: e.clientY }))
