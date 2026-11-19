@@ -10,6 +10,7 @@ routes = [{ pattern = "api.twinmap.app", custom_domain = true }]
 
 [vars]
 INBOX = "catubba/twinmap-inbox"
+DAILY = "1000" # samples taken in a day from everyone, 200 MB at the most; 0 takes none
 
 # About five messages a minute from one address. Cloudflare counts loosely: a quick burst gets
 # some fifteen through before the refusals start (seen on 15 November 2026).
@@ -20,3 +21,20 @@ namespace_id = "1001"
 [ratelimits.simple]
 limit = 5
 period = 60
+
+# Samples of the participation programme: a hundred a minute from one address, one run's worth.
+[[ratelimits]]
+name = "SAMPLE_LIMIT"
+namespace_id = "1002"
+
+[ratelimits.simple]
+limit = 100
+period = 60
+
+# The bucket is in the EU and deletes what is older than twelve months:
+#   npx wrangler@4 r2 bucket create twinmap-samples --jurisdiction eu
+#   npx wrangler@4 r2 bucket lifecycle add twinmap-samples year --expire-days 365 --jurisdiction eu
+[[r2_buckets]]
+binding = "SAMPLES"
+bucket_name = "twinmap-samples"
+jurisdiction = "eu"
