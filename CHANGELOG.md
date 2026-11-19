@@ -2,6 +2,24 @@
 
 What changed in each version of Twinmap, newest first. The section of a version is also the text of its release on GitHub and of the addon's file on CurseForge.
 
+## 0.12.0 - 2026-11-19
+
+### New
+
+- **The map in 3D. One switch, 2D or 3D.** A new switch at the top of the map, beside Layers, turns the flat map into the land itself: mountains, valleys, coasts, lakes and rivers in relief, with the game's own ground painted over them. Turn it, tilt it, and zoom from a whole continent down to a single village. Your arrow, your quests, every pin, the names of the places and your route are all there, standing on the ground. Switch back to 2D whenever you like, with the button or with the 3 key: the place and the zoom stay the same. A bronze compass at the bottom left puts the north back up.
+- **Look inside the mountains.** In 3D, come close to a cave, a mine or a city dug into the rock, such as Ironforge, and the ground over it opens: you see the rooms where they really are, under the hill, with your arrow and your pins down on their floor.
+- **3D on your phone and tablet.** The same switch is on the map you open on your home network. One finger drags the map, two fingers pinch to zoom, turn to turn it and slide up or down to tilt it.
+- **Above or below.** When your character is under something it could walk on, in a mine or swimming under a bridge, its arrow fades a little, in 2D and in 3D.
+- **The right floor, with Shortest Path Forever 1.43 or later.** Where floors lie over one another, as inside Ironforge or over the canals of Stormwind, the line of your journey keeps to the floor the game guides you on. In 3D it stays on the hill when the way goes over a mine, and goes down inside when the way goes in.
+
+### Changed
+
+- **On a phone, the buttons keep the top row.** On a narrow map the name of the zone and its coordinates now go under the buttons.
+
+The first start after the update builds the 3D ground from your game files, once: about 26 MB more on disk.
+
+This version needs the new addon too: update Twinmap Forever from CurseForge.
+
 ## 0.11.1 - 2026-11-18
 
 ### New

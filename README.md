@@ -16,13 +16,15 @@
   <a href="https://ko-fi.com/catubba"><img src="https://img.shields.io/badge/Ko--fi-buy%20me%20a%20coffee-ff5e5b?logo=kofi&amp;logoColor=white" alt="Ko-fi"></a>
 </p>
 
-Twinmap is an interactive map of World of Warcraft: Forever for your second screen. It follows your character as you move and shows your quests, services and resources around you, on a second monitor, a laptop, a tablet or a phone.
+Twinmap is an interactive map of World of Warcraft: Forever for your second screen. It follows your character as you move and shows your quests, services and resources around you, on a second monitor, a laptop, a tablet or a phone. One switch takes the map from 2D to 3D and back.
 
 ![Twinmap on a monitor, a laptop, a tablet and a phone](docs/images/hero.png)
 
 ## What it does
 
 - **Real-time position.** Your arrow moves on the map as you move in the game, a few times a second.
+- **2D or 3D, one switch.** Turn the flat map into the land itself: mountains, valleys, coasts and rivers in relief, to turn, tilt and zoom, with your arrow, your quests and your route standing on the ground. One click, or the 3 key, and you are back in 2D at the same place.
+- **Look inside the mountains.** In 3D the ground opens over caves, mines and Ironforge as you come near, and you see the rooms where they really are.
 - **Even inside dungeons.** In dungeons and raids the arrow moves through the rooms, with the bosses marked. Open a dungeon's map from its door, before you go in.
 - **Caves and mines.** Zoom in on a zone and the galleries of its caves and mines show through the ground, before you go in.
 - **Your quests.** Where to hand in what is done and where to find what is left, for every quest of your log. With Questie installed, the same quests Questie shows to your character, the ones to take as well.
@@ -33,9 +35,11 @@ Twinmap is an interactive map of World of Warcraft: Forever for your second scre
 - **Your characters.** Bags, bank, gear and statistics of every character you play, with a picture of each. Readable with the game closed.
 - **Vendors and trainers.** What a vendor sells and at what price, what a trainer teaches, what you can learn now and what it costs.
 - **From the map to the game.** Mark a point or build a route on Twinmap, and it appears in the game.
-- **Phone and tablet.** No second monitor? Open the same map in the browser of a phone, a tablet or a laptop on your home network.
+- **Phone and tablet.** No second monitor? Open the same map in the browser of a phone, a tablet or a laptop on your home network, in 2D or in 3D.
 
 **Twinmap is free and open source.** No Overwolf, no ads, no account, no paid features. Nothing leaves your computer unless you send it.
+
+![The map in 3D: Dun Morogh, with a journey to Ironforge, open inside its mountain](docs/images/3d.png)
 
 ![The game on one monitor, Twinmap on the other](docs/images/second-monitor.png)
 
@@ -81,7 +85,7 @@ Twinmap never touches the game's memory and never plays for you.
 None of these is needed. When one is installed, Twinmap shows more.
 
 - [Questie](https://www.curseforge.com/wow/addons/questie): the map shows the same quests Questie shows in the game, with the ones you can take. Without it, the map shows the quests of your log.
-- [Shortest Path Forever](https://www.curseforge.com/wow/addons/shortest-path-forever): the map shows the whole journey it plans, flights, boats and the tram included, and what you send to the game is reached along the roads.
+- [Shortest Path Forever](https://www.curseforge.com/wow/addons/shortest-path-forever): the map shows the whole journey it plans, flights, boats and the tram included, on the floor the game guides you on, and what you send to the game is reached along the roads.
 
 ## Phone and tablet
 
