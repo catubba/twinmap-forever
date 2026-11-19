@@ -225,7 +225,7 @@
 {/if}
 {#if onSettings && setup && onSetup === false}
   <div class="over" in:fade={screen} out:fade={gone}>
-    <Settings {setup} {tiles} link={status} onback={() => (onSettings = false)} onfeedback={() => (onFeedback = true)} onfirstrun={() => ((onSettings = false), (onSetup = true))} />
+    <Settings {setup} {tiles} onback={() => (onSettings = false)} onfeedback={() => (onFeedback = true)} onfirstrun={() => ((onSettings = false), (onSetup = true))} />
   </div>
 {/if}
 {#if onItems && onSetup === false && !onSettings}
