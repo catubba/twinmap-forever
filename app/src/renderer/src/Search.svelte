@@ -169,10 +169,11 @@
 <style>
   .search {
     position: relative;
-    align-self: center;
-    margin: 0 0 0 auto;
-    /* As wide as it likes while the top row has the room, and no narrower than a word or two. */
-    flex: 0 1 240px;
+    /* Its middle on the middle of the words beside it, which stand on the foot of the row. */
+    align-self: flex-end;
+    margin: 0 0 3px auto;
+    /* As wide as it likes while the top row has the room, and no narrower than a word or two. It gives before the name of the character does: all of what is short is taken off here, down to the least. */
+    flex: 0 1000000 240px;
     min-width: 110px;
     -webkit-app-region: no-drag;
   }
@@ -247,6 +248,9 @@
   }
   /* Under a finger: as tall as the top row lets it be. Letters of 16 px, or a phone zooms the page in on the field. */
   @media (pointer: coarse) {
+    .search {
+      margin-bottom: 0; /* the taller field has the foot of the row */
+    }
     .field {
       height: 36px;
       font-size: 16px;

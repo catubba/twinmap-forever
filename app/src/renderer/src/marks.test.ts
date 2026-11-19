@@ -21,5 +21,5 @@ test('a companion has their role on the disc, or the first letter of their name'
 })
 
 test('every glyph of the specification is there', () => {
-  expect(Object.keys(GLYPHS).sort()).toEqual(['check', 'close', 'direction', 'grip', 'menu', 'minus', 'plus', 'search'])
+  expect(Object.keys(GLYPHS).sort()).toEqual(['bag', 'bug', 'check', 'close', 'direction', 'gear', 'grip', 'menu', 'minus', 'pin', 'plus', 'search'])
 })

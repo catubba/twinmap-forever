@@ -188,8 +188,8 @@
   {/if}
   {#if !onSetup}
     <nav aria-label="Sections">
-      <button class="tab" aria-current={onSettings || onItems ? undefined : 'page'} onclick={() => ((onSettings = false), (onItems = false))}>Now</button>
-      <button class="tab" aria-current={onItems && !onSettings ? 'page' : undefined} onclick={() => ((onSettings = false), (onItems = true))}>Items</button>
+      <button class="tab" title="Now" aria-label="Now" aria-current={onSettings || onItems ? undefined : 'page'} onclick={() => ((onSettings = false), (onItems = false))}><Glyph name="pin" size={18} /><span class="word">Now</span></button>
+      <button class="tab" title="Items" aria-label="Items" aria-current={onItems && !onSettings ? 'page' : undefined} onclick={() => ((onSettings = false), (onItems = true))}><Glyph name="bag" size={18} /><span class="word">Items</span></button>
     </nav>
   {/if}
   {#if onSetup === false && !onSettings && mapReady}
@@ -199,10 +199,11 @@
     <p class="status" class:alone={onSetup !== false || onSettings || !mapReady}><i class={status.tone} title={status.word}></i><span class="word">{status.word}</span>{#if inbox && !inbox.off && inbox.id === undefined}<span class="left" class:low={inbox.left < 5}>{inbox.left} sends left</span>{/if}</p>
   {/if}
   {#if setup}
-    <button class="entry feedback" onclick={() => (onFeedback = true)}>Feedback</button>
+    <!-- The bug and the cog say what the words may not, to those who do not know them; in a narrow window they stand alone. The sections have theirs too: the pin of where you are, the bag. -->
+    <button class="entry feedback" title="Report a bug or an idea" aria-label="Feedback" onclick={() => (onFeedback = true)}><Glyph name="bug" size={18} /><span class="word">Feedback</span></button>
   {/if}
   {#if onSetup === false}
-    <button class="entry" aria-current={onSettings ? 'page' : undefined} onclick={() => (onSettings = !onSettings)}>Settings</button>
+    <button class="entry" title="Settings" aria-label="Settings" aria-current={onSettings ? 'page' : undefined} onclick={() => (onSettings = !onSettings)}><Glyph name="gear" size={18} /><span class="word">Settings</span></button>
   {/if}
 </header>
 
@@ -382,6 +383,14 @@
   /* Settings sit at the far end, after the state of the link. */
   .entry {
     margin-left: 12px;
+  }
+  /* Each with its glyph before the word. */
+  .tab,
+  .entry {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    height: 33px; /* the line of the entries, also when the glyph stands alone */
   }
   .over {
     position: absolute;
@@ -712,10 +721,14 @@
     }
   }
   /* The app's window narrower than its top row at full size: nothing may go under the three buttons of Windows.
-     Feedback leaves first, being reached from the settings too; then the state of the link is its light alone. */
+     The entries are their glyphs alone first; then the state of the link is its light alone. */
   @media (max-width: 1100px) {
-    :global(html:not(.web)) .entry.feedback {
+    :global(html:not(.web)) .entry .word {
       display: none;
+    }
+    :global(html:not(.web)) .entry {
+      margin-left: 0;
+      padding: 0 8px;
     }
   }
   @media (max-width: 900px) {
@@ -745,6 +758,11 @@
     }
     .entry {
       margin-left: 0;
+    }
+    /* The sections and Settings are their glyphs alone, on a phone too. */
+    .tab .word,
+    .entry .word {
+      display: none;
     }
     .status .left {
       display: none;
