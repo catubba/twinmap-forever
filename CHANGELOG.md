@@ -2,6 +2,22 @@
 
 What changed in each version of Twinmap, newest first. The section of a version is also the text of its release on GitHub and of the addon's file on CurseForge.
 
+## 0.12.1 - 2026-11-19
+
+### Changed
+
+- **Settings, easier to read.** Two columns instead of one long list. On the left, what you choose: the game folder, the window on top, the map on your phone. On the right, what Twinmap found, each with a light: lit when it is there, and with a button to get it when it is not. The shortcuts are shown as keys.
+- **Icons in the top row.** Now, Items, Feedback and Settings each have an icon: a map pin, a bag, a bug and a cog. In a narrow window and on a phone the icons stay and the words go, and the search has the room. Feedback is where you report a bug or send an idea.
+
+### Fixed
+
+- **Settings under the window buttons.** In a narrow window Feedback and Settings could end up under the minimize, maximize and close buttons, where they could not be clicked. The top row now makes room.
+- **The picture of your character with Auto HDR.** With Auto HDR on in Windows the picture came out far too bright. It now comes out as the game shows it. If yours is too bright, open the character window in game and press Retake in Items.
+
+Both fixes come from messages sent with Feedback: thank you.
+
+The addon is the same as in 0.12.0, with the new number.
+
 ## 0.12.0 - 2026-11-19
 
 ### New
