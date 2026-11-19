@@ -40,6 +40,13 @@ export interface FixedPin {
   sells?: number[]
 }
 
+/**
+ * Whether a pin is the vendor or the trainer a place found stands for: found by its own name, or as the one
+ * who sells the item that was found. Its panel opens with the label.
+ */
+export const panelFor = (pin: FixedPin, found: { title: string; item?: number }): boolean =>
+  pin.npc !== undefined && (pin.name === found.title || (found.item !== undefined && (pin.sells ?? []).includes(found.item)))
+
 /** Whether a pin is for a character of this side. With the side not known yet, every pin is. */
 export const serves = (pin: { side?: string }, side: string | undefined): boolean => !pin.side || !side || pin.side.includes(side)
 

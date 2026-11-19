@@ -21,7 +21,7 @@
   import { boxOf, buildingsAt, killedIn, nameOfBoss, piecesIn, RARE_BOSSES, roomPixels, yardsInside, YARDS_PER_UNIT, type Box, type InteriorMap, type Interiors, type Piece, type UnderRoom, type Yards } from '../../shared/inside'
   import type { Continent, GameMap } from '../../shared/maps'
   import type { QuestPin } from '../../shared/quests'
-  import { iconOf, serves, type FixedLayer, type FixedPin, type Travel } from '../../shared/services'
+  import { iconOf, panelFor, serves, type FixedLayer, type FixedPin, type Travel } from '../../shared/services'
   import { pictureOfBlock, tileOfPicture } from '../../shared/pixels'
   import { WORLDS } from '../../shared/world'
   import { LAYER_GROUPS, layersFrom, type LayerId } from '../../shared/layers'
@@ -656,8 +656,10 @@
       pin: found ? { m: found.zone.id, ...found.place } : null,
       ...(to.item && { item: to.item }), // an item found: its picture beside the name
     }
-    // A vendor or a trainer found: its panel opens as for a click on its pin.
-    const target = at(to.at), npc = laid.find((l) => l.pin.npc && l.pin.name === to.title && view.distance(target, l.at) < 1)?.pin
+    // A vendor or a trainer found, by its name or as the one who sells the item found: its panel opens as for a click on its pin.
+    // The nearest to the place: in a town several vendors of one thing stand within a step of the map.
+    const target = at(to.at), far = (l: (typeof laid)[number]): number => view.distance(target, l.at)
+    const npc = laid.filter((l) => panelFor(l.pin, to) && far(l) < 1).sort((a, b) => far(a) - far(b))[0]?.pin
     if (npc) labelled.npc = { ...npc }
   }
 
