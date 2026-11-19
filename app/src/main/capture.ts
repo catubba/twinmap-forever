@@ -103,8 +103,9 @@ const processOf = (hwnd: WindowHandle | null): number => {
  * blue), rows from the top. x, y: its top left corner, in pixels of the window. Null when there is
  * nothing to read, or the rectangle reaches past the window. own: null too when anything of another
  * program lies over its corners or its middle, so that what is read is the window's and nothing else's.
+ * at: where its top left corner is on the desktop.
  */
-export function readRect(hwnd: WindowHandle, x: number, y: number, width: number, height: number, own = false): { width: number; height: number; rgb: Uint8Array } | null {
+export function readRect(hwnd: WindowHandle, x: number, y: number, width: number, height: number, own = false): { width: number; height: number; rgb: Uint8Array; at: { x: number; y: number } } | null {
   if (IsIconic(hwnd) || width <= 0 || height <= 0) return null
   const rect = { left: 0, top: 0, right: 0, bottom: 0 }
   if (!GetClientRect(hwnd, rect) || x < 0 || y < 0 || x + width > rect.right || y + height > rect.bottom) return null
@@ -141,7 +142,7 @@ export function readRect(hwnd: WindowHandle, x: number, y: number, width: number
     rgb[i * 3 + 1] = pixels[i * 4 + 1]!
     rgb[i * 3 + 2] = pixels[i * 4]!
   }
-  return { width, height, rgb }
+  return { width, height, rgb, at: origin }
 }
 
 /** A square of the window's client area, read the same way. */

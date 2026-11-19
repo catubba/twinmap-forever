@@ -4,6 +4,7 @@ import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node
 import { copyFile, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { keep, keptFrom } from '../shared/kept'
+import { burnt } from '../shared/hdr'
 import { modelFrom, pictureDue, portraitsFrom, wornKey, type Portraits, type PortraitsTold } from '../shared/portrait'
 import { heldOf, mergeSheet, sheetNewsFrom, sheetsFrom, type Sheets } from '../shared/sheet'
 import { linkStatus, lostPercent, type LinkSnapshot } from '../shared/link'
@@ -17,6 +18,7 @@ import { pageOf, setupComplete, setupPages, type SetupStatus } from '../shared/s
 import { tilesLine, type TilesStatus } from '../shared/tiles-status'
 import { placeWindow, WINDOW } from '../shared/window'
 import { findGameWindow, programOf } from './capture'
+import { readHdr } from './hdr'
 import { gameFolderFrom, registryInstallPath } from './client-files'
 import { homeAddress, LAN_PORT, startLan, type Lan, type Served } from './lan'
 import { startLink } from './link'
@@ -521,9 +523,9 @@ function createWindow(): void {
     tellPortraits()
   }
   const PORTRAIT_EVERY = 250 // ms between two looks at whether a picture is to be taken
-  let portraitLooked = 0
+  let portraitLooked = 0, portraitAwaited = false
   const lookPortrait = (state: LinkSnapshot['state'], now: number): void => {
-    if (now - portraitLooked < PORTRAIT_EVERY) return
+    if (portraitAwaited || now - portraitLooked < PORTRAIT_EVERY) return
     portraitLooked = now
     // ponytail: a model told by a strip that then stopped (the addon paused with the window open) is still believed; only Retake can then take what is there
     const box = modelFrom(state.sections.model), sheet = box ? sheets[box.key] : undefined
@@ -531,15 +533,26 @@ function createWindow(): void {
     if (!box || !pictureDue(box, now - (state.updatedAt.model ?? now), gear, portraits[box.key], retake)) return
     const cut = link.cut(box.x, box.y, box.w, box.h)
     if (!cut) return // the game is not on show there now: at the next look
-    try {
-      mkdirSync(portraitsFolder, { recursive: true })
-      writeFileSync(portraitFile(box.key), encodePng(cut.rgb, cut.width, cut.height))
-    } catch {
-      return
+    const keep = (rgb: Uint8Array, how: string): void => {
+      try {
+        mkdirSync(portraitsFolder, { recursive: true })
+        writeFileSync(portraitFile(box.key), encodePng(rgb, cut.width, cut.height))
+      } catch {
+        return
+      }
+      if (retake === box.key) retake = null
+      record.say(`portrait taken${how}`) // never whose
+      keepPortraits({ ...portraits, [box.key]: { at: now, gear: gear! } })
     }
-    if (retake === box.key) retake = null
-    record.say('portrait taken') // never whose
-    keepPortraits({ ...portraits, [box.key]: { at: now, gear: gear! } })
+    if (!burnt(cut.rgb)) return keep(cut.rgb, '')
+    // Its lights are cut, as with Auto HDR on (shared/hdr.ts): the same rectangle is read again in floating point,
+    // and that picture kept if there is one. Nothing else is looked at meanwhile.
+    // ponytail: what came over the model in that moment is in the picture; Retake takes another.
+    portraitAwaited = true
+    void readHdr({ ...cut.at, width: cut.width, height: cut.height, seen: cut.rgb }).then((read) => {
+      portraitAwaited = false
+      keep(read?.rgb ?? cut.rgb, read ? ', read in HDR' : ', its lights cut')
+    })
   }
   // Retake: a new picture of this character as soon as its model is on show; null takes the asking back.
   asks('retake-portrait', (key: unknown): void => {
