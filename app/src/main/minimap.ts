@@ -150,6 +150,8 @@ export interface InsideReport {
   picture?: number
   across?: number
   level?: number
+  /** The place told and how like the picture the minimap is there: under `SURE` when it is only followed from the one of a moment ago. */
+  place?: Found
   /** Milliseconds since a place was last found, or since the dungeon was entered when none was yet. */
   lostFor?: number
 }
@@ -250,7 +252,7 @@ export function startInside(tilesFolder: () => string | null, mosaics: (folder: 
       last = { u: place.u, v: place.v, facing, at: now, level, picture, across }
       lostTries = 0
       foundAt = now
-      report = { ...said, scores, picture, across, level, lostFor: 0 }
+      report = { ...said, scores, picture, across, level, place: { u: place.u, v: place.v, score: place.score }, lostFor: 0 }
       return fresh()
     },
   }

@@ -1,15 +1,15 @@
 // Writes a picture as a PNG file: what the tiles of the lower zoom levels are kept as.
 import { crc32, deflateSync } from 'node:zlib'
 
-/** A PNG file of red, green, blue bytes; with channels 4 each pixel has its transparency after them, with channels 1 it is one grey byte. */
-export function encodePng(rgb: Uint8Array, width: number, height: number, channels: 1 | 3 | 4 = 3): Buffer {
+/** A PNG file of red, green, blue bytes; with channels 4 each pixel has its transparency after them, with channels 1 it is one grey byte. up: each row kept as its difference from the row above. */
+export function encodePng(rgb: Uint8Array, width: number, height: number, channels: 1 | 3 | 4 = 3, up = channels === 1): Buffer {
   const raw = Buffer.alloc(height * (width * channels + 1)) // each row starts with a byte: its filter
   const row = width * channels
   for (let y = 0; y < height; y++) {
     const at = y * (row + 1)
-    if (channels === 1 && y > 0) {
+    if (up && y > 0) {
       // A grey picture (the relief) changes little from one row to the next: kept as the difference
-      // from the row above ("up" filter), it takes half the room.
+      // from the row above ("up" filter), it takes half the room; a minimap, a fifth less.
       raw[at] = 2
       for (let x = 0; x < row; x++) raw[at + 1 + x] = (rgb[y * row + x]! - rgb[(y - 1) * row + x]!) & 255
     } else raw.set(rgb.subarray(y * row, (y + 1) * row), at + 1)

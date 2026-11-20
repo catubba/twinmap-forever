@@ -152,6 +152,18 @@ export function readBox(hwnd: WindowHandle, x: number, y: number, size: number):
 }
 
 /**
+ * Whether a square of the window's client area shows the window and nothing of another program:
+ * asked before a piece of the screen leaves this computer (samples.ts). A point every few pixels.
+ */
+export function showsOnly(hwnd: WindowHandle, x: number, y: number, size: number): boolean {
+  const origin = { x, y }
+  if (IsIconic(hwnd) || !ClientToScreen(hwnd, origin)) return false
+  const program = processOf(hwnd), step = Math.max(1, Math.floor(size / 16))
+  for (let dy = 0; dy < size; dy += step) for (let dx = 0; dx < size; dx += step) if (processOf(WindowFromPoint({ x: origin.x + dx, y: origin.y + dy }) as WindowHandle | null) !== program) return false
+  return true
+}
+
+/**
  * The top or bottom row of the window's client area, as shown on screen: 4 bytes per pixel, in the
  * order blue, green, red, unused. Null when there is nothing to read: the window is gone, minimized
  * or empty. A window covered by another one gives the pixels of what covers it.

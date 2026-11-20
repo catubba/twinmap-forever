@@ -77,6 +77,7 @@ contextBridge.exposeInMainWorld('twinmap', {
   setOnTop: (on: boolean): Promise<void> => ipcRenderer.invoke('set-on-top', on),
   // Shows the map to the other devices of the home network, or stops showing it.
   setLan: (on: boolean): Promise<void> => ipcRenderer.invoke('set-lan', on),
+  setParticipate: (on: boolean): Promise<void> => ipcRenderer.invoke('set-participate', on),
   // NPCs, quests and items whose name answers what was typed.
   search: (typed: string): Promise<Found[]> => ipcRenderer.invoke('search', typed),
   // The way on foot between two points of a continent; null where there is none.

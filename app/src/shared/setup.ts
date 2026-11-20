@@ -18,6 +18,8 @@ export interface SetupStatus {
   version: string
   /** The player asked for the window to stay over the others. */
   onTop: boolean
+  /** The player turned the participation programme on: samples of the minimap inside dungeons are sent. */
+  participate: boolean
   /** The map on the home network: the address a phone opens, or why it cannot be had. Absent or null while it is off. */
   lan?: { url: string } | { error: string } | null
 }

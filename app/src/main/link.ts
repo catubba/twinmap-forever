@@ -5,8 +5,9 @@ import type { LinkSnapshot } from '../shared/link'
 import { decodeRow, readStrip } from '../shared/strip'
 import { readFileSync } from 'node:fs'
 import { worldOfYards } from '../shared/inside'
-import { findGameWindow, findWindow, readBox, readRect, readRow, windowState, type WindowHandle } from './capture'
-import { startInside, type Inside } from './minimap'
+import type { Box } from '../shared/minimap'
+import { findGameWindow, findWindow, readBox, readRect, readRow, showsOnly, windowState, type WindowHandle } from './capture'
+import { startInside, type Inside, type InsideReport } from './minimap'
 
 // Tuning knobs.
 const READ_EVERY = 15 // ms: a block stays up 50 ms, so it is seen about three times
@@ -41,7 +42,11 @@ function withInside(state: GameState, found: (Inside & { at: number }) | null): 
   return { ...state, sections: { ...state.sections, pos: { ...pos, facing, inst: { ...pos.inst, ...worldOfYards(found), level: found.level } } }, updatedAt: { ...state.updatedAt, pos: Math.max(state.updatedAt.pos ?? 0, found.at) } }
 }
 
-export function startLink(tilesFolder: () => string | null = () => null): { snapshot: () => LinkSnapshot; inside: () => ReturnType<ReturnType<typeof startInside>['report']>; cut: (x: number, y: number, width: number, height: number) => ReturnType<typeof readRect>; stop: () => void } {
+/**
+ * looked: told what each look at the minimap inside a dungeon came to, once each, with the square it looked at, and null once
+ * out of there; own says whether that square shows the game and nothing over it (the samples of samples.ts are taken from this).
+ */
+export function startLink(tilesFolder: () => string | null = () => null, looked: (report: InsideReport | null, seen: Box | null, own: () => boolean, now: number) => void = () => {}): { snapshot: () => LinkSnapshot; inside: () => ReturnType<ReturnType<typeof startInside>['report']>; cut: (x: number, y: number, width: number, height: number) => ReturnType<typeof readRect>; stop: () => void } {
   const game = createGame()
   // Inside a dungeon the game tells addons no place: there, and only there, it is found from the minimap on the screen.
   const inside = startInside(tilesFolder)
@@ -57,6 +62,19 @@ export function startLink(tilesFolder: () => string | null = () => null): { snap
 
   const replay = process.env.TWINMAP_REPLAY ? replayed(process.env.TWINMAP_REPLAY) : null
 
+  // The addon tells where the minimap is in pixels of the game: on a stretched game the square is as much further and bigger on screen.
+  let said: InsideReport | null = null
+  const lookInside = (window: WindowHandle, now: number): void => {
+    let at: { x: number; y: number; size: number } | null = null
+    const place = inside.look(game.state.sections.pos, (x, y, size) => ((at = { x: Math.round(x * stretch), y: Math.round(y * stretch), size: Math.round(size * stretch) }), readBox(window, at.x, at.y, at.size)), now)
+    found = place && (found && found.u === place.u && found.v === place.v && found.facing === place.facing && found.level === place.level ? found : { ...place, at: now })
+    const told = inside.report(), report = told?.report ?? null
+    if (report === said) return
+    said = report
+    const cut = at as { x: number; y: number; size: number } | null
+    looked(report, cut && told ? told.seen : null, () => !!cut && showsOnly(window, cut.x, cut.y, cut.size), now)
+  }
+
   const timer = setInterval(() => {
     const now = Date.now()
     if (replay) {
@@ -65,6 +83,9 @@ export function startLink(tilesFolder: () => string | null = () => null): { snap
       if (!row) return
       reads++
       game.feed(decodeRow(row), now)
+      // In a trial the minimap is cut from the window TWINMAP_WINDOW names by its title, as the portrait is.
+      const stand = process.env.TWINMAP_WINDOW ? findWindow(process.env.TWINMAP_WINDOW) : null
+      if (stand !== null) lookInside(stand, now)
       return
     }
     if (hwnd === null) {
@@ -92,11 +113,8 @@ export function startLink(tilesFolder: () => string | null = () => null): { snap
     if (read.drew) drew = read.drew
     if (reading.kind !== 'none') edgeSeenAt = now
     game.feed(reading, now)
-    // The addon tells where the minimap is in pixels of the game: on a stretched game the square is as much further and bigger on screen.
-    const window = hwnd
     stretch = drew ? (row.length >> 2) / drew : 1
-    const place = inside.look(game.state.sections.pos, (x, y, size) => readBox(window, Math.round(x * stretch), Math.round(y * stretch), Math.round(size * stretch)), now)
-    found = place && (found && found.u === place.u && found.v === place.v && found.facing === place.facing && found.level === place.level ? found : { ...place, at: now })
+    lookInside(hwnd, now)
   }, READ_EVERY)
 
   return {

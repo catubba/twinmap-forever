@@ -82,6 +82,14 @@
               {/if}
             </div>
           </section>
+          <!-- A provisional text: the words of the consent come with the programme's notice, before it is released. -->
+          <section class="group">
+            <h2 class="band">Participation programme</h2>
+            <div class="in">
+              <label class="choice"><input type="checkbox" class="check" checked={setup.participate} onchange={(e) => window.twinmap.setParticipate(e.currentTarget.checked)} />Send anonymous minimap samples from dungeons</label>
+              <p class="hint">Off unless you turn it on. Inside a dungeon Twinmap keeps a few pictures of your minimap, with the map, the place it found, and the versions of the app and the game, and sends them when you leave. No name, no realm, no character.</p>
+            </div>
+          </section>
         {/if}
       </div>
 

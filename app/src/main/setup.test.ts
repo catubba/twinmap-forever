@@ -17,13 +17,13 @@ const READY: TilesStatus = { state: 'ready', folder: 'x', version: '1.60.1', til
 
 test('the addon is found by its .toc, with its version; Questie by the file of its data', () => {
   const game = folder()
-  expect(setupStatus(game, {}, '0.1.0')).toEqual({ gameFolder: game, addon: null, questie: false, shortestPath: false, done: false, version: '0.1.0', onTop: false })
+  expect(setupStatus(game, {}, '0.1.0')).toEqual({ gameFolder: game, addon: null, questie: false, shortestPath: false, done: false, version: '0.1.0', onTop: false, participate: false })
   addons(game, 'TwinmapForever', 'Questie', 'QuestieDB')
   expect(setupStatus(game, {}, '0.1.0').questie, 'Questie with no data to read').toBe(false)
   writeFileSync(join(game, '_forever_', 'Interface', 'AddOns', 'QuestieDB', 'QuestieDB_Forever.toc'), '## Version: 1.0.13\r\n')
   expect(addonVersion(game), 'a folder with no .toc is not the addon').toBeNull()
   writeFileSync(join(game, '_forever_', 'Interface', 'AddOns', 'TwinmapForever', 'TwinmapForever.toc'), '## Interface: 11508\r\n## Title: Twinmap Forever\r\n## Version: 0.1.0\r\nTwinmapForever.lua\r\n')
-  expect(setupStatus(game, { setupDone: true, onTop: true }, '0.1.0')).toEqual({ gameFolder: game, addon: '0.1.0', questie: true, shortestPath: false, done: true, version: '0.1.0', onTop: true })
+  expect(setupStatus(game, { setupDone: true, onTop: true }, '0.1.0')).toEqual({ gameFolder: game, addon: '0.1.0', questie: true, shortestPath: false, done: true, version: '0.1.0', onTop: true, participate: false })
   addons(game, 'ShortestPathForever')
   expect(setupStatus(game, {}, '0.1.0').shortestPath, 'Shortest Path by its folder').toBe(true)
   expect(setupStatus(null, {}, '0.1.0')).toMatchObject({ gameFolder: null, addon: null, questie: false })
@@ -43,7 +43,7 @@ test('settings come back as they were written, and a file that is not ours gives
 const states = (setup: SetupStatus, tiles: TilesStatus | null, link: LinkStatus | null) => Object.fromEntries(setupPages(setup, tiles, link).map((p) => [p.id, p.state]))
 
 test('the pages of the first run, from nothing to the arrow', () => {
-  const none = { gameFolder: null, addon: null, questie: false, shortestPath: false, done: false, version: '0.1.0', onTop: false }
+  const none = { gameFolder: null, addon: null, questie: false, shortestPath: false, done: false, version: '0.1.0', onTop: false, participate: false }
   expect(states(none, { state: 'no-game' }, CLOSED)).toEqual({ game: 'todo', map: 'todo', addon: 'todo', extras: 'done', play: 'todo' })
   const found = { ...none, gameFolder: 'D:\\WoW' }
   expect(states(found, { state: 'converting', percent: 40 }, CLOSED)).toMatchObject({ game: 'done', map: 'working' })
@@ -57,7 +57,7 @@ test('the pages of the first run, from nothing to the arrow', () => {
 })
 
 test('what went wrong is said on its page: a map not built, an addon to tick, one of the two to update', () => {
-  const installed = { gameFolder: 'D:\\WoW', addon: '0.1.0', questie: true, shortestPath: false, done: false, version: '0.1.0', onTop: false }
+  const installed = { gameFolder: 'D:\\WoW', addon: '0.1.0', questie: true, shortestPath: false, done: false, version: '0.1.0', onTop: false, participate: false }
   expect(setupPages(installed, { state: 'failed', message: 'disk full' }, CLOSED)[1]).toMatchObject({ state: 'problem', lines: ['The map could not be built.', 'disk full', expect.stringContaining('try again')], action: 'retry' })
   const lost = setupPages(installed, READY, { kind: 'lost', word: 'Link lost', tone: 'objective' })[4]!
   expect(lost.state).toBe('todo')
@@ -78,7 +78,7 @@ test('the time left is said once there is something to tell it from, in round nu
 })
 
 test('an optional addon that is missing gets a button to its own page, and no other page can be asked for', () => {
-  const setup = { gameFolder: 'D:\WoW', addon: '0.1.0', questie: true, shortestPath: false, done: false, version: '0.1.0', onTop: false }
+  const setup = { gameFolder: 'D:\WoW', addon: '0.1.0', questie: true, shortestPath: false, done: false, version: '0.1.0', onTop: false, participate: false }
   const extras = (s: typeof setup): unknown => setupPages(s, { state: 'looking' }, null).find((p) => p.id === 'extras')!.get
   expect(extras(setup)).toEqual(['shortestPath'])
   expect(extras({ ...setup, questie: false })).toEqual(['questie', 'shortestPath'])

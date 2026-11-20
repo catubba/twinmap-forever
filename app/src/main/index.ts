@@ -19,12 +19,13 @@ import { tilesLine, type TilesStatus } from '../shared/tiles-status'
 import { placeWindow, WINDOW } from '../shared/window'
 import { findGameWindow, programOf } from './capture'
 import { readHdr } from './hdr'
-import { gameFolderFrom, registryInstallPath } from './client-files'
+import { gameFolderFrom, installedBuild, registryInstallPath } from './client-files'
 import { homeAddress, LAN_PORT, startLan, type Lan, type Served } from './lan'
 import { startLink } from './link'
 import { startLog } from './log'
 import type { Answer, Asked, Sources } from './questie-worker'
 import startQuestieWorker from './questie-worker?nodeWorker'
+import { gameLocale, sendSamples, startSamples } from './samples'
 import { addonHearsFonts, addonsFolder, readSettings, setupStatus, writeSettings } from './setup'
 import { hear, installChannel, send as sendSignal, sendOld, sentParts } from './signal'
 import { servedFile } from './tiles'
@@ -237,13 +238,26 @@ function createWindow(): void {
   if (devUrl) void win.loadURL(`${devUrl}#${hash}`)
   else void win.loadFile(join(__dirname, '../renderer/index.html'), { hash })
 
-  const link = startLink(() => {
-    const made = tiles.status()
-    return made.state === 'ready' ? made.folder : null
-  })
   const settingsFile = join(app.getPath('userData'), 'settings.json')
   const settings = readSettings(settingsFile)
   let gameFolder = findGameFolder(settings.gameFolder)
+  // The participation programme: with the choice on, the samples of a run in a dungeon are sent when the
+  // character leaves it. With it off nothing is kept and nothing is sent. TWINMAP_SAMPLES, for trials, names another address.
+  const participates = (): boolean => settings.participate === true
+  const samples = startSamples(participates)
+  const link = startLink(
+    () => {
+      const made = tiles.status()
+      return made.state === 'ready' ? made.folder : null
+    },
+    (report, seen, own, now) => {
+      const run = samples.take(report, seen, own, now)
+      if (!run || !gameFolder) return
+      const build = installedBuild(gameFolder)?.version, locale = gameLocale(gameFolder)
+      if (!build || !locale) return record.say('samples: not sent, the build or the language of the game is not known')
+      void sendSamples(run, { app: app.getVersion(), build, locale }, participates, process.env.TWINMAP_SAMPLES).then((sent) => record.say(`samples: ${sent} of ${run.samples.length} sent`))
+    },
+  )
   let tiles = startTiles(gameFolder)
   // The pins go to the window when they change, and once more when its page has loaded.
   let questsNow: QuestsStatus = { questie: null, pins: [] }
@@ -410,6 +424,11 @@ function createWindow(): void {
     settings.lan = on === true
     writeSettings(settingsFile, settings)
     turnLan(settings.lan)
+    setup = lookSetup()
+  })
+  ipcMain.handle('set-participate', (_event, on: unknown) => {
+    settings.participate = on === true
+    writeSettings(settingsFile, settings)
     setup = lookSetup()
   })
   let setup = lookSetup()
@@ -788,6 +807,7 @@ function createWindow(): void {
     ipcMain.removeHandler('open-feedback')
     ipcMain.removeHandler('set-on-top')
     ipcMain.removeHandler('set-lan')
+    ipcMain.removeHandler('set-participate')
     ipcMain.removeHandler('save-portrait')
     for (const name of Object.keys(calls)) ipcMain.removeHandler(name)
     lan?.stop()
