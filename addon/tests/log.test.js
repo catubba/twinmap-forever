@@ -62,6 +62,13 @@ test('after a yes the door of a dungeon is written down, with the app closed, as
   assert.doesNotMatch(file, /Catubbio|Sucameli/);
 });
 
+test('where the game tells the place in yards of the world, the door has it too', () => {
+  const addon = world('true');
+  addon.lua('GAME.north, GAME.west = -4921.5, -953.25');
+  enter(addon);
+  assert.deepEqual(logout(addon).sessions[0].e, [['door', 0, 3065, 1455, 0.3012, 0.62, 0, -4921.5, -953.25]]);
+});
+
 test('each run of the interface is a session of its own, and a run with nothing to say leaves none', () => {
   const addon = world('true');
   enter(addon);

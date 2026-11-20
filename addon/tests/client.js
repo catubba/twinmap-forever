@@ -13,6 +13,7 @@ const STUB = `
     printed[#printed + 1] = table.concat(parts, " ")
   end
   SlashCmdList = {}
+  unpack = unpack or table.unpack -- the game's Lua has it as a global
   -- The tests read the strip at full contrast with nothing between blocks, as a player may set it;
   -- the values a new install starts with are checked in trials.test.js.
   TwinmapForeverDB = { on = 50, neg = 50, amp = 255, idle = "hide" }

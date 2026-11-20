@@ -1,7 +1,11 @@
 -- Where the doors of the dungeons are, for the log (Log.lua): the place in the open world a moment
 -- before the character is inside a dungeon or a raid. Nothing is read while the log is off.
 -- Entry "door": the game's number of the dungeon's map, the game's number of the zone's map the
--- place is counted on, x and y on it from 0 to 1 from its top left.
+-- place is counted on, x and y on it from 0 to 1 from its top left; then, where the game tells
+-- them, the continent and the place in yards of the world, north then west: the map the game picks
+-- for a place may be one of a cave or a city, and the yards are the same on every map.
+-- Flights and portals are not written down: the flight nodes are in the game's own tables, which
+-- the app reads, and nothing uses the far end of a portal yet.
 local _, ns = ...
 
 local EVERY = 1 -- seconds between two looks at the place: the door is at most that far behind
@@ -20,7 +24,7 @@ local frame = CreateFrame("Frame")
 frame:RegisterEvent("PLAYER_ENTERING_WORLD")
 frame:SetScript("OnEvent", function()
   local map = Inside()
-  if map and last then ns.Log("door", map, last[1], last[2], last[3]) end
+  if map and last then ns.Log("door", map, unpack(last)) end
   last = nil -- a login or a portal: the place of before is no door
 end)
 frame:SetScript("OnUpdate", function(_, elapsed)
@@ -30,5 +34,8 @@ frame:SetScript("OnUpdate", function(_, elapsed)
   if not ns.Logging() or Inside() then return end
   local map = Num(Try(C_Map.GetBestMapForUnit, "player"))
   local p = map and Try(C_Map.GetPlayerMapPosition, map, "player")
-  if type(p) == "table" and Num(p.x) and Num(p.y) then last = { map, p.x, p.y } end
+  if not (type(p) == "table" and Num(p.x) and Num(p.y)) then return end
+  local north, west, _, continent = Try(UnitPosition, "player")
+  last = { map, p.x, p.y }
+  if Num(north) and Num(west) and Num(continent) then last[4], last[5], last[6] = continent, north, west end
 end)
