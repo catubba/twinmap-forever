@@ -12,9 +12,9 @@ function bucket(): Env['SAMPLES'] & { kept: Map<string, { value: string | Uint8A
     put: async (key, value, options) => kept.set(key, { value, options }),
   }
 }
-const env = (allowed = true, samples = bucket()): Env => {
+const env = (allowed = true, samples = bucket(), each = '5'): Env => {
   const limit = { limit: async () => ({ success: allowed }) }
-  return { INBOX: 'someone/inbox', GITHUB_TOKEN: 'secret', LIMIT: limit, SAMPLE_LIMIT: limit, SAMPLES: samples, DAILY: '2' }
+  return { INBOX: 'someone/inbox', GITHUB_TOKEN: 'secret', LIMIT: limit, SAMPLE_LIMIT: limit, SAMPLES: samples, DAILY: '2', MAP_DAILY: each }
 }
 const post = (body: string, path = '/feedback'): Request => new Request(`https://api.twinmap.app${path}`, { method: 'POST', body })
 
@@ -106,7 +106,7 @@ test('a sample is kept under its day and its run, with what it says', async () =
   const kept = samples.kept.get(`${today}/0123456789abcdef/07.png`)!
   assert.deepEqual(kept.value, png(238))
   assert.deepEqual(kept.options, { httpMetadata: { contentType: 'image/png' }, customMetadata: said })
-  assert.equal(samples.kept.get(`count/${today}`)!.value, '1')
+  assert.equal(samples.kept.get(`count/${today}`)!.value, '{"all":1,"maps":{"36":[1,0]}}')
 })
 
 test('what is not a sample is refused, and nothing is kept', async () => {
@@ -135,4 +135,26 @@ test('past the day\'s count, and in a burst from one address, a sample is refuse
   for (const [n, status] of [['0', 201], ['1', 201], ['2', 503]] as const) assert.equal((await send(sample({ ...SAID, n }), env(true, samples))).response.status, status)
   assert.equal(samples.kept.size, 3) // two samples and the count
   assert.equal((await send(sample(), env(false))).response.status, 429)
+})
+
+const want = (map: string, e: Env): Promise<Response> => worker.fetch(new Request(`https://api.twinmap.app/want?map=${map}`), e)
+
+test('each dungeon has its own count for the day, of places found and of places not found, and says what it still wants', async () => {
+  const samples = bucket(), e = { ...env(true, samples, '2'), DAILY: '100' }
+  const found = { ...SAID, u: '10', v: '20', score: '0.9' }, followed = { ...SAID, u: '10', v: '20', score: '0.6' }
+  assert.deepEqual(await (await want('36', e)).json(), { found: 2, failed: 2 })
+  // Two with no sure place (one of them followed under SURE), then no more of those; the ones with a place still go.
+  for (const [said, status] of [[{ ...SAID, n: '0' }, 201], [{ ...followed, n: '1' }, 201], [{ ...SAID, n: '2' }, 503], [{ ...found, n: '3' }, 201]] as const) assert.equal((await send(sample(said), e)).response.status, status)
+  assert.deepEqual(await (await want('36', e)).json(), { found: 1, failed: 0 })
+  // Another dungeon is not touched by it.
+  assert.deepEqual(await (await want('48', e)).json(), { found: 2, failed: 2 })
+  assert.equal((await send(sample({ ...SAID, map: '48' }), e)).response.status, 201)
+  assert.equal(samples.kept.get(`count/${today}`)!.value, '{"all":4,"maps":{"36":[1,2],"48":[0,1]}}')
+  // The count of everyone caps what a dungeon may still want; a count kept as a bare number, as before, is read.
+  assert.deepEqual(await (await want('36', { ...e, DAILY: '4' })).json(), { found: 0, failed: 0 })
+  samples.kept.set(`count/${today}`, { value: '99' })
+  assert.deepEqual(await (await want('36', e)).json(), { found: 1, failed: 1 })
+  assert.equal((await want('x', e)).status, 400)
+  assert.equal((await want('36', env(false))).status, 429)
+  assert.equal((await worker.fetch(new Request('https://api.twinmap.app/want?map=36', { method: 'POST' }), e)).status, 405)
 })

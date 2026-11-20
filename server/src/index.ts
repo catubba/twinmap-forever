@@ -7,7 +7,9 @@
 //
 // It also takes the samples of the participation programme: a picture of the minimap inside a
 // dungeon with a few figures about it, kept in a bucket that deletes them after twelve months.
-// A sample says nothing of who sent it.
+// A sample says nothing of who sent it. Each dungeon has its own count for the day, so that many
+// players in one dungeon do not take the room of the others; the app asks what is still wanted
+// (/want) before it sends anything.
 
 export interface Env {
   INBOX: string // owner/name of the private repository
@@ -16,6 +18,7 @@ export interface Env {
   SAMPLE_LIMIT: Limit
   SAMPLES: Bucket
   DAILY: string // samples taken in a day, from everyone; 0 takes none
+  MAP_DAILY: string // of them, from one dungeon: this many where the app found the place, and as many where it did not
 }
 interface Limit {
   limit(options: { key: string }): Promise<{ success: boolean }>
@@ -44,6 +47,34 @@ const FIELDS: Record<string, RegExp> = {
 }
 /** Where the app put the character and how sure it was: all three, or none when it found no place. */
 const FOUND: Record<string, RegExp> = { u: place, v: place, score: /^(0(\.\d{1,4})?|1)$/ }
+export const SURE = 0.75 // SURE of app/src/shared/minimap.ts: a likeness under this is a place not found
+/** Whether a sample is one where the app found no sure place. */
+const lost = (fields: Record<string, string>): boolean => !(Number(fields.score) >= SURE)
+
+/** The samples taken today: all of them, and for each dungeon those with a place found and those without. */
+interface Counts {
+  all: number
+  maps: Record<string, [number, number]>
+}
+const today = (): string => new Date().toISOString().slice(0, 10)
+async function countsOf(env: Env, day: string): Promise<Counts> {
+  let kept: unknown = null
+  try {
+    kept = JSON.parse((await (await env.SAMPLES.get(`count/${day}`))?.text()) ?? 'null')
+  } catch {
+    // not ours: counted from nothing
+  }
+  if (typeof kept === 'number') return { all: kept, maps: {} } // as it was kept before the dungeons had their own counts
+  const { all, maps } = (typeof kept === 'object' && kept !== null ? kept : {}) as Partial<Counts>
+  return { all: typeof all === 'number' ? all : 0, maps: typeof maps === 'object' && maps !== null ? maps : {} }
+}
+/** How many more samples of a dungeon are taken today, of each kind. */
+function wanted(counts: Counts, env: Env, map: string): { found: number; failed: number } {
+  const room = Number(env.DAILY) - counts.all, each = Number(env.MAP_DAILY), [found, failed] = counts.maps[map] ?? [0, 0]
+  const left = (taken: number): number => Math.max(0, Math.min(room, each - taken)) || 0
+  return { found: left(found), failed: left(failed) }
+}
+
 const PNG = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52]
 
 /** What is kept of a sample, or the reason it is refused. */
@@ -124,21 +155,32 @@ async function sample(request: Request, env: Env, address: string): Promise<Resp
   if ('error' in kept) return answer(400, kept.error)
   // ponytail: read, then write: two samples at the same instant count as one, so a day may take a
   // few over DAILY. A Durable Object counts exactly, if that ever matters.
-  const day = new Date().toISOString().slice(0, 10)
-  const taken = Number((await (await env.SAMPLES.get(`count/${day}`))?.text()) ?? 0)
-  if (!(taken < Number(env.DAILY))) return answer(503, 'enough samples for today')
-  await env.SAMPLES.put(`count/${day}`, String(taken + 1))
+  const day = today(), counts = await countsOf(env, day), map = kept.fields.map!, kind = lost(kept.fields) ? 1 : 0
+  if (!(wanted(counts, env, map)[kind ? 'failed' : 'found'] > 0)) return answer(503, 'enough samples for today')
+  const of = counts.maps[map] ?? [0, 0]
+  of[kind]++
+  await env.SAMPLES.put(`count/${day}`, JSON.stringify({ all: counts.all + 1, maps: { ...counts.maps, [map]: of } }))
   await env.SAMPLES.put(`${day}/${kept.key}`, bytes, { httpMetadata: { contentType: 'image/png' }, customMetadata: kept.fields })
   return answer(201)
+}
+
+/** How many samples of a dungeon are still wanted today: /want?map=36. Asked by the app before it sends a run; nothing is kept of the asking. */
+async function want(request: Request, env: Env, address: string): Promise<Response> {
+  const { success } = await env.SAMPLE_LIMIT.limit({ key: address })
+  if (!success) return answer(429, 'too many samples, try again in a minute')
+  const map = new URL(request.url).searchParams.get('map') ?? ''
+  if (!FIELDS.map!.test(map)) return answer(400, 'not a map')
+  return Response.json(wanted(await countsOf(env, today()), env, map))
 }
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const path = new URL(request.url).pathname
-    if (path !== '/feedback' && path !== '/sample') return answer(404, 'not found')
-    if (request.method !== 'POST') return answer(405, 'POST only')
+    if (path !== '/feedback' && path !== '/sample' && path !== '/want') return answer(404, 'not found')
     // The address is the key of the limit and is not written anywhere.
     const address = request.headers.get('cf-connecting-ip') ?? 'unknown'
+    if (path === '/want') return request.method === 'GET' ? want(request, env, address) : answer(405, 'GET only')
+    if (request.method !== 'POST') return answer(405, 'POST only')
     return path === '/sample' ? sample(request, env, address) : feedback(request, env, address)
   },
 }
