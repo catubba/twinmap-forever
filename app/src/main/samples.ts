@@ -22,6 +22,9 @@ const FAILED_EVERY = 10_000 // ms between two samples of a place not found: stan
 // ponytail: a room is a square of this many yards on the picture of its level, not a room of the
 // game's files. The rooms themselves (inPiece in shared/inside.ts) when the rule of the rooms wants them.
 const ROOM = 40
+// The addon says the mouse was over the minimap a little after it was: the pictures of this
+// many ms before are dropped, as they may hold the names the game shows there.
+const COVERED_BEFORE = 5_000
 const SEND_EVERY = 700 // ms between two sends: the server takes a hundred a minute from an address
 
 export interface Sample {
@@ -54,16 +57,24 @@ export function roundPng(box: Box): Buffer {
  * if it has anything: the caller sends it. With the choice off nothing is kept and nothing is given.
  */
 export function startSamples(on: () => boolean): { take: (report: InsideReport | null, seen: Box | null, own: () => boolean, now: number) => Run | null } {
-  let run: (Run & { dungeon: number; rooms: Map<string, number>; failedAt: number; found: number }) | null = null
+  let run: (Run & { dungeon: number; rooms: Map<string, number>; failedAt: number; found: number; times: number[] }) | null = null
   return {
     take(report, seen, own, now) {
       const done = run && report?.dungeon !== run.dungeon ? run : null
       if (done) run = null
       if (!on()) return (run = null), null
+      if (report?.hid && run) {
+        const since = now - COVERED_BEFORE
+        while ((run.times.at(-1) ?? -Infinity) > since) {
+          run.times.pop()
+          if (!lost(run.samples.pop()!)) run.found--
+        }
+        for (const [room, at] of run.rooms) if (at > since) run.rooms.delete(room)
+      }
       // Only a look that read the screen: a place found, or none like enough.
-      if (report && seen && (report.why === undefined || report.why === 'not sure') && Number.isInteger(report.zoom) && report.zoom! >= 0 && report.zoom! <= 5) {
+      if (report && seen && !report.hid && (report.why === undefined || report.why === 'not sure') && Number.isInteger(report.zoom) && report.zoom! >= 0 && report.zoom! <= 5) {
         const place = report.place, failed = !place || place.score < SURE
-        run ??= { id: randomBytes(8).toString('hex'), dungeon: report.dungeon, samples: [], rooms: new Map(), failedAt: -Infinity, found: 0 }
+        run ??= { id: randomBytes(8).toString('hex'), dungeon: report.dungeon, samples: [], rooms: new Map(), failedAt: -Infinity, found: 0, times: [] }
         const room = place ? `${report.picture} ${Math.floor(place.u / ROOM)} ${Math.floor(place.v / ROOM)}` : ''
         const due = failed ? now - run.failedAt >= FAILED_EVERY : run.found < MOST_FOUND && now - (run.rooms.get(room) ?? -Infinity) >= ROOM_EVERY
         const png = due && run.samples.length < MOST && own() ? roundPng(seen) : null
@@ -72,6 +83,7 @@ export function startSamples(on: () => boolean): { take: (report: InsideReport |
           if (failed) run.failedAt = now
           else run.rooms.set(room, now), run.found++
           const tenth = (n: number): string => String(Math.round(n * 10) / 10)
+          run.times.push(now)
           run.samples.push({
             fields: { n: String(run.samples.length), map: String(report.dungeon), zoom: String(report.zoom), ...(place ? { u: tenth(place.u), v: tenth(place.v), score: String(Math.round(Math.min(1, Math.max(0, place.score)) * 1000) / 1000) } : {}) },
             png,

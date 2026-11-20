@@ -17,13 +17,13 @@ const READY: TilesStatus = { state: 'ready', folder: 'x', version: '1.60.1', til
 
 test('the addon is found by its .toc, with its version; Questie by the file of its data', () => {
   const game = folder()
-  expect(setupStatus(game, {}, '0.1.0')).toEqual({ gameFolder: game, addon: null, questie: false, shortestPath: false, done: false, version: '0.1.0', onTop: false, participate: false })
+  expect(setupStatus(game, {}, '0.1.0')).toEqual({ gameFolder: game, addon: null, questie: false, shortestPath: false, done: false, version: '0.1.0', onTop: false, participate: null })
   addons(game, 'TwinmapForever', 'Questie', 'QuestieDB')
   expect(setupStatus(game, {}, '0.1.0').questie, 'Questie with no data to read').toBe(false)
   writeFileSync(join(game, '_forever_', 'Interface', 'AddOns', 'QuestieDB', 'QuestieDB_Forever.toc'), '## Version: 1.0.13\r\n')
   expect(addonVersion(game), 'a folder with no .toc is not the addon').toBeNull()
   writeFileSync(join(game, '_forever_', 'Interface', 'AddOns', 'TwinmapForever', 'TwinmapForever.toc'), '## Interface: 11508\r\n## Title: Twinmap Forever\r\n## Version: 0.1.0\r\nTwinmapForever.lua\r\n')
-  expect(setupStatus(game, { setupDone: true, onTop: true }, '0.1.0')).toEqual({ gameFolder: game, addon: '0.1.0', questie: true, shortestPath: false, done: true, version: '0.1.0', onTop: true, participate: false })
+  expect(setupStatus(game, { setupDone: true, onTop: true, participate: false }, '0.1.0')).toEqual({ gameFolder: game, addon: '0.1.0', questie: true, shortestPath: false, done: true, version: '0.1.0', onTop: true, participate: false })
   addons(game, 'ShortestPathForever')
   expect(setupStatus(game, {}, '0.1.0').shortestPath, 'Shortest Path by its folder').toBe(true)
   expect(setupStatus(null, {}, '0.1.0')).toMatchObject({ gameFolder: null, addon: null, questie: false })
@@ -34,6 +34,9 @@ test('settings come back as they were written, and a file that is not ours gives
   expect(readSettings(file)).toEqual({})
   writeSettings(file, { gameFolder: 'D:\\Games\\WoW', setupDone: true, onTop: true })
   expect(readSettings(file)).toEqual({ gameFolder: 'D:\\Games\\WoW', setupDone: true, onTop: true })
+  // A no to Help improve Twinmap is kept too: it is what tells the question was asked.
+  writeSettings(file, { participate: false })
+  expect(readSettings(file)).toEqual({ participate: false })
   writeFileSync(file, '{"gameFolder": 7, "setupDone": "yes", "other": 1}')
   expect(readSettings(file)).toEqual({})
   writeFileSync(file, 'not json')

@@ -111,6 +111,18 @@ test('in a dungeon the position says where the minimap is on the window, and now
   addon.run(2);
   assert.equal(positions(addon).at(-1).inst.mini.turns, true);
 
+  // The mouse over the minimap: said for a few seconds after, then no more.
+  addon.lua('ROTATES = "0"');
+  addon.run(4);
+  assert.equal(positions(addon).at(-1).inst.mini.hid, undefined);
+  addon.lua('Minimap.IsMouseOver = function() return true end');
+  addon.run(0.1);
+  addon.lua('Minimap.IsMouseOver = function() return false end');
+  addon.run(1);
+  assert.equal(positions(addon).at(-1).inst.mini.hid, true);
+  addon.run(4);
+  assert.equal(positions(addon).at(-1).inst.mini.hid, undefined);
+
   // A battleground is an instance too, but the game tells the place there: no minimap is asked for.
   addon.lua('GAME.instance = { name = "Warsong Gulch", kind = "pvp", id = 489 }');
   addon.run(2);

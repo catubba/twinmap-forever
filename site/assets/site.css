@@ -515,6 +515,13 @@ dt {
 dl > :nth-last-child(-n + 2) {
   border-bottom: 0;
 }
+dd ul {
+  margin: 0;
+  padding-left: 18px;
+}
+dd li + li {
+  margin-top: 8px;
+}
 .get dt {
   padding-top: 22px;
   color: var(--gold);

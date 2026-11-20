@@ -23,6 +23,7 @@ test('a report opens on GitHub or as a letter, and nowhere else', () => {
   expect(decodeURIComponent(github)).toContain('---\nTwinmap 0.1.0\nLink: Connected')
   const email = feedbackLink('email', 'Twinmap 0.1.0')!
   expect(email.startsWith('mailto:dev@twinmap.app?subject=Twinmap%20feedback&body=')).toBe(true)
+  expect(feedbackLink('participation', '')).toBe('https://twinmap.app/privacy.html#participation')
   for (const way of ['https://example.com', undefined, 'toString']) expect(feedbackLink(way, 'x')).toBeNull()
   expect(feedbackLink('github', { toString: () => 'x' }), 'details that are not text are left out').not.toBeNull()
   expect(feedbackLink('email', 'a&b=c d'.repeat(1000))!.length, 'long details are cut').toBeLessThan(8000)

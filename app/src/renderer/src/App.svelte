@@ -18,6 +18,7 @@
   import Search from './Search.svelte'
   import { ADDON_MISSING, type SetupStatus } from '../../shared/setup'
   import Feedback from './Feedback.svelte'
+  import Participate from './Participate.svelte'
   import FirstRun from './FirstRun.svelte'
   import Glyph from './Glyph.svelte'
   import Logo from './Logo.svelte'
@@ -73,6 +74,7 @@
   let onItems = $state(false)
   // Feedback is a small window over whatever is on show.
   let onFeedback = $state(false)
+  let answered = $state(false) // Help improve Twinmap was answered in this run: the setup may tell it a moment later
   window.twinmap.onSetup((told) => {
     setup = told
     // On a phone there are no steps to go through, only the wait for them to be done on the computer: it ends by itself.
@@ -209,6 +211,10 @@
 
 {#if onFeedback && setup}
   <Feedback details={feedbackDetails(setup, tiles, status?.word ?? null)} onclose={() => (onFeedback = false)} />
+{/if}
+<!-- Help improve Twinmap is asked once, on this computer only, after the first run and never over another window. -->
+{#if inApp && setup && setup.participate === null && !answered && onSetup === false && !onFeedback}
+  <Participate onclose={() => (answered = true)} />
 {/if}
 {#if onSetup && setup}
   <div class="whole" out:fade={gone}>

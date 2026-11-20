@@ -1,6 +1,6 @@
 <script lang="ts">
-  // Feedback: a small window over the app with the ways to tell us something. The app sends
-  // nothing by itself: the player writes here and presses Send, or opens an issue on GitHub or a
+  // Feedback: a small window over the app with the ways to tell us something. Nothing here is
+  // sent by itself: the player writes here and presses Send, or opens an issue on GitHub or a
   // letter in their mail program. What the app adds about itself is shown here first.
   import { onMount } from 'svelte'
   import { FEEDBACK, LONGEST_MESSAGE, type FeedbackWay } from '../../shared/feedback'

@@ -38,6 +38,18 @@ test('with the choice off nothing is kept, and turning it off lets go of what wa
   expect(samples.take(null, null, own, 3000)).toBeNull()
 })
 
+test('with the mouse over the minimap no picture is kept, and those of the moments before are dropped', () => {
+  const samples = startSamples(() => true)
+  samples.take(found(10), box(), own, 0) // long before: kept
+  samples.take(found(90), box(), own, 8000) // just before the addon said it: dropped, and its room is free again
+  samples.take(lost, box(), own, 9000) // dropped too
+  samples.take({ ...lost, hid: true }, box(), own, 10_000) // while it is said: not taken
+  samples.take({ ...found(90), hid: true }, box(), own, 20_000)
+  samples.take(found(90), box(), own, 25_000) // the room dropped has its sample again
+  const run = samples.take(null, null, own, 30_000)!
+  expect(run.samples.map((s) => s.fields.u)).toEqual(['10', '90'])
+})
+
 test('a sample for each place not found, one a room where it is, and the run when the dungeon is left', () => {
   const samples = startSamples(() => true)
   expect(samples.take(found(10), box(), own, 0)).toBeNull()

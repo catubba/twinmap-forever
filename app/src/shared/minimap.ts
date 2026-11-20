@@ -261,6 +261,8 @@ export interface MinimapPlace {
   turns?: boolean
   /** How many yards it shows from its middle to its edge, as the game tells the addon; missing from an addon that does not ask. */
   r?: number
+  /** The mouse was over the minimap a moment ago: no picture of it is kept (samples.ts). */
+  hid?: boolean
 }
 
 /**

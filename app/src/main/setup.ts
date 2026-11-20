@@ -23,7 +23,7 @@ export interface Settings {
   lan?: boolean
   /** The code those devices must hold. Made once, so an address saved on a phone keeps working. */
   lanCode?: string
-  /** The participation programme: samples of the minimap inside dungeons are sent (samples.ts). Off until the player turns it on. */
+  /** The participation programme (Help improve Twinmap): its data is sent only when true. Missing until the player answers, then kept as said. */
   participate?: boolean
 }
 
@@ -38,7 +38,7 @@ export function readSettings(file: string): Settings {
       ...(setupDone === true ? { setupDone } : {}),
       ...(onTop === true ? { onTop } : {}),
       ...(lan === true ? { lan } : {}),
-      ...(participate === true ? { participate } : {}),
+      ...(typeof participate === 'boolean' ? { participate } : {}),
       ...(typeof lanCode === 'string' && /^[\w-]{8,64}$/.test(lanCode) ? { lanCode } : {}),
     }
   } catch {
@@ -82,6 +82,6 @@ export function setupStatus(gameFolder: string | null, settings: Settings, versi
     done: settings.setupDone === true,
     version,
     onTop: settings.onTop === true,
-    participate: settings.participate === true,
+    participate: settings.participate ?? null,
   }
 }

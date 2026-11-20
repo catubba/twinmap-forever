@@ -89,6 +89,16 @@ local function Widen(inside)
   end
 end
 
+-- Whether the mouse is over the minimap: the game then shows the names of the players nearby on it.
+-- Looked at every frame, and said with the position for a few seconds after, so that a moment
+-- between two positions is not missed: the app takes no picture of the minimap for the
+-- participation programme then, and drops those just taken. Only inside a dungeon or a raid, the
+-- only places the app takes pictures: one call a frame there, none elsewhere.
+-- ponytail: the mouse only, as the user chose; a tooltip opened elsewhere that lies over the minimap is in the picture.
+local COVERED_FOR = 3
+local coveredAt, watching
+local function Covered() return Minimap and Try(Minimap.IsMouseOver, Minimap) == true end
+
 local function BuildPos()
   local out = { zone = Str(Try(GetZoneText)), sub = Str(Try(GetSubZoneText)) }
   local mapId = Num(Try(C_Map.GetBestMapForUnit, "player"))
@@ -109,7 +119,8 @@ local function BuildPos()
   -- Inside a dungeon, a raid or a battleground: which one. It travels with the position, so the
   -- app never holds the place of one moment with the instance of another.
   local name, kind, _, _, _, _, _, id = Try(GetInstanceInfo)
-  Widen(kind == "party" or kind == "raid")
+  watching = kind == "party" or kind == "raid"
+  Widen(watching)
   if Str(kind) and kind ~= "none" and Num(id) then
     local inst = { id = id, name = Str(name), kind = kind }
     -- Where in it, if the game tells addons: yards of the world, north then west, to the yard.
@@ -130,6 +141,7 @@ local function BuildPos()
         -- How many yards it shows from its middle to its edge: it changes with the zoom, and between under a roof and the open.
         local radius = C_Minimap and Num(Try(C_Minimap.GetViewRadius))
         if radius and radius > 0 then inst.mini.r = Round(radius, 0.1) end
+        if coveredAt and GetTime() - coveredAt < COVERED_FOR then inst.mini.hid = true end
       end
     end
     out.inst = inst
@@ -459,6 +471,7 @@ driver:SetScript("OnEvent", function(_, event)
   for _, s in ipairs(SECTIONS) do s.nextAt, s.json = 0, nil end
 end)
 driver:SetScript("OnUpdate", function(_, elapsed)
+  if watching and Covered() then coveredAt = GetTime() end
   if not startAt then return end
   if ns.db.paused then
     if not paused then

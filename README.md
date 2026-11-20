@@ -125,8 +125,8 @@ None of these is needed. When one is installed, Twinmap shows more.
 <details>
 <summary><b>Privacy</b></summary>
 
-- The app sends nothing by itself. There is no account and no tracking.
-- It connects to the internet to look for a newer version of itself, on GitHub, and when you press Send in the Feedback window. What a message carries and where it goes: [twinmap.app/privacy.html](https://twinmap.app/privacy.html).
+- The app sends nothing by itself unless you turn on Help improve Twinmap, in Settings: it is off until you do. There is no account and no tracking.
+- It connects to the internet to look for a newer version of itself, on GitHub; when you press Send in the Feedback window; and, if you turn on Help improve Twinmap, to send anonymous data about the world of Forever. What is sent and where it goes: [twinmap.app/privacy.html](https://twinmap.app/privacy.html).
 - The map on your home network is off until you turn it on.
 - What the app keeps of your characters, their picture included, stays on your computer.
 </details>
