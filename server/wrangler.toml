@@ -2,6 +2,8 @@
 #   test:    node --test server/src/index.test.ts
 #   publish: npx wrangler@4 deploy            (from this folder)
 #   secret:  npx wrangler@4 secret put GITHUB_TOKEN
+#            npx wrangler@4 secret put ADMIN_TOKEN    (for /kept: who has it may list and read the bucket)
+#   rules:   a file named rules in the bucket narrows what is taken, with nothing published again (Rules in src/index.ts)
 name = "twinmap-api"
 main = "src/index.ts"
 compatibility_date = "2026-11-01"

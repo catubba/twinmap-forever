@@ -10,6 +10,11 @@
 // A sample says nothing of who sent it. Each dungeon has its own count for the day, so that many
 // players in one dungeon do not take the room of the others; the app asks what is still wanted
 // (/want) before it sends anything.
+//
+// What is taken can be narrowed without publishing this again: a file named rules in the bucket
+// (Rules) switches a kind of data off, leaves a dungeon out, or asks for a newer app. The count of
+// the day says what was taken and what was refused, and /kept, for us alone, lists and gives what
+// is in the bucket.
 
 export interface Env {
   INBOX: string // owner/name of the private repository
@@ -19,13 +24,15 @@ export interface Env {
   SAMPLES: Bucket
   DAILY: string // samples taken in a day, from everyone; 0 takes none
   MAP_DAILY: string // of them, from one dungeon: this many where the app found the place, and as many where it did not
+  ADMIN_TOKEN?: string // a secret: who has it may list and read the bucket (/kept); without it nobody may
 }
 interface Limit {
   limit(options: { key: string }): Promise<{ success: boolean }>
 }
 /** What is used of an R2 bucket. */
 export interface Bucket {
-  get(key: string): Promise<{ text(): Promise<string> } | null>
+  get(key: string): Promise<{ text(): Promise<string>; arrayBuffer(): Promise<ArrayBuffer>; customMetadata?: Record<string, string> } | null>
+  list(options: { prefix?: string; cursor?: string; limit?: number }): Promise<{ objects: { key: string; size: number }[]; truncated: boolean; cursor?: string }>
   put(key: string, value: string | Uint8Array, options?: { httpMetadata?: { contentType: string }; customMetadata?: Record<string, string> }): Promise<unknown>
 }
 
@@ -51,10 +58,50 @@ export const SURE = 0.75 // SURE of app/src/shared/minimap.ts: a likeness under 
 /** Whether a sample is one where the app found no sure place. */
 const lost = (fields: Record<string, string>): boolean => !(Number(fields.score) >= SURE)
 
-/** The samples taken today: all of them, and for each dungeon those with a place found and those without. */
+/** The samples taken today: all of them, for each dungeon those with a place found and those without, their bytes, how many from each version of the app, and how many were refused and why. */
 interface Counts {
   all: number
   maps: Record<string, [number, number]>
+  bytes: number
+  apps: Record<string, number>
+  refused: Record<string, number>
+}
+
+/**
+ * What is switched off without publishing the worker again, in the file rules of the bucket:
+ *   { "off": ["minimap"], "maps": [36], "app": "0.14.0" }
+ * off: the kinds of data not taken ("*" for all of them); maps: the dungeons not taken; app: the
+ * oldest version of the app still taken. No file, or a part left out, switches nothing off. A file
+ * or a part that cannot be read switches that part off for everyone: a slip of the hand while
+ * closing must not leave it open.
+ */
+export interface Rules {
+  off?: unknown
+  maps?: unknown
+  app?: unknown
+}
+const KIND = 'minimap' // the one kind of data there is so far
+async function rulesOf(env: Env): Promise<Rules> {
+  try {
+    const kept: unknown = JSON.parse((await (await env.SAMPLES.get('rules'))?.text()) ?? '{}')
+    return typeof kept === 'object' && kept !== null && !Array.isArray(kept) ? kept : { off: '*' }
+  } catch {
+    return { off: '*' }
+  }
+}
+const older = (a: string, b: string): boolean => {
+  const x = a.split('.').map(Number), y = b.split('.').map(Number)
+  for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return x[i]! < y[i]!
+  return false
+}
+const REFUSED = { off: 'not taken for now', map: 'not taken from this dungeon', app: 'this version of Twinmap is too old', enough: 'enough samples for today' } as const
+/** Why the rules leave out a sample of this dungeon from this version of the app, or null when they do not. */
+function ruledOut(rules: Rules, map: string, app: string): keyof typeof REFUSED | null {
+  const off = rules.off === undefined ? [] : Array.isArray(rules.off) ? rules.off.map(String) : ['*']
+  if (off.includes('*') || off.includes(KIND)) return 'off'
+  if (rules.maps !== undefined && (!Array.isArray(rules.maps) || rules.maps.map(String).includes(map))) return 'map'
+  if (rules.app !== undefined && (typeof rules.app !== 'string' || !FIELDS.app!.test(rules.app) || older(app, rules.app))) return 'app'
+  return null
 }
 const today = (): string => new Date().toISOString().slice(0, 10)
 async function countsOf(env: Env, day: string): Promise<Counts> {
@@ -64,9 +111,10 @@ async function countsOf(env: Env, day: string): Promise<Counts> {
   } catch {
     // not ours: counted from nothing
   }
-  if (typeof kept === 'number') return { all: kept, maps: {} } // as it was kept before the dungeons had their own counts
-  const { all, maps } = (typeof kept === 'object' && kept !== null ? kept : {}) as Partial<Counts>
-  return { all: typeof all === 'number' ? all : 0, maps: typeof maps === 'object' && maps !== null ? maps : {} }
+  if (typeof kept === 'number') kept = { all: kept } // as it was kept before the dungeons had their own counts
+  const { all, maps, bytes, apps, refused } = (typeof kept === 'object' && kept !== null ? kept : {}) as Partial<Counts>
+  const table = <T>(value: T | undefined): T => (typeof value === 'object' && value !== null ? value : {}) as T
+  return { all: typeof all === 'number' ? all : 0, maps: table(maps), bytes: typeof bytes === 'number' ? bytes : 0, apps: table(apps), refused: table(refused) }
 }
 /** How many more samples of a dungeon are taken today, of each kind. */
 function wanted(counts: Counts, env: Env, map: string): { found: number; failed: number } {
@@ -155,28 +203,61 @@ async function sample(request: Request, env: Env, address: string): Promise<Resp
   if ('error' in kept) return answer(400, kept.error)
   // ponytail: read, then write: two samples at the same instant count as one, so a day may take a
   // few over DAILY. A Durable Object counts exactly, if that ever matters.
-  const day = today(), counts = await countsOf(env, day), map = kept.fields.map!, kind = lost(kept.fields) ? 1 : 0
-  if (!(wanted(counts, env, map)[kind ? 'failed' : 'found'] > 0)) return answer(503, 'enough samples for today')
+  const day = today(), counts = await countsOf(env, day), map = kept.fields.map!, app = kept.fields.app!, kind = lost(kept.fields) ? 1 : 0
+  const why = ruledOut(await rulesOf(env), map, app) ?? (wanted(counts, env, map)[kind ? 'failed' : 'found'] > 0 ? null : 'enough')
+  if (why) {
+    // The app asks before it sends, so a refusal here is rare: an app that did not ask, or a rule changed meanwhile.
+    await env.SAMPLES.put(`count/${day}`, JSON.stringify({ ...counts, refused: { ...counts.refused, [why]: (counts.refused[why] ?? 0) + 1 } }))
+    return answer(503, REFUSED[why])
+  }
   const of = counts.maps[map] ?? [0, 0]
   of[kind]++
-  await env.SAMPLES.put(`count/${day}`, JSON.stringify({ all: counts.all + 1, maps: { ...counts.maps, [map]: of } }))
+  await env.SAMPLES.put(`count/${day}`, JSON.stringify({ ...counts, all: counts.all + 1, maps: { ...counts.maps, [map]: of }, bytes: counts.bytes + bytes.length, apps: { ...counts.apps, [app]: (counts.apps[app] ?? 0) + 1 } }))
   await env.SAMPLES.put(`${day}/${kept.key}`, bytes, { httpMetadata: { contentType: 'image/png' }, customMetadata: kept.fields })
   return answer(201)
 }
 
-/** How many samples of a dungeon are still wanted today: /want?map=36. Asked by the app before it sends a run; nothing is kept of the asking. */
+/**
+ * What is still wanted today from this version of the app in this dungeon, by kind of data:
+ * /want?map=36&app=0.14.0 answers { "minimap": { "found": 3, "failed": 100 } }. A kind that is
+ * not in the answer is not wanted at all. Asked by the app before it sends; nothing is kept of the asking.
+ */
 async function want(request: Request, env: Env, address: string): Promise<Response> {
   const { success } = await env.SAMPLE_LIMIT.limit({ key: address })
   if (!success) return answer(429, 'too many samples, try again in a minute')
-  const map = new URL(request.url).searchParams.get('map') ?? ''
+  const asked = new URL(request.url).searchParams, map = asked.get('map') ?? '', app = asked.get('app') ?? ''
   if (!FIELDS.map!.test(map)) return answer(400, 'not a map')
-  return Response.json(wanted(await countsOf(env, today()), env, map))
+  if (!FIELDS.app!.test(app)) return answer(400, 'not an app')
+  if (ruledOut(await rulesOf(env), map, app)) return Response.json({})
+  return Response.json({ [KIND]: wanted(await countsOf(env, today()), env, map) })
+}
+
+const same = (a: string, b: string): boolean => {
+  let differ = a.length ^ b.length
+  for (let i = 0; i < a.length; i++) differ |= a.charCodeAt(i) ^ b.charCodeAt(i % (b.length || 1))
+  return differ === 0
+}
+/**
+ * For us alone, with the secret: what the bucket holds under a prefix, a thousand at a time
+ * (/kept?prefix=2026-11-20/), or one thing of it (/kept?key=...), with what was said of it in the
+ * header x-fields. To anyone else this path is not there.
+ */
+async function kept(request: Request, env: Env): Promise<Response> {
+  if (!env.ADMIN_TOKEN || !same(request.headers.get('authorization') ?? '', `Bearer ${env.ADMIN_TOKEN}`)) return answer(404, 'not found')
+  const asked = new URL(request.url).searchParams, key = asked.get('key')
+  if (key !== null) {
+    const one = await env.SAMPLES.get(key)
+    return one ? new Response(await one.arrayBuffer(), { headers: { 'content-type': 'application/octet-stream', 'x-fields': JSON.stringify(one.customMetadata ?? {}) } }) : answer(404, 'not found')
+  }
+  const listed = await env.SAMPLES.list({ prefix: asked.get('prefix') ?? '', cursor: asked.get('cursor') ?? undefined, limit: 1000 })
+  return Response.json({ keys: listed.objects.map(({ key, size }) => ({ key, size })), cursor: listed.truncated ? listed.cursor : null })
 }
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const path = new URL(request.url).pathname
-    if (path !== '/feedback' && path !== '/sample' && path !== '/want') return answer(404, 'not found')
+    if (path !== '/feedback' && path !== '/sample' && path !== '/want' && path !== '/kept') return answer(404, 'not found')
+    if (path === '/kept') return request.method === 'GET' ? kept(request, env) : answer(404, 'not found')
     // The address is the key of the limit and is not written anywhere.
     const address = request.headers.get('cf-connecting-ip') ?? 'unknown'
     if (path === '/want') return request.method === 'GET' ? want(request, env, address) : answer(405, 'GET only')

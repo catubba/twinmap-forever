@@ -79,9 +79,9 @@ test('a run holds a hundred samples at most', () => {
 // A server on this computer plays api.twinmap.app: nothing in this test leaves it.
 test('the server is asked what it wants, then the samples go one by one, stop when the choice is turned off, and stop at the first refusal', async () => {
   const got: string[] = []
-  let refuse = false, want: unknown = { found: 9, failed: 9 }
+  let refuse = false, want: unknown = { minimap: { found: 9, failed: 9 } }
   const server = createServer((request, answer) => {
-    if (request.method === 'GET') return void answer.writeHead(request.url === '/want?map=36' && want ? 200 : 500).end(JSON.stringify(want))
+    if (request.method === 'GET') return void answer.writeHead(request.url === '/want?map=36&app=0.12.1' && want ? 200 : 500).end(JSON.stringify(want))
     got.push(request.url!)
     request.resume().on('end', () => answer.writeHead(refuse ? 503 : 201).end('{}'))
   })
@@ -101,12 +101,15 @@ test('the server is asked what it wants, then the samples go one by one, stop wh
   expect(got).toHaveLength(4 + 1 + 0 + 1)
   // No more than the server wants of each kind, and nothing when it does not answer what it wants.
   refuse = false
-  want = { found: 0, failed: 2 }
+  want = { minimap: { found: 0, failed: 2 } }
   expect(await sendSamples(run, said, () => true, to, 0)).toBe(2)
   expect(got.slice(-2).map((url) => /&n=(\d+)/.exec(url)![1])).toEqual(['0', '1'])
-  want = { found: 1, failed: 0 }
+  want = { minimap: { found: 1, failed: 0 } }
   expect(await sendSamples(run, said, () => true, to, 0)).toBe(1)
   expect(got.at(-1)).toContain('&n=3&')
+  // The kind switched off on the server is not in the answer: nothing goes.
+  want = {}
+  expect(await sendSamples(run, said, () => true, to, 0)).toBe(0)
   want = null
   expect(await sendSamples(run, said, () => true, to, 0)).toBe(0)
   expect(await sendSamples(run, said, () => true, 'http://127.0.0.1:9/sample', 0)).toBe(0)

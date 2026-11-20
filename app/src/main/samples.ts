@@ -97,17 +97,18 @@ const lost = (sample: Sample): boolean => !(Number(sample.fields.score) >= SURE)
 
 /**
  * Sends the samples of a run, one after the other, while the choice stays on: first the server is
- * asked how many of that dungeon it still wants today, with a place found and without, and the rest
- * is let go. said: the version of the app, the build of the game and its language. Gives how many the server took.
+ * asked how many of that dungeon it still wants today from this version of the app, with a place
+ * found and without, and the rest is let go. said: the version of the app, the build of the game and its language. Gives how many the server took.
  */
 // ponytail: a send that fails (no network, the server's limit of the day) lets the rest of the run go:
 // nothing is tried again, nothing is kept on disk. A queue on disk if too many runs are lost this way.
 export async function sendSamples(run: Run, said: { app: string; build: string; locale: string }, on: () => boolean, to: string = SAMPLES_TO, every: number = SEND_EVERY): Promise<number> {
   let sent = 0, want: { found: number; failed: number }
   try {
-    const answer = await fetch(`${to.replace(/sample$/, 'want')}?map=${run.samples[0]?.fields.map}`, { signal: AbortSignal.timeout(15_000) })
+    const answer = await fetch(`${to.replace(/sample$/, 'want')}?${new URLSearchParams({ map: run.samples[0]?.fields.map ?? '', app: said.app })}`, { signal: AbortSignal.timeout(15_000) })
     if (!answer.ok || !on()) return 0
-    want = (await answer.json()) as typeof want
+    // By kind of data: one that is not in the answer is not wanted, switched off on the server.
+    want = ((await answer.json()) as Record<string, typeof want | undefined>).minimap ?? { found: 0, failed: 0 }
   } catch {
     return 0
   }
