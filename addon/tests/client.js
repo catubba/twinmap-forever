@@ -118,6 +118,7 @@ const STUB = `
     if unit == "npc" and GAME.trainer then return "Creature-0-5250-0-11-" .. GAME.trainer.npc .. "-0000ABCDEF" end
     if unit == "target" or unit == "mouseover" then return GAME[unit] end
   end
+  function UnitIsDead(unit) return unit == "target" and GAME.target ~= nil and GAME.dead == true end
   function UnitClassification(unit) if unit == "target" and GAME.target then return GAME.classification or "normal" end end
   function GetNumLootItems() return GAME.loot and #GAME.loot or 0 end
   function GetLootSourceInfo(slot) if GAME.loot and GAME.loot[slot] then return GAME.loot[slot], 1 end end

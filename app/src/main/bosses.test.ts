@@ -6,7 +6,7 @@ import type { InsideReport } from './minimap'
 const THANES = 3065
 const at = (u: number, v: number, score = 0.9): InsideReport => ({ dungeon: THANES, pictures: 3, picture: 1, place: { u, v, score } })
 const lost: InsideReport = { dungeon: THANES, pictures: 3, why: 'not sure' }
-const kills = (ids: number[], rares: number[] = [], map = THANES): unknown => ({ map, list: [], ids, rares })
+const kills = (ids: number[], rares: number[] = [], map = THANES, slain: number[] = []): unknown => ({ map, list: [], ids, rares, slain })
 
 test('a kill in a run is kept where the minimap was, and the run goes out as a session of the log when the character leaves', () => {
   const bosses = startBosses(() => true, '0.14.0')
@@ -15,12 +15,13 @@ test('a kill in a run is kept where the minimap was, and the run goes out as a s
   bosses.kills(kills([3493]), 1500)
   bosses.take(lost, 2000)
   bosses.kills(kills([3493, 3496], [3586]), 4000)
+  bosses.kills(kills([3493, 3496], [3586], THANES, [3586]), 5000)
   bosses.take(lost, 20_000)
-  bosses.kills(kills([3493, 3494, 3496], [3586]), 20_000) // the place is older than ten seconds: none
+  bosses.kills(kills([3493, 3494, 3496], [3586], THANES, [3586]), 20_000) // the place is older than ten seconds: none
   expect(bosses.take(at(17000, 17000), 21_000)).toBeNull()
   const session = bosses.take(null, 30_000)!
   const read = JSON.parse(session.text)
-  expect(read).toEqual({ log: 1, id: session.id, v: '0.14.0', e: [['boss', 3, 3496, THANES, 1, 17068, 16738.3, 0.9], ['boss', 19, 3494, THANES], ['rare', 29, 3586, THANES]] })
+  expect(read).toEqual({ log: 1, id: session.id, v: '0.14.0', e: [['boss', 3, 3496, THANES, 1, 17068, 16738.3, 0.9], ['rare', 3, 3586, THANES, 0, 1, 17068, 16738.3, 0.9], ['rare', 4, 3586, THANES, 1, 1, 17068, 16738.3, 0.9], ['boss', 19, 3494, THANES]] })
   expect(session.id).toMatch(/^[0-9a-f]{16}$/)
   expect('error' in logFor(new URLSearchParams({ app: '0.14.0', build: '1.60.1.70938', locale: 'enUS' }), session.text)).toBe(false)
 })

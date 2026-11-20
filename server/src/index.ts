@@ -77,7 +77,7 @@ interface Counts {
 /**
  * What is switched off without publishing the worker again, in the file rules of the bucket:
  *   { "off": ["minimap"], "maps": [36], "app": "0.14.0" }
- * off: the kinds of data not taken, "minimap" or "log" ("*" for all of them); maps: the dungeons not taken; app: the
+ * off: the kinds of data not taken, "minimap" or "log" ("*" for all of them); maps: the dungeons not taken, their samples and the bosses and rares of the log alike; app: the
  * oldest version of the app still taken. No file, or a part left out, switches nothing off. A file
  * or a part that cannot be read switches that part off for everyone: a slip of the hand while
  * closing must not leave it open.
@@ -109,6 +109,14 @@ function ruledOut(rules: Rules, kind: Kind, map: string | null, app: string): ke
   if (map !== null && rules.maps !== undefined && (!Array.isArray(rules.maps) || rules.maps.map(String).includes(map))) return 'map'
   if (rules.app !== undefined && (typeof rules.app !== 'string' || !FIELDS.app!.test(rules.app) || older(app, rules.app))) return 'app'
   return null
+}
+/** The kinds of entry of the log that are of a dungeon, its map their fourth value: the bosses and the rares the app saw in a run. */
+const OF_A_DUNGEON = new Set(['boss', 'rare'])
+/** A session less the entries of the dungeons the rules leave out; null when nothing is left. A dungeon switched off takes its bosses with it. */
+function withoutRuledMaps(body: string, rules: Rules): string | null {
+  const session = JSON.parse(body) as { e: unknown[][] }
+  const e = session.e.filter((entry) => !OF_A_DUNGEON.has(entry[0] as string) || ruledOut({ maps: rules.maps }, 'log', String(entry[3]), '0.0.0') !== 'map')
+  return e.length > 0 ? JSON.stringify({ ...session, e }) : null
 }
 const today = (): string => new Date().toISOString().slice(0, 10)
 async function countsOf(env: Env, day: string): Promise<Counts> {
@@ -264,11 +272,12 @@ async function log(request: Request, env: Env, address: string): Promise<Respons
   if (text.length > LARGEST_LOG) return answer(413, 'too large')
   const kept = logFor(new URL(request.url).searchParams, text)
   if ('error' in kept) return answer(400, kept.error)
-  const day = today(), counts = await countsOf(env, day), app = kept.fields.app!
-  const why = ruledOut(await rulesOf(env), 'log', null, app) ?? (wantedLogs(counts, env) > 0 ? null : 'enough')
-  if (why) return refuse(env, day, counts, why)
-  await env.SAMPLES.put(`count/${day}`, JSON.stringify({ ...counts, logs: counts.logs + 1, bytes: counts.bytes + kept.body.length, apps: { ...counts.apps, [app]: (counts.apps[app] ?? 0) + 1 } }))
-  await env.SAMPLES.put(`${day}/${kept.key}`, kept.body, { httpMetadata: { contentType: 'application/json' }, customMetadata: kept.fields })
+  const day = today(), counts = await countsOf(env, day), app = kept.fields.app!, rules = await rulesOf(env)
+  const body = withoutRuledMaps(kept.body, rules)
+  const why = ruledOut(rules, 'log', null, app) ?? (body === null ? 'map' : null) ?? (wantedLogs(counts, env) > 0 ? null : 'enough')
+  if (why || body === null) return refuse(env, day, counts, why ?? 'map')
+  await env.SAMPLES.put(`count/${day}`, JSON.stringify({ ...counts, logs: counts.logs + 1, bytes: counts.bytes + body.length, apps: { ...counts.apps, [app]: (counts.apps[app] ?? 0) + 1 } }))
+  await env.SAMPLES.put(`${day}/${kept.key}`, body, { httpMetadata: { contentType: 'application/json' }, customMetadata: kept.fields })
   return answer(201)
 }
 

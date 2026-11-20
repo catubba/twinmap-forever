@@ -284,3 +284,14 @@ test('the log switched off in the rules leaves the samples of the minimap alone,
   assert.equal((await send(logOf(SESSION, { ...GAME, app: '0.13.9' }), e)).response.status, 503)
   assert.deepEqual((count(samples) as { refused: unknown }).refused, { off: 1, app: 1 })
 })
+
+test('a dungeon left out in the rules takes its bosses and rares out of a session of the log, and a session with nothing else is refused', async () => {
+  const samples = bucket(), e = env(true, samples)
+  samples.kept.set('rules', { value: '{"maps":[36]}' })
+  const run = (map: number): unknown[][] => [['boss', 20, 2742, map, 1, 17066, 16748, 0.92], ['rare', 30, 3586, map, 0]]
+  assert.equal((await send(logOf({ ...SESSION, e: [...SESSION.e, ...run(36), ...run(3065)] }), e)).response.status, 201)
+  assert.deepEqual(JSON.parse(String(samples.kept.get(`${today}/log/fedcba9876543210.json`)!.value)).e, [...SESSION.e, ...run(3065)])
+  assert.equal((await send(logOf({ ...SESSION, id: '0123456789abcdef', e: run(36) }), e)).response.status, 503)
+  assert.equal(samples.kept.has(`${today}/log/0123456789abcdef.json`), false)
+  assert.deepEqual((count(samples) as { refused: unknown; logs: number }).refused, { map: 1 })
+})
