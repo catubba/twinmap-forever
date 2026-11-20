@@ -1,8 +1,8 @@
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, unlinkSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, expect, test } from 'vitest'
-import { BANK, buildFont, CAPACITY, channelInstalled, dataAdvances, hmtx, hear, installChannel, nameOf, send, sendOld, SLOTS } from './signal'
+import { BANK, buildFont, CAPACITY, channelInstalled, dataAdvances, hmtx, hear, installChannel, nameOf, removeSlots, send, sendOld, SLOTS } from './signal'
 
 // What the addon does with the widths of a font: the number in the letter A, and the bytes in the data letters.
 function read(font: Buffer): { n: number; data: Buffer } {
@@ -37,13 +37,12 @@ test('a font is a whole TrueType file that carries a number and up to 1018 bytes
   expect(() => dataAdvances(Buffer.alloc(CAPACITY + 1))).toThrow('do not fit')
 })
 
-test('the bank and the slots are made once, next to the addon, with no step by hand', async () => {
+test('the bank is made once, next to the addon, with no step by hand, and no slot with it', async () => {
   expect(readdirSync(join(addons, 'TwinmapForever_Signal')).length).toBe(BANK)
   expect(statSync(signal(1)).nlink, 'the names are hard links').toBe(1023)
   expect(statSync(signal(BANK - 1)).nlink).toBe(1023)
   expect(read(readFileSync(signal(5000)))).toEqual({ n: 0, data: Buffer.alloc(0) })
-  expect(readdirSync(addons).length).toBe(1 + SLOTS)
-  expect(readFileSync(join(addons, 'TwinmapForever_R30', 'TwinmapForever_R30.toc'), 'utf8')).toContain('## LoadOnDemand: 1\r\n## Dependencies: TwinmapForever\r\n\r\nInbox.lua')
+  expect(readdirSync(addons)).toEqual(['TwinmapForever_Signal'])
   expect(channelInstalled(addons)).toBe(true)
   expect(await installChannel(addons), 'nothing to make the second time').toBe(false)
 })
@@ -64,7 +63,7 @@ test('a send changes every name in place and keeps the links; to an addon never 
     expect(JSON.parse(told(i).text)).toEqual({ id, seq: 1, all: true, parts: { pin: PIN } })
   }
   expect(statSync(signal(500)).nlink).toBe(1023)
-  expect(existsSync(join(addons, 'TwinmapForever_R17', 'Inbox.lua')) && readFileSync(join(addons, 'TwinmapForever_R17', 'Inbox.lua'), 'utf8'), 'no slot is written').toBe('TwinmapForeverInbox = nil\n')
+  expect(existsSync(join(addons, 'TwinmapForever_R17')), 'no slot is made').toBe(false)
 })
 
 test('once the addon says what it has, a font tells what changed since, whatever was missed between', () => {
@@ -127,7 +126,11 @@ test('the number in the letter A is new at every write, goes round after 60 and 
   expect(numbers[59]).toBe(first)
 })
 
-test('an addon from before is told the old way: the change alone in the font, everything in the slots', () => {
+test('an addon from before is told the old way: the change alone in the font, everything in the slots, which are made for it', async () => {
+  expect(await installChannel(addons, true), 'the slots were made').toBe(true)
+  expect(readdirSync(addons).length).toBe(1 + SLOTS)
+  expect(readFileSync(join(addons, 'TwinmapForever_R30', 'TwinmapForever_R30.toc'), 'utf8')).toContain('## LoadOnDemand: 1\r\n## Dependencies: TwinmapForever\r\n\r\nInbox.lua')
+  expect(await installChannel(addons, true), 'nothing to make the second time').toBe(false)
   const before = told().n, next = (n: number): number => (n % 60) + 1
   const first = sendOld(addons, { pin: PIN })
   expect(first).toMatchObject({ seq: next(before), inFont: true })
@@ -143,6 +146,20 @@ test('an addon from before is told the old way: the change alone in the font, ev
   send(addons, { route: false })
   expect(news().id).not.toBe(id)
   expect(news().all).toBe(true)
+})
+
+test('the slots an addon of today no longer needs are taken away, and nothing that is not ours', () => {
+  // A folder with the name of a slot that something else made, and another addon's own slots.
+  writeFileSync(join(addons, 'TwinmapForever_R05', 'TwinmapForever_R05.toc'), '## Title: Somebody else\r\n')
+  mkdirSync(join(addons, 'WoWState_R04'))
+  writeFileSync(join(addons, 'WoWState_R04', 'WoWState_R04.toc'), '## Title: WoW State slot 04\r\n')
+  expect(removeSlots(addons)).toBe(SLOTS - 1)
+  expect(readdirSync(addons).sort()).toEqual(['TwinmapForever_R05', 'TwinmapForever_Signal', 'WoWState_R04'])
+  expect(removeSlots(addons), 'nothing left to take').toBe(0)
+  expect(channelInstalled(addons)).toBe(true)
+  // A send to an older addon with no slot beside it still goes in the font.
+  expect(sendOld(addons, { pin: false }).inFont).toBe(true)
+  send(addons, { pin: false })
 })
 
 test('a bank left half made is finished, and nothing is sent before it is whole', async () => {

@@ -7,13 +7,9 @@
 -- of each of its other letters: what changed since the send we say we have (the app reads that on
 -- the strip), or everything when we follow another history of sends. News too big for one font
 -- comes in pieces, a font each. Only text widths are measured, and the font's data is read as JSON:
--- data, never code. The slots, small addons loaded on demand that carried what did not fit, are
--- still here and switched off (SLOTS_ON): the app no longer writes them.
--- Slots adapted from wow-ai, Copyright (c) 2026 chelinho139, MIT License: full text in THIRD-PARTY-LICENSES.
+-- data, never code.
 local _, ns = ...
 
-local SLOTS = 30      -- same as signal.ts
-local SLOTS_ON = false
 local BANK = 20460    -- same as signal.ts
 local OLD_BANK = 8184 -- what an app before 0.5 made; the rest is there from the start of the game after
 local EM, A_BASE, A_STEP = 1000, 100, 50 -- same as signal.ts
@@ -63,37 +59,15 @@ local function Stop(why, line)
   if line then print("Twinmap Forever: " .. line) end
 end
 
-local used = 0 -- slots loaded in this session of the interface
-
--- Loads the next slot not used in this session of the interface (/reload frees them all) and takes
--- everything it has. The number we hold moves only when this works, so what could not be loaded now
--- is loaded after the /reload or the restart that the message asks for.
-local function LoadNextSlot()
-  for i = 1, SLOTS do
-    local name = string.format("TwinmapForever_R%02d", i)
-    if not C_AddOns.IsAddOnLoaded(name) then
-      local loaded, reason = C_AddOns.LoadAddOn(name)
-      local got = loaded and TwinmapForeverInbox
-      if type(got) ~= "table" or type(got.parts) ~= "table" or not Num(got.seq) then
-        return Stop("slot " .. tostring(reason or "empty"), "what Twinmap sent cannot be loaded. Keep the Twinmap Forever slot addons enabled; after Twinmap's first run, restart the game.")
-      end
-      used = i
-      local before = ns.db.inbox.parts
-      ns.db.inbox = { seq = got.seq, parts = got.parts }
-      return TellAll(before)
-    end
-  end
-  used = SLOTS
-  Stop("slots used up", "type /reload to go on receiving from Twinmap.")
-end
-
 -- What the app must know of its way to the game: the history of sends we follow and the number of
 -- the last one that arrived, so it can say "sent" and tell what is missing; how far a send in
 -- pieces has come; and why nothing can arrive, if so. In a fight too: the app waits on it.
+-- left: the slots, small addons loaded on demand, once carried what did not fit a font, and an app
+-- from then takes this section only with their count in it.
 ns.sections[#ns.sections + 1] = { name = "inbox", period = 0.25, combat = true, build = function()
   if not (ns.db and ns.db.inbox) or ns.signal == "waiting" then return end
   return {
-    id = ns.db.inbox.id, seq = ns.db.inbox.seq, left = SLOTS - used, off = ns.signal ~= "reading" and ns.signal or nil,
+    id = ns.db.inbox.id, seq = ns.db.inbox.seq, left = 30, off = ns.signal ~= "reading" and ns.signal or nil,
     got = ns.pieces and { ns.pieces.seq, ns.pieces.i } or nil,
   }
 end }
@@ -255,11 +229,7 @@ local function Attempt()
   if not data then return end -- the read fell in the middle of a write: the next one has it
   seen = number
   local news = data:sub(1, 1) == "#" and Piece(data) or Decode(data)
-  if news then
-    Take(news)
-  elseif SLOTS_ON then
-    LoadNextSlot()
-  end
+  if news then Take(news) end
 end
 
 local function BeginRead()
