@@ -113,7 +113,13 @@ const STUB = `
   -- An open trainer: GAME.trainer = { npc = 5174, trade = true, lines = { { name, kind, spell, cost, level, skill, filter }, ... } },
   -- filter "available", "unavailable" or "used"; the window shows a line only while its filter is on (GAME.filters, the
   -- game's own choice: available only). The spell is told only by a tooltip set on the line.
-  function UnitGUID(unit) if unit == "npc" and GAME.trainer then return "Creature-0-5250-0-11-" .. GAME.trainer.npc .. "-0000ABCDEF" end end
+  -- GAME.target, GAME.mouseover: the GUID of what is targeted or under the mouse. GAME.loot: the GUIDs the loot window says it comes from.
+  function UnitGUID(unit)
+    if unit == "npc" and GAME.trainer then return "Creature-0-5250-0-11-" .. GAME.trainer.npc .. "-0000ABCDEF" end
+    if unit == "target" or unit == "mouseover" then return GAME[unit] end
+  end
+  function GetNumLootItems() return GAME.loot and #GAME.loot or 0 end
+  function GetLootSourceInfo(slot) if GAME.loot and GAME.loot[slot] then return GAME.loot[slot], 1 end end
   local function shown()
     local out = {}
     for _, l in ipairs(GAME.trainer and GAME.trainer.lines or {}) do if (GAME.filters or { available = true })[l[7]] then out[#out + 1] = l end end

@@ -1,4 +1,4 @@
--- The log of the participation programme: what only the addon can read (Doors.lua, the trainers of Sheet.lua) and the strip
+-- The log of the participation programme: what only the addon can read (Doors.lua, Finds.lua, the trainers of Sheet.lua) and the strip
 -- does not carry. Off until the app says yes (the part "log" of the inbox, kept with the rest of
 -- it): the player turns the programme on in Twinmap's settings, and the yes holds with the app
 -- closed too, until a no arrives.
@@ -19,6 +19,29 @@ local MOST, LARGEST = 10, 200000 -- same as server/src/index.ts
 ns.receivers = ns.receivers or {}
 
 local id, began, entries, size
+
+local function Ok(ok, ...) if ok then return ... end end
+local function Try(f, ...) if f then return Ok(pcall(f, ...)) end end
+local function Num(v) if type(v) == "number" and not (issecretvalue and issecretvalue(v)) then return v end end
+
+-- The game's number of the dungeon or raid the character is in; nil in the open world.
+function ns.Inside()
+  local _, kind, _, _, _, _, _, map = Try(GetInstanceInfo)
+  return (kind == "party" or kind == "raid") and Num(map) or nil
+end
+
+-- Where the character is, for an entry: the game's number of the map the place is counted on, x and
+-- y on it from 0 to 1 from its top left; then, where the game tells them, the continent and the place
+-- in yards of the world, north then west: the map the game picks for a place may be one of a cave or
+-- a city, and the yards are the same on every map. nil where the game does not tell.
+function ns.Place()
+  local map = Num(Try(C_Map.GetBestMapForUnit, "player"))
+  local p = map and Try(C_Map.GetPlayerMapPosition, map, "player")
+  if not (type(p) == "table" and Num(p.x) and Num(p.y)) then return nil end
+  local north, west, _, continent = Try(UnitPosition, "player")
+  if Num(north) and Num(west) and Num(continent) then return map, p.x, p.y, continent, north, west end
+  return map, p.x, p.y
+end
 
 -- Whether the last word from the app was a yes.
 function ns.Logging()

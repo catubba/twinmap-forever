@@ -4,6 +4,8 @@
 // and the sessions not sent yet are sent (server/src/index.ts, /log), after asking the server
 // whether it wants any. A session that could not be sent stays in the file and goes at the next
 // read. Nothing is ever changed in the game's file: the addon lets go of the oldest sessions itself.
+// What the addon met in the open world (creatures, objects, steps of quests: Finds.lua) is sent only
+// where the player's QuestieDB does not have it with a place.
 // With the choice off the file is not even read.
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -49,6 +51,22 @@ export function logFiles(gameFolder: string): string[] {
   }
 }
 
+/** The kinds of entry that are sent only where QuestieDB has no place for their number (the third value of the entry). */
+const ASKED = new Set(['npc', 'object', 'quest'])
+
+/**
+ * A session less the entries QuestieDB has already, as `placed` tells for each [kind, number]; null
+ * when nothing is left. The rest as the addon wrote it.
+ */
+export async function withoutPlaced(text: string, placed: (asks: [string, number][]) => Promise<boolean[]>): Promise<string | null> {
+  const session = JSON.parse(text) as { e: unknown[][] }
+  const asks = session.e.filter((entry) => ASKED.has(entry[0] as string))
+  if (asks.length === 0) return text
+  const has = await placed(asks.map((entry) => [entry[0] as string, entry[2] as number]))
+  const e = session.e.filter((entry) => !has[asks.indexOf(entry)])
+  return e.length > 0 ? JSON.stringify({ ...session, e }) : null
+}
+
 /**
  * Sends sessions while the choice stays on: first the server is asked how many it still wants today
  * from this version of the app. Gives the sessions that need not be sent again: the ones the
@@ -78,7 +96,15 @@ export async function sendLog(sessions: Session[], said: { app: string; build: s
  * keeps, in its own data, which sessions it sent. said: the version of the app, the build of the
  * game and its language, null while they are not known.
  */
-export function startGameLog(gameFolder: () => string | null, sentFile: string, said: () => { app: string; build: string; locale: string } | null, on: () => boolean, say: (line: string) => void, to?: string): { stop: () => void } {
+export function startGameLog(
+  gameFolder: () => string | null,
+  sentFile: string,
+  said: () => { app: string; build: string; locale: string } | null,
+  on: () => boolean,
+  say: (line: string) => void,
+  to?: string,
+  placed: (asks: [string, number][]) => Promise<boolean[]> = (asks) => Promise.resolve(asks.map(() => false)),
+): { stop: () => void } {
   let sent: string[] = []
   try {
     const read: unknown = JSON.parse(readFileSync(sentFile, 'utf8'))
@@ -107,12 +133,24 @@ export function startGameLog(gameFolder: () => string | null, sentFile: string, 
         }
       }
       if (fresh.size === 0) return
-      const done = await sendLog([...fresh.values()], told, on, to)
+      // Those with nothing left once QuestieDB's are out need no sending. QuestieDB that cannot be read: the next read.
+      const left: Session[] = [], empty: string[] = []
+      try {
+        for (const session of fresh.values()) {
+          const text = await withoutPlaced(session.text, placed)
+          if (text) left.push({ id: session.id, text })
+          else empty.push(session.id)
+        }
+      } catch {
+        seen = ''
+        return
+      }
+      const done = [...empty, ...(left.length > 0 ? await sendLog(left, told, on, to) : [])]
       if (done.length > 0) {
         sent = [...sent, ...done].slice(-REMEMBERED)
         writeFileSync(sentFile, JSON.stringify(sent))
       }
-      say(`log: ${done.length} of ${fresh.size} sessions sent`)
+      say(`log: ${done.length - empty.length} of ${left.length} sessions sent${empty.length ? `, ${empty.length} with nothing QuestieDB lacks` : ''}`)
     } finally {
       busy = false
     }

@@ -21,6 +21,7 @@ Death.lua
 Inbox.lua
 Log.lua
 Doors.lua
+Finds.lua
 Pin.lua
 Route.lua
 Marks.lua

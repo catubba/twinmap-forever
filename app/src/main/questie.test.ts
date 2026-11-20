@@ -6,7 +6,7 @@ import { logFrom, shownFrom } from '../shared/quests'
 import { gameItemFacts, shopRows } from '../shared/items'
 import { gameFolderFrom, openClientFiles, registryInstallPath } from './client-files'
 import { sentKeys } from './keys'
-import { cbor, doerIndex, fixedPins, ITEM, NPC, OBJECT, openQuestie, QUEST, questLog, questPins, search, searchIndex, shops, shownFromLog } from './questie'
+import { cbor, doerIndex, fixedPins, ITEM, NPC, OBJECT, openQuestie, placed, QUEST, questLog, questPins, search, searchIndex, shops, shownFromLog } from './questie'
 
 // Writes a value the way QuestieDB does: CBOR, then base64. Only what these tests need.
 function enc(v: unknown): Buffer {
@@ -347,3 +347,10 @@ test.skipIf(!real)('the innkeeper of Ironforge sells his 17 goods at the prices 
   expect(gameItemFacts(files, [])![281246]).toBeUndefined()
   expect(shopRows(sold.get(4554)!, facts).find((r) => r.id === 281246)).toEqual({ id: 281246, name: 'Toxic Skullcap', quality: expect.any(Number), buy: 150, perBuy: 1 })
 }, 60_000)
+
+test("what the addon's log need not send: a creature, an object or a quest QuestieDB has with a place", () => {
+  const db = openQuestie(game([...LINES, `## X-Quest-11-S: ${b64({ [QUEST.name]: 'Cull the Rats' })}`, `## X-Quest-11-${QUEST.objectives}: ${b64([[[102]]])}`]))!
+  expect(['npc 101', 'npc 103', 'npc 104', 'object 900', 'object 901'].map((k) => placed(db, k.split(' ')[0]!, +k.split(' ')[1]!))).toEqual([true, true, false, true, false])
+  // A quest whose rats stand somewhere; one that asks for nothing with a place; one QuestieDB has not.
+  expect([11, 8, 12345].map((id) => placed(db, 'quest', id))).toEqual([true, false, false])
+})

@@ -24,7 +24,7 @@ import { homeAddress, LAN_PORT, startLan, type Lan, type Served } from './lan'
 import { startLink } from './link'
 import { startGameLog } from './gamelog'
 import { startLog } from './log'
-import type { Answer, Asked, Sources } from './questie-worker'
+import type { Answer, Asked, Placed, Sources } from './questie-worker'
 import startQuestieWorker from './questie-worker?nodeWorker'
 import { gameLocale, sendSamples, startSamples } from './samples'
 import { addonHearsFonts, addonsFolder, readSettings, setupStatus, writeSettings } from './setup'
@@ -86,15 +86,21 @@ function startTiles(gameFolder: string | null): { status: () => TilesStatus; ite
 
 // The quests on the map: the player's QuestieDB is opened once, and asked for the pins of what
 // Questie shows each time the addon tells something new. tell: called with every answer.
-function startQuests(gameFolder: string | null, tell: (status: QuestsStatus) => void): { show: (section: unknown, log?: unknown) => void; search: (typed: string) => Promise<Found[]>; sources: (item: number) => Promise<ItemSources>; stop: () => void } {
+function startQuests(
+  gameFolder: string | null,
+  tell: (status: QuestsStatus) => void,
+): { show: (section: unknown, log?: unknown) => void; search: (typed: string) => Promise<Found[]>; sources: (item: number) => Promise<ItemSources>; placed: (asks: [string, number][]) => Promise<boolean[]>; stop: () => void } {
   const NONE: ItemSources = { sold: [], drops: [], found: [] }
-  if (!gameFolder) return { show: () => {}, search: () => Promise.resolve([]), sources: () => Promise.resolve(NONE), stop: () => {} }
+  const ALL = (asks: [string, number][]): Promise<boolean[]> => Promise.resolve(asks.map(() => true))
+  if (!gameFolder) return { show: () => {}, search: () => Promise.resolve([]), sources: () => Promise.resolve(NONE), placed: ALL, stop: () => {} }
   const worker = startQuestieWorker({ workerData: { gameFolder } })
   // A search waits for the answer that carries its number.
-  const asked = new Map<number, (found: Found[]) => void>(), askedSources = new Map<number, (sources: ItemSources) => void>()
+  const asked = new Map<number, (found: Found[]) => void>(), askedSources = new Map<number, (sources: ItemSources) => void>(), askedPlaced = new Map<number, { answer: (placed: boolean[]) => void; fail: (why: Error) => void }>()
+  let dead = false
   let searches = 0
   const post = (message: Asked): void => worker.postMessage(message)
-  worker.on('message', (told: QuestsStatus | Answer | Sources) => {
+  worker.on('message', (told: QuestsStatus | Answer | Sources | Placed) => {
+    if ('placed' in told) return void (askedPlaced.get(told.id)?.answer(told.placed), askedPlaced.delete(told.id))
     if ('sources' in told) return void (askedSources.get(told.id)?.(told.sources), askedSources.delete(told.id))
     if (!('found' in told)) return tell(told)
     asked.get(told.id)?.(told.found)
@@ -104,6 +110,10 @@ function startQuests(gameFolder: string | null, tell: (status: QuestsStatus) => 
     tell({ questie: null, pins: [], fixed: [] }) // no quests on the map; the rest of the app goes on
     for (const answer of asked.values()) answer([])
     for (const answer of askedSources.values()) answer(NONE)
+    // What QuestieDB has cannot be told: the sessions wait in the game's file for the app to open again.
+    dead = true
+    for (const { fail } of askedPlaced.values()) fail(new Error('QuestieDB could not be read'))
+    askedPlaced.clear()
     asked.clear()
     askedSources.clear()
   })
@@ -126,6 +136,12 @@ function startQuests(gameFolder: string | null, tell: (status: QuestsStatus) => 
       new Promise((answer) => {
         askedSources.set(++searches, answer)
         post({ sources: item, id: searches })
+      }),
+    placed: (asks) =>
+      new Promise((answer, fail) => {
+        if (dead) return fail(new Error('QuestieDB could not be read'))
+        askedPlaced.set(++searches, { answer, fail })
+        post({ placed: asks, id: searches })
       }),
     stop: () => void worker.terminate(),
   }
@@ -259,7 +275,16 @@ function createWindow(): void {
       void sendSamples(run, { app: app.getVersion(), build, locale }, participates, process.env.TWINMAP_SAMPLES).then((sent) => record.say(`samples: ${sent} of ${run.samples.length} sent`))
     },
   )
-  // The addon's log of the same programme, read from the settings the game saves (gamelog.ts).
+  let tiles = startTiles(gameFolder)
+  // The pins go to the window when they change, and once more when its page has loaded.
+  let questsNow: QuestsStatus = { questie: null, pins: [] }
+  const tellQuests = (status: QuestsStatus): void => {
+    questsNow = { ...status, fixed: status.fixed ?? questsNow.fixed } // the fixed pins come once: kept for a page that loads later
+    if (!win.isDestroyed()) win.webContents.send('quests', status)
+    lan?.tell('quests', questsNow)
+  }
+  let quests = startQuests(gameFolder, tellQuests)
+  // The addon's log of the participation programme, read from the settings the game saves (gamelog.ts).
   const gameLog = startGameLog(
     () => gameFolder,
     join(app.getPath('userData'), 'log-sent.json'),
@@ -270,16 +295,8 @@ function createWindow(): void {
     participates,
     record.say,
     process.env.TWINMAP_SAMPLES?.replace(/sample$/, 'log'),
+    (asks) => quests.placed(asks), // what QuestieDB has with a place is not sent
   )
-  let tiles = startTiles(gameFolder)
-  // The pins go to the window when they change, and once more when its page has loaded.
-  let questsNow: QuestsStatus = { questie: null, pins: [] }
-  const tellQuests = (status: QuestsStatus): void => {
-    questsNow = { ...status, fixed: status.fixed ?? questsNow.fixed } // the fixed pins come once: kept for a page that loads later
-    if (!win.isDestroyed()) win.webContents.send('quests', status)
-    lan?.tell('quests', questsNow)
-  }
-  let quests = startQuests(gameFolder, tellQuests)
   let walks = startWalks(gameFolder)
   // A file of the map, for the window and for a phone on the home network alike.
   // The pictures of the characters (shared/portrait.ts): a PNG each beside the settings, named by the letters of the character's name.

@@ -172,3 +172,48 @@ test('with no yes, a trainer seen leaves nothing of the log', () => {
   atTrainer(addon);
   assert.doesNotMatch(logout(addon).file, /\["log"\] = \{|trainer\\"/);
 });
+
+// In Ironforge: Innkeeper Firebrew targeted, then a player, a pet and a creature under the mouse; a chest looted.
+const FIREBREW = 'Creature-0-5250-0-11-5111-0000ABCDEF';
+test('after a yes a creature targeted or under the mouse and an object looted are written down once a session, where the character is', () => {
+  const addon = world('true');
+  addon.lua(`GAME.target = "${FIREBREW}"`);
+  addon.fire('PLAYER_TARGET_CHANGED');
+  addon.fire('PLAYER_TARGET_CHANGED');
+  for (const guid of ['Player-5250-0ABCDEF1', 'Pet-0-5250-0-11-416-0100ABCDEF', 'Vehicle-0-5250-0-11-28781-0000ABCDEF', FIREBREW]) {
+    addon.lua(`GAME.mouseover = "${guid}"`);
+    addon.fire('UPDATE_MOUSEOVER_UNIT');
+  }
+  addon.lua('GAME.loot = { "GameObject-0-5250-0-11-2843-0000ABCDEF", "Creature-0-5250-0-11-1-0000ABCDEF" }');
+  addon.fire('LOOT_OPENED');
+  addon.lua(DUNGEON);
+  addon.lua(`GAME.target = "Creature-0-5250-0-11-3586-0000ABCDEF"`);
+  addon.fire('PLAYER_TARGET_CHANGED');
+  const { sessions, texts } = logout(addon);
+  assert.deepEqual(sessions[0].e.map((e) => e.slice(0, 1).concat(e.slice(2))), [
+    ['npc', 5111, 1455, 0.3012, 0.62],
+    ['npc', 28781, 1455, 0.3012, 0.62],
+    ['object', 2843, 1455, 0.3012, 0.62],
+  ]);
+  assert.ok(!('error' in logFor(new URLSearchParams({ app: '0.14.0', build: '1.60.1.70938', locale: 'enUS' }), texts[0])));
+});
+
+test('an objective of a quest that moves on is written down where it moved, every step', () => {
+  const addon = world('true');
+  addon.lua(`QUESTS = { [1] = { questID = 26, isHeader = false } }; KILLED = 0
+    C_QuestLog = { GetNumQuestLogEntries = function() return 1 end, GetInfo = function(i) return QUESTS[i] end,
+      GetQuestObjectives = function() return { { type = "item", numFulfilled = 1, finished = true }, { type = "monster", numFulfilled = KILLED, finished = false } } end }`);
+  addon.fire('QUEST_LOG_UPDATE'); // what the log held when the run began moves nothing
+  addon.lua('KILLED = 1'); addon.fire('QUEST_LOG_UPDATE');
+  addon.lua('GAME.x = 0.31'); addon.fire('QUEST_LOG_UPDATE'); // nothing moved
+  addon.lua('KILLED = 2'); addon.fire('QUEST_LOG_UPDATE');
+  assert.deepEqual(logout(addon).sessions[0].e.map((e) => e.slice(2)), [[26, 2, 1455, 0.3012, 0.62], [26, 2, 1455, 0.31, 0.62]]);
+});
+
+test('with no yes, nothing met is written down', () => {
+  const addon = world(undefined);
+  addon.lua(`GAME.target = "${FIREBREW}"; GAME.loot = { "GameObject-0-5250-0-11-2843-0000ABCDEF" }`);
+  addon.fire('PLAYER_TARGET_CHANGED');
+  addon.fire('LOOT_OPENED');
+  assert.doesNotMatch(logout(addon).file, /\["log"\] = \{/);
+});

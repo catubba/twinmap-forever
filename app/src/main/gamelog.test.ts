@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, test } from 'vitest'
 import { logFor } from '../../../server/src/index'
-import { logFiles, sendLog, sessionsIn, startGameLog } from './gamelog'
+import { logFiles, sendLog, sessionsIn, startGameLog, withoutPlaced } from './gamelog'
 
 const SAID = { app: '0.14.0', build: '1.60.1.70938', locale: 'enUS' }
 const session = (id: string): string => JSON.stringify({ log: 1, id, v: '0.14.0', e: [['door', 3, 3065, 1455, 0.3012, 0.62]] })
@@ -102,4 +102,18 @@ test('a session goes once; one whose send failed goes at the next read; with the
   expect(server.posted).toEqual([session(A), session(A), session(B)])
   server.close()
   rmSync(root, { recursive: true, force: true })
+})
+
+test('what QuestieDB has with a place is taken out of a session, the rest kept as written; nothing left, nothing to send', async () => {
+  const e = [['door', 1, 3065, 1455, 0.3, 0.6], ['npc', 2, 5111, 1455, 0.3, 0.6], ['npc', 3, 99999, 1455, 0.3, 0.6], ['quest', 4, 26, 2, 1455, 0.3, 0.6], ['object', 5, 2843, 1455, 0.3, 0.6]]
+  const text = JSON.stringify({ log: 1, id: A, v: '0.14.0', e })
+  const asked: [string, number][][] = []
+  const known = new Set(['npc 5111', 'object 2843'])
+  const placed = (asks: [string, number][]): Promise<boolean[]> => (asked.push(asks), Promise.resolve(asks.map(([kind, id]) => known.has(`${kind} ${id}`))))
+  const kept = await withoutPlaced(text, placed)
+  expect(asked).toEqual([[['npc', 5111], ['npc', 99999], ['quest', 26], ['object', 2843]]])
+  expect(JSON.parse(kept!).e).toEqual([e[0], e[2], e[3]])
+  expect('error' in logFor(new URLSearchParams(SAID), kept!)).toBe(false)
+  expect(await withoutPlaced(session(B), placed)).toBe(session(B)) // nothing to ask: as written
+  expect(await withoutPlaced(JSON.stringify({ log: 1, id: A, v: '0.14.0', e: [e[1]] }), placed)).toBeNull()
 })

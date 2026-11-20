@@ -382,6 +382,16 @@ export function shownFromLog(db: Questie, log: GameQuest[]): QuestieShown {
   return { icons, active }
 }
 
+/**
+ * Whether QuestieDB has this creature, object or quest with a place to show: what the addon's log
+ * need not send (gamelog.ts, M15-F14). A quest has one when anything it asks for has one.
+ */
+export function placed(db: Questie, kind: string, id: number): boolean {
+  // ponytail: a quest as a whole, not the one objective that moved; the objective's number is in the entry if that is ever needed.
+  if (kind === 'quest') return shownFromLog(db, [{ id, done: false, objectives: [] }]).icons.objective.length > 0
+  return Object.values(db.places(kind === 'npc' ? 'Npc' : 'Object', id)).some((spots) => spots.length > 0)
+}
+
 /** The quests of the log, each by the name its pins carry. */
 export function questLog(db: Questie, shown: QuestieShown): LogQuest[] {
   return shown.active.map((q) => {
