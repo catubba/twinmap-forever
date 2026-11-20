@@ -303,6 +303,7 @@ end
 -- All does the same on Forever, UI/TrainerSpells.lua). The game names no spell: a hidden tooltip does.
 local trainers -- npc -> { n, c, s }
 local trainerDue = false
+local logged = {} -- npc -> true: the trainers already in this session of the log
 local tip
 
 local function ServiceSpell(i)
@@ -339,8 +340,17 @@ local function ReadTrainer()
   for _, f in ipairs(on) do pcall(SetTrainerServiceTypeFilter, f, false) end
   if #lines == 0 then return false end
   table.sort(lines, function(a, b) return a[1] < b[1] end)
-  local _, class = Try(UnitClass, "player")
-  trainers[npc] = { n = npc, c = not Try(IsTradeskillTrainer) and Str(class) or nil, s = lines }
+  local _, class, classId = Try(UnitClass, "player")
+  local trade = Try(IsTradeskillTrainer)
+  trainers[npc] = { n = npc, c = not trade and Str(class) or nil, s = lines }
+  -- The log (Log.lua), once a session for each trainer. Entry "trainer": the NPC, the class's number
+  -- for a class trainer (0 for a profession), how its faction stands to the character (UnitReaction,
+  -- 4 neutral to 8 exalted: a good standing lowers the costs), then a line: spell, copper, level, skill.
+  if not logged[npc] and ns.Logging() then
+    logged[npc] = true
+    local standing = Num(Try(UnitReaction, "npc", "player")) or 0
+    for _, l in ipairs(lines) do ns.Log("trainer", npc, trade and 0 or Num(classId) or 0, standing, l[1], l[2], l[3], l[4]) end
+  end
   return true
 end
 

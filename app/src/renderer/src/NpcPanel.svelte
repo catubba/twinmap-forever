@@ -9,6 +9,7 @@
   import type { FixedPin } from '../../shared/services'
   import type { Sheets } from '../../shared/sheet'
   import { classTrainer, professionTrainer, trainerReads, type TrainerFacts, type TrainerRow } from '../../shared/trainers'
+  import { TRAINERS_SEEN } from '../../shared/trainers-seen'
   import Glyph from './Glyph.svelte'
   import { itemTip } from './item-tip.svelte'
   import { TILES } from './web'
@@ -31,7 +32,7 @@
   const sheet = $derived(shown ? sheets[shown.key] : undefined)
   const who = $derived(whoOf(sheet))
   const money = $derived(typeof sheet?.pieces.money === 'number' ? sheet.pieces.money : null)
-  const reads = $derived(trainerReads(sheets))
+  const reads = $derived(trainerReads(sheets, TRAINERS_SEEN))
   const npc = $derived(pin.npc ?? 0)
   const goods = $derived(pin.sells?.length && items ? vendorRows(pin.sells, items, sheet) : [])
   const craft = $derived(pin.layers.includes('trainers') ? professionTrainer(npc, trainers, reads) : null)
@@ -42,6 +43,8 @@
     if (!trainers.format) return null // not read yet: a list without the game's facts would show numbers for names
     if (craft && stand) return grouped(craft.rows, (r) => r.skill, stand.skill, stand.known)
     if (cls && mine) return grouped(forRace(classTrainer(npc, cls, trainers, reads), who.race), (r) => r.level, who.level ?? 0, knownSpells(sheet))
+    // Another class's trainer someone saw: what it teaches by level, nothing to learn.
+    if (cls && reads.trainers.has(npc)) return grouped(classTrainer(npc, cls, trainers, reads), (r) => r.level, 0, new Set())
     return null
   })
   let showKnown = $state(false)
@@ -117,6 +120,9 @@
     </div>
   {/if}
   <div class="list">
+    {#if cls && !mine}
+      <p class="note">Teaches {cls.charAt(0) + cls.slice(1).toLowerCase()}s only{who.class ? '' : ': pick a character to see what it can learn'}.</p>
+    {/if}
     {#if list}
       {#if craft && stand?.next}
         <div class="later">
@@ -134,8 +140,6 @@
           {#each list.known as r (r.spell)}{@render line(r, false)}{/each}
         </div>
       {/if}
-    {:else if cls}
-      <p class="note">Teaches {cls.charAt(0) + cls.slice(1).toLowerCase()}s only{who.class ? '' : ': pick a character to see what it can learn'}.</p>
     {/if}
     {#if goods.length}
       {#if list}<h3 class="grp"><span>Sells · {goods.length}</span></h3>{/if}

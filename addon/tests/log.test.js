@@ -131,3 +131,44 @@ test('the oldest sessions go past ten, and past 200,000 bytes', () => {
   assert.equal(all.length, 1);
   assert.ok(all[0].length <= 200000 && all[0].length > 190000, String(all[0].length));
 });
+
+// A gnome mage at Juli Stormkettle in Ironforge, honored with Gnomeregan: two lines, one learned.
+const MAGE_TRAINER = `GAME.surname, GAME.level, GAME.race, GAME.class = "Sucameli", 12, "Gnome", "MAGE"
+  GAME.trainer = { npc = 5145, standing = 6, lines = {
+    { "Frost", "header" },
+    { "Frostbolt", "available", 205, 90, 8, nil, "available" },
+    { "Frost Nova", "used", 122, 9, 10, nil, "used" },
+  } }`;
+const atTrainer = (addon) => {
+  addon.lua(MAGE_TRAINER);
+  addon.run(4);
+  addon.fire('TRAINER_SHOW');
+  addon.run(4);
+};
+
+test('after a yes a trainer seen is written down once a session, every line of it, with the class and the standing', () => {
+  const addon = world('true');
+  atTrainer(addon);
+  addon.fire('TRAINER_CLOSED');
+  addon.fire('TRAINER_SHOW');
+  addon.run(4);
+  const { sessions, texts, file } = logout(addon);
+  assert.deepEqual(sessions[0].e.map((e) => e.slice(2)), [[5145, 8, 6, 122, 9, 10, 0], [5145, 8, 6, 205, 90, 8, 0]]);
+  assert.ok(!('error' in logFor(new URLSearchParams({ app: '0.14.0', build: '1.60.1.70938', locale: 'enUS' }), texts[0])));
+  assert.doesNotMatch(file.replace(/\["TwinmapForeverSheet"\][\s\S]*$/, ''), /Juli|Frostbolt/);
+  // A profession trainer: class 0.
+  addon.reload();
+  addon.fire('PLAYER_LOGIN');
+  addon.fire('PLAYER_ENTERING_WORLD');
+  addon.lua('GAME.trainer = { npc = 5174, trade = true, lines = { { "Expert Engineer", "available", 4038, 4500, 20, 125, "available" } } }');
+  addon.run(4);
+  addon.fire('TRAINER_SHOW');
+  addon.run(4);
+  assert.deepEqual(logout(addon).sessions[1].e.map((e) => e.slice(2)), [[5174, 0, 4, 4038, 4500, 20, 125]]);
+});
+
+test('with no yes, a trainer seen leaves nothing of the log', () => {
+  const addon = world(undefined);
+  atTrainer(addon);
+  assert.doesNotMatch(logout(addon).file, /\["log"\] = \{|trainer\\"/);
+});

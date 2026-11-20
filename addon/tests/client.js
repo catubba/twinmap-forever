@@ -49,7 +49,8 @@ const STUB = `
     return "Catubbio", "Sucameli"
   end
   function UnitClass(unit)
-    if unit == "player" then return GAME.class, GAME.class end
+    local ids = { WARRIOR = 1, PALADIN = 2, HUNTER = 3, ROGUE = 4, PRIEST = 5, SHAMAN = 7, MAGE = 8, WARLOCK = 9, DRUID = 11 }
+    if unit == "player" then return GAME.class, GAME.class, ids[GAME.class] end
     local other = GAME.party and GAME.party[unit]
     return other and other.class, other and other.class
   end
@@ -130,6 +131,7 @@ const STUB = `
     GAME.filters[f] = on or nil
   end
   function IsTradeskillTrainer() return GAME.trainer and GAME.trainer.trade == true end
+  function UnitReaction(unit) if unit == "npc" and GAME.trainer then return GAME.trainer.standing or 4 end end
   C_TradeSkillUI = {
     GetAllRecipeIDs = function() local out = {} for id in pairs(GAME.trade and GAME.trade.recipes or {}) do out[#out + 1] = id end table.sort(out) return out end,
     GetRecipeInfo = function(id) return { learned = GAME.trade.recipes[id] } end,

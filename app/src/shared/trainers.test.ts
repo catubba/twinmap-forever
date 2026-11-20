@@ -68,6 +68,13 @@ test('a profession trainer gives the ranks it teaches and its recipes by skill, 
   expect(professionTrainer(5172, FACTS, NONE), 'a class trainer').toBeNull()
 })
 
+test("the trainers of the participation programme come after the player's own: a trainer never seen here, and costs read nowhere else", () => {
+  const seen: TrainerRead[] = [{ n: 906, c: 'WARLOCK', s: [[348, 9, 1, 0], [697, 400, 10, 0]] }, { n: 5172, c: 'WARLOCK', s: [[348, 1, 1, 0]] }]
+  const reads = trainerReads({ catubbio: sheet([{ n: 5172, c: 'WARLOCK', s: [[348, 10, 1, 0]] }], 2) }, seen)
+  expect(reads.trainers.get(5172)!.s).toEqual([[348, 10, 1, 0]])
+  expect(classTrainer(906, 'WARLOCK', FACTS, reads).map((r) => [r.name, r.cost])).toEqual([['Immolate', 10], ['Summon Voidwalker', 400]])
+})
+
 test('a reading the app cannot use is left out', () => {
   const bad = { c: { code: 'c', rev: 1, pieces: { trainers: [null, { n: 'x', s: [] }, { n: 1, s: [[1, 'free'], 'line', [2, 30, 1, 0]] }] }, at: {} } } as unknown as Record<string, Sheet>
   const reads = trainerReads(bad)

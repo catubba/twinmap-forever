@@ -7,6 +7,8 @@
 // CMaNGOS classic-db by way of One for All (profession-trainers.ts).
 // What the addon read at a trainer (its sheet piece "trainers", Sheet.lua) wins over both: what
 // that trainer teaches, and the costs and levels of every trainer of the same class or profession.
+// After the player's own reads, those of the participation programme (trainers-seen.ts): every
+// trainer someone saw, the costs before any discount.
 import { CLASS_QUESTS } from './class-quests'
 import { PROFESSION_TRAINERS } from './profession-trainers'
 import type { Sheets } from './sheet'
@@ -119,12 +121,11 @@ export interface TrainerRead {
   s: ReadLine[]
 }
 
-/** What the addon read at trainers, from every character's sheet, the newest first: by NPC, and each spell's line. */
-export function trainerReads(sheets: Sheets): { trainers: Map<number, TrainerRead>; lines: Map<number, ReadLine> } {
+/** What the addon read at trainers, from every character's sheet, the newest first, then `seen` (trainers-seen.ts): by NPC, and each spell's line. */
+export function trainerReads(sheets: Sheets, seen: TrainerRead[] = []): { trainers: Map<number, TrainerRead>; lines: Map<number, ReadLine> } {
   const trainers = new Map<number, TrainerRead>(), lines = new Map<number, ReadLine>()
   const sorted = Object.values(sheets).sort((a, b) => (b.at.trainers ?? 0) - (a.at.trainers ?? 0))
-  for (const sheet of sorted) {
-    const piece = sheet.pieces.trainers
+  for (const piece of [...sorted.map((sheet) => sheet.pieces.trainers), seen]) {
     for (const t of Array.isArray(piece) ? (piece as TrainerRead[]) : []) {
       if (!t || !Number.isInteger(t.n) || !Array.isArray(t.s)) continue
       const s = t.s.filter((l): l is ReadLine => Array.isArray(l) && Number.isInteger(l[0]) && Number.isInteger(l[1]))

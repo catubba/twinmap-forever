@@ -1,4 +1,4 @@
--- The log of the participation programme: what only the addon can read (Doors.lua) and the strip
+-- The log of the participation programme: what only the addon can read (Doors.lua, the trainers of Sheet.lua) and the strip
 -- does not carry. Off until the app says yes (the part "log" of the inbox, kept with the rest of
 -- it): the player turns the programme on in Twinmap's settings, and the yes holds with the app
 -- closed too, until a no arrives.
