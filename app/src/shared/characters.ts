@@ -18,7 +18,7 @@ export interface Known {
 }
 
 // The colours the game gives the classes (visual-spec.md).
-const CLASS_COLORS: Record<string, string> = {
+export const CLASS_COLORS: Record<string, string> = {
   WARRIOR: '#c79c6e', PALADIN: '#f58cba', HUNTER: '#abd473', ROGUE: '#fff569', PRIEST: '#ffffff',
   SHAMAN: '#0070de', MAGE: '#69ccf0', WARLOCK: '#9482c9', DRUID: '#ff7d0a',
 }

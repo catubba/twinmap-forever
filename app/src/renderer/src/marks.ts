@@ -44,7 +44,7 @@ const DRAWINGS = {
   dungeon: [16, `<path d="M2 15.25V7.5a6 6 0 0 1 12 0v7.75Z" fill="${TEXT}" ${EDGE}/><path d="M5.6 15.25V8.2a2.4 2.4 0 0 1 4.8 0v7.05Z"/>`],
   // A rare creature or a treasure.
   rare: [16, `<path d="M8 .9 10.3 5.7 15.1 8 10.3 10.3 8 15.1 5.7 10.3.9 8 5.7 5.7Z" fill="#fff6c2" ${EDGE}/>`],
-  // Someone of the group, in a colour of their own: set the colour of the text around it. What they do in the group is drawn on it (companionPin).
+  // Someone of the group, in the colour of their class: set the colour of the text around it. What they do in the group is drawn on it (companionPin).
   companion: [22, `<circle cx="11" cy="11" r="10.25" fill="currentColor" ${EDGE}/>`],
   // A pin the player put down.
   flag: [16, `<path d="M3.5 1.6v13" stroke="#000" stroke-width="3.6" stroke-linecap="round"/><path d="M3.5 1.75h10l-2.7 3.3 2.7 3.3h-10Z" fill="${TEXT}" ${EDGE}/><path d="M3.5 1.6v13" stroke="${TEXT}" stroke-width="1.6" stroke-linecap="round"/>`],
