@@ -7,6 +7,7 @@ import { readFileSync } from 'node:fs'
 import { worldOfYards } from '../shared/inside'
 import type { Box } from '../shared/minimap'
 import { findGameWindow, findWindow, readBox, readRect, readRow, showsOnly, windowState, type WindowHandle } from './capture'
+import { look } from './health'
 import { startInside, type Inside, type InsideReport } from './minimap'
 
 // Tuning knobs.
@@ -66,11 +67,13 @@ export function startLink(tilesFolder: () => string | null = () => null, looked:
   let said: InsideReport | null = null
   const lookInside = (window: WindowHandle, now: number): void => {
     let at: { x: number; y: number; size: number } | null = null
+    const began = performance.now()
     const place = inside.look(game.state.sections.pos, (x, y, size) => ((at = { x: Math.round(x * stretch), y: Math.round(y * stretch), size: Math.round(size * stretch) }), readBox(window, at.x, at.y, at.size)), now)
     found = place && (found && found.u === place.u && found.v === place.v && found.facing === place.facing && found.level === place.level ? found : { ...place, at: now })
     const told = inside.report(), report = told?.report ?? null
     if (report === said) return
     said = report
+    if (report) look(performance.now() - began, report.why === undefined) // a new report: the look searched (health.ts)
     const cut = at as { x: number; y: number; size: number } | null
     looked(report, cut && told ? told.seen : null, () => !!cut && showsOnly(window, cut.x, cut.y, cut.size), now)
   }

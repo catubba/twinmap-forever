@@ -19,6 +19,9 @@
 // And it takes the sessions of the addon's log (/log): what the addon wrote down by itself, a kind
 // and numbers an entry, read by the app from the game's saved settings. Kept in the same bucket,
 // under the same rules as a kind of data of its own, "log".
+//
+// And the app's own reports of its health (/errors): the lines of its errors and how long its looks at
+// the minimap took, with no place and no name. A kind of data of its own too, "errors".
 
 export interface Env {
   INBOX: string // owner/name of the private repository
@@ -29,6 +32,7 @@ export interface Env {
   DAILY: string // samples taken in a day, from everyone; 0 takes none
   MAP_DAILY: string // of them, from one dungeon: this many where the app found the place, and as many where it did not
   LOG_DAILY: string // sessions of the addon's log taken in a day, from everyone; 0 takes none
+  ERRORS_DAILY?: string // reports of the app's health taken in a day, from everyone; 0 or none takes none
   ADMIN_TOKEN?: string // a secret: who has it may list and read the bucket (/kept); without it nobody may
 }
 interface Limit {
@@ -68,6 +72,7 @@ const lost = (fields: Record<string, string>): boolean => !(Number(fields.score)
 interface Counts {
   all: number
   logs: number
+  errors: number
   maps: Record<string, [number, number]>
   bytes: number
   apps: Record<string, number>
@@ -77,7 +82,7 @@ interface Counts {
 /**
  * What is switched off without publishing the worker again, in the file rules of the bucket:
  *   { "off": ["minimap"], "maps": [36], "app": "0.14.0" }
- * off: the kinds of data not taken, "minimap" or "log" ("*" for all of them); maps: the dungeons not taken, their samples and the bosses and rares of the log alike; app: the
+ * off: the kinds of data not taken, "minimap", "log" or "errors" ("*" for all of them); maps: the dungeons not taken, their samples and the bosses and rares of the log alike; app: the
  * oldest version of the app still taken. No file, or a part left out, switches nothing off. A file
  * or a part that cannot be read switches that part off for everyone: a slip of the hand while
  * closing must not leave it open.
@@ -87,7 +92,7 @@ export interface Rules {
   maps?: unknown
   app?: unknown
 }
-type Kind = 'minimap' | 'log'
+type Kind = 'minimap' | 'log' | 'errors'
 async function rulesOf(env: Env): Promise<Rules> {
   try {
     const kept: unknown = JSON.parse((await (await env.SAMPLES.get('rules'))?.text()) ?? '{}')
@@ -127,15 +132,18 @@ async function countsOf(env: Env, day: string): Promise<Counts> {
     // not ours: counted from nothing
   }
   if (typeof kept === 'number') kept = { all: kept } // as it was kept before the dungeons had their own counts
-  const { all, logs, maps, bytes, apps, refused } = (typeof kept === 'object' && kept !== null ? kept : {}) as Partial<Counts>
+  const { all, logs, errors, maps, bytes, apps, refused } = (typeof kept === 'object' && kept !== null ? kept : {}) as Partial<Counts>
   const table = <T>(value: T | undefined): T => (typeof value === 'object' && value !== null ? value : {}) as T
-  return { all: typeof all === 'number' ? all : 0, logs: typeof logs === 'number' ? logs : 0, maps: table(maps), bytes: typeof bytes === 'number' ? bytes : 0, apps: table(apps), refused: table(refused) }
+  return { all: typeof all === 'number' ? all : 0, logs: typeof logs === 'number' ? logs : 0, errors: typeof errors === 'number' ? errors : 0, maps: table(maps), bytes: typeof bytes === 'number' ? bytes : 0, apps: table(apps), refused: table(refused) }
 }
 /** One refusal more in the count of the day, and the answer that says why. */
 async function refuse(env: Env, day: string, counts: Counts, why: keyof typeof REFUSED): Promise<Response> {
   await env.SAMPLES.put(`count/${day}`, JSON.stringify({ ...counts, refused: { ...counts.refused, [why]: (counts.refused[why] ?? 0) + 1 } }))
   return answer(503, REFUSED[why])
 }
+/** How many more reports of the app's health are taken today. */
+const wantedErrors = (counts: Counts, env: Env): number => Math.max(0, Number(env.ERRORS_DAILY ?? 0) - counts.errors) || 0
+
 /** How many more sessions of the log are taken today. */
 const wantedLogs = (counts: Counts, env: Env): number => Math.max(0, Number(env.LOG_DAILY) - counts.logs) || 0
 /** How many more samples of a dungeon are taken today, of each kind. */
@@ -281,6 +289,52 @@ async function log(request: Request, env: Env, address: string): Promise<Respons
   return answer(201)
 }
 
+const MOST_LINES = 20, LONGEST_LINE = 300
+// A folder, as it would be written on Windows or elsewhere: a drive, a share, a home. The app takes them out; one that is still here refuses the report.
+const FOLDER = /[A-Za-z]:[\\/]|\\\\|(^|[\s('"=])\/(Users|home|mnt|Volumes|var|tmp|private)\/|[\\/]Users[\\/]/i
+/**
+ * What is kept of a report of the app's health, or the reason it is refused. The address says
+ * app, build and locale and nothing else; the body is { "id": 16 hex digits drawn anew,
+ * "errors": [lines], "looks": n, "failed": n, "ms": [middle, 95 in 100, longest] } and nothing else:
+ * at most twenty lines of printable text with no folder in them, whole numbers, and the times only
+ * when there were looks.
+ */
+export function errorsFor(said: URLSearchParams, text: string): { key: string; fields: Record<string, string>; body: string } | { error: string } {
+  const SAID = ['app', 'build', 'locale'], fields = Object.fromEntries(said)
+  if ([...said.keys()].length !== SAID.length || SAID.some((name) => !FIELDS[name]!.test(fields[name] ?? ''))) return { error: 'not a report' }
+  let read: unknown
+  try {
+    read = JSON.parse(text)
+  } catch {
+    return { error: 'not a report' }
+  }
+  if (typeof read !== 'object' || read === null || Array.isArray(read)) return { error: 'not a report' }
+  const { id, errors, looks, failed, ms, ...more } = read as Record<string, unknown>
+  const whole = (n: unknown, most: number): n is number => Number.isInteger(n) && (n as number) >= 0 && (n as number) <= most
+  if (Object.keys(more).length > 0 || typeof id !== 'string' || !FIELDS.run!.test(id) || !Array.isArray(errors) || errors.length > MOST_LINES) return { error: 'not a report' }
+  if (!whole(looks, 10_000_000) || !whole(failed, looks) || !Array.isArray(ms) || ms.length !== (looks > 0 ? 3 : 0) || !ms.every((n) => whole(n, 600_000))) return { error: 'not a report' }
+  for (const line of errors) if (typeof line !== 'string' || line.length < 1 || line.length > LONGEST_LINE || /[\u0000-\u001f\u007f]/.test(line) || FOLDER.test(line)) return { error: 'not a report' }
+  if (errors.length === 0 && looks === 0) return { error: 'not a report' }
+  return { key: `errors/${id}.json`, fields, body: JSON.stringify({ id, errors, looks, failed, ms }) }
+}
+
+/** The report is the body, what is said of the app and the game is in the address: /errors?app=...&build=...&locale=... A report sent twice is kept once. */
+async function errorsReport(request: Request, env: Env, address: string): Promise<Response> {
+  const { success } = await env.SAMPLE_LIMIT.limit({ key: address })
+  if (!success) return answer(429, 'too many samples, try again in a minute')
+  if (Number(request.headers.get('content-length')) > LARGEST) return answer(413, 'too large')
+  const text = await request.text()
+  if (text.length > LARGEST) return answer(413, 'too large')
+  const kept = errorsFor(new URL(request.url).searchParams, text)
+  if ('error' in kept) return answer(400, kept.error)
+  const day = today(), counts = await countsOf(env, day), app = kept.fields.app!
+  const why = ruledOut(await rulesOf(env), 'errors', null, app) ?? (wantedErrors(counts, env) > 0 ? null : 'enough')
+  if (why) return refuse(env, day, counts, why)
+  await env.SAMPLES.put(`count/${day}`, JSON.stringify({ ...counts, errors: counts.errors + 1, bytes: counts.bytes + kept.body.length, apps: { ...counts.apps, [app]: (counts.apps[app] ?? 0) + 1 } }))
+  await env.SAMPLES.put(`${day}/${kept.key}`, kept.body, { httpMetadata: { contentType: 'application/json' }, customMetadata: kept.fields })
+  return answer(201)
+}
+
 /**
  * What is still wanted today from this version of the app, by kind of data:
  * /want?map=36&app=0.14.0 answers { "minimap": { "found": 3, "failed": 100 }, "log": { "sessions": 990 } }.
@@ -297,6 +351,7 @@ async function want(request: Request, env: Env, address: string): Promise<Respon
   return Response.json({
     ...(map !== null && !ruledOut(rules, 'minimap', map, app) ? { minimap: wanted(counts, env, map) } : {}),
     ...(!ruledOut(rules, 'log', null, app) ? { log: { sessions: wantedLogs(counts, env) } } : {}),
+    ...(!ruledOut(rules, 'errors', null, app) ? { errors: { reports: wantedErrors(counts, env) } } : {}),
   })
 }
 
@@ -324,12 +379,12 @@ async function kept(request: Request, env: Env): Promise<Response> {
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const path = new URL(request.url).pathname
-    if (path !== '/feedback' && path !== '/sample' && path !== '/log' && path !== '/want' && path !== '/kept') return answer(404, 'not found')
+    if (path !== '/feedback' && path !== '/sample' && path !== '/log' && path !== '/errors' && path !== '/want' && path !== '/kept') return answer(404, 'not found')
     if (path === '/kept') return request.method === 'GET' ? kept(request, env) : answer(404, 'not found')
     // The address is the key of the limit and is not written anywhere.
     const address = request.headers.get('cf-connecting-ip') ?? 'unknown'
     if (path === '/want') return request.method === 'GET' ? want(request, env, address) : answer(405, 'GET only')
     if (request.method !== 'POST') return answer(405, 'POST only')
-    return path === '/sample' ? sample(request, env, address) : path === '/log' ? log(request, env, address) : feedback(request, env, address)
+    return path === '/sample' ? sample(request, env, address) : path === '/log' ? log(request, env, address) : path === '/errors' ? errorsReport(request, env, address) : feedback(request, env, address)
   },
 }

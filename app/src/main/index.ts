@@ -2,6 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, Menu, protocol, screen, shell } fr
 import { randomBytes } from 'node:crypto'
 import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { copyFile, readFile, writeFile } from 'node:fs/promises'
+import { hostname, userInfo } from 'node:os'
 import { join } from 'node:path'
 import { keep, keptFrom } from '../shared/kept'
 import { burnt } from '../shared/hdr'
@@ -24,6 +25,7 @@ import { homeAddress, LAN_PORT, startLan, type Lan, type Served } from './lan'
 import { startLink } from './link'
 import { startBosses } from './bosses'
 import { sendLog, startGameLog } from './gamelog'
+import { describe, fault, startHealth } from './health'
 import { startLog } from './log'
 import type { Answer, Asked, Placed, Sources } from './questie-worker'
 import startQuestieWorker from './questie-worker?nodeWorker'
@@ -66,11 +68,15 @@ function startTiles(gameFolder: string | null): { status: () => TilesStatus; ite
   // The picture of an item, or of a spell by its file, the folder does not have yet is made by the worker, which has the game's archive (item-icons.ts).
   const items = new Map<string, ((made: boolean) => void)[]>()
   worker.on('message', (told: TilesStatus | { asked: string; made: boolean }) => {
-    if (!('asked' in told)) return void (status = told)
+    if (!('asked' in told)) {
+      if (told.state === 'failed') fault(`map: ${told.message}`)
+      return void (status = told)
+    }
     for (const answer of items.get(told.asked) ?? []) answer(told.made)
     items.delete(told.asked)
   })
   worker.on('error', (e) => {
+    fault(`map: worker stopped: ${describe(e)}`)
     status = { state: 'failed', message: e instanceof Error ? e.message : String(e) }
     for (const answers of items.values()) for (const answer of answers) answer(false)
     items.clear()
@@ -107,7 +113,8 @@ function startQuests(
     asked.get(told.id)?.(told.found)
     asked.delete(told.id)
   })
-  worker.on('error', () => {
+  worker.on('error', (e) => {
+    fault(`quests: worker stopped: ${describe(e)}`)
     tell({ questie: null, pins: [], fixed: [] }) // no quests on the map; the rest of the app goes on
     for (const answer of asked.values()) answer([])
     for (const answer of askedSources.values()) answer(NONE)
@@ -157,7 +164,8 @@ function startWalks(gameFolder: string | null): { find: (ask: WalkAsk) => Promis
     asked.get(told.id)?.(told.path)
     asked.delete(told.id)
   })
-  worker.on('error', () => {
+  worker.on('error', (e) => {
+    fault(`walk: worker stopped: ${describe(e)}`)
     for (const answer of asked.values()) answer(null) // no line on the map, distances as the crow flies; the rest of the app goes on
     asked.clear()
   })
@@ -176,6 +184,9 @@ function startWalks(gameFolder: string | null): { find: (ask: WalkAsk) => Promis
 
 // The app's record of what happened to it, for the player to copy into a report.
 const record = startLog(join(app.getPath('userData'), 'twinmap.log'))
+// What falls over in the main process goes in the record, and in the reports of the app's health (health.ts).
+process.on('uncaughtExceptionMonitor', (e, origin) => fault(`${origin}: ${describe(e)}`))
+process.on('unhandledRejection', (why) => fault(`unhandled rejection: ${describe(why)}`))
 // Every send to the game goes in the record: its number, the parts it changes by kind (the name of
 // a mark holds its place, which the record does not keep), and how it goes: in how many fonts, or,
 // to an addon from before the fonts carried everything, in the font or in a slot.
@@ -242,12 +253,18 @@ function createWindow(): void {
   let reloadedAt = 0
   win.webContents.on('render-process-gone', (_event, gone) => {
     const again = gone.reason !== 'clean-exit' && Date.now() - reloadedAt > 60_000
-    record.say(`window: page gone (${gone.reason}, code ${gone.exitCode})${again ? ', loaded again' : ''}`)
+    const line = `window: page gone (${gone.reason}, code ${gone.exitCode})${again ? ', loaded again' : ''}`
+    if (gone.reason === 'clean-exit') record.say(line)
+    else fault(line)
     if (!again || win.isDestroyed()) return
     reloadedAt = Date.now()
     win.webContents.reload()
   })
-  win.webContents.on('unresponsive', () => record.say('window: page not answering'))
+  win.webContents.on('unresponsive', () => fault('window: page not answering'))
+  // An error the page did not catch, as its console tells it; not the pictures it could not find, which are many and expected.
+  win.webContents.on('console-message', (e) => {
+    if (e.level === 'error' && e.message.startsWith('Uncaught')) fault(`page: ${e.message.split('\n')[0]}`)
+  })
   win.webContents.on('responsive', () => record.say('window: page answering again'))
 
   // In development the renderer comes from the dev server, in a build from disk.
@@ -300,6 +317,18 @@ function createWindow(): void {
     record.say,
     process.env.TWINMAP_SAMPLES?.replace(/sample$/, 'log'),
     (asks) => quests.placed(asks), // what QuestieDB has with a place is not sent
+  )
+  // The app's health, for the same programme: its errors and the times of its looks at the minimap (health.ts).
+  const health = startHealth(
+    participates,
+    () => {
+      const build = gameFolder && installedBuild(gameFolder)?.version, locale = gameFolder && gameLocale(gameFolder)
+      return build && locale ? { app: app.getVersion(), build, locale } : null
+    },
+    (): [string, string][] => [...(gameFolder ? [[gameFolder, '<game>'] as [string, string]] : []), [app.getPath('userData'), '<data>'], [app.getAppPath(), '<app>'], [app.getPath('temp'), '<temp>'], [app.getPath('home'), '<home>']],
+    () => [userInfo().username, hostname(), ...Object.keys(sheets).flatMap((key) => key.split(' '))],
+    record.say,
+    process.env.TWINMAP_SAMPLES?.replace(/sample$/, 'errors'),
   )
   let walks = startWalks(gameFolder)
   // A file of the map, for the window and for a phone on the home network alike.
@@ -865,6 +894,7 @@ function createWindow(): void {
     if (marksTimer) clearTimeout(marksTimer)
     link.stop()
     gameLog.stop()
+    health.stop()
     tiles.stop()
     quests.stop()
     walks.stop()

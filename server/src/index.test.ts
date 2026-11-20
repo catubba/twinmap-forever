@@ -113,7 +113,7 @@ test('a sample is kept under its day and its run, with what it says', async () =
   const kept = samples.kept.get(`${today}/0123456789abcdef/07.png`)!
   assert.deepEqual(kept.value, png(238))
   assert.deepEqual(kept.options, { httpMetadata: { contentType: 'image/png' }, customMetadata: said })
-  assert.deepEqual(count(samples), { all: 1, logs: 0, maps: { '36': [1, 0] }, bytes: png(238).length, apps: { '0.13.0': 1 }, refused: {} })
+  assert.deepEqual(count(samples), { all: 1, logs: 0, errors: 0, maps: { '36': [1, 0] }, bytes: png(238).length, apps: { '0.13.0': 1 }, refused: {} })
 })
 
 test('what is not a sample is refused, and nothing is kept', async () => {
@@ -147,7 +147,7 @@ test('past the day\'s count, and in a burst from one address, a sample is refuse
 const want = (map: string, e: Env, app = '0.13.0'): Promise<Response> => worker.fetch(new Request(`https://api.twinmap.app/want?map=${map}&app=${app}`), e)
 /** What is wanted of the minimap alone: the log has its own test. */
 const mini = async (answer: Promise<Response>): Promise<unknown> => {
-  const { log: _, ...rest } = (await (await answer).json()) as Record<string, unknown>
+  const { log: _, errors: __, ...rest } = (await (await answer).json()) as Record<string, unknown>
   return rest
 }
 
@@ -185,7 +185,7 @@ test('the rules in the bucket switch a kind off, leave a dungeon out and ask for
     assert.deepEqual(await mini(want('36', e)), {}, off)
     assert.equal(await taken(), 503, off)
   }
-  assert.deepEqual(count(samples), { all: 0, logs: 0, maps: {}, bytes: 0, apps: {}, refused: { off: 5 } })
+  assert.deepEqual(count(samples), { all: 0, logs: 0, errors: 0, maps: {}, bytes: 0, apps: {}, refused: { off: 5 } })
   // Another kind off leaves this one alone.
   rules('{"off":["trainers"]}')
   assert.deepEqual(await mini(want('36', e)), { minimap: { found: 2, failed: 2 } })
@@ -201,7 +201,7 @@ test('the rules in the bucket switch a kind off, leave a dungeon out and ask for
   assert.equal(await taken(), 503)
   assert.deepEqual(await mini(want('36', e, '0.13.1')), { minimap: { found: 1, failed: 1 } })
   assert.equal(await taken({ ...SAID, n: '8', app: '1.2.0' }), 201)
-  assert.deepEqual(count(samples), { all: 2, logs: 0, maps: { '48': [0, 1], '36': [0, 1] }, bytes: 2 * png(238).length, apps: { '0.13.0': 1, '1.2.0': 1 }, refused: { off: 5, map: 1, app: 1 } })
+  assert.deepEqual(count(samples), { all: 2, logs: 0, errors: 0, maps: { '48': [0, 1], '36': [0, 1] }, bytes: 2 * png(238).length, apps: { '0.13.0': 1, '1.2.0': 1 }, refused: { off: 5, map: 1, app: 1 } })
   // Past the count of the day a refusal is counted too.
   assert.equal(await taken({ ...SAID, n: '9', app: '1.2.0' }), 503)
   assert.equal((count(samples) as { refused: Record<string, number> }).refused.enough, 1)
@@ -227,14 +227,14 @@ const wantLog = async (e: Env, query = 'app=0.14.0'): Promise<unknown> => (await
 
 test('a session of the log is kept under its day, written anew, and counted apart from the samples', async () => {
   const samples = bucket(), e = env(true, samples)
-  assert.deepEqual(await wantLog(e), { log: { sessions: 2 } })
+  assert.deepEqual(await wantLog(e), { log: { sessions: 2 }, errors: { reports: 0 } })
   assert.equal((await send(logOf(), e)).response.status, 201)
   const kept = samples.kept.get(`${today}/log/fedcba9876543210.json`)!
   assert.deepEqual(JSON.parse(String(kept.value)), SESSION)
   assert.deepEqual(kept.options, { httpMetadata: { contentType: 'application/json' }, customMetadata: GAME })
-  assert.deepEqual(count(samples), { all: 0, logs: 1, maps: {}, bytes: JSON.stringify(SESSION).length, apps: { '0.14.0': 1 }, refused: {} })
+  assert.deepEqual(count(samples), { all: 0, logs: 1, errors: 0, maps: {}, bytes: JSON.stringify(SESSION).length, apps: { '0.14.0': 1 }, refused: {} })
   // With a dungeon in the asking, both kinds are answered for; the samples have their room whole.
-  assert.deepEqual(await wantLog(e, 'map=36&app=0.14.0'), { minimap: { found: 2, failed: 2 }, log: { sessions: 1 } })
+  assert.deepEqual(await wantLog(e, 'map=36&app=0.14.0'), { minimap: { found: 2, failed: 2 }, log: { sessions: 1 }, errors: { reports: 0 } })
   // The same session again takes the place of the first; past the count of the day, refused.
   assert.equal((await send(logOf(), e)).response.status, 201)
   assert.equal((await send(logOf({ ...SESSION, id: '0000000000000001' }), e)).response.status, 503)
@@ -271,15 +271,15 @@ test('the log switched off in the rules leaves the samples of the minimap alone,
   const samples = bucket(), e = env(true, samples)
   const rules = (value: string): void => void samples.kept.set('rules', { value })
   rules('{"off":["log"]}')
-  assert.deepEqual(await wantLog(e, 'map=36&app=0.14.0'), { minimap: { found: 2, failed: 2 } })
+  assert.deepEqual(await wantLog(e, 'map=36&app=0.14.0'), { minimap: { found: 2, failed: 2 }, errors: { reports: 0 } })
   assert.equal((await send(logOf(), e)).response.status, 503)
   assert.equal((await send(sample(), e)).response.status, 201)
   rules('{"off":["minimap"]}')
-  assert.deepEqual(await wantLog(e, 'map=36&app=0.14.0'), { log: { sessions: 2 } })
+  assert.deepEqual(await wantLog(e, 'map=36&app=0.14.0'), { log: { sessions: 2 }, errors: { reports: 0 } })
   assert.equal((await send(logOf(), e)).response.status, 201)
   // A dungeon left out says nothing of the log, which is of no dungeon; an app too old is too old for both.
   rules('{"maps":[36],"app":"0.14.0"}')
-  assert.deepEqual(await wantLog(e, 'map=36&app=0.14.0'), { log: { sessions: 1 } })
+  assert.deepEqual(await wantLog(e, 'map=36&app=0.14.0'), { log: { sessions: 1 }, errors: { reports: 0 } })
   assert.deepEqual(await wantLog(e, 'map=48&app=0.13.9'), {})
   assert.equal((await send(logOf(SESSION, { ...GAME, app: '0.13.9' }), e)).response.status, 503)
   assert.deepEqual((count(samples) as { refused: unknown }).refused, { off: 1, app: 1 })
@@ -294,4 +294,41 @@ test('a dungeon left out in the rules takes its bosses and rares out of a sessio
   assert.equal((await send(logOf({ ...SESSION, id: '0123456789abcdef', e: run(36) }), e)).response.status, 503)
   assert.equal(samples.kept.has(`${today}/log/0123456789abcdef.json`), false)
   assert.deepEqual((count(samples) as { refused: unknown; logs: number }).refused, { map: 1 })
+})
+
+const REPORT = { id: '00112233445566aa', errors: ['tiles: worker stopped: Cannot read properties of undefined (reading \'rows\')'], looks: 120, failed: 30, ms: [180, 420, 900] }
+const reportOf = (report: unknown = REPORT, said: Record<string, string> = GAME): Request => new Request(`https://api.twinmap.app/errors?${new URLSearchParams(said)}`, { method: 'POST', body: typeof report === 'string' ? report : JSON.stringify(report) })
+
+test("a report of the app's health is kept under its day, written anew, counted apart, and switched off on its own", async () => {
+  const samples = bucket(), e = { ...env(true, samples), ERRORS_DAILY: '2' }
+  assert.deepEqual(await wantLog(e), { log: { sessions: 2 }, errors: { reports: 2 } })
+  assert.equal((await send(reportOf(), e)).response.status, 201)
+  const kept = samples.kept.get(`${today}/errors/00112233445566aa.json`)!
+  assert.deepEqual(JSON.parse(String(kept.value)), REPORT)
+  assert.deepEqual((kept.options as { customMetadata: unknown }).customMetadata, GAME)
+  assert.equal((count(samples) as { errors: number }).errors, 1)
+  samples.kept.set('rules', { value: '{"off":["errors"]}' })
+  assert.deepEqual(await wantLog(e), { log: { sessions: 2 } })
+  assert.equal((await send(reportOf({ ...REPORT, id: '00112233445566bb' }), e)).response.status, 503)
+  assert.equal((await send(logOf(), e)).response.status, 201)
+})
+
+test('what is not a report of the health is refused: a folder in a line, anything more, numbers that do not add up', async () => {
+  const e = { ...env(), ERRORS_DAILY: '9' }
+  for (const bad of [
+    { ...REPORT, errors: ["ENOENT: no such file, open 'C:\\Games\\World of Warcraft\\_forever_\\x'"] },
+    { ...REPORT, errors: ['at Object.<anonymous> (/Users/someone/app/main.js:1:1)'] },
+    { ...REPORT, errors: ['open \\\\server\\share\\file'] },
+    { ...REPORT, errors: ['a\nb'] },
+    { ...REPORT, errors: ['x'.repeat(301)] },
+    { ...REPORT, errors: Array(21).fill('x') },
+    { ...REPORT, failed: 121 },
+    { ...REPORT, ms: [] },
+    { ...REPORT, looks: 0, failed: 0, ms: [], errors: [] },
+    { ...REPORT, name: 'Catubbio' },
+    { ...REPORT, id: 'someone' },
+    'not json',
+  ]) assert.equal((await send(reportOf(bad), e)).response.status, 400, JSON.stringify(bad))
+  assert.equal((await send(reportOf(REPORT, { ...GAME, realm: 'x' }), e)).response.status, 400)
+  assert.equal((await send(reportOf({ ...REPORT, looks: 0, failed: 0, ms: [] }), e)).response.status, 201)
 })
