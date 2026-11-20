@@ -7,7 +7,7 @@ import * as THREE from 'three'
 import type { Terrain } from './terrain3d'
 
 const LENGTH = 8 // yards from tip to tail
-const LEAST = 20 // pixels on the screen it never goes under
+const LEAST = 30 // pixels on the screen it never goes under
 const HEIGHT = 0.16 * 1.6 // of its length: the "thickness" of the prototype
 const LIFT = 0.175 // of its length, off the ground
 const BAND = 0.02 // half the band round its edge
@@ -143,7 +143,11 @@ export class Arrow3d {
   }
 
   /** No arrow: the character is not on this map. */
+  /** Where the arrow is on the view, in pixels, and how far round it reaches: told when it changes, null when there is none. For what is drawn over the view to leave it in front. */
+  onscreen: ((at: { x: number; y: number; r: number } | null) => void) | null = null
+
   hide(): void {
+    this.onscreen?.(null)
     this.want = null
   }
 
@@ -185,6 +189,8 @@ export class Arrow3d {
     this.group.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(side, this.up, back))
     this.group.position.set(w.x, this.y, w.z).addScaledVector(this.up, LIFT * size)
     this.group.scale.setScalar(size)
+    const seen = this.group.position.clone().project(camera), { width, height } = this.terrain.size
+    this.onscreen?.({ x: ((seen.x + 1) / 2) * width, y: ((1 - seen.y) / 2) * height, r: (LEAST * size) / least / 2 })
     this.gold.opacity = this.dark.opacity = w.opacity
     this.ghostly.opacity = GHOST * w.opacity
     this.shadowy.opacity = SHADOW * w.opacity * (lifted ? 0.6 : 1)

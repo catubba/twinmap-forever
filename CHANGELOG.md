@@ -2,6 +2,26 @@
 
 What changed in each version of Twinmap, newest first. The section of a version is also the text of its release on GitHub and of the addon's file on CurseForge.
 
+## 0.13.0 - 2026-11-19
+
+### New
+
+- **Quests from far.** Zoom out past a zone and the quests to take and to hand in stay on the map, where every pin used to go. Those of one kind that would lie on each other become one pin, set a little aside from the others and from your arrow: the pointer on it lists them all with who gives them, and a click goes near enough to tell them apart.
+- **An item found opens who sells it.** The search lists an item once for each vendor who sells it, the nearest first. Choose one and the map goes to that vendor, as before, and now the vendor's panel opens too, with everything sold there, the prices and how many you already hold.
+
+### Changed
+
+- **The title from far.** Zoomed out, the map names the continent you are looking at, Eastern Kingdoms or Kalimdor, where it named the zone that happened to be in its middle.
+- **The arrow in 3D.** From afar it is half again as large, and nothing lies over it: the pins and the line of a journey leave room round it. In 2D the gold ring of an open label no longer covers it.
+- **One click to download.** The buttons on twinmap.app and on GitHub now download the installer itself, where they opened the page of the release.
+
+### Fixed
+
+- **Dun Morogh.** Its vendors, trainers, innkeepers and other services had no pin, nor its ore and its herbs, and neither the search nor Nearby found them: from Kharanos the nearest vendor was said to be in Ironforge. Without Questie, the objectives and the hand-ins of your quests there were missing too. They are all on the map now.
+- **Memory on a long journey.** The app took hundreds of MB more as you travelled across a continent, and never gave them back. The same travel now takes about a sixth of that.
+
+The addon is the same as in 0.12.1, with the new number.
+
 ## 0.12.1 - 2026-11-19
 
 ### Changed

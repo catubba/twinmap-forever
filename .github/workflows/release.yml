@@ -76,8 +76,11 @@ jobs:
           PRE=""
           case "$VERSION" in *-*) PRE="--prerelease" ;; esac
           UPDATE_FILES=$(ls dist/*.yml | grep -v builder-)
+          # The installer once more under a name with no version in it: the address of the latest one is then always
+          # the same (releases/latest/download/Twinmap-Setup.exe), for the site and the README to link the download itself.
+          cp "dist/Twinmap-Setup-$VERSION.exe" dist/Twinmap-Setup.exe
           gh release create "$GITHUB_REF_NAME" --title "Twinmap $VERSION" --notes-file notes.md $PRE \
-            "dist/Twinmap-Setup-$VERSION.exe" "dist/Twinmap-Setup-$VERSION.exe.blockmap" $UPDATE_FILES
+            "dist/Twinmap-Setup-$VERSION.exe" "dist/Twinmap-Setup-$VERSION.exe.blockmap" $UPDATE_FILES dist/Twinmap-Setup.exe
 
       # The result goes into the release notes, and into virustotal.json for the badge of the README and of the site.
       # A scan that fails does not take the release back: it is published already.

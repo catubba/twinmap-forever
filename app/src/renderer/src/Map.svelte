@@ -16,12 +16,12 @@
   import { MORE_BOSS_PINS } from '../../shared/more-boss-pins'
   import type { Position } from '../../shared/game'
   import { coloursFor, type Companion } from '../../shared/group'
-  import { unitsOfPlace, unitsOfRect, type Point } from '../../shared/geo'
+  import { clearOf, gathered, unitsOfPlace, unitsOfRect, type Point } from '../../shared/geo'
   import { addFix, BEHIND, PERIOD, whereAt, type Fix } from '../../shared/glide'
   import { boxOf, buildingsAt, killedIn, nameOfBoss, piecesIn, RARE_BOSSES, roomPixels, yardsInside, YARDS_PER_UNIT, type Box, type InteriorMap, type Interiors, type Piece, type UnderRoom, type Yards } from '../../shared/inside'
   import type { Continent, GameMap } from '../../shared/maps'
   import type { QuestPin } from '../../shared/quests'
-  import { iconOf, serves, type FixedLayer, type FixedPin, type Travel } from '../../shared/services'
+  import { iconOf, panelFor, serves, type FixedLayer, type FixedPin, type Travel } from '../../shared/services'
   import { pictureOfBlock, tileOfPicture } from '../../shared/pixels'
   import { WORLDS } from '../../shared/world'
   import { LAYER_GROUPS, layersFrom, type LayerId } from '../../shared/layers'
@@ -56,6 +56,8 @@
   const ROOFED = new Set([1458])
   const CITY_UNDER = 3e6 // square yards: a zone map smaller than this is a city
   const PIN_ZOOM = 3.5 // under this zoom the pins of a zone lie on each other: they are not shown
+  const GATHER = 26 // pixels: from far, the quests to take (or to hand in) nearer than this to each other are one pin
+  const QUEST_ZOOM = 2 // the quests to take and to hand in are few: they are shown from farther, as the doors of the dungeons are
   const FAR = 3 // under this zoom the names of the regions are written small
   const EDGE = 14 // px from the edge of the map's box that a name keeps clear: the frame and a little air
   const GROUND_INSIDE = 0.45 // how bright the ground of a dungeon is: its rooms are what matters
@@ -277,7 +279,7 @@
   let places: Place[] = []
   const pins = L.layerGroup()
   const arrow = L.marker([0, 0], {
-    zIndexOffset: 2000,
+    zIndexOffset: 5000, // over every pin and the ring of a label: the character is never under anything
     interactive: false,
     keyboard: false, // nothing to do on it: not a stop for Tab
     icon: L.divIcon({
@@ -400,7 +402,8 @@
   function look(): void {
     if (browsing && inside) return void (looking = { zone: inside.name, where: '' }) // a dungeon opened from outside: its name, not the character's place
     if (!map || following || inside) return void (looking = null)
-    const middle = map.getCenter(), found = zoneAt(maps, continent, { x: middle.lng, y: -middle.lat })
+    // From far, where the pins of a zone are not shown, it is the continent that is looked at, not the zone in its middle.
+    const middle = map.getCenter(), found = map.getZoom() < PIN_ZOOM ? null : zoneAt(maps, continent, { x: middle.lng, y: -middle.lat })
     looking = { zone: found?.zone.name ?? NAMES[continent], where: found ? `${found.place.x.toFixed(1)}, ${found.place.y.toFixed(1)}` : '' }
   }
   $effect(look) // following, the continent on show, a dungeon entered or left, or opened from outside
@@ -656,8 +659,10 @@
       pin: found ? { m: found.zone.id, ...found.place } : null,
       ...(to.item && { item: to.item }), // an item found: its picture beside the name
     }
-    // A vendor or a trainer found: its panel opens as for a click on its pin.
-    const target = at(to.at), npc = laid.find((l) => l.pin.npc && l.pin.name === to.title && view.distance(target, l.at) < 1)?.pin
+    // A vendor or a trainer found, by its name or as the one who sells the item found: its panel opens as for a click on its pin.
+    // The nearest to the place: in a town several vendors of one thing stand within a step of the map.
+    const target = at(to.at), far = (l: (typeof laid)[number]): number => view.distance(target, l.at)
+    const npc = laid.filter((l) => panelFor(l.pin, to) && far(l) < 1).sort((a, b) => far(a) - far(b))[0]?.pin
     if (npc) labelled.npc = { ...npc }
   }
 
@@ -1039,9 +1044,35 @@
   $effect(() => {
     for (const group of Object.values(questLayers)) group.clearLayers()
     const zones = new Map(maps.filter((m) => m.level === 'zone' && m.rect && m.area && m.continent === continent).map((m) => [m.area, m]))
-    for (const p of quests) {
+    // From far the pins to take, and those to hand in, that would lie on each other are one, in their middle: it names them all, and a click goes near enough to tell them apart.
+    const far = zoom < PIN_ZOOM ? zoom : null
+    const placed = quests.flatMap((p) => {
       const zone = zones.get(p.area)
-      if (!zone?.rect) continue
+      return zone?.rect ? [{ p, zone, ...unitsOfPlace(zone.rect, p.x, p.y) }] : []
+    })
+    const alone = new Set(placed)
+    if (far !== null) {
+      const groups = (['available', 'turnin'] as const).flatMap((type) => gathered(placed.filter((q) => q.p.type === type), GATHER / 2 ** far).filter((g) => g.of.length > 1).map((g) => ({ ...g, type })))
+      for (const group of groups) for (const q of group.of) alone.delete(q)
+      // Such a pin says "around here": it stands a little aside rather than on another pin or on the character's arrow.
+      const taken: Point[] = [...[...alone].filter((q) => q.p.type !== 'objective'), ...(me && me.continent === continent ? [me.units] : [])]
+      for (const group of groups) {
+        const [drawing, layer, above] = QUEST_PINS[group.type], size = pinSize(drawing), units = clearOf(group, taken, (size + 4) / 2 ** far)
+        taken.push(units)
+        const tip = document.createElement('span')
+        group.of.forEach((q, i) => {
+          if (i) tip.append(document.createElement('br'))
+          tip.append(Object.assign(document.createElement('b'), { textContent: q.p.name }))
+          for (const quest of q.p.quests) if (quest !== q.p.name) tip.append(document.createElement('br'), quest)
+        })
+        L.marker(at(units), { keyboard: false, zIndexOffset: above, icon: L.divIcon({ className: 'door', iconSize: [size, size], html: pin(drawing) }) })
+          .bindTooltip(tip, { direction: 'top', offset: [0, -size / 2], className: 'tip' })
+          .on('click', () => map?.setView(at(units), PIN_ZOOM + 1.5))
+          .addTo(questLayers[layer])
+      }
+    }
+    for (const { p, zone } of alone) {
+      if (!zone.rect) continue
       const [plain, layer, above] = QUEST_PINS[p.type]
       // An objective is drawn by what it asks for, where the addon told.
       const drawing: PinName = p.type === 'objective' && p.kind ? p.kind : plain
@@ -1057,10 +1088,10 @@
         .addTo(questLayers[layer])
     }
   })
-  // Not inside a dungeon, whose map is another; not from far, where they would cover the land.
+  // Not inside a dungeon, whose map is another; not from far, where they would cover the land: the objectives, which are many, go first.
   $effect(() => {
     for (const [id, group] of Object.entries(questLayers) as [keyof typeof questLayers, L.LayerGroup][]) {
-      if (map && layers[id] && !inside && zoom >= PIN_ZOOM) group.addTo(map)
+      if (map && layers[id] && !inside && zoom >= (id === 'objectives' ? PIN_ZOOM : QUEST_ZOOM)) group.addTo(map)
       else group.remove()
     }
   })

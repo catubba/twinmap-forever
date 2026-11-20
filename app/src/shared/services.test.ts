@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest'
 import { unitsOfPlace, unitsOfWorld } from './geo'
 import type { GameMap } from './maps'
-import { iconOf, resourceOf, serves, servicesOf, travel, TRAVEL_FORMAT, type FixedLayer } from './services'
+import { iconOf, panelFor, resourceOf, serves, servicesOf, travel, TRAVEL_FORMAT, type FixedLayer, type FixedPin } from './services'
 import type { Row, Table } from './wdc5'
 
 // A table of the game, as far as these readers look at one: rows of columns, a column a value or a list.
@@ -41,6 +41,17 @@ test('a pin is for a side when it serves it, and for everyone while the side is 
   expect(serves({ side: 'A' }, 'H')).toBe(false)
   expect(serves({ side: 'A' }, undefined)).toBe(true)
   expect(serves({}, 'H'), 'ore has no side').toBe(true)
+})
+
+test('the panel of a vendor opens for its name, and for an item it sells', () => {
+  const brianna: FixedPin = { area: 44, x: 22, y: 44.8, name: 'Innkeeper Brianna', layers: ['inn', 'vendors'], npc: 6727, sells: [159, 1179] }
+  expect(panelFor(brianna, { title: 'Innkeeper Brianna' })).toBe(true)
+  expect(panelFor(brianna, { title: 'Refreshing Spring Water', item: 159 }), 'found as who sells the item').toBe(true)
+  expect(panelFor(brianna, { title: 'Rough Arrow', item: 2512 }), 'an item she does not sell').toBe(false)
+  expect(panelFor(brianna, { title: 'Refreshing Spring Water' }), 'a name alone that is not hers').toBe(false)
+  // A flight master has no panel, and a trainer sells nothing.
+  expect(panelFor({ area: 44, x: 30, y: 59, name: 'Ariena Stormfeather', layers: ['flight'] }, { title: 'Ariena Stormfeather' })).toBe(false)
+  expect(panelFor({ area: 44, x: 30, y: 59, name: 'Dockmaster Baren', layers: ['trainers'], npc: 381 }, { title: 'Spotted Sunfish', item: 1467 })).toBe(false)
 })
 
 test('doors and flights come from the tables of the maps and of the flight paths', () => {
