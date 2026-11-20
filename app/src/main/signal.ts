@@ -7,9 +7,10 @@
 // too big for one font goes in pieces, one font each. An addon older than this (no "X-Channel: 2"
 // in its .toc) is still told the old way: a font for the change alone, and for what does not fit or
 // was missed the slots, small addons the game loads on demand, only SLOTS of them in one session of
-// its interface. Nothing else writes the slots any more.
+// its interface. Nothing else writes the slots any more: they are made for such an addon alone, and
+// taken away once the addon beside them needs none (removeSlots).
 // Slots adapted from wow-ai, Copyright (c) 2026 chelinho139, MIT License: full text in THIRD-PARTY-LICENSES.
-import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, renameSync, writeFileSync, writeSync } from 'node:fs'
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, renameSync, rmSync, writeFileSync, writeSync } from 'node:fs'
 import { link } from 'node:fs/promises'
 import { randomBytes } from 'node:crypto'
 import { join } from 'node:path'
@@ -208,34 +209,36 @@ function readOutbox(addons: string): Outbox {
 /** The parts the game has, or will have once it reads: everything sent so far and not taken away. */
 export const sentParts = (addons: string): Record<string, unknown> => readOutbox(addons).parts
 
-/** Whether the bank and the slots are all in this AddOns folder. */
-export const channelInstalled = (addons: string): boolean => existsSync(join(addons, SIGNAL, nameOf(BANK - 1))) && existsSync(slotFile(addons, SLOTS))
+/** Whether the bank is all in this AddOns folder. */
+export const channelInstalled = (addons: string): boolean => existsSync(join(addons, SIGNAL, nameOf(BANK - 1)))
+const SLOT_TITLE = '## Title: Twinmap Forever slot '
+const slotToc = (addons: string, i: number): string => join(addons, slotName(i), slotName(i) + '.toc')
 
 /**
- * Puts the bank of font names and the slots into the game's AddOns folder, next to the addon. Does
- * nothing where they already are. True when something was made: the game sees new names only from
- * its next start.
+ * Puts the bank of font names into the game's AddOns folder, next to the addon; with slots, for an
+ * addon from before the fonts carried everything, the slots too. Does nothing where they already
+ * are. True when something was made: the game sees new names only from its next start.
  * ponytail: hard links need NTFS; on another file system this throws and the channel stays off. Copy the files if anyone has the game on one.
  */
-export async function installChannel(addons: string): Promise<boolean> {
-  if (channelInstalled(addons)) return false
+export async function installChannel(addons: string, slots = false): Promise<boolean> {
+  if (channelInstalled(addons) && (!slots || existsSync(slotFile(addons, SLOTS)))) return false
   const dir = join(addons, SIGNAL)
   mkdirSync(dir, { recursive: true })
   const font = buildFont(readOutbox(addons).mark, dataAdvances())
   // A bank left half made is finished, never made again: a running game may already hold its names.
-  for (let i = 0; i < BANK; i++) {
+  for (let i = channelInstalled(addons) ? BANK : 0; i < BANK; i++) {
     const file = join(dir, nameOf(i))
     if (existsSync(file)) continue
     if (i % LINKS === 0) writeFileSync(file, font)
     else await link(join(dir, nameOf(i - (i % LINKS))), file)
   }
-  for (let i = 1; i <= SLOTS; i++) {
+  for (let i = 1; slots && i <= SLOTS; i++) {
     const name = slotName(i)
     mkdirSync(join(addons, name), { recursive: true })
     if (!existsSync(slotFile(addons, i))) writeFileSync(slotFile(addons, i), 'TwinmapForeverInbox = nil\n')
     writeFileSync(join(addons, name, name + '.toc'), [
       '## Interface: 16001',
-      `## Title: Twinmap Forever slot ${String(i).padStart(2, '0')}`,
+      SLOT_TITLE + String(i).padStart(2, '0'),
       '## Notes: Carries what Twinmap sends to the game. Loaded on demand; leave it enabled.',
       '## LoadOnDemand: 1',
       '## Dependencies: TwinmapForever',
@@ -245,6 +248,25 @@ export async function installChannel(addons: string): Promise<boolean> {
     ].join('\r\n'))
   }
   return true
+}
+
+/**
+ * Takes away the slots an app before this one made, thirty folders the addon of today never loads.
+ * Only a folder that has our .toc in it: one of the same name made by anything else is left alone.
+ * Gives how many went.
+ */
+export function removeSlots(addons: string): number {
+  let gone = 0
+  for (let i = 1; i <= SLOTS; i++) {
+    try {
+      if (!readFileSync(slotToc(addons, i), 'utf8').includes(SLOT_TITLE)) continue
+      rmSync(join(addons, slotName(i)), { recursive: true })
+      gone++
+    } catch {
+      // not there, not ours to read, or held by something: the next start tries again
+    }
+  }
+  return gone
 }
 
 const nextMark = (mark: number): number => (mark % SEQ_MAX) + 1
@@ -371,7 +393,7 @@ export function sendOld(addons: string, changed: Record<string, unknown>): { seq
   atomicWrite(outboxFile(addons), JSON.stringify(box))
   // The slots before the signal: a new number must find the news there.
   const lua = `TwinmapForeverInbox = ${toLua({ seq, parts: box.parts })}\n`
-  for (let i = 1; i <= SLOTS; i++) atomicWrite(slotFile(addons, i), lua)
+  for (let i = 1; i <= SLOTS; i++) if (existsSync(slotToc(addons, i))) atomicWrite(slotFile(addons, i), lua)
   // prev: an addon that missed a send must not apply this one alone, so it loads a slot instead.
   const news = Buffer.from(JSON.stringify({ seq, prev, parts: changed }))
   const inFont = news.length <= CAPACITY

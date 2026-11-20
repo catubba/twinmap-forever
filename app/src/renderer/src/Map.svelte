@@ -1266,7 +1266,7 @@
     else myPinsLayer.remove()
   })
 
-  // The companions of the group: a disc each, in a colour of their own and with what they do in the
+  // The companions of the group: a disc each, in the colour of their class and with what they do in the
   // group drawn on it, where the game or their own Twinmap tells they are. Inside a dungeon only
   // their Twinmap can tell, and the disc is on the dungeon's map while that is on show.
   // ponytail: a disc jumps to each new place; it can glide as the arrow does (glide.ts) if that reads badly.
@@ -1275,7 +1275,7 @@
   let companionColours = new Map<string, string>()
   $effect(() => {
     const here = new Set<string>()
-    companionColours = coloursFor(group.map((c) => c.name), companionColours)
+    companionColours = coloursFor(group, companionColours)
     for (const c of group) {
       const zone = inside || c.map === undefined ? undefined : maps.find((m) => m.id === c.map)
       const within = inside && c.inst === inside.id ? yardsInside({ id: c.inst, x: c.wx, y: c.wy }) : undefined

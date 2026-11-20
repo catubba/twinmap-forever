@@ -27,7 +27,7 @@ import type { Answer, Asked, Sources } from './questie-worker'
 import startQuestieWorker from './questie-worker?nodeWorker'
 import { gameLocale, sendSamples, startSamples } from './samples'
 import { addonHearsFonts, addonsFolder, readSettings, setupStatus, writeSettings } from './setup'
-import { hear, installChannel, send as sendSignal, sendOld, sentParts } from './signal'
+import { hear, installChannel, removeSlots, send as sendSignal, sendOld, sentParts } from './signal'
 import { servedFile } from './tiles'
 import startTilesWorker from './tiles-worker?nodeWorker'
 import { updateFirst } from './update'
@@ -623,7 +623,15 @@ function createWindow(): void {
     // a game already running then sends everything again at once. With it goes the version of this
     // app, which is the newest the addon can be: an older addon says so in the game's chat.
     // Small enough to ride the font.
-    channel = installChannel(addons)
+    // The slots are for an addon from before the fonts carried everything. Beside one of today they
+    // are thirty folders nothing loads: taken away, with the game closed, since a game that started
+    // with an older addon may still load one.
+    const fonts = addonHearsFonts(gameFolder)
+    if (fonts && findGameWindow() === null) {
+      const gone = removeSlots(addons)
+      if (gone) record.say(`took away ${gone} slot folders the addon no longer needs`)
+    }
+    channel = installChannel(addons, !fonts)
       .then(() => void send(addons, { sync: Date.now(), latest: app.getVersion(), sheet: heldOf(sheets) }, addonHearsFonts(gameFolder!)))
       .then(() => (marksTimer ??= setTimeout(sendMarks, MARKS_WAIT)))
       .catch(() => {})

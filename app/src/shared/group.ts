@@ -1,5 +1,7 @@
 // The companions of the group, as the addon tells them (addon/TwinmapForever/Group.lua).
 
+import { CLASS_COLORS } from './characters'
+
 export interface Companion {
   name: string
   /** The game's word for the class: "MAGE", "WARRIOR". */
@@ -18,16 +20,19 @@ export interface Companion {
 /** What a companion does in the group, where the group gave roles: tank, healer, damage. */
 export type Role = 'T' | 'H' | 'D'
 
-/** The colours companions are drawn in: none is the gold of the character's own arrow. */
+/** The colours of companions whose class the game did not tell: none is the gold of the character's own arrow. */
 export const COMPANION_COLOURS = ['#4cc9f0', '#ff6b9d', '#7ae582', '#ff9f43', '#b388ff'] as const
 
 /**
- * A colour for each companion, by name: no two alike while the colours last (a group has four
- * companions, a raid more than there are colours), and who had one keeps it as others come and go.
+ * A colour for each companion, by name: the colour the game gives their class, as players expect.
+ * Without a class, one of COMPANION_COLOURS: no two alike while the colours last (a raid has more
+ * companions than there are colours), and who had one keeps it as others come and go.
  */
-export function coloursFor(names: string[], before: ReadonlyMap<string, string> = new Map()): Map<string, string> {
+export function coloursFor(group: Pick<Companion, 'name' | 'cls'>[], before: ReadonlyMap<string, string> = new Map()): Map<string, string> {
   const out = new Map<string, string>()
-  for (const name of names) if (before.has(name)) out.set(name, before.get(name)!)
+  for (const { name, cls } of group) if (cls && CLASS_COLORS[cls]) out.set(name, CLASS_COLORS[cls])
+  const names = group.map((c) => c.name)
+  for (const name of names) if (!out.has(name) && (COMPANION_COLOURS as readonly string[]).includes(before.get(name)!)) out.set(name, before.get(name)!)
   for (const name of names) {
     if (out.has(name)) continue
     const taken = new Set(out.values())

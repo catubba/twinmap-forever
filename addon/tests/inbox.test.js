@@ -473,7 +473,7 @@ test('with no bank to read (the addon without the app) it gives up quietly, and 
 test('the addon and the app agree on the numbers of the channel', () => {
   const lua = fs.readFileSync(path.join(DIR, 'Inbox.lua'), 'utf8');
   const ts = fs.readFileSync(path.join(__dirname, '..', '..', 'app', 'src', 'main', 'signal.ts'), 'utf8');
-  assert.ok(lua.includes(`local SLOTS = ${app.SLOTS} `) && lua.includes(`local BANK = ${app.BANK} `));
+  assert.ok(lua.includes(`left = ${app.SLOTS},`) && lua.includes(`local BANK = ${app.BANK} `));
   assert.ok(lua.includes('local EM, A_BASE, A_STEP = 1000, 100, 50') && ts.includes('const EM = 1000, A_BASE = 100, A_STEP = 50'));
   assert.ok(lua.includes('local B_WIDTH, C_WIDTH = 1000, 500') && ts.includes('const B_WIDTH = 1000, C_WIDTH = 500'));
   assert.ok(lua.includes('DATA_FIRST, DATA_LETTERS = 0xE000, 1024') && ts.includes('DATA_FIRST = 0xe000') && ts.includes('DATA_LETTERS = 1024'));
