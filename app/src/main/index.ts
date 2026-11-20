@@ -22,6 +22,7 @@ import { readHdr } from './hdr'
 import { gameFolderFrom, installedBuild, registryInstallPath } from './client-files'
 import { homeAddress, LAN_PORT, startLan, type Lan, type Served } from './lan'
 import { startLink } from './link'
+import { startGameLog } from './gamelog'
 import { startLog } from './log'
 import type { Answer, Asked, Sources } from './questie-worker'
 import startQuestieWorker from './questie-worker?nodeWorker'
@@ -258,6 +259,18 @@ function createWindow(): void {
       void sendSamples(run, { app: app.getVersion(), build, locale }, participates, process.env.TWINMAP_SAMPLES).then((sent) => record.say(`samples: ${sent} of ${run.samples.length} sent`))
     },
   )
+  // The addon's log of the same programme, read from the settings the game saves (gamelog.ts).
+  const gameLog = startGameLog(
+    () => gameFolder,
+    join(app.getPath('userData'), 'log-sent.json'),
+    () => {
+      const build = gameFolder && installedBuild(gameFolder)?.version, locale = gameFolder && gameLocale(gameFolder)
+      return build && locale ? { app: app.getVersion(), build, locale } : null
+    },
+    participates,
+    record.say,
+    process.env.TWINMAP_SAMPLES?.replace(/sample$/, 'log'),
+  )
   let tiles = startTiles(gameFolder)
   // The pins go to the window when they change, and once more when its page has loaded.
   let questsNow: QuestsStatus = { questie: null, pins: [] }
@@ -430,6 +443,13 @@ function createWindow(): void {
     settings.participate = on === true
     writeSettings(settingsFile, settings)
     setup = lookSetup()
+    // The addon keeps its log only after a yes, and lets go of it at a no: told at once, and again at every start (readyChannel).
+    if (!gameFolder || !channel) return
+    try {
+      send(addonsFolder(gameFolder), { log: participates() }, addonHearsFonts(gameFolder))
+    } catch {
+      // the way to the game is not there: it is told at the next start
+    }
   })
   let setup = lookSetup()
   // The way back to the game: once the addon is there, the bank of font names and the slots go next
@@ -622,7 +642,8 @@ function createWindow(): void {
     // Once the way is there, the addon is told that this app was just opened and has heard nothing yet:
     // a game already running then sends everything again at once. With it goes the version of this
     // app, which is the newest the addon can be: an older addon says so in the game's chat.
-    // Small enough to ride the font.
+    // Small enough to ride the font. And whether the addon is to keep its log (Log.lua): the
+    // player's choice, told again at every start, since it may have changed with the game closed.
     // The slots are for an addon from before the fonts carried everything. Beside one of today they
     // are thirty folders nothing loads: taken away, with the game closed, since a game that started
     // with an older addon may still load one.
@@ -632,7 +653,7 @@ function createWindow(): void {
       if (gone) record.say(`took away ${gone} slot folders the addon no longer needs`)
     }
     channel = installChannel(addons, !fonts)
-      .then(() => void send(addons, { sync: Date.now(), latest: app.getVersion(), sheet: heldOf(sheets) }, addonHearsFonts(gameFolder!)))
+      .then(() => void send(addons, { sync: Date.now(), latest: app.getVersion(), sheet: heldOf(sheets), log: participates() }, addonHearsFonts(gameFolder!)))
       .then(() => (marksTimer ??= setTimeout(sendMarks, MARKS_WAIT)))
       .catch(() => {})
   }
@@ -821,6 +842,7 @@ function createWindow(): void {
     lan?.stop()
     if (marksTimer) clearTimeout(marksTimer)
     link.stop()
+    gameLog.stop()
     tiles.stop()
     quests.stop()
     walks.stop()

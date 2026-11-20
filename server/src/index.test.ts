@@ -1,7 +1,7 @@
 // node --test server/src/index.test.ts
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import worker, { fenced, issueFor, LARGEST_SAMPLE, LONGEST, type Env } from './index.ts'
+import worker, { fenced, issueFor, LARGEST_LOG, LARGEST_SAMPLE, LONGEST, type Env } from './index.ts'
 
 /** A bucket in memory, with what was put in it. */
 function bucket(): Env['SAMPLES'] & { kept: Map<string, { value: string | Uint8Array; options?: unknown }> } {
@@ -20,7 +20,7 @@ function bucket(): Env['SAMPLES'] & { kept: Map<string, { value: string | Uint8A
 }
 const env = (allowed = true, samples = bucket(), each = '5'): Env => {
   const limit = { limit: async () => ({ success: allowed }) }
-  return { INBOX: 'someone/inbox', GITHUB_TOKEN: 'secret', LIMIT: limit, SAMPLE_LIMIT: limit, SAMPLES: samples, DAILY: '2', MAP_DAILY: each }
+  return { INBOX: 'someone/inbox', GITHUB_TOKEN: 'secret', LIMIT: limit, SAMPLE_LIMIT: limit, SAMPLES: samples, DAILY: '2', MAP_DAILY: each, LOG_DAILY: '2' }
 }
 const post = (body: string, path = '/feedback'): Request => new Request(`https://api.twinmap.app${path}`, { method: 'POST', body })
 
@@ -113,7 +113,7 @@ test('a sample is kept under its day and its run, with what it says', async () =
   const kept = samples.kept.get(`${today}/0123456789abcdef/07.png`)!
   assert.deepEqual(kept.value, png(238))
   assert.deepEqual(kept.options, { httpMetadata: { contentType: 'image/png' }, customMetadata: said })
-  assert.deepEqual(count(samples), { all: 1, maps: { '36': [1, 0] }, bytes: png(238).length, apps: { '0.13.0': 1 }, refused: {} })
+  assert.deepEqual(count(samples), { all: 1, logs: 0, maps: { '36': [1, 0] }, bytes: png(238).length, apps: { '0.13.0': 1 }, refused: {} })
 })
 
 test('what is not a sample is refused, and nothing is kept', async () => {
@@ -145,23 +145,28 @@ test('past the day\'s count, and in a burst from one address, a sample is refuse
 })
 
 const want = (map: string, e: Env, app = '0.13.0'): Promise<Response> => worker.fetch(new Request(`https://api.twinmap.app/want?map=${map}&app=${app}`), e)
+/** What is wanted of the minimap alone: the log has its own test. */
+const mini = async (answer: Promise<Response>): Promise<unknown> => {
+  const { log: _, ...rest } = (await (await answer).json()) as Record<string, unknown>
+  return rest
+}
 
 test('each dungeon has its own count for the day, of places found and of places not found, and says what it still wants', async () => {
   const samples = bucket(), e = { ...env(true, samples, '2'), DAILY: '100' }
   const found = { ...SAID, u: '10', v: '20', score: '0.9' }, followed = { ...SAID, u: '10', v: '20', score: '0.6' }
-  assert.deepEqual(await (await want('36', e)).json(), { minimap: { found: 2, failed: 2 } })
+  assert.deepEqual(await mini(want('36', e)), { minimap: { found: 2, failed: 2 } })
   // Two with no sure place (one of them followed under SURE), then no more of those; the ones with a place still go.
   for (const [said, status] of [[{ ...SAID, n: '0' }, 201], [{ ...followed, n: '1' }, 201], [{ ...SAID, n: '2' }, 503], [{ ...found, n: '3' }, 201]] as const) assert.equal((await send(sample(said), e)).response.status, status)
-  assert.deepEqual(await (await want('36', e)).json(), { minimap: { found: 1, failed: 0 } })
+  assert.deepEqual(await mini(want('36', e)), { minimap: { found: 1, failed: 0 } })
   // Another dungeon is not touched by it.
-  assert.deepEqual(await (await want('48', e)).json(), { minimap: { found: 2, failed: 2 } })
+  assert.deepEqual(await mini(want('48', e)), { minimap: { found: 2, failed: 2 } })
   assert.equal((await send(sample({ ...SAID, map: '48' }), e)).response.status, 201)
   assert.deepEqual((count(samples) as { all: number; maps: unknown }).maps, { '36': [1, 2], '48': [0, 1] })
   assert.equal((count(samples) as { all: number }).all, 4)
   // The count of everyone caps what a dungeon may still want; a count kept as a bare number, as before, is read.
-  assert.deepEqual(await (await want('36', { ...e, DAILY: '4' })).json(), { minimap: { found: 0, failed: 0 } })
+  assert.deepEqual(await mini(want('36', { ...e, DAILY: '4' })), { minimap: { found: 0, failed: 0 } })
   samples.kept.set(`count/${today}`, { value: '99' })
-  assert.deepEqual(await (await want('36', e)).json(), { minimap: { found: 1, failed: 1 } })
+  assert.deepEqual(await mini(want('36', e)), { minimap: { found: 1, failed: 1 } })
   assert.equal((await want('x', e)).status, 400)
   assert.equal((await want('36', e, 'new')).status, 400)
   assert.equal((await want('36', env(false))).status, 429)
@@ -173,30 +178,30 @@ test('the rules in the bucket switch a kind off, leave a dungeon out and ask for
   const rules = (value: string): void => void samples.kept.set('rules', { value })
   const taken = async (said: Record<string, string> = SAID): Promise<number> => (await send(sample(said), e)).response.status
   // No rules: everything is taken.
-  assert.deepEqual(await (await want('36', e)).json(), { minimap: { found: 2, failed: 2 } })
+  assert.deepEqual(await mini(want('36', e)), { minimap: { found: 2, failed: 2 } })
   // The kind off: the app is told it is not wanted, and one that sends all the same is refused and counted.
   for (const off of ['{"off":["minimap"]}', '{"off":["*"]}', '{"off":"minimap"}', 'not json', '[]']) {
     rules(off)
-    assert.deepEqual(await (await want('36', e)).json(), {}, off)
+    assert.deepEqual(await mini(want('36', e)), {}, off)
     assert.equal(await taken(), 503, off)
   }
-  assert.deepEqual(count(samples), { all: 0, maps: {}, bytes: 0, apps: {}, refused: { off: 5 } })
+  assert.deepEqual(count(samples), { all: 0, logs: 0, maps: {}, bytes: 0, apps: {}, refused: { off: 5 } })
   // Another kind off leaves this one alone.
   rules('{"off":["trainers"]}')
-  assert.deepEqual(await (await want('36', e)).json(), { minimap: { found: 2, failed: 2 } })
+  assert.deepEqual(await mini(want('36', e)), { minimap: { found: 2, failed: 2 } })
   // A dungeon left out, the others taken.
   rules('{"maps":[36]}')
-  assert.deepEqual(await (await want('36', e)).json(), {})
+  assert.deepEqual(await mini(want('36', e)), {})
   assert.equal(await taken(), 503)
-  assert.deepEqual(await (await want('48', e)).json(), { minimap: { found: 2, failed: 2 } })
+  assert.deepEqual(await mini(want('48', e)), { minimap: { found: 2, failed: 2 } })
   assert.equal(await taken({ ...SAID, map: '48' }), 201)
   // An app older than asked for, and one that is not.
   rules('{"app":"0.13.1"}')
-  assert.deepEqual(await (await want('36', e)).json(), {})
+  assert.deepEqual(await mini(want('36', e)), {})
   assert.equal(await taken(), 503)
-  assert.deepEqual(await (await want('36', e, '0.13.1')).json(), { minimap: { found: 1, failed: 1 } })
+  assert.deepEqual(await mini(want('36', e, '0.13.1')), { minimap: { found: 1, failed: 1 } })
   assert.equal(await taken({ ...SAID, n: '8', app: '1.2.0' }), 201)
-  assert.deepEqual(count(samples), { all: 2, maps: { '48': [0, 1], '36': [0, 1] }, bytes: 2 * png(238).length, apps: { '0.13.0': 1, '1.2.0': 1 }, refused: { off: 5, map: 1, app: 1 } })
+  assert.deepEqual(count(samples), { all: 2, logs: 0, maps: { '48': [0, 1], '36': [0, 1] }, bytes: 2 * png(238).length, apps: { '0.13.0': 1, '1.2.0': 1 }, refused: { off: 5, map: 1, app: 1 } })
   // Past the count of the day a refusal is counted too.
   assert.equal(await taken({ ...SAID, n: '9', app: '1.2.0' }), 503)
   assert.equal((count(samples) as { refused: Record<string, number> }).refused.enough, 1)
@@ -213,4 +218,69 @@ test('what is kept is listed and given to who has the secret, and to nobody else
   assert.deepEqual(new Uint8Array(await one.arrayBuffer()), png(238))
   assert.deepEqual(JSON.parse(one.headers.get('x-fields')!), said)
   assert.equal((await kept('key=nothing', 'the-secret')).status, 404)
+})
+
+const GAME = { app: '0.14.0', build: '1.60.1.70938', locale: 'enUS' }
+const SESSION = { log: 1, id: 'fedcba9876543210', v: '0.14.0', e: [['door', 12, 3065, 1455, 0.3012, 0.6243]] }
+const logOf = (session: unknown = SESSION, said: Record<string, string> = GAME): Request => new Request(`https://api.twinmap.app/log?${new URLSearchParams(said)}`, { method: 'POST', body: typeof session === 'string' ? session : JSON.stringify(session) })
+const wantLog = async (e: Env, query = 'app=0.14.0'): Promise<unknown> => (await worker.fetch(new Request(`https://api.twinmap.app/want?${query}`), e)).json()
+
+test('a session of the log is kept under its day, written anew, and counted apart from the samples', async () => {
+  const samples = bucket(), e = env(true, samples)
+  assert.deepEqual(await wantLog(e), { log: { sessions: 2 } })
+  assert.equal((await send(logOf(), e)).response.status, 201)
+  const kept = samples.kept.get(`${today}/log/fedcba9876543210.json`)!
+  assert.deepEqual(JSON.parse(String(kept.value)), SESSION)
+  assert.deepEqual(kept.options, { httpMetadata: { contentType: 'application/json' }, customMetadata: GAME })
+  assert.deepEqual(count(samples), { all: 0, logs: 1, maps: {}, bytes: JSON.stringify(SESSION).length, apps: { '0.14.0': 1 }, refused: {} })
+  // With a dungeon in the asking, both kinds are answered for; the samples have their room whole.
+  assert.deepEqual(await wantLog(e, 'map=36&app=0.14.0'), { minimap: { found: 2, failed: 2 }, log: { sessions: 1 } })
+  // The same session again takes the place of the first; past the count of the day, refused.
+  assert.equal((await send(logOf(), e)).response.status, 201)
+  assert.equal((await send(logOf({ ...SESSION, id: '0000000000000001' }), e)).response.status, 503)
+  assert.equal([...samples.kept.keys()].filter((key) => key.includes('/log/')).length, 1)
+  assert.equal((await send(logOf(), env(false))).response.status, 429)
+})
+
+test('what is not a session of the log is refused: a text among the numbers, a name, anything more', async () => {
+  for (const [i, [request, status]] of ([
+    [logOf('not json'), 400],
+    [logOf([SESSION]), 400],
+    [logOf({ ...SESSION, e: [] }), 400],
+    [logOf({ ...SESSION, e: [['door', 1, 'Someone']] }), 400],
+    [logOf({ ...SESSION, e: [['Door of Someone', 1, 2]] }), 400],
+    [logOf({ ...SESSION, e: [['door', 1, [2]]] }), 400],
+    [logOf({ ...SESSION, e: [['door']] }), 400],
+    [logOf({ ...SESSION, e: [['door', ...Array<number>(20).fill(1)]] }), 400],
+    [logOf({ ...SESSION, id: '../../count/x' }), 400],
+    [logOf({ ...SESSION, v: 'new' }), 400],
+    [logOf({ ...SESSION, log: 2 }), 400],
+    [logOf({ ...SESSION, name: 'Someone' }), 400],
+    [logOf(SESSION, { ...GAME, name: 'Someone' }), 400],
+    [logOf(SESSION, { app: '0.14.0', build: '1.60.1.70938' }), 400],
+    [logOf({ ...SESSION, e: Array(20000).fill(['door', 1, 123456.789]) }), 413],
+  ] as const).entries()) {
+    const samples = bucket()
+    assert.equal((await send(request, env(true, samples))).response.status, status, `case ${i}`)
+    assert.equal(samples.kept.size, 0)
+  }
+  assert.ok(JSON.stringify({ ...SESSION, e: Array(20000).fill(['door', 1, 123456.789]) }).length > LARGEST_LOG)
+})
+
+test('the log switched off in the rules leaves the samples of the minimap alone, and the other way round', async () => {
+  const samples = bucket(), e = env(true, samples)
+  const rules = (value: string): void => void samples.kept.set('rules', { value })
+  rules('{"off":["log"]}')
+  assert.deepEqual(await wantLog(e, 'map=36&app=0.14.0'), { minimap: { found: 2, failed: 2 } })
+  assert.equal((await send(logOf(), e)).response.status, 503)
+  assert.equal((await send(sample(), e)).response.status, 201)
+  rules('{"off":["minimap"]}')
+  assert.deepEqual(await wantLog(e, 'map=36&app=0.14.0'), { log: { sessions: 2 } })
+  assert.equal((await send(logOf(), e)).response.status, 201)
+  // A dungeon left out says nothing of the log, which is of no dungeon; an app too old is too old for both.
+  rules('{"maps":[36],"app":"0.14.0"}')
+  assert.deepEqual(await wantLog(e, 'map=36&app=0.14.0'), { log: { sessions: 1 } })
+  assert.deepEqual(await wantLog(e, 'map=48&app=0.13.9'), {})
+  assert.equal((await send(logOf(SESSION, { ...GAME, app: '0.13.9' }), e)).response.status, 503)
+  assert.deepEqual((count(samples) as { refused: unknown }).refused, { off: 1, app: 1 })
 })

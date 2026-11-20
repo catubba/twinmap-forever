@@ -14,6 +14,7 @@ routes = [{ pattern = "api.twinmap.app", custom_domain = true }]
 INBOX = "catubba/twinmap-inbox"
 DAILY = "3000" # samples taken in a day from everyone (a sample is 51 KB on average, 200 KB at the most); 0 takes none
 MAP_DAILY = "100" # of them, from one dungeon: this many where the place was found, and as many where it was not
+LOG_DAILY = "1000" # sessions of the addon's log taken in a day from everyone (a session is 200 KB at the most, a few hundred bytes as a rule); 0 takes none
 
 # About five messages a minute from one address. Cloudflare counts loosely: a quick burst gets
 # some fifteen through before the refusals start (seen on 15 November 2026).

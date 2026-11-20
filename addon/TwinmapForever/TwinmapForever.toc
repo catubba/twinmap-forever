@@ -19,6 +19,8 @@ Group.lua
 Bosses.lua
 Death.lua
 Inbox.lua
+Log.lua
+Doors.lua
 Pin.lua
 Route.lua
 Marks.lua

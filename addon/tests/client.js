@@ -403,6 +403,20 @@ const STUB = `
   end
   function T_click(name) return rawget(_G[name], "OnClick")(_G[name]) end
   function T_slide(name, value) return rawget(_G[name], "OnValueChanged")(_G[name], tonumber(value)) end
+  -- The saved settings as the game writes them to their file, at logout or /reload.
+  local function saved(v, pad)
+    if type(v) == "string" then return (string.format("%q", v):gsub("\\\\\\n", "\\\\n")) end
+    if type(v) ~= "table" then return tostring(v) end
+    local out, n = {}, #v
+    for i = 1, n do out[#out + 1] = pad .. "\\t" .. saved(v[i], pad .. "\\t") .. ", -- [" .. i .. "]" end
+    for k, x in pairs(v) do
+      if not (math.type(k) == "integer" and k >= 1 and k <= n) then
+        out[#out + 1] = pad .. "\\t[" .. (type(k) == "string" and string.format("%q", k) or tostring(k)) .. "] = " .. saved(x, pad .. "\\t") .. ","
+      end
+    end
+    return "{\\n" .. table.concat(out, "\\n") .. (#out > 0 and "\\n" or "") .. pad .. "}"
+  end
+  function T_saved() return "\\nTwinmapForeverDB = " .. saved(TwinmapForeverDB, "") .. "\\n" end
   function T_printed() return table.concat(printed, "\\n") end
   function T_ns(key) return tostring(ns[key]) end
 `;
@@ -462,6 +476,8 @@ function loadAddon(dir, { addons } = {}) {
   });
 
   if (lauxlib.luaL_dostring(L, to_luastring(STUB)) !== lua.LUA_OK) throw new Error(to_jsstring(lua.lua_tostring(L, -1)));
+  // The game draws its random numbers anew at each start; this VM would give the same ones every time.
+  lauxlib.luaL_dostring(L, to_luastring(`math.randomseed(${Date.now() % 2 ** 31 ^ (Math.random() * 2 ** 31)})`));
   const run = () => {
     for (const f of toc.files) call('T_load', name, fs.readFileSync(path.join(dir, f), 'utf8'), f);
   };
@@ -479,6 +495,8 @@ function loadAddon(dir, { addons } = {}) {
     slots: () => Number(call('T_slots')),
     slash: (text) => call('T_slash', text),
     printed: () => call('T_printed'),
+    // The file of saved settings the game would write now.
+    saved: () => call('T_saved'),
     ns: (key) => call('T_ns', key),
     lua: (code) => call('T_lua', code),
     click: (name) => call('T_click', name),

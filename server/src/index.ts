@@ -15,6 +15,10 @@
 // (Rules) switches a kind of data off, leaves a dungeon out, or asks for a newer app. The count of
 // the day says what was taken and what was refused, and /kept, for us alone, lists and gives what
 // is in the bucket.
+//
+// And it takes the sessions of the addon's log (/log): what the addon wrote down by itself, a kind
+// and numbers an entry, read by the app from the game's saved settings. Kept in the same bucket,
+// under the same rules as a kind of data of its own, "log".
 
 export interface Env {
   INBOX: string // owner/name of the private repository
@@ -24,6 +28,7 @@ export interface Env {
   SAMPLES: Bucket
   DAILY: string // samples taken in a day, from everyone; 0 takes none
   MAP_DAILY: string // of them, from one dungeon: this many where the app found the place, and as many where it did not
+  LOG_DAILY: string // sessions of the addon's log taken in a day, from everyone; 0 takes none
   ADMIN_TOKEN?: string // a secret: who has it may list and read the bucket (/kept); without it nobody may
 }
 interface Limit {
@@ -40,6 +45,7 @@ const LARGEST = 100_000 // bytes of a request
 export const LONGEST = { message: 5000, email: 200, details: 1500, log: 50_000 } as const // characters; an issue holds 65,536
 
 export const LARGEST_SAMPLE = 200_000 // bytes: a minimap cut wider than needed came to 144,000 as a PNG
+export const LARGEST_LOG = 200_000 // bytes of a session: LARGEST of the addon's Log.lua, which keeps no more than that
 
 const place = /^-?\d{1,6}(\.\d{1,2})?$/
 /** What a sample may say, and nothing else: a name not here is refused. */
@@ -58,9 +64,10 @@ export const SURE = 0.75 // SURE of app/src/shared/minimap.ts: a likeness under 
 /** Whether a sample is one where the app found no sure place. */
 const lost = (fields: Record<string, string>): boolean => !(Number(fields.score) >= SURE)
 
-/** The samples taken today: all of them, for each dungeon those with a place found and those without, their bytes, how many from each version of the app, and how many were refused and why. */
+/** What was taken today: all the samples, for each dungeon those with a place found and those without, the sessions of the log, the bytes of everything, how many from each version of the app, and how many were refused and why. */
 interface Counts {
   all: number
+  logs: number
   maps: Record<string, [number, number]>
   bytes: number
   apps: Record<string, number>
@@ -70,7 +77,7 @@ interface Counts {
 /**
  * What is switched off without publishing the worker again, in the file rules of the bucket:
  *   { "off": ["minimap"], "maps": [36], "app": "0.14.0" }
- * off: the kinds of data not taken ("*" for all of them); maps: the dungeons not taken; app: the
+ * off: the kinds of data not taken, "minimap" or "log" ("*" for all of them); maps: the dungeons not taken; app: the
  * oldest version of the app still taken. No file, or a part left out, switches nothing off. A file
  * or a part that cannot be read switches that part off for everyone: a slip of the hand while
  * closing must not leave it open.
@@ -80,7 +87,7 @@ export interface Rules {
   maps?: unknown
   app?: unknown
 }
-const KIND = 'minimap' // the one kind of data there is so far
+type Kind = 'minimap' | 'log'
 async function rulesOf(env: Env): Promise<Rules> {
   try {
     const kept: unknown = JSON.parse((await (await env.SAMPLES.get('rules'))?.text()) ?? '{}')
@@ -95,11 +102,11 @@ const older = (a: string, b: string): boolean => {
   return false
 }
 const REFUSED = { off: 'not taken for now', map: 'not taken from this dungeon', app: 'this version of Twinmap is too old', enough: 'enough samples for today' } as const
-/** Why the rules leave out a sample of this dungeon from this version of the app, or null when they do not. */
-function ruledOut(rules: Rules, map: string, app: string): keyof typeof REFUSED | null {
+/** Why the rules leave out this kind of data from this version of the app, or null when they do not. map: the dungeon a sample is of; the log is of no dungeon. */
+function ruledOut(rules: Rules, kind: Kind, map: string | null, app: string): keyof typeof REFUSED | null {
   const off = rules.off === undefined ? [] : Array.isArray(rules.off) ? rules.off.map(String) : ['*']
-  if (off.includes('*') || off.includes(KIND)) return 'off'
-  if (rules.maps !== undefined && (!Array.isArray(rules.maps) || rules.maps.map(String).includes(map))) return 'map'
+  if (off.includes('*') || off.includes(kind)) return 'off'
+  if (map !== null && rules.maps !== undefined && (!Array.isArray(rules.maps) || rules.maps.map(String).includes(map))) return 'map'
   if (rules.app !== undefined && (typeof rules.app !== 'string' || !FIELDS.app!.test(rules.app) || older(app, rules.app))) return 'app'
   return null
 }
@@ -112,10 +119,17 @@ async function countsOf(env: Env, day: string): Promise<Counts> {
     // not ours: counted from nothing
   }
   if (typeof kept === 'number') kept = { all: kept } // as it was kept before the dungeons had their own counts
-  const { all, maps, bytes, apps, refused } = (typeof kept === 'object' && kept !== null ? kept : {}) as Partial<Counts>
+  const { all, logs, maps, bytes, apps, refused } = (typeof kept === 'object' && kept !== null ? kept : {}) as Partial<Counts>
   const table = <T>(value: T | undefined): T => (typeof value === 'object' && value !== null ? value : {}) as T
-  return { all: typeof all === 'number' ? all : 0, maps: table(maps), bytes: typeof bytes === 'number' ? bytes : 0, apps: table(apps), refused: table(refused) }
+  return { all: typeof all === 'number' ? all : 0, logs: typeof logs === 'number' ? logs : 0, maps: table(maps), bytes: typeof bytes === 'number' ? bytes : 0, apps: table(apps), refused: table(refused) }
 }
+/** One refusal more in the count of the day, and the answer that says why. */
+async function refuse(env: Env, day: string, counts: Counts, why: keyof typeof REFUSED): Promise<Response> {
+  await env.SAMPLES.put(`count/${day}`, JSON.stringify({ ...counts, refused: { ...counts.refused, [why]: (counts.refused[why] ?? 0) + 1 } }))
+  return answer(503, REFUSED[why])
+}
+/** How many more sessions of the log are taken today. */
+const wantedLogs = (counts: Counts, env: Env): number => Math.max(0, Number(env.LOG_DAILY) - counts.logs) || 0
 /** How many more samples of a dungeon are taken today, of each kind. */
 function wanted(counts: Counts, env: Env, map: string): { found: number; failed: number } {
   const room = Number(env.DAILY) - counts.all, each = Number(env.MAP_DAILY), [found, failed] = counts.maps[map] ?? [0, 0]
@@ -138,6 +152,33 @@ export function sampleFor(said: URLSearchParams, bytes: Uint8Array): { key: stri
   const sizes = new DataView(bytes.buffer, bytes.byteOffset), width = sizes.getUint32(16), height = sizes.getUint32(20)
   if (width !== height || width < 32 || width > 1024) return { error: 'not a minimap' }
   return { key: `${fields.run}/${fields.n!.padStart(2, '0')}.png`, fields }
+}
+
+const SAID = ['app', 'build', 'locale'] as const // what the app says of the game a session comes from
+const ENTRY_KIND = /^[a-z]{1,12}$/
+/**
+ * What is kept of a session of the addon's log, or the reason it is refused. A session is
+ * { "log": 1, "id": 16 hex digits, "v": version of the addon, "e": entries }, an entry a kind and
+ * numbers: nothing else gets in, so no text the game or a player wrote. What is kept is written
+ * anew from what was read.
+ */
+export function logFor(said: URLSearchParams, text: string): { key: string; fields: Record<string, string>; body: string } | { error: string } {
+  const fields = Object.fromEntries(said)
+  if ([...said.keys()].length !== SAID.length || SAID.some((name) => !FIELDS[name]!.test(fields[name] ?? ''))) return { error: 'not a log' }
+  let read: unknown
+  try {
+    read = JSON.parse(text)
+  } catch {
+    return { error: 'not a log' }
+  }
+  if (typeof read !== 'object' || read === null || Array.isArray(read)) return { error: 'not a log' }
+  const { log, id, v, e, ...more } = read as Record<string, unknown>
+  if (log !== 1 || Object.keys(more).length > 0 || typeof id !== 'string' || !FIELDS.run!.test(id) || typeof v !== 'string' || !FIELDS.app!.test(v) || !Array.isArray(e) || e.length < 1) return { error: 'not a log' }
+  for (const entry of e as unknown[]) {
+    if (!Array.isArray(entry) || entry.length < 2 || entry.length > 20 || typeof entry[0] !== 'string' || !ENTRY_KIND.test(entry[0])) return { error: 'not a log' }
+    if (entry.slice(1).some((n) => typeof n !== 'number' || !Number.isFinite(n))) return { error: 'not a log' }
+  }
+  return { key: `log/${id}.json`, fields, body: JSON.stringify({ log, id, v, e }) }
 }
 
 const answer = (status: number, error?: string): Response => Response.json(error ? { error } : { ok: true }, { status })
@@ -204,12 +245,9 @@ async function sample(request: Request, env: Env, address: string): Promise<Resp
   // ponytail: read, then write: two samples at the same instant count as one, so a day may take a
   // few over DAILY. A Durable Object counts exactly, if that ever matters.
   const day = today(), counts = await countsOf(env, day), map = kept.fields.map!, app = kept.fields.app!, kind = lost(kept.fields) ? 1 : 0
-  const why = ruledOut(await rulesOf(env), map, app) ?? (wanted(counts, env, map)[kind ? 'failed' : 'found'] > 0 ? null : 'enough')
-  if (why) {
-    // The app asks before it sends, so a refusal here is rare: an app that did not ask, or a rule changed meanwhile.
-    await env.SAMPLES.put(`count/${day}`, JSON.stringify({ ...counts, refused: { ...counts.refused, [why]: (counts.refused[why] ?? 0) + 1 } }))
-    return answer(503, REFUSED[why])
-  }
+  const why = ruledOut(await rulesOf(env), 'minimap', map, app) ?? (wanted(counts, env, map)[kind ? 'failed' : 'found'] > 0 ? null : 'enough')
+  // The app asks before it sends, so a refusal here is rare: an app that did not ask, or a rule changed meanwhile.
+  if (why) return refuse(env, day, counts, why)
   const of = counts.maps[map] ?? [0, 0]
   of[kind]++
   await env.SAMPLES.put(`count/${day}`, JSON.stringify({ ...counts, all: counts.all + 1, maps: { ...counts.maps, [map]: of }, bytes: counts.bytes + bytes.length, apps: { ...counts.apps, [app]: (counts.apps[app] ?? 0) + 1 } }))
@@ -217,19 +255,40 @@ async function sample(request: Request, env: Env, address: string): Promise<Resp
   return answer(201)
 }
 
+/** The session is the body, what is said of the game it comes from is in the address: /log?app=...&build=...&locale=... A session sent twice is kept once. */
+async function log(request: Request, env: Env, address: string): Promise<Response> {
+  const { success } = await env.SAMPLE_LIMIT.limit({ key: address })
+  if (!success) return answer(429, 'too many samples, try again in a minute')
+  if (Number(request.headers.get('content-length')) > LARGEST_LOG) return answer(413, 'too large')
+  const text = await request.text()
+  if (text.length > LARGEST_LOG) return answer(413, 'too large')
+  const kept = logFor(new URL(request.url).searchParams, text)
+  if ('error' in kept) return answer(400, kept.error)
+  const day = today(), counts = await countsOf(env, day), app = kept.fields.app!
+  const why = ruledOut(await rulesOf(env), 'log', null, app) ?? (wantedLogs(counts, env) > 0 ? null : 'enough')
+  if (why) return refuse(env, day, counts, why)
+  await env.SAMPLES.put(`count/${day}`, JSON.stringify({ ...counts, logs: counts.logs + 1, bytes: counts.bytes + kept.body.length, apps: { ...counts.apps, [app]: (counts.apps[app] ?? 0) + 1 } }))
+  await env.SAMPLES.put(`${day}/${kept.key}`, kept.body, { httpMetadata: { contentType: 'application/json' }, customMetadata: kept.fields })
+  return answer(201)
+}
+
 /**
- * What is still wanted today from this version of the app in this dungeon, by kind of data:
- * /want?map=36&app=0.14.0 answers { "minimap": { "found": 3, "failed": 100 } }. A kind that is
- * not in the answer is not wanted at all. Asked by the app before it sends; nothing is kept of the asking.
+ * What is still wanted today from this version of the app, by kind of data:
+ * /want?map=36&app=0.14.0 answers { "minimap": { "found": 3, "failed": 100 }, "log": { "sessions": 990 } }.
+ * A kind that is not in the answer is not wanted at all. Without a map the samples of the minimap,
+ * which are of a dungeon, are not answered for. Asked by the app before it sends; nothing is kept of the asking.
  */
 async function want(request: Request, env: Env, address: string): Promise<Response> {
   const { success } = await env.SAMPLE_LIMIT.limit({ key: address })
   if (!success) return answer(429, 'too many samples, try again in a minute')
-  const asked = new URL(request.url).searchParams, map = asked.get('map') ?? '', app = asked.get('app') ?? ''
-  if (!FIELDS.map!.test(map)) return answer(400, 'not a map')
+  const asked = new URL(request.url).searchParams, map = asked.get('map'), app = asked.get('app') ?? ''
+  if (map !== null && !FIELDS.map!.test(map)) return answer(400, 'not a map')
   if (!FIELDS.app!.test(app)) return answer(400, 'not an app')
-  if (ruledOut(await rulesOf(env), map, app)) return Response.json({})
-  return Response.json({ [KIND]: wanted(await countsOf(env, today()), env, map) })
+  const rules = await rulesOf(env), counts = await countsOf(env, today())
+  return Response.json({
+    ...(map !== null && !ruledOut(rules, 'minimap', map, app) ? { minimap: wanted(counts, env, map) } : {}),
+    ...(!ruledOut(rules, 'log', null, app) ? { log: { sessions: wantedLogs(counts, env) } } : {}),
+  })
 }
 
 const same = (a: string, b: string): boolean => {
@@ -256,12 +315,12 @@ async function kept(request: Request, env: Env): Promise<Response> {
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const path = new URL(request.url).pathname
-    if (path !== '/feedback' && path !== '/sample' && path !== '/want' && path !== '/kept') return answer(404, 'not found')
+    if (path !== '/feedback' && path !== '/sample' && path !== '/log' && path !== '/want' && path !== '/kept') return answer(404, 'not found')
     if (path === '/kept') return request.method === 'GET' ? kept(request, env) : answer(404, 'not found')
     // The address is the key of the limit and is not written anywhere.
     const address = request.headers.get('cf-connecting-ip') ?? 'unknown'
     if (path === '/want') return request.method === 'GET' ? want(request, env, address) : answer(405, 'GET only')
     if (request.method !== 'POST') return answer(405, 'POST only')
-    return path === '/sample' ? sample(request, env, address) : feedback(request, env, address)
+    return path === '/sample' ? sample(request, env, address) : path === '/log' ? log(request, env, address) : feedback(request, env, address)
   },
 }
