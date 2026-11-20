@@ -22,7 +22,8 @@ import { readHdr } from './hdr'
 import { gameFolderFrom, installedBuild, registryInstallPath } from './client-files'
 import { homeAddress, LAN_PORT, startLan, type Lan, type Served } from './lan'
 import { startLink } from './link'
-import { startGameLog } from './gamelog'
+import { startBosses } from './bosses'
+import { sendLog, startGameLog } from './gamelog'
 import { startLog } from './log'
 import type { Answer, Asked, Placed, Sources } from './questie-worker'
 import startQuestieWorker from './questie-worker?nodeWorker'
@@ -262,17 +263,20 @@ function createWindow(): void {
   // character leaves it. With it off nothing is kept and nothing is sent. TWINMAP_SAMPLES, for trials, names another address.
   const participates = (): boolean => settings.participate === true
   const samples = startSamples(participates)
+  const bosses = startBosses(participates, app.getVersion()) // where the bosses die, sent at the same moment (bosses.ts)
   const link = startLink(
     () => {
       const made = tiles.status()
       return made.state === 'ready' ? made.folder : null
     },
     (report, seen, own, now) => {
-      const run = samples.take(report, seen, own, now)
-      if (!run || !gameFolder) return
+      const run = samples.take(report, seen, own, now), killed = bosses.take(report, now)
+      if (!(run || killed) || !gameFolder) return
       const build = installedBuild(gameFolder)?.version, locale = gameLocale(gameFolder)
       if (!build || !locale) return record.say('samples: not sent, the build or the language of the game is not known')
-      void sendSamples(run, { app: app.getVersion(), build, locale }, participates, process.env.TWINMAP_SAMPLES).then((sent) => record.say(`samples: ${sent} of ${run.samples.length} sent`))
+      const said = { app: app.getVersion(), build, locale }
+      if (run) void sendSamples(run, said, participates, process.env.TWINMAP_SAMPLES).then((sent) => record.say(`samples: ${sent} of ${run.samples.length} sent`))
+      if (killed) void sendLog([killed], said, participates, process.env.TWINMAP_SAMPLES?.replace(/sample$/, 'log')).then((sent) => record.say(`bosses: ${sent.length ? 'sent' : 'not sent'}`))
     },
   )
   let tiles = startTiles(gameFolder)
@@ -756,6 +760,7 @@ function createWindow(): void {
       }
     }
     quests.show(snapshot.state.sections.questie, snapshot.state.sections.quests)
+    bosses.kills(snapshot.state.sections.kills, Date.now())
     takeSheet(snapshot.state.sections.sheet)
     lookPortrait(snapshot.state, Date.now())
     win.webContents.send('link', snapshot)

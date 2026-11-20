@@ -1,7 +1,8 @@
 -- The bosses killed in the dungeon or raid the character is in, for the app's map: it draws them
 -- as done. The game tells each kill as it happens, with the name of the boss.
--- Section "kills": { map = the instance's map, list = { names }, ids = { numbers of the fights } }, sent
--- inside an instance only. The names are in the game's language; the numbers are the same in every one,
+-- Section "kills": { map = the instance's map, list = { names }, ids = { numbers of the fights },
+-- rares = { numbers of the rare creatures targeted } }, sent inside an instance only. The rares tell the
+-- participation programme which of them were there in a run (the app's bosses.ts). The names are in the game's language; the numbers are the same in every one,
 -- and the app finds by them the boss of a game in another language.
 --
 -- The list is kept with the saved settings, so a /reload or a walk back in after a wipe does not
@@ -50,11 +51,27 @@ local function Killed(name, id)
   ns.db.kills = k
 end
 
+-- A rare creature targeted in here, as the game classes it, is kept with the kills.
+local function Met()
+  local map, guid, class = Instance(), Str(Try(UnitGUID, "target")), Str(Try(UnitClassification, "target"))
+  local npc = map and guid and (class == "rare" or class == "rareelite") and tonumber(guid:match("^Creature%-%d+%-%d+%-%d+%-%d+%-(%d+)%-"))
+  if not (npc and ns.db) then return end
+  local k = Kept(map) or { map = map, list = {}, at = Now() }
+  k.rares = type(k.rares) == "table" and k.rares or {}
+  for _, had in ipairs(k.rares) do
+    if had == npc then return end
+  end
+  k.rares[#k.rares + 1] = npc
+  ns.db.kills = k
+end
+
 local frame = CreateFrame("Frame")
 -- Not every game has every event: one it does not know is left out.
-for _, event in ipairs({ "ENCOUNTER_END", "BOSS_KILL", "CHAT_MSG_SYSTEM" }) do pcall(frame.RegisterEvent, frame, event) end
+for _, event in ipairs({ "ENCOUNTER_END", "BOSS_KILL", "CHAT_MSG_SYSTEM", "PLAYER_TARGET_CHANGED" }) do pcall(frame.RegisterEvent, frame, event) end
 frame:SetScript("OnEvent", function(_, event, a, name, _, _, success)
-  if event == "BOSS_KILL" then
+  if event == "PLAYER_TARGET_CHANGED" then
+    Met()
+  elseif event == "BOSS_KILL" then
     Killed(name, a)
   elseif event == "ENCOUNTER_END" then
     if Num(success) == 1 then Killed(name, a) end
@@ -66,10 +83,12 @@ end)
 ns.sections[#ns.sections + 1] = { name = "kills", period = 1, build = function()
   local map = Instance()
   if not map then return end
-  local k, list, ids = Kept(map), {}, {}
+  local k, list, ids, rares = Kept(map), {}, {}, {}
   for i, name in ipairs(k and k.list or {}) do list[i] = name end
   for i, id in ipairs(k and type(k.ids) == "table" and k.ids or {}) do ids[i] = id end
+  for i, npc in ipairs(k and type(k.rares) == "table" and k.rares or {}) do rares[i] = npc end
   table.sort(list)
   table.sort(ids)
-  return { map = map, list = list, ids = ids }
+  table.sort(rares)
+  return { map = map, list = list, ids = ids, rares = rares }
 end }

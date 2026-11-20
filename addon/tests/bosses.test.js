@@ -31,15 +31,15 @@ test('in the open world nothing is said of bosses', () => {
 test('a boss killed in a dungeon is told once, however the game tells it, and a fight lost is not', () => {
   const addon = enterWorld(STOCKADE);
   addon.run(12);
-  assert.deepEqual(kills(addon), { map: 34, list: [], ids: [] });
+  assert.deepEqual(kills(addon), { map: 34, list: [], ids: [], rares: [] });
   addon.lua(`T_fire(${JSON.stringify(['ENCOUNTER_END', 2757, 'Kam Deepfury', 1, 5, 0]).slice(1, -1)})`); // a wipe
   addon.lua(`T_fire(${JSON.stringify(['ENCOUNTER_END', 2756, 'Targorr the Dread', 1, 5, 1]).slice(1, -1)})`);
   addon.lua(`T_fire(${JSON.stringify(['BOSS_KILL', 2756, 'Targorr the Dread']).slice(1, -1)})`);
   addon.run(3);
-  assert.deepEqual(kills(addon), { map: 34, list: ['Targorr the Dread'], ids: [2756] });
+  assert.deepEqual(kills(addon), { map: 34, list: ['Targorr the Dread'], ids: [2756], rares: [] });
   addon.lua(`T_fire(${JSON.stringify(['BOSS_KILL', 2758, 'Hamhock']).slice(1, -1)})`);
   addon.run(3);
-  assert.deepEqual(kills(addon), { map: 34, list: ['Hamhock', 'Targorr the Dread'], ids: [2756, 2758] });
+  assert.deepEqual(kills(addon), { map: 34, list: ['Hamhock', 'Targorr the Dread'], ids: [2756, 2758], rares: [] });
 });
 
 test('the kills outlive a reload, and start again in another dungeon, on a reset, on a second kill, with time', () => {
@@ -69,7 +69,7 @@ test('the kills outlive a reload, and start again in another dungeon, on a reset
   addon.lua(`T_fire(${JSON.stringify(['BOSS_KILL', 2758, 'Hamhock']).slice(1, -1)})`);
   addon.lua('GAME.instance = { name = "Deadmines", kind = "party", id = 36 }');
   addon.run(3);
-  assert.deepEqual(kills(addon), { map: 36, list: [], ids: [] }, 'another dungeon');
+  assert.deepEqual(kills(addon), { map: 36, list: [], ids: [], rares: [] }, 'another dungeon');
 
   addon.lua(`T_fire(${JSON.stringify(['BOSS_KILL', 644, 'Rhahk\'Zor']).slice(1, -1)})`);
   addon.run(3);
@@ -85,15 +85,30 @@ test('a game in another language tells the same numbers: they go with its names'
   addon.lua(`T_fire(${JSON.stringify(['ENCOUNTER_END', 2742, 'Schnitter', 1, 5, 1]).slice(1, -1)})`);
   addon.lua(`T_fire(${JSON.stringify(['BOSS_KILL', 2742, 'Schnitter']).slice(1, -1)})`);
   addon.run(3);
-  assert.deepEqual(kills(addon), { map: 36, list: ['Schnitter'], ids: [2742] });
+  assert.deepEqual(kills(addon), { map: 36, list: ['Schnitter'], ids: [2742], rares: [] });
 });
 
 test('kills kept by an addon before the numbers are still told, with no numbers', () => {
   const addon = enterWorld(STOCKADE);
   addon.lua('local ns = ...; ns.db.kills = { map = 34, list = { "Hamhock" }, at = GetTime() }');
   addon.run(12);
-  assert.deepEqual(kills(addon), { map: 34, list: ['Hamhock'], ids: [] });
+  assert.deepEqual(kills(addon), { map: 34, list: ['Hamhock'], ids: [], rares: [] });
   addon.lua(`T_fire(${JSON.stringify(['BOSS_KILL', 2756, 'Targorr the Dread']).slice(1, -1)})`);
   addon.run(3);
-  assert.deepEqual(kills(addon), { map: 34, list: ['Hamhock', 'Targorr the Dread'], ids: [2756] });
+  assert.deepEqual(kills(addon), { map: 34, list: ['Hamhock', 'Targorr the Dread'], ids: [2756], rares: [] });
+});
+
+test('a rare targeted in a dungeon is kept with the kills, once; a creature that is not rare, or one in the open world, is not', () => {
+  const addon = enterWorld();
+  addon.lua('GAME.target, GAME.classification = "Creature-0-5250-0-11-3586-0000ABCDEF", "rareelite"');
+  addon.fire('PLAYER_TARGET_CHANGED');
+  addon.lua(STOCKADE);
+  addon.fire('PLAYER_ENTERING_WORLD');
+  addon.run(12);
+  for (const [guid, kind] of [['Creature-0-5250-0-11-1716-0000ABCDEF', 'elite'], ['Creature-0-5250-0-11-3586-0000ABCDEF', 'rareelite'], ['Creature-0-5250-0-11-3586-0000ABCDEF', 'rareelite'], ['Creature-0-5250-0-11-947-0000ABCDEF', 'rare']]) {
+    addon.lua(`GAME.target, GAME.classification = "${guid}", "${kind}"`);
+    addon.fire('PLAYER_TARGET_CHANGED');
+  }
+  addon.run(3);
+  assert.deepEqual(kills(addon), { map: 34, list: [], ids: [], rares: [947, 3586] });
 });
