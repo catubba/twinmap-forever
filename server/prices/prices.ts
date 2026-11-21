@@ -13,7 +13,7 @@ import { createHash, createHmac } from 'node:crypto'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 
-const REGIONS = ['eu', 'us']
+const REGIONS = ['eu', 'us', 'kr', 'tw'] // every region Forever is played in; China has an API of its own
 const RULESET = 1 // every ruleset lists the same houses with the same auctions (seen 21 November 2026)
 const HOURS = 24
 const CACHE = 'public, max-age=300'
