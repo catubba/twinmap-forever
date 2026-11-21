@@ -15,6 +15,7 @@ function bucket(): Env['SAMPLES'] & { kept: Map<string, { value: string | Uint8A
       return { text: async () => String(one.value), arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer, customMetadata: (one.options as { customMetadata?: Record<string, string> } | undefined)?.customMetadata }
     },
     put: async (key, value, options) => kept.set(key, { value, options }),
+    delete: async (keys) => void [keys].flat().forEach((key) => kept.delete(key)),
     list: async ({ prefix = '' }) => ({ objects: [...kept].filter(([key]) => key.startsWith(prefix)).map(([key, one]) => ({ key, size: one.value.length })), truncated: false }),
   }
 }
@@ -218,6 +219,13 @@ test('what is kept is listed and given to who has the secret, and to nobody else
   assert.deepEqual(new Uint8Array(await one.arrayBuffer()), png(238))
   assert.deepEqual(JSON.parse(one.headers.get('x-fields')!), said)
   assert.equal((await kept('key=nothing', 'the-secret')).status, 404)
+  // Throwing away a day: only a day, only with the secret, and the count and the rules stay.
+  samples.kept.set('rules', { value: '{}' })
+  samples.kept.set('2026-01-01/0123456789abcdef/01.png', { value: 'another day' })
+  for (const query of ['prefix=', 'prefix=count/', 'prefix=rules', `prefix=${today}`]) assert.equal((await kept(query, 'the-secret', 'DELETE')).status, 400)
+  assert.equal((await kept(`prefix=${today}/`, undefined, 'DELETE')).status, 404)
+  assert.deepEqual(await (await kept(`prefix=${today}/`, 'the-secret', 'DELETE')).json(), { deleted: 1 })
+  assert.deepEqual([...samples.kept.keys()].sort(), ['2026-01-01/0123456789abcdef/01.png', `count/${today}`, 'rules'])
 })
 
 const GAME = { app: '0.14.0', build: '1.60.1.70938', locale: 'enUS' }

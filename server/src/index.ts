@@ -43,6 +43,7 @@ export interface Bucket {
   get(key: string): Promise<{ text(): Promise<string>; arrayBuffer(): Promise<ArrayBuffer>; customMetadata?: Record<string, string> } | null>
   list(options: { prefix?: string; cursor?: string; limit?: number }): Promise<{ objects: { key: string; size: number }[]; truncated: boolean; cursor?: string }>
   put(key: string, value: string | Uint8Array, options?: { httpMetadata?: { contentType: string }; customMetadata?: Record<string, string> }): Promise<unknown>
+  delete(keys: string | string[]): Promise<unknown>
 }
 
 const LARGEST = 100_000 // bytes of a request
@@ -363,11 +364,23 @@ const same = (a: string, b: string): boolean => {
 /**
  * For us alone, with the secret: what the bucket holds under a prefix, a thousand at a time
  * (/kept?prefix=2026-11-20/), or one thing of it (/kept?key=...), with what was said of it in the
- * header x-fields. To anyone else this path is not there.
+ * header x-fields. DELETE /kept?prefix=2026-11-20/ throws away what was kept on that day; only a day,
+ * so the rules and the counts cannot go with it. To anyone else this path is not there.
  */
 async function kept(request: Request, env: Env): Promise<Response> {
   if (!env.ADMIN_TOKEN || !same(request.headers.get('authorization') ?? '', `Bearer ${env.ADMIN_TOKEN}`)) return answer(404, 'not found')
   const asked = new URL(request.url).searchParams, key = asked.get('key')
+  if (request.method === 'DELETE') {
+    const prefix = asked.get('prefix') ?? ''
+    if (!/^\d{4}-\d\d-\d\d\/$/.test(prefix)) return answer(400, 'a day only, as 2026-11-20/')
+    let deleted = 0
+    for (;;) {
+      const keys = (await env.SAMPLES.list({ prefix, limit: 1000 })).objects.map((one) => one.key)
+      if (!keys.length) return Response.json({ deleted })
+      await env.SAMPLES.delete(keys)
+      deleted += keys.length
+    }
+  }
   if (key !== null) {
     const one = await env.SAMPLES.get(key)
     return one ? new Response(await one.arrayBuffer(), { headers: { 'content-type': 'application/octet-stream', 'x-fields': JSON.stringify(one.customMetadata ?? {}) } }) : answer(404, 'not found')
@@ -380,7 +393,7 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const path = new URL(request.url).pathname
     if (path !== '/feedback' && path !== '/sample' && path !== '/log' && path !== '/errors' && path !== '/want' && path !== '/kept') return answer(404, 'not found')
-    if (path === '/kept') return request.method === 'GET' ? kept(request, env) : answer(404, 'not found')
+    if (path === '/kept') return request.method === 'GET' || request.method === 'DELETE' ? kept(request, env) : answer(404, 'not found')
     // The address is the key of the limit and is not written anywhere.
     const address = request.headers.get('cf-connecting-ip') ?? 'unknown'
     if (path === '/want') return request.method === 'GET' ? want(request, env, address) : answer(405, 'GET only')
