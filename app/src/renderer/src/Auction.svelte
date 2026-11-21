@@ -3,10 +3,11 @@
   // as approved on design/ah/mock.html (design/ui.md, section 5). The game's categories on the left,
   // a row for each item with its kinds, the page of an item with what is on sale cheapest first, a
   // search that forgives a letter, and the line Blizzard's terms ask for. Data: shared/ah.ts.
-  import { afterCut, ahItems, categoriesOf, disenchantOf, disenchantValue, houseLine, houseNumber, lowestOf, nextPrices, countsAt, ownedOf, priceOf, suffixOf, REGIONS, rulesetName, rulesetOf, RULESETS, search, SIDES, type AhItem, type AhNames, type Category, type Home, type House, type HouseHints, type Kind, type Listing, type Owned, type OwnedPlace, type PricesTold, type Region, type Side } from '../../shared/ah'
+  import { afterCut, ahItems, categoriesOf, disenchantOf, disenchantValue, houseLine, houseNumber, lowestOf, nextPrices, countsAt, ownedOf, priceOf, suffixOf, REGIONS, rulesetName, rulesetOf, RULESETS, search, SIDES, type AhItem, type AhNames, type Category, type History, type Home, type House, type HouseHints, type Kind, type Listing, type Owned, type OwnedPlace, type PricesTold, type Region, type Side } from '../../shared/ah'
   import { coins, QUALITY_TEXT as QUALITY_COLORS, typeOf, type ItemFacts } from '../../shared/items'
   import type { Known } from '../../shared/characters'
   import type { Sheets } from '../../shared/sheet'
+  import Chart, { placed, runs } from './Chart.svelte'
   import { columns } from './columns'
   import Glyph from './Glyph.svelte'
   import { TILES } from './web'
@@ -62,6 +63,24 @@
   let page = $state<{ id: number; key: string } | null>(null)
   const pageItem = $derived(page ? items.find((it) => it.id === page!.id) : undefined)
   const pageKind = $derived(pageItem?.kinds.find((k) => k.key === page!.key) ?? pageItem?.kinds[0])
+
+  // The history (M18-F9): the last 24 hours of the rows on show for their column, and the days too for the page's chart.
+  let sparks = $state.raw<{ snapshot: string; of: Record<string, History> }>({ snapshot: '', of: {} })
+  $effect(() => {
+    const snapshot = listing?.snapshot ?? '', keys = page || mine ? [] : found.slice(0, most).map((it) => it.kinds[0]!.key)
+    if (!snapshot || !keys.length) return
+    let gone = false
+    void window.twinmap.ahHistory(keys, false).then((of) => !gone && (sparks = { snapshot, of: sparks.snapshot === snapshot ? { ...sparks.of, ...of } : of }))
+    return () => (gone = true)
+  })
+  let chartOf = $state.raw<{ key: string; snapshot: string; history: History | null } | null>(null)
+  $effect(() => {
+    const key = pageKind?.key, snapshot = listing?.snapshot
+    if (!key || !snapshot) return
+    let gone = false
+    void window.twinmap.ahHistory([key], true).then((of) => !gone && (chartOf = { key, snapshot, history: of[key] ?? null }))
+    return () => (gone = true)
+  })
 
   // The house chooser: asked for, or shown by itself when the house is not known.
   let choosing = $state(false)
@@ -141,6 +160,19 @@
 
 {#snippet head(by: string, label: string, sort: Sort, set: (now: Sort) => void)}
   <th aria-sort={sort?.by === by ? (sort.up ? 'ascending' : 'descending') : undefined}><button class="sort" class:on={sort?.by === by} onclick={() => set(sort)}>{label}{#if sort?.by === by}<svg viewBox="0 0 10 10" aria-hidden="true"><path d={sort.up ? 'M1 7h8L5 2z' : 'M1 3h8L5 8z'} /></svg>{/if}</button></th>
+{/snippet}
+
+{#snippet spark(h: History | undefined)}
+  {@const pts = placed(h, '24h', listing!.snapshot)}
+  {@const lo = Math.min(...pts.map((x) => x.low))}
+  {@const hi = Math.max(...pts.map((x) => x.low))}
+  {@const Y = (y: number): number => (hi > lo ? 17 - ((y - lo) / (hi - lo)) * 14 : 10)}
+  {@const X = (i: number): number => 2 + (i / 23) * 86}
+  {@const color = pts.length < 2 ? '#b9a88c' : pts.at(-1)!.low >= pts[0]!.low ? '#8fe39a' : '#ff8a7a'}
+  <svg class="spark" viewBox="0 0 90 20" aria-hidden="true">
+    {#each runs(pts) as run (run[0]!.i)}{#if run.length > 1}<polyline fill="none" stroke={color} stroke-width="1.5" points={run.map((x) => `${X(x.i)},${Y(x.low)}`).join(' ')} />{:else}<circle cx={X(run[0]!.i)} cy={Y(run[0]!.low)} r="1.5" fill={color} />{/if}{/each}
+    {#if pts.length}<circle cx={X(pts.at(-1)!.i)} cy={Y(pts.at(-1)!.low)} r="2.5" fill={color} />{/if}
+  </svg>
 {/snippet}
 
 {#snippet tree(list: Category[], depth: number)}
@@ -244,6 +276,7 @@
               <div><small>AVAILABLE</small><span>{k.available.toLocaleString('en')}</span></div>
               <div><small>VENDOR GIVES</small><span>{@render money(it.vendor)}</span></div>
             </div>
+            <Chart history={chartOf?.key === k.key && chartOf.snapshot === listing.snapshot ? chartOf.history : null} snapshot={listing.snapshot} {now} />
             <h5>On sale now, cheapest first</h5>
             <table class="list" use:columns={'ah-ladder'}>
               <thead><tr><th>PRICE EACH</th><th>HOW MANY</th><th>UP TO HERE</th><th>COST UP TO HERE</th></tr></thead>
@@ -308,7 +341,7 @@
       {:else}
         <div class="main">
           <table class="list" use:columns={'ah-browse'}>
-            <thead><tr>{#each [['name', 'NAME', true], ['lowest', 'LOWEST'], ['typical', 'TYPICAL'], ['available', 'AVAILABLE'], ['vendor', 'VENDOR']] as [by, label, text] (by)}{@render head(by as string, label as string, browseSort, (s) => (browseSort = turn(s, by as string, !!text)))}{/each}</tr></thead>
+            <thead><tr>{#each [['name', 'NAME', true], ['lowest', 'LOWEST'], ['typical', 'TYPICAL'], ['available', 'AVAILABLE'], ['vendor', 'VENDOR']] as [by, label, text] (by)}{@render head(by as string, label as string, browseSort, (s) => (browseSort = turn(s, by as string, !!text)))}{/each}<th>24 HOURS</th></tr></thead>
             <tbody>
               {#each found.slice(0, most) as it (it.id)}
                 {@const many = it.kinds.length > 1}
@@ -319,10 +352,11 @@
                   <td>{#if !many}{@render money(k.typical * times(it))}{/if}</td>
                   <td>{it.available.toLocaleString('en')}</td>
                   <td>{@render money(it.vendor * times(it))}</td>
+                  <td class="sp">{#if sparks.snapshot === listing.snapshot && sparks.of[k.key]}{@render spark(sparks.of[k.key])}{/if}</td>
                 </tr>
                 {#if many && open.has(it.id)}
                   {#each it.kinds as x (x.key)}
-                    <tr class="item kind" onclick={() => (page = { id: it.id, key: x.key })}><td style:color={QUALITY_COLORS[it.quality]}>{x.suffix || '(plain)'}{levelOf(it)}</td><td>{@render money(x.lowest * times(it))}</td><td>{@render money(x.typical * times(it))}</td><td>{x.available.toLocaleString('en')}</td><td></td></tr>
+                    <tr class="item kind" onclick={() => (page = { id: it.id, key: x.key })}><td style:color={QUALITY_COLORS[it.quality]}>{x.suffix || '(plain)'}{levelOf(it)}</td><td>{@render money(x.lowest * times(it))}</td><td>{@render money(x.typical * times(it))}</td><td>{x.available.toLocaleString('en')}</td><td></td><td></td></tr>
                   {/each}
                 {/if}
               {/each}
@@ -633,6 +667,15 @@
   .ico.big {
     width: 52px;
     height: 52px;
+  }
+  .spark {
+    width: 90px;
+    height: 20px;
+    vertical-align: middle;
+  }
+  td.sp {
+    padding-top: 0;
+    padding-bottom: 0;
   }
   .more {
     color: var(--text-dim);

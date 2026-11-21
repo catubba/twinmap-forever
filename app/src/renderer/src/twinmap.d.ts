@@ -26,6 +26,7 @@ declare global {
       onPrices: (listener: (told: import('../../shared/ah').PricesTold) => void) => void
       ahHouse: (region: string, house: number) => Promise<void>
       ahAgain: () => Promise<void>
+      ahHistory: (keys: string[], days: boolean) => Promise<Record<string, import('../../shared/ah').History>>
       onUpdate: (listener: (updating: import('../../main/update').Updating) => void) => void
       chooseGameFolder: () => Promise<string | null>
       openCurseForge: (addon?: import('../../shared/setup').Optional) => Promise<void>

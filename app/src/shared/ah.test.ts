@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest'
 import * as ah from './ah'
-import { ahItems, categoriesOf, gameAhNames, houseFrom, houseNumber, houseOf, listingFrom, nameRank, oneApart, priceOf, search, typical, type AhNames, type Listing } from './ah'
+import { ahItems, categoriesOf, chartDays, dayOfHours, historyOf, withListing, gameAhNames, houseFrom, houseNumber, houseOf, listingFrom, nameRank, oneApart, priceOf, search, typical, type AhNames, type Listing } from './ah'
 import type { ItemFacts } from './items'
 import { gameFolderFrom, openClientFiles, registryInstallPath } from '../main/client-files'
 import { sentKeys } from '../main/keys'
@@ -160,4 +160,30 @@ test('disenchanting: dust and essence by item level, swapped for a weapon; a sha
   // 0.75 x 2.5 x 100 + 0.2 x 1.5 x 1000 + 0.05 x 1 x 300
   expect(disenchantValue(disenchantOf({ cls: 4, quality: 2, itemLevel: 18 }), listing)).toBe(503)
   expect(disenchantValue(disenchantOf({ cls: 4, quality: 2, itemLevel: 30 }), listing)).toBeNull()
+})
+
+test('the history of a key: the day from the hours is the day the server writes, a newer listing joins the hours', async () => {
+  const { nextDay, nextHours } = await import('../../../server/prices/prices')
+  const snaps: [string, Record<string, [number, number][]>][] = [
+    ['2026-11-20T23:23:00.000Z', { '2589': [[10, 5]], '6567:12718': [[900, 1]] }],
+    ['2026-11-21T00:23:00.000Z', { '2589': [[12, 3], [15, 9]] }],
+    ['2026-11-21T01:23:00.000Z', { '2589': [[11, 2], [13, 2], [20, 7]], '6567:12718': [[950, 2]] }],
+  ]
+  let hours = null as ReturnType<typeof nextHours> | null, day = null as ReturnType<typeof nextDay> | null
+  for (const [at, items] of snaps.slice(0, 2)) {
+    hours = nextHours(hours, at, items)
+    day = nextDay(day, at.slice(0, 10), at, items)
+  }
+  // The app has the listing of 01:23 before the bucket's hours have it.
+  const [at, items] = snaps[2]!
+  const merged = withListing(hours, { region: 'eu', house: 111, name: '', snapshot: at, items })!
+  expect(merged).toEqual(nextHours(hours, at, items))
+  day = nextDay(day, '2026-11-21', at, items)
+  for (const key of ['2589', '6567:12718']) expect(dayOfHours(merged, key, '2026-11-21')).toEqual(day.keys[key])
+  // Only the hours it was on sale; the past day from its file, the day of the snapshot from the hours.
+  const before = { day: '2026-11-20', hours: [snaps[0]![0]], keys: { '6567:12718': [900, 900, 1, 1] as [number, number, number, number] } }
+  const h = historyOf('6567:12718', merged, { '2026-11-19': null, '2026-11-20': before, '2026-11-21': null }, '2026-11-21')
+  expect(h.hours.map((x) => x.at)).toEqual([snaps[0]![0], at])
+  expect(h.days).toEqual([{ day: '2026-11-20', p: [900, 900, 1, 1] }, { day: '2026-11-21', p: [950, 950, 2, 1] }])
+  expect(chartDays(at)).toEqual(['2026-11-15', '2026-11-16', '2026-11-17', '2026-11-18', '2026-11-19', '2026-11-20', '2026-11-21'])
 })

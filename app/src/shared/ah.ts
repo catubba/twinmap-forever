@@ -97,11 +97,86 @@ export interface PricesTold {
   error: string | null
 }
 
-/** How many days the app keeps what came from Blizzard's API at most (its terms ask for 30, design/product.md). */
-export const KEEP_DAYS = 30
+/** How many days the app keeps what came from Blizzard's API at most: the chart goes back 7 (the terms would allow 30, design/product.md). */
+export const KEEP_DAYS = 8
 
 /** When the next prices should be on the bucket: an hour after the snapshot, and the time the hourly Action takes. */
 export const nextPrices = (snapshot: string): number => Date.parse(snapshot) + 75 * 60_000
+
+// The history of the prices (M18-F9), as server/prices/prices.ts writes it beside the listing.
+
+/** Of one key in one snapshot: lowest, typical, how many. */
+export type Point = [number, number, number]
+/** prices/<region>/<house>/hours.json: the last 24 snapshots; a key not on sale in one has null there. */
+export interface HoursFile {
+  hours: string[]
+  keys: Record<string, (Point | null)[]>
+}
+/** Of one key in one day: lowest of the day, mean typical, mean count, hours seen. */
+export type DayPoint = [number, number, number, number]
+/** prices/<region>/<house>/<YYYY-MM-DD>.json. */
+export interface DayFile {
+  day: string
+  hours: string[]
+  keys: Record<string, DayPoint>
+}
+/** What the chart of a key is drawn from: only the snapshots and the days it was really seen on sale. */
+export interface History {
+  hours: { at: string; p: Point }[]
+  days: { day: string; p: DayPoint }[]
+}
+
+export function hoursFrom(v: unknown): HoursFile | null {
+  const h = v as HoursFile | null
+  return h && Array.isArray(h.hours) && h.hours.every((x) => typeof x === 'string') && h.keys && typeof h.keys === 'object' ? h : null
+}
+export function dayFrom(v: unknown, day: string): DayFile | null {
+  const d = v as DayFile | null
+  return d && d.day === day && Array.isArray(d.hours) && d.keys && typeof d.keys === 'object' ? d : null
+}
+
+/** Lowest, typical and how many from the lots of a key, as the server makes them. */
+export const pointOf = (ladder: [number, number][]): Point => [Math.min(...ladder.map((l) => l[0])), typical([...ladder].sort((a, b) => a[0] - b[0])), ladder.reduce((n, [, q]) => n + q, 0)]
+
+/** The hours file with a newer listing added at its end, as the next run of the server will write it. */
+export function withListing(hours: HoursFile | null, listing: Listing | null): HoursFile | null {
+  if (!listing || (hours && hours.hours.at(-1)! >= listing.snapshot)) return hours
+  const before = hours ?? { hours: [], keys: {} }
+  const keys: HoursFile['keys'] = {}
+  for (const key of new Set([...Object.keys(before.keys), ...Object.keys(listing.items)])) {
+    const lots = listing.items[key]
+    keys[key] = [...(before.keys[key] ?? before.hours.map(() => null)), Array.isArray(lots) && lots.length ? pointOf(lots) : null].slice(-24)
+  }
+  return { hours: [...before.hours, listing.snapshot].slice(-24), keys }
+}
+
+/** The day of a key from the snapshots of that day in the hours, added up as the server adds up the day's file. */
+export function dayOfHours(hours: HoursFile, key: string, day: string): DayPoint | null {
+  let p: DayPoint | null = null
+  hours.hours.forEach((at, i) => {
+    const x = hours.keys[key]?.[i]
+    if (!x || !at.startsWith(day)) return
+    p = p ? [Math.min(p[0], x[0]), Math.round((p[1] * p[3] + x[1]) / (p[3] + 1)), Math.round((p[2] * p[3] + x[2]) / (p[3] + 1)), p[3] + 1] : [x[0], x[1], x[2], 1]
+  })
+  return p
+}
+
+/** The 7 days the chart shows, the last one the day of the snapshot (UTC, as the server names its files). */
+export const chartDays = (snapshot: string): string[] => Array.from({ length: 7 }, (_, i) => new Date(Date.parse(snapshot.slice(0, 10)) - (6 - i) * 86_400_000).toISOString().slice(0, 10))
+
+/** The history of a key: each hour and each day it was on sale. The day of the snapshot comes from the hours, the others from their files. */
+export function historyOf(key: string, hours: HoursFile | null, days: Record<string, DayFile | null>, today: string | null): History {
+  const out: History = { hours: [], days: [] }
+  hours?.hours.forEach((at, i) => {
+    const p = hours.keys[key]?.[i]
+    if (p) out.hours.push({ at, p })
+  })
+  for (const day of Object.keys(days).sort()) {
+    const p = day === today ? (hours ? dayOfHours(hours, key, day) : null) : (days[day]?.keys[key] ?? null)
+    if (p) out.days.push({ day, p })
+  }
+  return out
+}
 
 // The names of the game's categories and of the kinds of items, from its tables (made beside items.json).
 const ITEM_CLASS_FILE = 1140189 // ClassName, ClassID

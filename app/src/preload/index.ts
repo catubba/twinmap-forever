@@ -3,7 +3,7 @@
 // failure, to stay over other windows, to show the map on the home network, to search the player's QuestieDB, to mark a point in the
 // game, to send it a route, to step ahead on that route, and to fetch the prices of an auction house. It says one: that its opening screen is drawn.
 import { contextBridge, ipcRenderer } from 'electron'
-import type { PricesTold } from '../shared/ah'
+import type { History, PricesTold } from '../shared/ah'
 import type { FeedbackSent, FeedbackWay } from '../shared/feedback'
 import type { Kept, KeptKey } from '../shared/kept'
 import type { PortraitsTold } from '../shared/portrait'
@@ -59,6 +59,8 @@ contextBridge.exposeInMainWorld('twinmap', {
   // The house whose prices to fetch, now and every hour; and again at once, after a failure.
   ahHouse: (region: string, house: number): Promise<void> => ipcRenderer.invoke('ah-house', region, house),
   ahAgain: (): Promise<void> => ipcRenderer.invoke('ah-again'),
+  // The chart's history of these keys of the house on show: the last 24 hours, and with days the last 7 days.
+  ahHistory: (keys: string[], days: boolean): Promise<Record<string, History>> => ipcRenderer.invoke('ah-history', keys, days),
   // Who sells an item, who drops it, where it is found.
   itemSources: (item: number): Promise<ItemSources> => ipcRenderer.invoke('item-sources', item),
   onQuests: (listener: (status: QuestsStatus) => void) => {

@@ -429,6 +429,7 @@ function createWindow(): void {
   win.webContents.on('did-finish-load', () => win.webContents.send('prices', prices.told()))
   asks('ah-house', (region: unknown, house: unknown): void => prices.want(region, house))
   asks('ah-again', (): void => prices.again())
+  asks('ah-history', (keys: unknown, days: unknown) => prices.history(keys, days))
   // What the window may ask for, and only this: to let the player pick the game folder, to open the
   // addon's page on CurseForge in the browser, and (further down) to keep the window over the others.
   ipcMain.handle('choose-game-folder', async (): Promise<string | null> => {
