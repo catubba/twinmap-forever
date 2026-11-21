@@ -27,27 +27,27 @@ local POLL, POLL_INSIDE, POLL_PIECES = 5, 1.5, 1
 local GIVE_UP, PROBE_WAIT = 8, 2
 local MAX_FAILS = 3
 
--- Who takes each part of the news: ns.receivers.name = function(value, part), value nil for a part
--- taken away. Called at login with what was last received, and it may be called again with the same
--- value. A part named with letters and then more ("mark" and a place) goes to the receiver of the
+-- Who takes each part of the news: ns.receivers.name = function(value, part, again), value nil for a
+-- part taken away. Called at login with what was last received (again true: nothing new came), and it
+-- may be called again with the same value. A part named with letters and then more ("mark" and a place) goes to the receiver of the
 -- letters: one receiver for as many parts as the app cares to send.
 ns.receivers = ns.receivers or {}
 ns.signal = "waiting" -- "waiting", "reading", or why nothing can arrive in this session
 
 local function Num(v) if type(v) == "number" and not (issecretvalue and issecretvalue(v)) then return v end end
 
-local function Tell(part)
+local function Tell(part, again)
   local fn = ns.receivers[part] or ns.receivers[part:match("^%a+") or ""]
-  if fn then pcall(fn, ns.db.inbox.parts[part], part) end
+  if fn then pcall(fn, ns.db.inbox.parts[part], part, again) end
 end
 
 -- before: the parts held until now, when a slot has just replaced them all: one of them that is no
--- longer there is told as taken away.
-local function TellAll(before)
+-- longer there is told as taken away. again: at login, what was saved told once more.
+local function TellAll(before, again)
   local parts = ns.db.inbox.parts
-  for part in pairs(ns.receivers) do Tell(part) end
+  for part in pairs(ns.receivers) do Tell(part, again) end
   for part in pairs(parts) do
-    if not ns.receivers[part] then Tell(part) end
+    if not ns.receivers[part] then Tell(part, again) end
   end
   for part in pairs(before or {}) do
     if parts[part] == nil and not ns.receivers[part] then Tell(part) end
@@ -262,7 +262,7 @@ frame:SetScript("OnEvent", function()
   if started then return end
   started = true
   if type(ns.db.inbox) ~= "table" or type(ns.db.inbox.parts) ~= "table" then ns.db.inbox = { seq = 0, parts = {} } end
-  TellAll()
+  TellAll(nil, true)
 end)
 frame:SetScript("OnUpdate", function(_, elapsed)
   if not started or (ns.signal ~= "waiting" and ns.signal ~= "reading") then return end

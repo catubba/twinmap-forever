@@ -203,6 +203,9 @@ const send = (addons: string, changed: Record<string, unknown>, fonts: boolean):
   return sent
 }
 
+// The addon reads news every 5 s: a pause asked again sooner would only ask the same twice.
+const PAUSE_AGAIN = 10_000
+
 function createWindow(): void {
   // The window opens where it was closed: monitor, place, size, and maximized if it was.
   const placeFile = join(app.getPath('userData'), 'window.json')
@@ -295,7 +298,24 @@ function createWindow(): void {
       if (run) void sendSamples(run, said, participates, process.env.TWINMAP_SAMPLES).then((sent) => record.say(`samples: ${sent} of ${run.samples.length} sent`))
       if (killed) void sendLog([killed], said, participates, process.env.TWINMAP_SAMPLES?.replace(/sample$/, 'log')).then((sent) => record.say(`bosses: ${sent.length ? 'sent' : 'not sent'}`))
     },
+    // The addon draws again while paused (a /reload, a login): asked once more, but not before it had time to read the last ask.
+    () => {
+      if (paused && Date.now() - pauseToldAt > PAUSE_AGAIN) tellPause()
+    },
   )
+  // The Pause button: the app stops reading the strip and asks the addon to stop drawing it, for this run
+  // of the app and that session of the game's interface alone. The part "pause" is a number new at every
+  // ask, so that an ask after a /reload is news; false takes it back. Never kept: the app starts unpaused.
+  let paused = false, pauseToldAt = 0
+  const tellPause = (): void => {
+    if (!gameFolder || !addonHearsFonts(gameFolder)) return // an addon from before the fonts has no pause: the app alone stops
+    pauseToldAt = Date.now()
+    try {
+      send(addonsFolder(gameFolder), { pause: paused ? pauseToldAt : false }, true)
+    } catch {
+      record.say('pause: not told, the way to the addon is not ready')
+    }
+  }
   let tiles = startTiles(gameFolder)
   // The pins go to the window when they change, and once more when its page has loaded.
   let questsNow: QuestsStatus = { questie: null, pins: [] }
@@ -703,7 +723,8 @@ function createWindow(): void {
       if (gone) record.say(`took away ${gone} slot folders the addon no longer needs`)
     }
     channel = installChannel(addons, !fonts)
-      .then(() => void send(addons, { sync: Date.now(), latest: app.getVersion(), sheet: heldOf(sheets), log: participates() }, addonHearsFonts(gameFolder!)))
+      // The pause is taken back too: one asked by a run of the app that closed while paused is not to stay.
+      .then(() => void send(addons, { sync: Date.now(), latest: app.getVersion(), sheet: heldOf(sheets), log: participates(), ...(fonts ? { pause: paused ? Date.now() : false } : {}) }, addonHearsFonts(gameFolder!)))
       .then(() => (marksTimer ??= setTimeout(sendMarks, MARKS_WAIT)))
       .catch(() => {})
   }
@@ -719,6 +740,14 @@ function createWindow(): void {
       return { error: 'Twinmap could not write next to the addon in the game folder.' }
     }
   }
+  // The Pause button (tellPause, above).
+  asks('set-pause', (on: unknown): void => {
+    if ((on === true) === paused) return
+    paused = on === true
+    link.pause(paused)
+    record.say(paused ? 'paused' : 'resumed')
+    tellPause()
+  })
   asks('send-pin', (asked: unknown): Sent => {
     const pin = pinFrom(asked)
     return sendParts(pin && { pin: { ...pin, t: Date.now() } })

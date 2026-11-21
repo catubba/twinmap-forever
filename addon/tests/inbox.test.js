@@ -715,3 +715,32 @@ test('the strip tells the app which point is followed, and the app can ask to le
   assert.equal(addon.arrow(), 'South Gate | 500 yd | 0 -26');
   assert.deepEqual(followTold(), { m: 1429, x: 50, y: 75, name: 'South Gate' });
 });
+
+test('the pause the app asks stops the strip for this session alone: a /reload draws again until it asks again', () => {
+  const { addon, enter } = world();
+  // How many positions the strip has carried so far, and whether one more comes once the character moves.
+  const drawn = () => addon.strips().map(decodeStrip).filter((b) => b && !b.negative && b.section === 'pos').length;
+  const moved = (x) => {
+    const was = drawn();
+    addon.lua(`GAME.x = ${x}`);
+    addon.run(12);
+    return drawn() > was;
+  };
+  addon.run(12);
+  assert.ok(moved(0.5), 'no strip to begin with');
+  send({ pause: 1 });
+  addon.run(7);
+  assert.equal(moved(0.6), false, 'drew while the app has it paused');
+  assert.equal(addon.lua('return tostring((...).db.paused)'), 'false', "the player's own pause was touched");
+  // The part is saved with the rest of the inbox, and told again at login: that never pauses.
+  addon.reload();
+  enter();
+  addon.run(12);
+  assert.ok(moved(0.65), 'still paused after a /reload');
+  send({ pause: 2 });
+  addon.run(7);
+  assert.equal(moved(0.7), false, 'a new ask did not pause again');
+  send({ pause: false });
+  addon.run(7);
+  assert.ok(moved(0.75), 'taken back, the strip did not come back');
+});

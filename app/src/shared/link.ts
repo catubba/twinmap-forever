@@ -13,22 +13,31 @@ export interface LinkSnapshot {
   cpu: number
   /** Inside a dungeon or a raid: why the place is not known, when it is not, and for how many milliseconds. */
   inside?: { why?: string; lostFor?: number } | null
+  /** The player pressed Pause: the strip is not read, and the addon was asked to stop drawing it. */
+  paused?: boolean
+  /** When the pause was last taken back (ms since 1970): the addon takes a few seconds to draw again. */
+  resumedAt?: number
 }
 
 /** How the link is, for the top row: a word, its colour, and a sentence for the map when the player has something to do. */
 export interface LinkStatus {
-  kind: 'connected' | 'combat' | 'waiting' | 'closed' | 'minimized' | 'lost' | 'update-app' | 'update-addon'
+  kind: 'paused' | 'connected' | 'combat' | 'waiting' | 'closed' | 'minimized' | 'lost' | 'update-app' | 'update-addon'
   word: string
   /** Green: all well. Gold: in a fight. Red: no position is coming. Dim: not known yet. */
   tone: 'done' | 'gold' | 'objective' | 'dim'
   line?: string
 }
 
+/** Under the map while paused, beside its Resume button. */
+export const PAUSED = 'Twinmap is paused: the map stays where you were and your character is not followed.'
+
 // The addon sends the position at least every 10 seconds. Two missed and a margin: the strip has stopped.
 export const LOST_AFTER = 25_000
 
 export function linkStatus(link: LinkSnapshot, now: number): LinkStatus {
   const { state } = link
+  // The map says so with a button of its own (App.svelte): no line here.
+  if (link.paused) return { kind: 'paused', word: 'Paused', tone: 'dim' }
   if (link.game === 'closed')
     return { kind: 'closed', word: 'Game not running', tone: 'objective', line: 'Game not running. The map still works; your position appears when you log in.' }
   if (link.game === 'minimized')
@@ -37,6 +46,8 @@ export function linkStatus(link: LinkSnapshot, now: number): LinkStatus {
     return { kind: `update-${state.protocol.update}`, word: state.protocol.update === 'app' ? 'Update the app' : 'Update the addon', tone: 'objective', line: state.protocol.message }
   const heard = Math.max(0, ...Object.values(state.updatedAt))
   if (!heard && link.seconds * 1000 < LOST_AFTER) return { kind: 'waiting', word: 'Connecting', tone: 'dim' }
+  // Back from a pause, the addon reads the news within seconds and draws again: until then the link is not lost.
+  if (link.resumedAt !== undefined && heard < link.resumedAt && now - link.resumedAt < LOST_AFTER) return { kind: 'waiting', word: 'Connecting', tone: 'dim' }
   if (now - heard > LOST_AFTER)
     return { kind: 'lost', word: 'Link lost', tone: 'objective', line: 'No signal from the game. Log in, and check that the Twinmap Forever addon is on and its strip is not paused.' }
   const line = insideLine(link.inside)

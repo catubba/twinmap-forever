@@ -1,6 +1,6 @@
 <script lang="ts">
   // The main screen: the top row with the state of the link, the map in its frame, and the Now panel.
-  import { experience, linkStatus, type LinkSnapshot } from '../../shared/link'
+  import { experience, linkStatus, PAUSED, type LinkSnapshot } from '../../shared/link'
   import { groupFrom } from '../../shared/group'
   import { deathFrom, type Place as DeathPlace } from '../../shared/death'
   import { feedbackDetails } from '../../shared/feedback'
@@ -106,8 +106,12 @@
   })
 
   const status = $derived(link ? linkStatus(link, now) : null)
+  // Paused (the button on the state of the link): the map stays where the character was when it was pressed.
+  const paused = $derived(status?.kind === 'paused')
+  const setPause = (on: boolean): void => void window.twinmap.setPause(on)
   // The position is shown only while it is coming: an arrow left where the character was an hour ago would lie.
-  const live = $derived(status?.kind === 'connected' || status?.kind === 'combat')
+  // Paused, it is the place of the moment the player chose to stop at, and the map says so.
+  const live = $derived(status?.kind === 'connected' || status?.kind === 'combat' || paused)
   const pos = $derived(live ? link?.state.sections.pos : undefined)
   // Level and experience stay as last seen.
   const char = $derived(link?.state.sections.char)
@@ -226,7 +230,8 @@
     <Search ready={mapReady} {pos} side={char?.side} onpick={(place) => ((onItems = false), mapView?.goTo(place))} />
   {/if}
   {#if status}
-    <p class="status" class:alone={onSetup !== false || onSettings || !mapReady}><i class={status.tone} title={status.word}></i><span class="word">{status.word}</span>{#if inbox && !inbox.off && inbox.id === undefined}<span class="left" class:low={inbox.left < 5}>{inbox.left} sends left</span>{/if}</p>
+    <!-- The state of the link is the Pause button too: two bars to pause, the arrow of play to resume. -->
+    <button class="status" class:alone={onSetup !== false || onSettings || !mapReady} class:paused title={paused ? 'Resume Twinmap' : 'Pause Twinmap'} aria-label={paused ? 'Resume Twinmap' : 'Pause Twinmap'} aria-pressed={paused} onclick={() => setPause(!paused)}><i class={status.tone}></i><span class="word">{status.word}</span>{#if inbox && !inbox.off && inbox.id === undefined}<span class="left" class:low={inbox.left < 5}>{inbox.left} sends left</span>{/if}<span class="toggle"><Glyph name={paused ? 'play' : 'pause'} size={16} /></span></button>
   {/if}
   {#if setup}
     <!-- The bug and the cog say what the words may not, to those who do not know them; in a narrow window they stand alone. The sections have theirs too: the pin of where you are, the bag. -->
@@ -301,6 +306,8 @@
     {/if}
     {#if setup?.gameFolder && !setup.addon}
       <p class="map-note with-button" role="status">{ADDON_MISSING} <button class="btn" onclick={() => window.twinmap.openCurseForge()}>Get it on CurseForge</button></p>
+    {:else if paused && mapReady}
+      <p class="map-note with-button" role="status" in:fly={drop(8)} out:fade={gone}>{PAUSED} <button class="btn" onclick={() => setPause(false)}>Resume</button></p>
     {:else if status?.line && mapReady}
       {#key status.line}<p class="map-note" role="status" in:fly={drop(8)} out:fade={gone}>{status.line}</p>{/key}
     {/if}
@@ -462,6 +469,36 @@
     margin: 0;
     line-height: 31px; /* on the line of the entries beside it */
     padding-bottom: 2px;
+  }
+  /* The state of the link is a button: pause and resume. Quiet until the pointer is on it. */
+  button.status {
+    height: 27px;
+    margin-top: 2px;
+    padding: 0 6px 0 10px;
+    line-height: 1;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    background: none;
+    font: var(--t-nav);
+    color: var(--nav-rest);
+    text-shadow: 0 1px 0 #000;
+    cursor: pointer;
+    -webkit-app-region: no-drag;
+  }
+  button.status:hover {
+    border-color: var(--bronze-500);
+    color: var(--text);
+  }
+  button.status .toggle {
+    display: inline-flex;
+    margin-left: 4px;
+    padding-left: 7px;
+    border-left: 1px solid #fff2;
+    color: var(--text-dim);
+  }
+  button.status:hover .toggle,
+  button.status.paused .toggle {
+    color: var(--gold);
   }
   /* Without the search before it, the state of the link is what goes to the right. */
   .status.alone {

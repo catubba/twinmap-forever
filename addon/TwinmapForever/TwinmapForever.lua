@@ -44,8 +44,10 @@ SlashCmdList["TWINMAP"] = function(msg)
   elseif word == "pause" then
     ns.db.paused = not ns.db.paused
     print(ns.db.paused and "Twinmap Forever: strip paused." or "Twinmap Forever: strip on.")
+    if ns.linkPaused then print("Twinmap Forever: Twinmap has paused the strip too. Resume it there.") end
   else
     print(("Twinmap Forever %s, protocol %d"):format(ns.VERSION, ns.PROTOCOL))
+    if ns.linkPaused then print("Twinmap has paused the strip. Resume it there, or /reload.") end
     if ns.signal ~= "waiting" and ns.signal ~= "reading" then
       print(("Nothing can arrive from Twinmap in this session (%s). Open Twinmap once, then restart the game."):format(ns.signal))
     end

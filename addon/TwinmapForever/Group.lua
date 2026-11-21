@@ -73,6 +73,15 @@ local function Say(now)
 end
 
 local frame = CreateFrame("Frame")
+-- The group hears where the character is whatever the strip does: paused, it still does. Looked at
+-- twice a second, as the section "group" was before.
+local sayAt = 0
+frame:SetScript("OnUpdate", function()
+  local now = GetTime()
+  if not ns.ready or now < sayAt then return end
+  sayAt = now + 0.5
+  Say(now)
+end)
 frame:RegisterEvent("PLAYER_LOGIN")
 frame:RegisterEvent("CHAT_MSG_ADDON")
 frame:SetScript("OnEvent", function(_, event, prefix, text, _, sender)
@@ -96,7 +105,6 @@ end)
 
 local function BuildGroup()
   local now = GetTime()
-  Say(now)
   local list = {}
   local grouped = Try(IsInGroup)
   -- Alone, and nothing to take back: nothing goes out.

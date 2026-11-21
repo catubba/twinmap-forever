@@ -116,3 +116,15 @@ test('a companion inside is sent where their Twinmap says, while that is fresh',
   addon.run(10);
   assert.deepEqual(groups(addon).at(-1), [{ n: 'Staliot Falsaperla', c: 'MAGE' }]);
 });
+
+test('with the strip paused the group still hears where the character is', () => {
+  const addon = enterWorld(MAGE);
+  addon.run(10);
+  addon.slash('/twinmap pause');
+  addon.run(1);
+  const drawn = addon.strips().length;
+  addon.lua('GAME.x = 0.45');
+  addon.run(4);
+  assert.deepEqual(sent(addon).slice(1), ['TwinmapF|1 1429 45.00 65.71|PARTY']);
+  assert.equal(addon.strips().length, drawn, 'the strip drew while paused');
+});

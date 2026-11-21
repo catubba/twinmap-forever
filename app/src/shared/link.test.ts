@@ -67,3 +67,11 @@ test('inside a dungeon a missing place has its reason on the map, and the link s
   expect(linkStatus({ ...link('open', heard(1000, { combat: true })), inside: { why: 'minimap turns' } }, NOW)).toMatchObject({ kind: 'combat', line: expect.stringContaining('Rotate Minimap') })
   expect(linkStatus({ ...link('open', heard(1000)), inside: null }, NOW).line).toBeUndefined()
 })
+
+test('paused, the link says so before anything else, and back from a pause it is connecting until the strip comes', () => {
+  expect(linkStatus({ ...link('closed', heard(1000)), paused: true }, NOW)).toEqual({ kind: 'paused', word: 'Paused', tone: 'dim' })
+  const back = { ...link('open', heard(LOST_AFTER * 2)), resumedAt: NOW - 3000 }
+  expect(linkStatus(back, NOW)).toMatchObject({ kind: 'waiting', word: 'Connecting' })
+  expect(linkStatus(back, NOW + LOST_AFTER).kind).toBe('lost')
+  expect(linkStatus({ ...link('open', heard(1000)), resumedAt: NOW - 3000 }, NOW).kind).toBe('connected')
+})

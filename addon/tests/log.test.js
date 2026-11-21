@@ -217,3 +217,12 @@ test('with no yes, nothing met is written down', () => {
   addon.fire('LOOT_OPENED');
   assert.doesNotMatch(logout(addon).file, /\["log"\] = \{/);
 });
+
+test('with the strip paused a trainer seen is still written down', () => {
+  const addon = world('true');
+  addon.slash('/twinmap pause');
+  atTrainer(addon);
+  addon.fire('TRAINER_CLOSED');
+  const { sessions } = logout(addon);
+  assert.deepEqual(sessions[0].e.map((e) => e.slice(2)), [[5145, 8, 6, 122, 9, 10, 0], [5145, 8, 6, 205, 90, 8, 0]]);
+});

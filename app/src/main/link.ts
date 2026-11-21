@@ -15,6 +15,11 @@ const READ_EVERY = 15 // ms: a block stays up 50 ms, so it is seen about three t
 const FIND_EVERY = 3000 // ms between looks for the game's window while it is not open
 const EDGE_KEPT = 5000 // ms without a strip before the other edge of the window is tried again
 const REPLAY_EVERY = 5000 // ms between the strips of a recorded session
+// Paused, the strip is looked for a second every five: a /reload of the game draws it again, and the
+// app has to ask for the pause once more. A block is up 50 ms and a character standing still sends one
+// every 10 s, so one row now and then would miss it; a whole second catches what a login sends.
+const PAUSED_EVERY = 5000
+const PAUSED_FOR = 1000
 
 // For trials without the game: TWINMAP_REPLAY names a file of recorded strips (a list of strings of
 // cells, one digit 0 to 7 a pixel, as addon/tests/record.js writes them). They go through the same
@@ -47,7 +52,12 @@ function withInside(state: GameState, found: (Inside & { at: number }) | null): 
  * looked: told what each look at the minimap inside a dungeon came to, once each, with the square it looked at, and null once
  * out of there; own says whether that square shows the game and nothing over it (the samples of samples.ts are taken from this).
  */
-export function startLink(tilesFolder: () => string | null = () => null, looked: (report: InsideReport | null, seen: Box | null, own: () => boolean, now: number) => void = () => {}): { snapshot: () => LinkSnapshot; inside: () => ReturnType<ReturnType<typeof startInside>['report']>; cut: (x: number, y: number, width: number, height: number) => ReturnType<typeof readRect>; stop: () => void } {
+export function startLink(
+  tilesFolder: () => string | null = () => null,
+  looked: (report: InsideReport | null, seen: Box | null, own: () => boolean, now: number) => void = () => {},
+  // Paused, a strip was seen on the game's window: the addon draws again (a /reload, a login) and is to be asked once more.
+  drawnWhilePaused: () => void = () => {},
+): { snapshot: () => LinkSnapshot; inside: () => ReturnType<ReturnType<typeof startInside>['report']>; cut: (x: number, y: number, width: number, height: number) => ReturnType<typeof readRect>; pause: (on: boolean) => void; stop: () => void } {
   const game = createGame()
   // Inside a dungeon the game tells addons no place: there, and only there, it is found from the minimap on the screen.
   const inside = startInside(tilesFolder)
@@ -60,6 +70,9 @@ export function startLink(tilesFolder: () => string | null = () => null, looked:
   let edge: 'top' | 'bottom' = 'top', edgeSeenAt = 0
   let drew: number | undefined // how wide the game drew the last strip read
   let stretch = 1 // pixels of the screen for each pixel the game drew: more than 1 on a game stretched to fill its monitor
+  // The Pause button: nothing is read but a look for the strip now and then, nothing changes the state, the minimap is not read.
+  // Never kept: the app starts unpaused.
+  let paused = false, pausedAt = 0, resumedAt: number | undefined
 
   const replay = process.env.TWINMAP_REPLAY ? replayed(process.env.TWINMAP_REPLAY) : null
 
@@ -81,6 +94,7 @@ export function startLink(tilesFolder: () => string | null = () => null, looked:
   const timer = setInterval(() => {
     const now = Date.now()
     if (replay) {
+      if (paused) return
       const row = replay()
       status = 'open'
       if (!row) return
@@ -106,10 +120,21 @@ export function startLink(tilesFolder: () => string | null = () => null, looked:
     status = state
     if (state === 'minimized') return
 
+    if (paused) {
+      if (now >= pausedAt + PAUSED_FOR) {
+        if (now < pausedAt + PAUSED_EVERY) return
+        pausedAt = now
+      }
+    }
     if (now - edgeSeenAt > EDGE_KEPT) edge = edge === 'top' ? 'bottom' : 'top'
     const row = readRow(hwnd, edge)
     if (!row) return
     reads++
+    if (paused) {
+      const seen = readStrip(row, drew).reading.kind !== 'none'
+      if (seen) (edgeSeenAt = now), drawnWhilePaused()
+      return
+    }
     // A game stretched to fill its monitor: the width it drew at is found once and kept.
     const read = readStrip(row, drew)
     const reading = read.reading
@@ -131,7 +156,15 @@ export function startLink(tilesFolder: () => string | null = () => null, looked:
         seconds: elapsed / 1000,
         reads,
         cpu: elapsed ? ((cpu.user + cpu.system) / 1000 / elapsed) * 100 : 0,
+        ...(paused ? { paused: true } : {}),
+        ...(resumedAt !== undefined ? { resumedAt } : {}),
       }
+    },
+    pause(on) {
+      if (on === paused) return
+      paused = on
+      if (on) pausedAt = 0
+      else resumedAt = Date.now()
     },
     inside: () => inside.report(),
     // A rectangle of the game's window, told in pixels of the game: only what the game itself shows there, never a window over it.

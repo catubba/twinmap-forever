@@ -78,6 +78,8 @@ contextBridge.exposeInMainWorld('twinmap', {
   // Shows the map to the other devices of the home network, or stops showing it.
   setLan: (on: boolean): Promise<void> => ipcRenderer.invoke('set-lan', on),
   setParticipate: (on: boolean): Promise<void> => ipcRenderer.invoke('set-participate', on),
+  // The Pause button: stops reading the game and asks the addon to stop drawing its strip, until Resume.
+  setPause: (on: boolean): Promise<void> => ipcRenderer.invoke('set-pause', on),
   // NPCs, quests and items whose name answers what was typed.
   search: (typed: string): Promise<Found[]> => ipcRenderer.invoke('search', typed),
   // The way on foot between two points of a continent; null where there is none.

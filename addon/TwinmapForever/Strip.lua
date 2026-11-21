@@ -342,6 +342,18 @@ local ahead -- the next block, painted before its turn while another look is on 
 local shown -- the look on screen
 local paused = false
 
+-- The pause asked by the app (its Pause button): the strip only, for this session of the interface.
+-- It is held in memory and never saved: a /reload, a login or a new start of the game draws the strip
+-- again until the app asks once more. The part "pause" is a number new at every ask, false when the
+-- app takes it back. again: the part as it was saved, told at login, which never pauses.
+-- The player's own pause (ns.db.paused, /twinmap pause) is saved, and stays as it was.
+ns.linkPaused = false
+ns.receivers = ns.receivers or {}
+ns.receivers.pause = function(value, _, again)
+  if again then return end
+  ns.linkPaused = type(value) == "number"
+end
+
 -- What is on screen while no block is: nothing, or the even line.
 local function Rest()
   if ns.db.idle == "hide" then return Show(nil) end
@@ -473,7 +485,7 @@ end)
 driver:SetScript("OnUpdate", function(_, elapsed)
   if watching and Covered() then coveredAt = GetTime() end
   if not startAt then return end
-  if ns.db.paused then
+  if ns.db.paused or ns.linkPaused then
     if not paused then
       paused, queue, steps, last, ahead, timer = true, {}, {}, nil, nil, 0
       Show(nil)

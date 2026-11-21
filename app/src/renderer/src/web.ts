@@ -70,6 +70,7 @@ if (!inApp) {
     setOnTop: () => Promise.resolve(),
     setLan: () => Promise.resolve(),
     setParticipate: () => Promise.resolve(),
+    setPause: call('set-pause', undefined),
     drawn: () => {},
     onUpdate: () => {}, // the app updates itself on its computer, never from here
     retryTiles: call('retry-tiles', undefined),

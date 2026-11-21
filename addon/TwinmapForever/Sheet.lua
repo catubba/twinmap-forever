@@ -302,6 +302,7 @@ end
 -- Trainers: read once a visit, with every filter of the window on, then the filters set back (One for
 -- All does the same on Forever, UI/TrainerSpells.lua). The game names no spell: a hidden tooltip does.
 local trainers -- npc -> { n, c, s }
+local read = {} -- npc -> { n, c, s }: the trainers read in this session, for the sheet to take in
 local trainerDue = false
 local logged = {} -- npc -> true: the trainers already in this session of the log
 local tip
@@ -342,7 +343,7 @@ local function ReadTrainer()
   table.sort(lines, function(a, b) return a[1] < b[1] end)
   local _, class, classId = Try(UnitClass, "player")
   local trade = Try(IsTradeskillTrainer)
-  trainers[npc] = { n = npc, c = not trade and Str(class) or nil, s = lines }
+  read[npc] = { n = npc, c = not trade and Str(class) or nil, s = lines }
   -- The log (Log.lua), once a session for each trainer. Entry "trainer": the NPC, the class's number
   -- for a class trainer (0 for a profession), how its faction stands to the character (UnitReaction,
   -- 4 neutral to 8 exalted: a good standing lowers the costs), then a line: spell, copper, level, skill.
@@ -362,8 +363,7 @@ local function Trainers(s)
       if type(t) == "table" and Num(t.n) then trainers[t.n] = t end
     end
   end
-  -- The window may still be empty when it opens: read again until it is not.
-  if trainerDue and ReadTrainer() then trainerDue = false end
+  for npc, t in pairs(read) do trainers[npc] = t end
   local out = {}
   for _, t in pairs(trainers) do out[#out + 1] = t end
   table.sort(out, function(a, b) return a.n < b.n end)
@@ -475,6 +475,17 @@ for _, event in ipairs({ "SPELLS_CHANGED", "LEARNED_SPELL_IN_TAB", "SKILL_LINES_
   "CHARACTER_POINTS_CHANGED", "PLAYER_LEVEL_UP", "PLAYER_EQUIPMENT_CHANGED", "TRADE_SKILL_SHOW", "TRADE_SKILL_LIST_UPDATE", "TRADE_SKILL_DATA_SOURCE_CHANGED", "NEW_RECIPE_LEARNED" }) do
   pcall(frame.RegisterEvent, frame, event) -- one the game does not have is left out
 end
+-- A trainer's window is read on its own clock, not the strip's: paused, the strip takes no sheet, and
+-- the log (Log.lua) still has the trainer. The window may still be empty when it opens: read again,
+-- twice a second, until it is not.
+local trainerAt = 0
+frame:SetScript("OnUpdate", function()
+  if not trainerDue then return end
+  local now = GetTime()
+  if now < trainerAt then return end
+  trainerAt = now + 0.5
+  if ReadTrainer() then trainerDue = false end
+end)
 frame:SetScript("OnEvent", function(_, event, recipe)
   if event == "BANKFRAME_OPENED" or event == "BANKFRAME_CLOSED" then
     bankOpen = event == "BANKFRAME_OPENED"
