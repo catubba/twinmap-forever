@@ -118,7 +118,8 @@ test('where floors lie over one another, the height of an end says which one the
   expect(high === null || high.yards > low!.yards, 'onto the ridge: a longer way, or none').toBe(true)
   expect(find(south, [-4180, -2464], undefined, 227), 'further in, the ridge is not walked onto').toBeNull()
   expect(find(south, inTunnel)!.yards, 'with no height told, the cheapest').toBe(low!.yards)
-})
+  // ponytail: a way that cannot end on the ridge searches the whole continent: 2 seconds here, past the default 5 on GitHub's Windows machines.
+}, 30_000)
 
 test('a way tells how high it is at each of its points: into Fargodeep Mine it goes down, onto the hill over it it stays up', () => {
   const find = walker(shipped), outside: Yards = [-9740, 120], over: Yards = [-9828, 124]
