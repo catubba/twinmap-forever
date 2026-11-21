@@ -18,6 +18,8 @@
   import type { Place } from '../../shared/death'
   import { savedFrom } from '../../shared/saved'
   import { kept as keptByApp } from './kept.svelte'
+  import type { Alert } from '../../shared/ah'
+  import { coins } from '../../shared/items'
 
   // onpick: a row was chosen, the map should go there. onpoint: the pointer or the keyboard is on
   // a row (or on none: null), the map should show which pin it is.
@@ -36,6 +38,8 @@
     inGame,
     journey, // the journey Shortest Path guides in the game, whoever started it
     back, // dead: where to walk to live again, the corpse or the door of the dungeon it lies in
+    met, // alerts on auction prices that were met (M18-F10), until they are removed
+    onalerts, // a met alert was clicked: the Alerts of the auction house
     onpick,
     onpoint,
     onsent,
@@ -59,6 +63,8 @@
     inGame: boolean
     journey: Journey | null
     back: (Place & { name: string; door: boolean }) | null
+    met: Alert[]
+    onalerts: () => void
     onsent: (t: number) => void
     onarrive: () => void
     onend: () => void
@@ -206,11 +212,18 @@
 {/snippet}
 
 <div class="now" data-took={walked.took.toFixed(1)}>
-  {#if attention.length && me}
+  {#if (attention.length && me) || met.length}
     {@render title('attention', 'Attention')}
     {#if !folded.attention}<div class="rows attention">
-      {#each attention as row (row.key)}
-        {@const way = row.continent === me.continent ? { ...wayOf(me.at, row.at), ...(toBack.yards(row.at) === undefined ? {} : { yards: toBack.yards(row.at)! }) } : null}
+      {#each met as a (a.t)}
+        <button class="row alert" onclick={onalerts}>
+          <span><Glyph name="coins" size={14} />{a.name}</span>
+          <span>{a.when === 'appears' ? 'On sale' : a.when === 'below' ? 'Cheaper' : 'Dearer'}</span>
+          <span class="num">{a.at === null ? '' : coins(a.at).map(([n, c]) => `${n}${c}`).join(' ')}</span>
+        </button>
+      {/each}
+      {#each me ? attention : [] as row (row.key)}
+        {@const way = row.continent === me!.continent ? { ...wayOf(me!.at, row.at), ...(toBack.yards(row.at) === undefined ? {} : { yards: toBack.yards(row.at)! }) } : null}
         <button class="row" aria-current={row.key === chosen} onclick={() => pick(row)}>
           <span><img src="{TILES}/icons/{back?.door ? 'dungeon' : 'corpse'}.png" alt="" class:swirl={back?.door} />{row.name}</span>
           <span>{row.kind}</span>
@@ -302,6 +315,11 @@
     height: 16px;
     margin-right: 6px;
     vertical-align: -3px;
+  }
+  .attention .alert :global(svg) {
+    margin-right: 6px;
+    vertical-align: -2px;
+    color: var(--gold);
   }
   .attention img.swirl {
     height: 22px;

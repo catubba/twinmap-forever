@@ -1,19 +1,25 @@
+<script module lang="ts">
+  let alertsTaken = 0 // the last asking of Now for the Alerts view that was answered, across openings of the tab
+</script>
+
 <script lang="ts">
   // Auction House (M18-F7): the prices of the house the character sells at, as wide as the window,
   // as approved on design/ah/mock.html (design/ui.md, section 5). The game's categories on the left,
   // a row for each item with its kinds, the page of an item with what is on sale cheapest first, a
   // search that forgives a letter, and the line Blizzard's terms ask for. Data: shared/ah.ts.
-  import { afterCut, ahItems, categoriesOf, disenchantOf, disenchantValue, houseLine, houseNumber, lowestOf, nextPrices, countsAt, ownedOf, priceOf, suffixOf, REGIONS, rulesetName, rulesetOf, RULESETS, search, SIDES, type AhItem, type AhNames, type Category, type History, type Home, type House, type HouseHints, type Kind, type Listing, type Owned, type OwnedPlace, type PricesTold, type Region, type Side } from '../../shared/ah'
+  import { afterCut, ahItems, alertLowest, type Alert, type AlertWhen, categoriesOf, disenchantOf, disenchantValue, houseLine, houseNumber, lowestOf, nextPrices, countsAt, ownedOf, priceOf, suffixOf, REGIONS, rulesetName, rulesetOf, RULESETS, search, SIDES, type AhItem, type AhNames, type Category, type History, type Home, type House, type HouseHints, type Kind, type Listing, type Owned, type OwnedPlace, type PricesTold, type Region, type Side } from '../../shared/ah'
   import { coins, QUALITY_TEXT as QUALITY_COLORS, typeOf, type ItemFacts } from '../../shared/items'
   import type { Known } from '../../shared/characters'
   import type { Sheets } from '../../shared/sheet'
   import Chart, { placed, runs } from './Chart.svelte'
   import { columns } from './columns'
+  import { untrack } from 'svelte'
   import Glyph from './Glyph.svelte'
   import { TILES } from './web'
 
   // listing: the prices of the house on show (App.svelte). homes: each character's own house, as the game told it.
-  let { house, chosen, hints, who, prices, listing, sheets, known, homes, now, onchoose }: { house: House | null; chosen: boolean; hints: HouseHints | null; who: string | null; prices: PricesTold | null; listing: Listing | null; sheets: Sheets; known: Known[]; homes: Record<string, Home>; now: number; onchoose: (h: House | null) => void } = $props()
+  // alerts: of every character (M18-F10); showAlerts: a number new each time Now asks for the Alerts view.
+  let { house, chosen, hints, who, prices, listing, sheets, known, homes, now, alerts, showAlerts, onchoose }: { house: House | null; chosen: boolean; hints: HouseHints | null; who: string | null; prices: PricesTold | null; listing: Listing | null; sheets: Sheets; known: Known[]; homes: Record<string, Home>; now: number; alerts: Alert[]; showAlerts: number; onchoose: (h: House | null) => void } = $props()
 
   // What the game says of each item and the names of its categories and kinds, made beside the map.
   let facts = $state.raw<ItemFacts>({})
@@ -67,7 +73,7 @@
   // The history (M18-F9): the last 24 hours of the rows on show for their column, and the days too for the page's chart.
   let sparks = $state.raw<{ snapshot: string; of: Record<string, History> }>({ snapshot: '', of: {} })
   $effect(() => {
-    const snapshot = listing?.snapshot ?? '', keys = page || mine ? [] : found.slice(0, most).map((it) => it.kinds[0]!.key)
+    const snapshot = listing?.snapshot ?? '', keys = page || yours ? [] : found.slice(0, most).map((it) => it.kinds[0]!.key)
     if (!snapshot || !keys.length) return
     let gone = false
     void window.twinmap.ahHistory(keys, false).then((of) => !gone && (sparks = { snapshot, of: sparks.snapshot === snapshot ? { ...sparks.of, ...of } : of }))
@@ -118,8 +124,9 @@
   const levelOf = (it: AhItem): string => (it.level ? ` (${it.level})` : '')
   const kindName = (it: AhItem, k: Kind): string => (k.suffix ? `${it.name} ${k.suffix}` : it.name)
   // My items (M18-F8): what the characters of this house hold, each kind at its own lowest price.
-  let mine = $state(false)
-  let fromMine = $state(false) // the page of an item was opened from My items: Back goes there
+  let yours = $state<'mine' | 'alerts' | null>(null) // My items or Alerts on show, instead of a category
+  let from = $state<'mine' | 'alerts' | null>(null) // the page of an item was opened from there: Back goes there
+  const YOURS = { mine: 'My items', alerts: 'Alerts' }
   let where = $state<OwnedPlace | null>(null)
   const race = (key: string): unknown => (sheets[key]?.pieces.who as { race?: unknown } | undefined)?.race
   const ours = $derived(house ? Object.keys(sheets).filter((key) => countsAt(homes[key], race(key), house!).counts) : [])
@@ -147,6 +154,29 @@
       copied = true
       setTimeout(() => (copied = false), 1500)
     })
+  }
+  // Alerts (M18-F10): every character's at the house on show, the one in game first.
+  const here = $derived(house ? alerts.filter((a) => a.region === house!.region && a.house === houseNumber(house!)).sort((a, b) => (a.who === b.who ? a.t - b.t : a.who === who ? -1 : b.who === who ? 1 : a.who.localeCompare(b.who))) : [])
+  $effect(() => {
+    if (showAlerts <= alertsTaken) return
+    alertsTaken = showAlerts
+    yours = 'alerts'
+    page = null
+  })
+  const WHEN: Record<AlertWhen, string> = { below: 'goes below', above: 'goes above', appears: 'appears at all' }
+  let alertWhen = $state<AlertWhen>('below'), alertPrice = $state(''), alertKind = $state(true), alertGame = $state(true), alertSet = $state('')
+  // The price asked for in silver, as the field says: "3.2" is 3 silver 20 copper.
+  const silver = (typed: string): number | undefined => (/^\d+([.,]\d{1,2})?$/.test(typed.trim()) ? Math.round(Number(typed.trim().replace(',', '.')) * 100) : undefined)
+  const alertPriceOk = $derived(alertWhen === 'appears' || !!silver(alertPrice))
+  $effect(() => {
+    const key = pageKind?.key
+    if (key) untrack(() => ((alertPrice = (Math.round(pageKind!.lowest * 0.9) / 100).toFixed(2)), (alertSet = '')))
+  })
+  function setAlert(it: AhItem, k: Kind): void {
+    const price = alertWhen === 'appears' ? 0 : silver(alertPrice)
+    if (!house || !who || price === undefined || !alertPriceOk) return
+    void window.twinmap.ahAlert({ who, region: house.region, house: houseNumber(house), item: it.id, key: alertKind ? k.key : null, name: alertKind ? kindName(it, k) : it.name, when: alertWhen, price, game: alertGame })
+    alertSet = k.key
   }
 </script>
 
@@ -177,7 +207,7 @@
 
 {#snippet tree(list: Category[], depth: number)}
   {#each list as c (c.key)}
-    <button class="cat" class:on={category === c.key} style:padding-left="{16 + depth * 16}px" onclick={() => ((category = category === c.key && !c.kids.length ? null : c.key), (page = null), (mine = false))}>{c.name} <small>{c.n}</small></button>
+    <button class="cat" class:on={category === c.key} style:padding-left="{16 + depth * 16}px" onclick={() => ((category = category === c.key && !c.kids.length ? null : c.key), (page = null), (yours = null))}>{c.name} <small>{c.n}</small></button>
     {#if c.kids.length && category?.split('.').slice(0, depth + 1).join('.') === c.key}{@render tree(c.kids, depth + 1)}{/if}
   {/each}
 {/snippet}
@@ -248,9 +278,10 @@
     {:else}
       <nav class="cats" aria-label="Categories">
         <h4>YOURS</h4>
-        <button class="cat" class:on={mine} onclick={() => ((mine = true), (page = null))}>My items <small>{owned.length}</small></button>
+        <button class="cat" class:on={yours === 'mine'} onclick={() => ((yours = 'mine'), (page = null))}>My items <small>{owned.length}</small></button>
+        <button class="cat" class:on={yours === 'alerts'} onclick={() => ((yours = 'alerts'), (page = null))}>Alerts <small>{here.length}</small></button>
         <h4>CATEGORIES</h4>
-        <button class="cat" class:on={!category && !mine} onclick={() => ((category = null), (page = null), (mine = false))}>All items <small>{items.length}</small></button>
+        <button class="cat" class:on={!category && !yours} onclick={() => ((category = null), (page = null), (yours = null))}>All items <small>{items.length}</small></button>
         {@render tree(cats, 0)}
       </nav>
       {#if page && pageItem && pageKind}
@@ -260,7 +291,7 @@
         {@const draws = disenchantOf(it)}
         <div class="itempage">
           <div class="kinds">
-            <button class="back" onclick={() => ((page = null), (mine = fromMine), (fromMine = false))}>‹ Back to {fromMine ? 'My items' : typed.trim() ? 'the search' : category_(category)}</button>
+            <button class="back" onclick={() => ((page = null), (yours = from), (from = null))}>‹ Back to {from ? YOURS[from] : typed.trim() ? 'the search' : category_(category)}</button>
             {#each it.kinds as x (x.key)}
               <button class="kind" class:on={x.key === k.key} onclick={() => (page = { id: it.id, key: x.key })}><span style:color={QUALITY_COLORS[it.quality]}>{x.suffix || it.name}{levelOf(it)}</span><span>{@render money(x.lowest)}</span></button>
             {/each}
@@ -304,11 +335,51 @@
               </div>
               <div class="note">{draws.map(([id, chance, least, most]) => `${facts[id]?.[0] ?? `Item ${id}`} ${least === most ? least : `${least}-${most}`} (${Math.round(chance * 1000) / 10}%)`).join(', ')}, at the lowest prices of {clock(snapshot)}.</div>
             {/if}
+            <h5>Alert</h5>
+            <div class="alert">
+              <label class="line">When the lowest <select class="field sel" bind:value={alertWhen}>{#each Object.entries(WHEN) as [w, label] (w)}<option value={w}>{label}</option>{/each}</select></label>
+              {#if alertWhen !== 'appears'}
+                <div class="line"><input class="field price" inputmode="decimal" aria-label="Price in silver" aria-invalid={!alertPriceOk} bind:value={alertPrice} /> silver <span class="dim">now {@render money(k.lowest)}</span></div>
+              {:else}
+                <div class="dim">When it is on sale again, after an hour with none.</div>
+              {/if}
+              <label class="opt"><input type="checkbox" bind:checked={alertKind} /> This kind only ({k.suffix || 'plain'})</label>
+              <label class="opt"><input type="checkbox" bind:checked={alertGame} /> Tell me in the game too</label>
+              {#if alertSet === k.key}
+                <div>Alert set. <button class="link" onclick={() => ((page = null), (yours = 'alerts'), (from = null))}>See alerts</button></div>
+              {:else}
+                <div><button class="btn" disabled={!who || !alertPriceOk} onclick={() => setAlert(it, k)}>Set alert</button></div>
+              {/if}
+              <div class="note">{who ? 'Checked every hour while Twinmap is open.' : 'Play a character with the addon on to set alerts for it.'}</div>
+            </div>
             <h5>Find it in the game</h5>
             <div class="dim">"{it.name}" · <button class="link" onclick={() => copy(it.name)}>{copied ? 'Copied' : 'Copy'}</button></div>
           </div>
         </div>
-      {:else if mine}
+      {:else if yours === 'alerts'}
+        <div class="main">
+          <table class="list" use:columns={'ah-alerts'}>
+            <thead><tr><th>ITEM</th><th>WHEN THE LOWEST</th><th>NOW</th><th>STATE</th><th>IN GAME</th><th></th></tr></thead>
+            <tbody>
+              {#each here as a, i (a.t)}
+                {@const f = facts[a.item]}
+                {@const lowest = alertLowest(a, listing)}
+                {#if a.who !== here[i - 1]?.who}<tr class="who"><td colspan="6" style:color={colorOf(a.who)}>{a.who}</td></tr>{/if}
+                <tr data-alert={a.t} data-met={a.met ?? ''} class:item={lowest !== undefined} onclick={(e) => lowest !== undefined && !(e.target as Element).closest('button') && ((yours = null), (from = 'alerts'), (page = { id: a.item, key: a.key ?? items.find((it) => it.id === a.item)?.kinds[0]?.key ?? '' }))}>
+                  <td><span class="nm">{@render icon(a.item)}<span class="n" style:color={QUALITY_COLORS[f?.[1] ?? 1]}>{a.name}</span>{#if a.key === null}<span class="more">any kind</span>{/if}</span></td>
+                  <td>{#if a.when === 'appears'}appears at all{:else}{WHEN[a.when]} {@render money(a.price)}{/if}</td>
+                  <td>{#if lowest !== undefined}{@render money(lowest)}{:else}<span class="off">not on sale</span>{/if}</td>
+                  <td>{#if a.met}<span class="met">● Met at {clock(Date.parse(a.met))}{#if a.at !== null}, {@render money(a.at)}{/if}</span>{:else}<span class="dim">waiting</span>{/if}</td>
+                  <td class="dim">{a.game ? (a.met ? 'sent' : 'on') : 'off'}</td>
+                  <td><button class="btn small" onclick={() => window.twinmap.ahUnalert(a.t)}>Remove</button></td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+          {#if !here.length}<p class="none">No alerts at this house yet. Open an item and set one on the right of its page.</p>{/if}
+          <p class="note pad">Alerts are checked each hour when new prices arrive, only while Twinmap is open. A met alert shows here, in Now under Attention, and in the game if you choose so.</p>
+        </div>
+      {:else if yours === 'mine'}
         {@const ah = ownedRows.reduce((n, o) => n + o.at, 0)}
         {@const vendor = ownedRows.reduce((n, o) => n + o.vendor, 0)}
         <div class="main">
@@ -323,7 +394,7 @@
             <tbody>
               {#each ownedSorted as o, i (o.who + o.place + o.key)}
                 {#if o.who !== ownedSorted[i - 1]?.who}<tr class="who"><td colspan="7" style:color={colorOf(o.who)}>{o.who}</td></tr>{/if}
-                <tr data-key={o.key} data-who={o.who} data-place={o.place} class:item={o.each !== undefined} onclick={() => o.each !== undefined && ((mine = false), (fromMine = true), (page = { id: o.id, key: o.key }))}>
+                <tr data-key={o.key} data-who={o.who} data-place={o.place} class:item={o.each !== undefined} onclick={() => o.each !== undefined && ((yours = null), (from = 'mine'), (page = { id: o.id, key: o.key }))}>
                   <td><span class="nm">{@render icon(o.id)}<span class="n" style:color={QUALITY_COLORS[o.quality]}>{o.name}{o.suffix ? ` ${o.suffix}` : ''}</span></span></td>
                   <td class="dim">{o.place}</td>
                   <td>{o.n.toLocaleString('en')}</td>
@@ -830,6 +901,27 @@
   }
   .note.pad {
     padding: 0 18px;
+  }
+  .alert {
+    display: grid;
+    gap: 8px;
+    padding: 4px 0 2px;
+  }
+  .alert .field.price {
+    width: 110px;
+  }
+  .opt {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    cursor: pointer;
+  }
+  .met {
+    color: var(--done);
+  }
+  .btn.small {
+    height: 22px;
+    padding: 0 8px;
   }
   .foot {
     grid-row: 4;

@@ -98,6 +98,26 @@ test('the same version, an older one, or anything that is not a version says not
   assert.deepEqual(notices(addon), []);
 });
 
+const alertLines = (addon) => addon.printed().split('\n').filter((line) => line.includes('auction house'));
+
+test('a met alert on prices is said in chat once, to its own character only, and again after it is set anew', () => {
+  const { addon, enter } = world('pin');
+  addon.lua('GAME.surname = "Sucameli"');
+  addon.run(12);
+  send({ alert7: { who: 'Catubbio Sucameli', t: 7, name: 'Linen Cloth |cffff0000x', at: 9, when: 'below', price: 10, h: '17:23' }, alert8: { who: 'Padre Gaetano', t: 8, name: 'Copper Bar', at: 50, when: 'above', price: 40, h: '17:23' } });
+  addon.run(7);
+  assert.deepEqual(alertLines(addon), ['Twinmap Forever: Linen Cloth ||cffff0000x is at 9c, below 10c at the auction house (prices of 17:23).']);
+  enter(); // a login tells every part again
+  addon.run(7);
+  assert.equal(alertLines(addon).length, 1, 'said twice');
+  send({ alert7: false });
+  addon.run(7);
+  send({ alert7: { who: 'Catubbio Sucameli', t: 7, name: 'Linen Cloth', at: 120, when: 'appears', price: 0, h: '18:23' } });
+  addon.run(7);
+  assert.equal(alertLines(addon).at(-1), 'Twinmap Forever: Linen Cloth is on sale again, from 1s 20c at the auction house (prices of 18:23).');
+  assert.equal(alertLines(addon).length, 2);
+});
+
 test('every number of the channel is read right where the interface is scaled, and no slot is spent', () => {
   // Seen on 13 November 2026 at a scale of 1.2 (a font of 77 pixels): 48 was read as 47 at every
   // read, and each read spent a slot.

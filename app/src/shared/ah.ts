@@ -570,3 +570,64 @@ export function disenchantValue(draws: Draw[] | null, listing: Listing | null | 
 
 /** What the auction house keeps of a sale (5%), so what reaches the seller of a lot sold at that price. */
 export const afterCut = (price: number): number => Math.floor(price * 0.95)
+
+// Alerts on prices (M18-F10): a character asks to be told when the lowest price of an item, or of
+// one kind of it, goes below or above a price, or when it is on sale again after an hour with none.
+// Checked against every listing of the house the alert was set at; met once, and then it stays met
+// until it is removed.
+
+export type AlertWhen = 'below' | 'above' | 'appears'
+export const ALERT_WHEN: AlertWhen[] = ['below', 'above', 'appears']
+
+export interface Alert {
+  /** When it was set (ms): its name. */
+  t: number
+  /** The character it belongs to, as the game names it. */
+  who: string
+  region: string
+  house: number
+  item: number
+  /** One kind of the item (its key in the listing), or null: any kind. */
+  key: string | null
+  /** The name to tell it by, with the kind's suffix. */
+  name: string
+  when: AlertWhen
+  /** In copper; 0 for 'appears'. */
+  price: number
+  /** Told in the game too. */
+  game: boolean
+  /** The snapshot it was met at, null while waiting; and the lowest price then. */
+  met: string | null
+  at: number | null
+  /** For 'appears': a listing of the house had none on sale since the alert was set. */
+  away: boolean
+}
+
+/** An alert as a screen asks for it or the file kept it, checked; null for anything else. */
+export function alertFrom(v: unknown): Alert | null {
+  const a = v as Partial<Alert> | null
+  if (!a || typeof a !== 'object') return null
+  const key = a.key === null || a.key === undefined ? null : a.key
+  if (!Number.isInteger(a.t) || typeof a.who !== 'string' || !a.who || a.who.length > 80 || typeof a.region !== 'string' || !/^[a-z]{2}$/i.test(a.region)) return null
+  if (!Number.isInteger(a.house) || !Number.isInteger(a.item) || (a.item as number) <= 0 || !ALERT_WHEN.includes(a.when as AlertWhen)) return null
+  if (key !== null && (typeof key !== 'string' || (key !== `${a.item}` && !key.startsWith(`${a.item}:`)) || !/^\d+(:\d+(\.\d+)*)?$/.test(key))) return null
+  if (!Number.isInteger(a.price) || (a.price as number) < 0 || (a.when !== 'appears' && !a.price)) return null
+  const met = typeof a.met === 'string' && !Number.isNaN(Date.parse(a.met)) ? a.met : null
+  return { t: a.t as number, who: a.who, region: a.region.toUpperCase(), house: a.house as number, item: a.item as number, key, name: typeof a.name === 'string' ? a.name.slice(0, 120) : `Item ${a.item}`, when: a.when as AlertWhen, price: a.when === 'appears' ? 0 : (a.price as number), game: a.game === true, met, at: met && Number.isInteger(a.at) ? (a.at as number) : null, away: a.away === true }
+}
+
+/** The lowest price an alert looks at in a listing: of its kind, or of any kind of its item. */
+export function alertLowest(a: Pick<Alert, 'item' | 'key'>, listing: Listing | null | undefined): number | undefined {
+  if (a.key !== null) return lowestOf(listing, a.key)
+  const all = Object.keys(listing?.items ?? {}).filter((k) => k === `${a.item}` || k.startsWith(`${a.item}:`)).map((k) => lowestOf(listing, k)).filter((p) => p !== undefined)
+  return all.length ? Math.min(...all) : undefined
+}
+
+/** The alert after a listing: met at its snapshot with the lowest price then, or away for 'appears' when none are on sale. A listing of another house changes nothing. */
+export function alertAfter(a: Alert, listing: Listing | null | undefined): Alert {
+  if (a.met || !listing || listing.region.toUpperCase() !== a.region || listing.house !== a.house) return a
+  const lowest = alertLowest(a, listing)
+  if (lowest === undefined) return a.when === 'appears' && !a.away ? { ...a, away: true } : a
+  const met = a.when === 'appears' ? a.away : a.when === 'below' ? lowest < a.price : lowest > a.price
+  return met ? { ...a, met: listing.snapshot, at: lowest } : a
+}

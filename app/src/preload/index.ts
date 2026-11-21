@@ -1,9 +1,9 @@
 // The door between the window and the main process. The window listens; it can ask for ten things
 // only: to forget a character, to pick the game folder, to open the addon's page on CurseForge, to build the map again after a
 // failure, to stay over other windows, to show the map on the home network, to search the player's QuestieDB, to mark a point in the
-// game, to send it a route, to step ahead on that route, and to fetch the prices of an auction house. It says one: that its opening screen is drawn.
+// game, to send it a route, to step ahead on that route, to fetch the prices of an auction house, and to set alerts on them. It says one: that its opening screen is drawn.
 import { contextBridge, ipcRenderer } from 'electron'
-import type { History, PricesTold } from '../shared/ah'
+import type { Alert, History, PricesTold } from '../shared/ah'
 import type { FeedbackSent, FeedbackWay } from '../shared/feedback'
 import type { Kept, KeptKey } from '../shared/kept'
 import type { PortraitsTold } from '../shared/portrait'
@@ -61,6 +61,12 @@ contextBridge.exposeInMainWorld('twinmap', {
   ahAgain: (): Promise<void> => ipcRenderer.invoke('ah-again'),
   // The chart's history of these keys of the house on show: the last 24 hours, and with days the last 7 days.
   ahHistory: (keys: string[], days: boolean): Promise<Record<string, History>> => ipcRenderer.invoke('ah-history', keys, days),
+  // The alerts on prices of every character: told at load and at every change; one set, one removed by its name.
+  onAlerts: (listener: (alerts: Alert[]) => void) => {
+    ipcRenderer.on('alerts', (_event, alerts: Alert[]) => listener(alerts))
+  },
+  ahAlert: (alert: Omit<Alert, 't' | 'met' | 'at' | 'away'>): Promise<void> => ipcRenderer.invoke('ah-alert', alert),
+  ahUnalert: (t: number): Promise<void> => ipcRenderer.invoke('ah-unalert', t),
   // Who sells an item, who drops it, where it is found.
   itemSources: (item: number): Promise<ItemSources> => ipcRenderer.invoke('item-sources', item),
   onQuests: (listener: (status: QuestsStatus) => void) => {

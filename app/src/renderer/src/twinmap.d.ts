@@ -27,6 +27,9 @@ declare global {
       ahHouse: (region: string, house: number) => Promise<void>
       ahAgain: () => Promise<void>
       ahHistory: (keys: string[], days: boolean) => Promise<Record<string, import('../../shared/ah').History>>
+      onAlerts: (listener: (alerts: import('../../shared/ah').Alert[]) => void) => void
+      ahAlert: (alert: Omit<import('../../shared/ah').Alert, 't' | 'met' | 'at' | 'away'>) => Promise<void>
+      ahUnalert: (t: number) => Promise<void>
       onUpdate: (listener: (updating: import('../../main/update').Updating) => void) => void
       chooseGameFolder: () => Promise<string | null>
       openCurseForge: (addon?: import('../../shared/setup').Optional) => Promise<void>

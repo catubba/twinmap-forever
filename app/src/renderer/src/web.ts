@@ -63,6 +63,9 @@ if (!inApp) {
     ahHouse: call('ah-house', undefined),
     ahAgain: call('ah-again', undefined),
     ahHistory: call('ah-history', {}),
+    onAlerts: on('alerts'),
+    ahAlert: call('ah-alert', undefined),
+    ahUnalert: call('ah-unalert', undefined),
     // What belongs to the computer stays on the computer.
     chooseGameFolder: () => Promise.resolve('Choose the game folder in Twinmap on the computer.'),
     openCurseForge: (addon?: string) => Promise.resolve(void window.open(pageOf(addon), '_blank', 'noopener')),

@@ -23,6 +23,7 @@ Log.lua
 Doors.lua
 Finds.lua
 Pin.lua
+Alerts.lua
 Route.lua
 Marks.lua
 Arrow.lua

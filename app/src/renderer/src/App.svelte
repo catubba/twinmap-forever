@@ -29,7 +29,7 @@
   import Picker from './Picker.svelte'
   import Items from './Items.svelte'
   import Auction from './Auction.svelte'
-  import { homeOf, houseFrom, houseNumber, houseOf, type Home, type House, type PricesTold } from '../../shared/ah'
+  import { homeOf, houseFrom, houseNumber, houseOf, type Alert, type Home, type House, type PricesTold } from '../../shared/ah'
   import ItemPopup from './ItemPopup.svelte'
   import NpcPanel from './NpcPanel.svelte'
   import { firstName, knownOf, shownOf } from '../../shared/characters'
@@ -191,6 +191,12 @@
   window.twinmap.onPrices((told) => {
     prices = told
   })
+  // Alerts on prices (M18-F10), every character's: the met ones show in Now under Attention too, and a click there opens them.
+  let alerts = $state.raw<Alert[]>([])
+  window.twinmap.onAlerts((all) => {
+    alerts = all
+  })
+  let showAlerts = $state(0)
   // The prices of the house on show only: a house changed a moment ago has none until they come.
   const listing = $derived(house && prices?.house === houseNumber(house) && prices.region === house.region ? prices.listing : null)
   // Each character's own house, as the game told it while it was played: whose items count at the house on show (M18-F8).
@@ -326,7 +332,7 @@
 {/if}
 {#if onAh && onSetup === false && !onSettings}
   <div class="over" in:fade={screen} out:fade={gone}>
-    <Auction {house} chosen={!!chosenHouse} hints={char ?? null} who={char?.name ?? null} {prices} {listing} {sheets} known={characters} {homes} {now} onchoose={chooseHouse} />
+    <Auction {house} chosen={!!chosenHouse} hints={char ?? null} who={char?.name ?? null} {prices} {listing} {sheets} known={characters} {homes} {now} {alerts} {showAlerts} onchoose={chooseHouse} />
   </div>
 {/if}
 {#if onSetup === false}
@@ -401,6 +407,8 @@
       inGame={route.sent && gameRoute?.t === route.t}
       {journey}
       back={death ? back : null}
+      met={alerts.filter((a) => a.met)}
+      onalerts={() => ((onSettings = false), (onItems = false), (onAh = true), showAlerts++)}
       onsent={(t) => setRoute({ ...route, sent: true, t })}
       onskip={skip}
       onarrive={() => setRoute(advance(route))}

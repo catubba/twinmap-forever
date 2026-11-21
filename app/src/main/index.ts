@@ -40,6 +40,8 @@ import { navFolder } from './nav'
 import { encodePng } from './png'
 import { farAskFrom, trackAskFrom, walkAskFrom, type Far, type FarAsk, type Floors, type TrackAsk, type WalkAsk, type WalkPath } from '../shared/walk'
 import { startPrices } from './prices'
+import { startAlerts } from './alerts'
+import type { Listing } from '../shared/ah'
 
 const SHOW_EVERY = 50 // ms between updates of the window: a position must be there well before the arrow needs it (BEHIND in glide.ts)
 const LOG_EVERY = 5000 // ms between writes of the measures
@@ -422,11 +424,23 @@ function createWindow(): void {
   })
   // The prices of the auction house the window shows (M18-F7): asked for by the window, which knows
   // the house, and kept beside the settings. TWINMAP_PRICES, for trials, names another address.
+  // Alerts on those prices (M18-F10), checked at every new listing; a met one goes to the game too when asked (sendParts, below).
+  const alerts = startAlerts(join(app.getPath('userData'), 'alerts.json'), (all) => {
+    if (!win.isDestroyed()) win.webContents.send('alerts', all)
+    lan?.tell('alerts', all)
+  }, (parts) => void sendParts(parts))
+  let checked: Listing | null = null
   const prices = startPrices(join(app.getPath('userData'), 'prices'), (told) => {
     if (!win.isDestroyed()) win.webContents.send('prices', told)
     lan?.tell('prices', told)
+    if (told.listing !== checked) alerts.check((checked = told.listing))
   }, process.env.TWINMAP_PRICES)
-  win.webContents.on('did-finish-load', () => win.webContents.send('prices', prices.told()))
+  win.webContents.on('did-finish-load', () => {
+    win.webContents.send('prices', prices.told())
+    win.webContents.send('alerts', alerts.all())
+  })
+  asks('ah-alert', (asked: unknown): void => alerts.set(asked, prices.told().listing))
+  asks('ah-unalert', (t: unknown): void => alerts.remove(t))
   asks('ah-house', (region: unknown, house: unknown): void => prices.want(region, house))
   asks('ah-again', (): void => prices.again())
   asks('ah-history', (keys: unknown, days: unknown) => prices.history(keys, days))
@@ -517,6 +531,7 @@ function createWindow(): void {
     lan.tell('sheets', sheets)
     lan.tell('portraits', portraitsTold())
     lan.tell('prices', prices.told())
+    lan.tell('alerts', alerts.all())
     void lanUrl()
   }
   ipcMain.handle('set-lan', (_event, on: unknown) => {
