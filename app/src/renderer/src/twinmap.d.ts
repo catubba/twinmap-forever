@@ -39,6 +39,8 @@ declare global {
       retryTiles: () => Promise<void>
       drawn: () => void
       setOnTop: (on: boolean) => Promise<void>
+      setZoom: (zoom: number) => Promise<void>
+      zoomBy: (by: 1 | -1) => Promise<void>
       setLan: (on: boolean) => Promise<void>
       setParticipate: (on: boolean) => Promise<void>
       setPause: (on: boolean) => Promise<void>

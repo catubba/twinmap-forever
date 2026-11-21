@@ -262,9 +262,19 @@
   async function choose(): Promise<void> {
     wrong = (await window.twinmap.chooseGameFolder()) ?? ''
   }
+  // Ctrl and the wheel make the whole window bigger or smaller, a step for each turn of a wheel. A touchpad's many
+  // small moves add up to one. On the map the wheel stays the map's: it never comes here, or comes taken.
+  let turned = 0
+  function wheel(e: WheelEvent): void {
+    if (!inApp || !e.ctrlKey || e.defaultPrevented) return
+    turned += e.deltaY
+    if (Math.abs(turned) < 50) return
+    void window.twinmap.zoomBy(turned < 0 ? 1 : -1)
+    turned = 0
+  }
 </script>
 
-<svelte:window bind:innerWidth={wide} />
+<svelte:window bind:innerWidth={wide} onwheel={wheel} />
 
 {#if opening}
   <div class="opening" out:fade={opened}><Logo size={96} stacked /></div>

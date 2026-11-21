@@ -213,7 +213,7 @@
 {/snippet}
 
 <main class="surface">
-  <div class="bar">
+  <div class="tools">
     <span class="srch"><span class="glass"><Glyph name="search" /></span><input class="field" type="search" placeholder={'Search the auction house: a name, or "an exact name"'} aria-label="Search the auction house" bind:value={typed} oninput={() => (page = null)} /></span>
     <button class="btn" aria-pressed={filtersOpen} onclick={() => (filtersOpen = !filtersOpen)}>Filters{active ? ` · ${active}` : ''}</button>
     <span class="seg" role="group" aria-label="Prices"><button aria-pressed={!perStack} onclick={() => (perStack = false)}>Per unit</button><button aria-pressed={perStack} onclick={() => (perStack = true)}>Per stack</button></span>
@@ -453,7 +453,8 @@
     grid-template-rows: auto auto minmax(0, 1fr) 28px;
     font-variant-numeric: tabular-nums;
   }
-  .bar {
+  /* Not .bar: that is the thin progress bar of ui.css, 6 px tall, which a wrapped row would spill out of. */
+  .tools {
     display: flex;
     align-items: center;
     gap: 12px;
@@ -941,9 +942,9 @@
   .foot .right {
     margin-left: auto;
   }
-  /* A narrow window: the bar wraps, the categories go over the list, the page of an item is one column. */
+  /* A narrow window: the tools wrap, the categories go over the list, the page of an item is one column. */
   @media (max-width: 900px) {
-    .bar {
+    .tools {
       flex-wrap: wrap;
     }
     .srch,

@@ -31,3 +31,12 @@ export function placeWindow(saved: unknown, areas: Rect[], primary: Rect): Rect 
   const w = Math.min(width, primary.width), h = Math.min(height, primary.height)
   return { x: primary.x + Math.round((primary.width - w) / 2), y: primary.y + Math.round((primary.height - h) / 2), width: w, height: h }
 }
+
+/** The sizes of the whole window's text and drawings the player may pick, 1 being as made. */
+export const ZOOMS = [0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2] as const
+
+/** The size one step bigger (1) or smaller (-1) than `now`, kept within the list; `now` not in it counts as 1. */
+export function zoomStep(now: number, by: 1 | -1): number {
+  const i = ZOOMS.indexOf(now as (typeof ZOOMS)[number])
+  return ZOOMS[Math.min(ZOOMS.length - 1, Math.max(0, (i < 0 ? ZOOMS.indexOf(1) : i) + by))]
+}

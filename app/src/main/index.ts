@@ -17,7 +17,7 @@ import { arrived, inboxFrom, marksNews, pinFrom, routeNewsFrom, stepFrom, takenF
 import { feedbackLink, sendFeedback } from '../shared/feedback'
 import { pageOf, setupComplete, setupPages, type SetupStatus } from '../shared/setup'
 import { tilesLine, type TilesStatus } from '../shared/tiles-status'
-import { placeWindow, WINDOW } from '../shared/window'
+import { placeWindow, WINDOW, ZOOMS, zoomStep } from '../shared/window'
 import { findGameWindow, programOf } from './capture'
 import { readHdr } from './hdr'
 import { gameFolderFrom, installedBuild, registryInstallPath } from './client-files'
@@ -506,7 +506,7 @@ function createWindow(): void {
   // turns it on in the settings. The same page, the same map files, and what a page may ask for above.
   let lan: Lan | null = null
   let lanWord: SetupStatus['lan'] = null
-  const lookSetup = (): SetupStatus => ({ ...setupStatus(gameFolder, settings, app.getVersion()), lan: lanWord })
+  const lookSetup = (): SetupStatus => ({ ...setupStatus(gameFolder, settings, app.getVersion()), lan: lanWord, zoom: settings.zoom ?? 1 })
   const lanUrl = async (): Promise<void> => {
     const address = await homeAddress()
     if (lan) lanWord = address ? { url: `http://${address}:${LAN_PORT}/?k=${settings.lanCode}` } : { error: 'This computer is on no home network.' }
@@ -807,6 +807,33 @@ function createWindow(): void {
     win.setAlwaysOnTop(settings.onTop)
     setup = lookSetup()
   })
+  // The size of the whole window: from the settings, Ctrl with + - 0, Ctrl with the wheel. The choice is kept.
+  // Windows' three buttons grow with the top row they sit in. The page loaded again keeps the size too.
+  const showZoom = (): void => {
+    const zoom = settings.zoom ?? 1
+    win.webContents.setZoomFactor(zoom)
+    win.setTitleBarOverlay({ height: Math.round(WINDOW.top * zoom) })
+  }
+  const zoomTo = (zoom: unknown): void => {
+    if (!ZOOMS.some((z) => z === zoom)) return
+    settings.zoom = zoom as number
+    writeSettings(settingsFile, settings)
+    showZoom()
+    setup = lookSetup()
+  }
+  showZoom()
+  win.webContents.on('did-finish-load', showZoom)
+  ipcMain.handle('set-zoom', (_event, zoom: unknown) => zoomTo(zoom))
+  // Ctrl and the wheel, from the page: it alone knows whether the map took the wheel first. (Electron's zoom-changed
+  // comes all the same, at times twice for one turn.)
+  ipcMain.handle('zoom-by', (_event, by: unknown) => zoomTo(zoomStep(settings.zoom ?? 1, by === -1 ? -1 : 1)))
+  win.webContents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown' || !input.control || input.alt || input.meta) return
+    const by = input.key === '+' || input.key === '=' ? 1 : input.key === '-' ? -1 : input.key === '0' ? 0 : null
+    if (by === null) return
+    zoomTo(by === 0 ? 1 : zoomStep(settings.zoom ?? 1, by))
+    event.preventDefault()
+  })
   const look = setInterval(() => {
     if (!gameFolder && (gameFolder = findGameFolder(settings.gameFolder))) quests = startQuests(gameFolder, tellQuests) // the game may be started after the app
     if (gameFolder && tiles.status().state === 'no-game') tiles = startTiles(gameFolder)
@@ -946,6 +973,8 @@ function createWindow(): void {
     ipcMain.removeHandler('open-curseforge')
     ipcMain.removeHandler('open-feedback')
     ipcMain.removeHandler('set-on-top')
+    ipcMain.removeHandler('set-zoom')
+    ipcMain.removeHandler('zoom-by')
     ipcMain.removeHandler('set-lan')
     ipcMain.removeHandler('set-participate')
     ipcMain.removeHandler('save-portrait')

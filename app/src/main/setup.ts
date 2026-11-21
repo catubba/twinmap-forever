@@ -3,6 +3,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { SetupStatus } from '../shared/setup'
+import { ZOOMS } from '../shared/window'
 import { questieFile } from './questie'
 import { shortestPathFolder } from './walk'
 
@@ -25,6 +26,8 @@ export interface Settings {
   lanCode?: string
   /** The participation programme (Help improve Twinmap): its data is sent only when true. Missing until the player answers, then kept as said. */
   participate?: boolean
+  /** The size of the whole window, one of ZOOMS; missing is 1. */
+  zoom?: number
 }
 
 /** The settings as they were saved; nothing where the file is missing or is not ours. */
@@ -32,13 +35,14 @@ export function readSettings(file: string): Settings {
   try {
     const read: unknown = JSON.parse(readFileSync(file, 'utf8'))
     if (typeof read !== 'object' || !read) return {}
-    const { gameFolder, setupDone, onTop, lan, lanCode, participate } = read as Record<string, unknown>
+    const { gameFolder, setupDone, onTop, lan, lanCode, participate, zoom } = read as Record<string, unknown>
     return {
       ...(typeof gameFolder === 'string' ? { gameFolder } : {}),
       ...(setupDone === true ? { setupDone } : {}),
       ...(onTop === true ? { onTop } : {}),
       ...(lan === true ? { lan } : {}),
       ...(typeof participate === 'boolean' ? { participate } : {}),
+      ...(ZOOMS.some((z) => z === zoom) ? { zoom: zoom as number } : {}),
       ...(typeof lanCode === 'string' && /^[\w-]{8,64}$/.test(lanCode) ? { lanCode } : {}),
     }
   } catch {

@@ -37,7 +37,9 @@ test('settings come back as they were written, and a file that is not ours gives
   // A no to Help improve Twinmap is kept too: it is what tells the question was asked.
   writeSettings(file, { participate: false })
   expect(readSettings(file)).toEqual({ participate: false })
-  writeFileSync(file, '{"gameFolder": 7, "setupDone": "yes", "other": 1}')
+  writeSettings(file, { zoom: 1.25 })
+  expect(readSettings(file)).toEqual({ zoom: 1.25 })
+  writeFileSync(file, '{"gameFolder": 7, "setupDone": "yes", "zoom": 9, "other": 1}')
   expect(readSettings(file)).toEqual({})
   writeFileSync(file, 'not json')
   expect(readSettings(file)).toEqual({})

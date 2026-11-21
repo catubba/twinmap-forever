@@ -75,6 +75,8 @@ if (!inApp) {
       return Promise.resolve()
     },
     setOnTop: () => Promise.resolve(),
+    setZoom: () => Promise.resolve(),
+    zoomBy: () => Promise.resolve(),
     setLan: () => Promise.resolve(),
     setParticipate: () => Promise.resolve(),
     setPause: call('set-pause', undefined),

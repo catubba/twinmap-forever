@@ -20,6 +20,8 @@ export interface SetupStatus {
   onTop: boolean
   /** The player's answer to Help improve Twinmap (the participation programme): null while never asked. */
   participate: boolean | null
+  /** The size of the whole app window the player picked, 1 being as made. A phone's browser has its own. */
+  zoom?: number
   /** The map on the home network: the address a phone opens, or why it cannot be had. Absent or null while it is off. */
   lan?: { url: string } | { error: string } | null
 }

@@ -91,6 +91,9 @@ contextBridge.exposeInMainWorld('twinmap', {
   // The opening screen is drawn: the window can show itself.
   drawn: (): void => ipcRenderer.send('drawn'),
   setOnTop: (on: boolean): Promise<void> => ipcRenderer.invoke('set-on-top', on),
+  setZoom: (zoom: number): Promise<void> => ipcRenderer.invoke('set-zoom', zoom),
+  // A step bigger (1) or smaller (-1): Ctrl and the wheel.
+  zoomBy: (by: 1 | -1): Promise<void> => ipcRenderer.invoke('zoom-by', by),
   // Shows the map to the other devices of the home network, or stops showing it.
   setLan: (on: boolean): Promise<void> => ipcRenderer.invoke('set-lan', on),
   setParticipate: (on: boolean): Promise<void> => ipcRenderer.invoke('set-participate', on),

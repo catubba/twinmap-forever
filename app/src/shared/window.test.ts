@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { placeWindow, WINDOW } from './window'
+import { placeWindow, WINDOW, zoomStep } from './window'
 
 const MAIN = { x: 0, y: 0, width: 2560, height: 1392 }
 const SIDE = { x: 2560, y: 69, width: 1920, height: 1032 }
@@ -40,4 +40,12 @@ test('a saved size is never under the minimum, nor over a main monitor it has to
   expect(placeWindow({ x: 300, y: 200, width: 10, height: 10 }, [MAIN], MAIN)).toEqual({ x: 300, y: 200, width: 720, height: 480 })
   const small = { x: 0, y: 0, width: 1366, height: 728 }
   expect(placeWindow({ x: 5000, y: 0, width: 1900, height: 1000 }, [small], small)).toEqual(small)
+})
+
+test('the text size goes up and down a step at a time, and no further than the list', () => {
+  expect(zoomStep(1, 1)).toBe(1.1)
+  expect(zoomStep(1.1, -1)).toBe(1)
+  expect(zoomStep(2, 1), 'the biggest stays').toBe(2)
+  expect(zoomStep(0.8, -1), 'the smallest stays').toBe(0.8)
+  expect(zoomStep(1.3, 1), 'a size not in the list starts from 1').toBe(1.1)
 })
