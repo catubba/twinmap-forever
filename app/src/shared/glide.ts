@@ -4,8 +4,12 @@
 
 /** Milliseconds between two positions of a character on the move: the addon's period for "pos". */
 export const PERIOD = 250
-/** How far behind the readings the arrow is shown: a period, and room for a reading that comes late. */
-export const BEHIND = 400
+/**
+ * How far behind the readings the arrow is shown: a period, and room for a reading that comes late. The next one must
+ * reach the window (every 50 ms, SHOW_EVERY in main/index.ts) before the arrow reaches the last: readings up to
+ * 300 ms apart keep it gliding, the period and a block of another section in the queue or a slow frame of the game.
+ */
+export const BEHIND = 350
 
 /** A place and the moment the game told it, in milliseconds. */
 export interface Fix { at: number; x: number; y: number }
