@@ -369,6 +369,8 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
 
   /** Called at every frame while the view runs, once it is drawn: what lies over it follows. */
   onFrame: () => void = () => {}
+  /** The azimuth the view turns to by itself, a little at every frame (the character's facing, heading up); null: left to the hand. */
+  heading: number | null = null
 
   /**
    * Where a point of the ground is on the view, in pixels from its top left corner; how much of it
@@ -465,12 +467,14 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
   /** Where the camera is. */
   looking(): Look {
     const t = this.controls.target
+    // From where the camera is, not from the controls: while turn() runs they still hold the angles it started from.
+    const angles = new THREE.Spherical().setFromVector3(this.eye.clone().sub(t))
     return {
       x: t.x,
       z: t.z,
       seen: 2 * this.eye.distanceTo(t) * Math.tan((FOV * Math.PI) / 360),
-      polar: this.controls.getPolarAngle(),
-      azimuth: this.controls.getAzimuthalAngle(),
+      polar: angles.phi,
+      azimuth: angles.theta,
     }
   }
 
@@ -537,6 +541,14 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
     this.dirty = true
   }
 
+  // A fifth of the way to the heading at every frame: a turn of the character is followed in about a quarter of a second, softly.
+  private steer(): void {
+    const a = this.controls.getAzimuthalAngle(),
+      da = Math.atan2(Math.sin(this.heading! - a), Math.cos(this.heading! - a))
+    if (Math.abs(da) < 0.001) return
+    this.place(this.camera.position.distanceTo(this.controls.target), this.controls.getPolarAngle(), a + da * 0.2)
+  }
+
   private resize(): void {
     const w = this.host.clientWidth,
       h = this.host.clientHeight
@@ -593,7 +605,10 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
     if (this.lifted) this.camera.position.copy(this.logical)
     this.lifted = false
     if (this.turning) this.turning(now)
-    else if (this.controls.update()) this.dirty = true
+    else {
+      if (this.heading !== null) this.steer()
+      if (this.controls.update()) this.dirty = true
+    }
     this.hold()
     if (!this.camera.position.equals(this.drawnFrom)) this.dirty = true
     const distance = this.eye.distanceTo(this.controls.target)
