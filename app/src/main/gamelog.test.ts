@@ -118,3 +118,13 @@ test('what QuestieDB has with a place is taken out of a session, the rest kept a
   expect(await withoutPlaced(session(B), placed)).toBe(session(B)) // nothing to ask: as written
   expect(await withoutPlaced(JSON.stringify({ log: 1, id: A, v: '0.14.0', e: [e[1]] }), placed)).toBeNull()
 })
+
+test("what the addon tells of a creature is asked of QuestieDB by the creature's number, its name with it (M15-F24)", async () => {
+  const e = [['about', 1, 268048, 32, 1, 4, 7, 2], ['name', 1, 268048, "Zul'jin's Herald"], ['sells', 2, 5111, 159, 25, 1, -1], ['gives', 3, 268048, 9001]]
+  const asked: Ask[][] = []
+  const placed = (asks: Ask[]): Promise<boolean[]> => (asked.push(asks), Promise.resolve(asks.map(([, id]) => id === 5111)))
+  const kept = await withoutPlaced(JSON.stringify({ log: 1, id: A, v: '0.14.0', e }), placed)
+  expect(asked[0]!.map(([kind, id]) => `${kind} ${id}`)).toEqual(['about 268048', 'name 268048', 'sells 5111', 'gives 268048'])
+  expect(JSON.parse(kept!).e).toEqual([e[0], e[1], e[3]])
+  expect('error' in logFor(new URLSearchParams(SAID), kept!)).toBe(false)
+})

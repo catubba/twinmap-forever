@@ -256,6 +256,15 @@ test('what is not a session of the log is refused: a text among the numbers, a n
     [logOf([SESSION]), 400],
     [logOf({ ...SESSION, e: [] }), 400],
     [logOf({ ...SESSION, e: [['door', 1, 'Someone']] }), 400],
+    // A name only in a name entry, after two numbers, without quotes, backslashes or control characters, 64 at most.
+    [logOf({ ...SESSION, e: [['npc', 1, 7464, 'Magma Totem II']] }), 400],
+    [logOf({ ...SESSION, e: [['name', 1, 'Magma Totem II', 7464]] }), 400],
+    [logOf({ ...SESSION, e: [['name', 1, 7464, 'Say "hi"']] }), 400],
+    [logOf({ ...SESSION, e: [['name', 1, 7464, 'a\\b']] }), 400],
+    [logOf({ ...SESSION, e: [['name', 1, 7464, 'line\nbreak']] }), 400],
+    [logOf({ ...SESSION, e: [['name', 1, 7464, 'x'.repeat(65)]] }), 400],
+    [logOf({ ...SESSION, e: [['name', 1, 7464, '']] }), 400],
+    [logOf({ ...SESSION, e: [['name', 1, 7464, 'Magma Totem II', 2]] }), 400],
     [logOf({ ...SESSION, e: [['Door of Someone', 1, 2]] }), 400],
     [logOf({ ...SESSION, e: [['door', 1, [2]]] }), 400],
     [logOf({ ...SESSION, e: [['door']] }), 400],
@@ -339,4 +348,11 @@ test('what is not a report of the health is refused: a folder in a line, anythin
   ]) assert.equal((await send(reportOf(bad), e)).response.status, 400, JSON.stringify(bad))
   assert.equal((await send(reportOf(REPORT, { ...GAME, realm: 'x' }), e)).response.status, 400)
   assert.equal((await send(reportOf({ ...REPORT, looks: 0, failed: 0, ms: [] }), e)).response.status, 201)
+})
+
+test("a creature's name is the one text a session takes, in its own entry (M15-F24)", async () => {
+  const samples = bucket(), e = env(true, samples)
+  const named = { ...SESSION, e: [['name', 3, 268048, "Zul'jin's Herald (Forever)"], ['name', 4, 7464, 'Tótem de magma'], ['about', 3, 268048, 32, 1, 4, 7, 2]] }
+  assert.equal((await send(logOf(named), e)).response.status, 201)
+  assert.deepEqual(JSON.parse(String(samples.kept.get(`${today}/log/fedcba9876543210.json`)!.value)), named)
 })

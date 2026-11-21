@@ -173,11 +173,14 @@ export function sampleFor(said: URLSearchParams, bytes: Uint8Array): { key: stri
 
 const SAID = ['app', 'build', 'locale'] as const // what the app says of the game a session comes from
 const ENTRY_KIND = /^[a-z]{1,12}$/
+/** The one text an entry may hold: a creature's name, in a "name" entry (M15-F24). No control character, no quote, no backslash. */
+const CREATURE_NAME = /^[^\p{C}"\\]{1,64}$/u
 /**
  * What is kept of a session of the addon's log, or the reason it is refused. A session is
  * { "log": 1, "id": 16 hex digits, "v": version of the addon, "e": entries }, an entry a kind and
- * numbers: nothing else gets in, so no text the game or a player wrote. What is kept is written
- * anew from what was read.
+ * numbers: nothing else gets in, so no text a player wrote. The one text taken is a creature's name,
+ * the game server's own, in an entry ["name", second, creature, name] (M15-F24). What is kept is
+ * written anew from what was read.
  */
 export function logFor(said: URLSearchParams, text: string): { key: string; fields: Record<string, string>; body: string } | { error: string } {
   const fields = Object.fromEntries(said)
@@ -193,7 +196,8 @@ export function logFor(said: URLSearchParams, text: string): { key: string; fiel
   if (log !== 1 || Object.keys(more).length > 0 || typeof id !== 'string' || !FIELDS.run!.test(id) || typeof v !== 'string' || !FIELDS.app!.test(v) || !Array.isArray(e) || e.length < 1) return { error: 'not a log' }
   for (const entry of e as unknown[]) {
     if (!Array.isArray(entry) || entry.length < 2 || entry.length > 20 || typeof entry[0] !== 'string' || !ENTRY_KIND.test(entry[0])) return { error: 'not a log' }
-    if (entry.slice(1).some((n) => typeof n !== 'number' || !Number.isFinite(n))) return { error: 'not a log' }
+    const named = entry[0] === 'name' && entry.length === 4 && typeof entry[3] === 'string' && CREATURE_NAME.test(entry[3])
+    if ((named ? entry.slice(1, 3) : entry.slice(1)).some((n) => typeof n !== 'number' || !Number.isFinite(n))) return { error: 'not a log' }
   }
   return { key: `log/${id}.json`, fields, body: JSON.stringify({ log, id, v, e }) }
 }

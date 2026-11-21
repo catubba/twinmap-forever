@@ -190,7 +190,7 @@ test('after a yes a creature targeted or under the mouse and an object looted ar
   addon.lua(`GAME.target = "Creature-0-5250-0-11-3586-0000ABCDEF"`);
   addon.fire('PLAYER_TARGET_CHANGED');
   const { sessions, texts } = logout(addon);
-  assert.deepEqual(sessions[0].e.map((e) => e.slice(0, 1).concat(e.slice(2))), [
+  assert.deepEqual(sessions[0].e.filter((e) => e[0] === 'npc' || e[0] === 'object').map((e) => e.slice(0, 1).concat(e.slice(2))), [
     ['npc', 5111, 1455, 0.3012, 0.62],
     ['npc', 28781, 1455, 0.3012, 0.62],
     ['object', 2843, 1455, 0.3012, 0.62],
@@ -245,4 +245,51 @@ test('after a yes an NPC talked to is written down once a session, where the cha
   off.lua(`GAME.npc = "${FIREBREW}"`);
   off.fire('GOSSIP_SHOW');
   assert.doesNotMatch(logout(off).file, /talk/);
+});
+
+// Herald 268048, a creature QuestieDB lacks: a vendor who gives a quest and takes another. A shaman's totem and a companion beside him.
+const HERALD = 'Creature-0-5250-0-11-268048-0000ABCDEF', TOTEM = 'Creature-0-5250-0-11-7464-0000ABCDEF', CAT = 'Creature-0-5250-0-11-7380-0000ABCDEF'
+const CREATURES = `GAME.creatures = {
+  ["${HERALD}"] = { name = "Zul'jin's Herald", level = 32, classification = "elite", reaction = 4, type = "Humanoid", faction = "Horde" },
+  ["${TOTEM}"] = { name = "Magma Totem II", level = 26, classification = "normal", reaction = 5, type = "Totem", controlled = true },
+  ["${CAT}"] = { name = "Siamese", level = 1, classification = "normal", reaction = 4, type = "Non-combat Pet" },
+}`
+test('of a creature met, all the game tells: what it is, its name, its windows, what it sells, the quests it gives and takes; none of a creature of a player (M15-F24)', () => {
+  const addon = world('true');
+  addon.lua(CREATURES);
+  for (const guid of [TOTEM, CAT]) {
+    addon.lua(`GAME.target = "${guid}"`);
+    addon.fire('PLAYER_TARGET_CHANGED');
+  }
+  addon.lua(`GAME.npc = "${HERALD}"; GAME.gossip = { available = { 9001 }, active = { 9002 } }`);
+  addon.fire('GOSSIP_SHOW');
+  addon.lua('GAME.merchant = { { 159, 25, 1, -1 }, { 2320, 10, 1, 5 } }');
+  addon.fire('MERCHANT_SHOW');
+  addon.fire('MERCHANT_SHOW'); // once a session
+  addon.lua('GAME.quest = 9001');
+  addon.fire('QUEST_DETAIL');
+  addon.lua(`GAME.target = "${HERALD}"`);
+  addon.fire('PLAYER_TARGET_CHANGED');
+  const { sessions, texts } = logout(addon);
+  const e = sessions[0].e.map((x) => x.slice(0, 1).concat(x.slice(2)))
+  assert.deepEqual(e.filter(([kind]) => kind !== 'talk' && kind !== 'npc'), [
+    ['about', 268048, 32, 1, 4, 7, 2],
+    ['name', 268048, "Zul'jin's Herald"],
+    ['opens', 268048, 1],
+    ['gives', 268048, 9001],
+    ['takes', 268048, 9002],
+    ['opens', 268048, 2],
+    ['sells', 268048, 159, 25, 1, -1],
+    ['sells', 268048, 2320, 10, 1, 5],
+    ['opens', 268048, 3],
+  ]);
+  assert.deepEqual(e.filter(([kind]) => kind === 'talk' || kind === 'npc').map(([kind, id]) => `${kind} ${id}`), ['talk 268048', 'npc 268048']);
+  assert.doesNotMatch(texts[0], /7464|7380|Totem|Siamese/);
+  assert.ok(!('error' in logFor(new URLSearchParams({ app: '0.14.0', build: '1.60.1.70938', locale: 'enUS' }), texts[0])));
+});
+
+test('a name with a quote, a backslash or past 64 bytes is not written, and nothing else of it breaks', () => {
+  const addon = world('true');
+  addon.lua(`local ns = ...; ns.LogName(1, 'Say "hi"'); ns.LogName(2, "a\\\\b"); ns.LogName(3, ("x"):rep(65)); ns.LogName(4, {}); ns.LogName(5, "Gug Fatcandle")`);
+  assert.deepEqual(logout(addon).sessions[0].e.map((x) => x.slice(2)), [[5, 'Gug Fatcandle']]);
 });

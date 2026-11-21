@@ -43,7 +43,17 @@ const STUB = `
   function IsInRaid() return GAME.raid == true end
   function UnitExists(unit) return unit == "player" or (GAME.party ~= nil and GAME.party[unit] ~= nil) end
   function UnitIsUnit(a, b) return a == b end
+  -- GAME.creatures[guid] = { name, level, classification, reaction, type, faction, controlled }: what the game tells of a
+  -- creature targeted, under the mouse or whose window is open ("npc"). GAME.merchant = { { item, price, quantity, available }, ... }:
+  -- the vendor's window. GAME.gossip = { available = { quest, ... }, active = { quest, ... } }. GAME.quest: the quest of the quest window.
+  local function creature(unit)
+    if unit ~= "npc" and unit ~= "target" and unit ~= "mouseover" then return nil end
+    return GAME.creatures and GAME.creatures[UnitGUID(unit) or ""]
+  end
+  CREATURE_OF = creature
   function UnitName(unit)
+    local c = creature(unit)
+    if c then return c.name end
     local other = GAME.party and GAME.party[unit]
     if other then return other.name, other.second end
     return "Catubbio", "Sucameli"
@@ -121,7 +131,7 @@ const STUB = `
     if unit == "target" or unit == "mouseover" then return GAME[unit] end
   end
   function UnitIsDead(unit) return unit == "target" and GAME.target ~= nil and GAME.dead == true end
-  function UnitClassification(unit) if unit == "target" and GAME.target then return GAME.classification or "normal" end end
+  function UnitClassification(unit) local c = CREATURE_OF(unit) if c then return c.classification end if unit == "target" and GAME.target then return GAME.classification or "normal" end end
   function GetNumLootItems() return GAME.loot and #GAME.loot or 0 end
   function GetLootSourceInfo(slot) if GAME.loot and GAME.loot[slot] then return GAME.loot[slot], 1 end end
   local function shown()
@@ -141,7 +151,21 @@ const STUB = `
     GAME.filters[f] = on or nil
   end
   function IsTradeskillTrainer() return GAME.trainer and GAME.trainer.trade == true end
-  function UnitReaction(unit) if unit == "npc" and GAME.trainer then return GAME.trainer.standing or 4 end end
+  function UnitReaction(unit)
+    local c = creature(unit)
+    if c then return c.reaction end
+    if unit == "npc" and GAME.trainer then return GAME.trainer.standing or 4 end
+  end
+  function UnitCreatureType(unit) local c = creature(unit) return c and c.type end
+  function UnitPlayerControlled(unit) local c = creature(unit) return c ~= nil and c.controlled == true end
+  function GetMerchantNumItems() return GAME.merchant and #GAME.merchant or 0 end
+  function GetMerchantItemID(i) local m = GAME.merchant and GAME.merchant[i] return m and m[1] end
+  function GetMerchantItemInfo(i) local m = GAME.merchant and GAME.merchant[i] if m then return "Item " .. m[1], 0, m[2], m[3], m[4], true, true, 0 end end
+  C_GossipInfo = {
+    GetAvailableQuests = function() local out = {} for _, q in ipairs(GAME.gossip and GAME.gossip.available or {}) do out[#out + 1] = { questID = q } end return out end,
+    GetActiveQuests = function() local out = {} for _, q in ipairs(GAME.gossip and GAME.gossip.active or {}) do out[#out + 1] = { questID = q } end return out end,
+  }
+  function GetQuestID() return GAME.quest or 0 end
   C_TradeSkillUI = {
     GetAllRecipeIDs = function() local out = {} for id in pairs(GAME.trade and GAME.trade.recipes or {}) do out[#out + 1] = id end table.sort(out) return out end,
     GetRecipeInfo = function(id) return { learned = GAME.trade.recipes[id] } end,
@@ -164,11 +188,11 @@ const STUB = `
   function UnitIsDeadOrGhost() return GAME.dead == true or GAME.ghost == true end
   function UnitIsGhost() return GAME.ghost == true end
   C_DeathInfo = { GetCorpseMapPosition = function(map) local c = GAME.corpse return c and c.map == map and CreateVector2D(c.x, c.y) or nil end }
-  function UnitLevel() return GAME.level end
+  function UnitLevel(unit) local c = CREATURE_OF(unit) if c then return c.level end return GAME.level end
   function UnitXP() return GAME.xp end
   function UnitXPMax() return GAME.xpMax end
   function GetXPExhaustion() return GAME.rested end
-  function UnitFactionGroup() return GAME.faction end -- "Alliance", "Horde"; unset, the game does not tell
+  function UnitFactionGroup(unit) local c = CREATURE_OF(unit) if c then return c.faction end return GAME.faction end -- "Alliance", "Horde"; unset, the game does not tell
   Settings = {
     RegisterCanvasLayoutCategory = function(panel, name) return { panel = panel, name = name } end,
     RegisterAddOnCategory = function(category) SETTINGS_CATEGORY = category end,

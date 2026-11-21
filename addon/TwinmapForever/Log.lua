@@ -55,23 +55,37 @@ local function Text(v)
   return (("%.4f"):format(v):gsub("%.?0+$", ""))
 end
 
--- One entry more: a kind, a short word of ours, and numbers. Anything else among them and the
--- entry is not written.
-function ns.Log(kind, ...)
-  if not ns.Logging() then return end
+-- The session's entry made of these parts, after its kind and its second.
+local function Append(kind, parts)
   if not entries then
     id = ("%04x%04x%04x%04x"):format(math.random(0, 65535), math.random(0, 65535), math.random(0, 65535), math.random(0, 65535))
     began, entries, size = GetTime(), {}, 0
   end
-  local parts = { '"' .. kind .. '"', Text(math.floor(GetTime() - began)) }
+  local entry = "[" .. table.concat({ '"' .. kind .. '"', Text(math.floor(GetTime() - began)), unpack(parts) }, ",") .. "]"
+  if size + #entry > LARGEST - 100 then return end -- a session alone never outgrows what is kept
+  entries[#entries + 1], size = entry, size + #entry + 1
+end
+
+-- One entry more: a kind, a short word of ours, and numbers. Anything else among them and the
+-- entry is not written.
+function ns.Log(kind, ...)
+  if not ns.Logging() then return end
+  local parts = {}
   for i = 1, select("#", ...) do
     local text = Text((select(i, ...)))
     if not text then return end
     parts[#parts + 1] = text
   end
-  local entry = "[" .. table.concat(parts, ",") .. "]"
-  if size + #entry > LARGEST - 100 then return end -- a session alone never outgrows what is kept
-  entries[#entries + 1], size = entry, size + #entry + 1
+  Append(kind, parts)
+end
+
+-- The one text the log takes: a creature's name, as the game's server gives it (M15-F24), never a
+-- player's. Printable, with no quote, no backslash and nothing below a space, 64 bytes at most:
+-- anything else and it is not written. The server checks it again.
+function ns.LogName(npc, name)
+  if not ns.Logging() or not Text(npc) or type(name) ~= "string" or (issecretvalue and issecretvalue(name)) then return end
+  if #name == 0 or #name > 64 or name:find('[%c"\\]') then return end
+  Append("name", { Text(npc), '"' .. name .. '"' })
 end
 
 -- A no, or a yes never heard: nothing is held and nothing stays in the saved settings.

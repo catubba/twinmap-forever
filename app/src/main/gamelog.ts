@@ -51,14 +51,16 @@ export function logFiles(gameFolder: string): string[] {
   }
 }
 
+/** What the addon tells of a creature (M15-F24), sent as "npc" is: only of one QuestieDB lacks or has with no place. */
+export const ABOUT_NPC = ['about', 'name', 'opens', 'sells', 'gives', 'takes']
 /**
  * The kinds of entry that are sent only where QuestieDB has no place for their number (the third
  * value of the entry); "talk", an NPC the player talked to, also where QuestieDB has it somewhere
  * else (M15-F24).
  */
-const ASKED = new Set(['npc', 'object', 'quest', 'talk'])
+const ASKED = new Set(['npc', 'object', 'quest', 'talk', ...ABOUT_NPC])
 /** What is asked of QuestieDB for an entry: its kind, its number, and the rest of it after the number (for "talk", the place). */
-export type Ask = [string, number, ...number[]]
+export type Ask = [string, number, ...(number | string)[]]
 
 /**
  * A session less the entries QuestieDB has already, as `placed` tells for each [kind, number]; null
@@ -68,7 +70,7 @@ export async function withoutPlaced(text: string, placed: (asks: Ask[]) => Promi
   const session = JSON.parse(text) as { e: unknown[][] }
   const asks = session.e.filter((entry) => ASKED.has(entry[0] as string))
   if (asks.length === 0) return text
-  const has = await placed(asks.map((entry) => [entry[0] as string, entry[2] as number, ...(entry.slice(3) as number[])]))
+  const has = await placed(asks.map((entry) => [entry[0] as string, entry[2] as number, ...(entry.slice(3) as (number | string)[])]))
   const e = session.e.filter((entry) => !has[asks.indexOf(entry)])
   return e.length > 0 ? JSON.stringify({ ...session, e }) : null
 }

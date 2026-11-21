@@ -7,7 +7,7 @@ import type { Found } from '../shared/search'
 import type { ItemSources } from '../shared/tips'
 import { readFileSync } from 'node:fs'
 import type { GameMap } from '../shared/maps'
-import type { Ask } from './gamelog'
+import { ABOUT_NPC, type Ask } from './gamelog'
 import { doerIndex, fixedPins, itemSources, metWhereQuestieSays, openQuestie, placed, questLog, questPins, search, searchIndex, shownFromLog } from './questie'
 
 /** What the main process asks. */
@@ -42,7 +42,8 @@ parentPort?.on('message', (asked: Asked) => {
   if ('search' in asked) tell({ id: asked.id, found: db ? search(db, index, asked.search, undefined, doers) : [] })
   else if ('placed' in asked) {
     const maps = mapsOf(asked.maps)
-    tell({ id: asked.id, placed: asked.placed.map(([kind, id, ...rest]) => !db || (kind === 'talk' ? metWhereQuestieSays(db, id, rest, maps) : placed(db, kind, id))) })
+    const of = (kind: string): string => (ABOUT_NPC.includes(kind) ? 'npc' : kind)
+    tell({ id: asked.id, placed: asked.placed.map(([kind, id, ...rest]) => !db || (kind === 'talk' ? metWhereQuestieSays(db, id, rest as number[], maps) : placed(db, of(kind), id))) })
   }
   else if ('sources' in asked) tell({ id: asked.id, sources: db ? itemSources(db, asked.sources) : { sold: [], drops: [], found: [] } })
   else if (db) {
