@@ -369,7 +369,7 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
 
   /** Called at every frame while the view runs, once it is drawn: what lies over it follows. */
   onFrame: () => void = () => {}
-  /** The azimuth the view turns to by itself, a little at every frame (the character's facing, heading up); null: left to the hand. */
+  /** The azimuth the view keeps to by itself (the arrow's, heading up); null: left to the hand. */
   heading: number | null = null
 
   /**
@@ -541,12 +541,13 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
     this.dirty = true
   }
 
-  // A fifth of the way to the heading at every frame: a turn of the character is followed in about a quarter of a second, softly.
+  // The heading comes already smooth (the arrow's turn): the view keeps to it. Only from far off, as heading up is
+  // turned on or the character is followed again, it goes a fifth of the way there at every frame.
   private steer(): void {
     const a = this.controls.getAzimuthalAngle(),
       da = Math.atan2(Math.sin(this.heading! - a), Math.cos(this.heading! - a))
-    if (Math.abs(da) < 0.001) return
-    this.place(this.camera.position.distanceTo(this.controls.target), this.controls.getPolarAngle(), a + da * 0.2)
+    if (Math.abs(da) < 0.0005) return
+    this.place(this.camera.position.distanceTo(this.controls.target), this.controls.getPolarAngle(), a + (Math.abs(da) < 0.15 ? da : da * 0.2))
   }
 
   private resize(): void {
@@ -605,10 +606,7 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
     if (this.lifted) this.camera.position.copy(this.logical)
     this.lifted = false
     if (this.turning) this.turning(now)
-    else {
-      if (this.heading !== null) this.steer()
-      if (this.controls.update()) this.dirty = true
-    }
+    else if (this.controls.update()) this.dirty = true
     this.hold()
     if (!this.camera.position.equals(this.drawnFrom)) this.dirty = true
     const distance = this.eye.distanceTo(this.controls.target)
@@ -621,6 +619,8 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
     this.camera.updateProjectionMatrix()
     this.compass.turn(this.controls.getPolarAngle() / 2, this.controls.getAzimuthalAngle())
     if (this.onBefore()) this.dirty = true
+    // After the arrow is turned for this frame, so the view turns with it in the same frame, not one behind.
+    if (this.heading !== null && !this.turning) this.steer()
     if (this.inside?.step(this.camera.position, Math.min(0.1, FRAME_MS / 1000 + 0.004))) this.dirty = true
     if (this.dirty) {
       this.dirty = false

@@ -837,10 +837,6 @@
   // Heading up: while the 3D view follows the character it turns with it, the way it faces at the top. The compass
   // or N turns it on and off; a drag lets the character go, and the view stays as it was turned until Follow.
   let headingUp = $state(localStorage.getItem('headingUp') === '1')
-  $effect(() => {
-    const on = threeD && headingUp && following && pos?.facing !== undefined
-    if (terrain) terrain.heading = on ? (pos!.facing! * Math.PI) / 180 : null // the game counts anticlockwise from north, as OrbitControls does
-  })
   function setHeadingUp(on: boolean): void {
     headingUp = on
     localStorage.setItem('headingUp', on ? '1' : '0')
@@ -930,7 +926,13 @@
         terrain.onGrab = () => (following = false)
         terrain.zoomAtCursor(!following)
         const body = new Arrow3d(terrain)
-        terrain.onBefore = () => body.step(performance.now())
+        terrain.onBefore = () => {
+          const moved = body.step(performance.now())
+          // Heading up: the view turns as the arrow does, so the arrow stays pointing up. Clockwise from north there,
+          // anticlockwise for OrbitControls.
+          terrain!.heading = headingUp && following && body.pointing !== null ? (-body.pointing * Math.PI) / 180 : null
+          return moved
+        }
         pins3d ??= new Pins3d(map, terrain, pinsHost, terrainHost, arrow, () => turned, body, () => floorAt)
         names3d ??= new Names3d(terrain, pinsHost)
         inside3d ??= new (await import('./inside3d')).Inside3d(terrain)
@@ -959,6 +961,7 @@
     threeD = false
     for (const layer of shown) layer.addTo(map)
     terrain.stop()
+    terrain.heading = null
     pins3d?.clear()
     names3d?.clear()
   }

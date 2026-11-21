@@ -14,6 +14,7 @@ const BAND = 0.02 // half the band round its edge
 const FLAT = 0.1 // the flat on its top, of its outline
 const TIP = 0.55 // how round the tip is, of the other corners
 const EASE = 0.25 // seconds the slope takes to follow the ground
+const TURN_MS = 250 // the 2D arrow's transition (.me svg in Map.svelte)
 const SHADOW = 0.5
 const GHOST = 0.4 // its outline through a hill
 const FLOOR = 3 // yards over the ground from which the character is on a floor, not on the ground (a bridge)
@@ -105,6 +106,11 @@ export class Arrow3d {
   private y: number | null = null
   private last = 0
   private drawn = ''
+  // The way it points, turned to a new heading in a quarter of a second at an even pace, as the 2D arrow's
+  // transition does: the game tells the facing a few times a second, and a jump each time reads as a stutter.
+  private turn = { from: 0, to: 0, at: 0 }
+  /** Where the arrow points as drawn, in degrees clockwise from north; null while there is none. */
+  pointing: number | null = null
 
   constructor(private terrain: Terrain) {
     const geo = body(),
@@ -158,9 +164,12 @@ export class Arrow3d {
     const w = this.want,
       ground = w ? this.terrain.groundAt(w.x, w.z) : NaN
     if (!w || !Number.isFinite(ground)) {
-      this.y = null
+      this.y = this.pointing = null
       return this.show(false, '')
     }
+    if (this.pointing === null) this.turn = { from: w.heading, to: w.heading, at: now }
+    else if (w.heading !== this.turn.to) this.turn = { from: this.pointing, to: w.heading, at: now }
+    this.pointing = this.turn.from + (this.turn.to - this.turn.from) * Math.min(1, (now - this.turn.at) / TURN_MS)
     // On a floor over the ground (a bridge): at its height and level. Else on the ground, as it slopes.
     // In a room under the ground, as it opens: down on its floor, level, and drawn with the rooms, before the ground.
     const lifted = w.floor !== null && w.floor > ground + FLOOR,
@@ -182,7 +191,7 @@ export class Arrow3d {
     this.up.lerp(slope, k).normalize()
     this.y = this.y === null ? y : this.y + (y - this.y) * (1 - Math.exp(-dt / (EASE / 2)))
     // Laid on that plane, the tip the way the character faces.
-    const a = (w.heading * Math.PI) / 180,
+    const a = (this.pointing * Math.PI) / 180,
       facing = new THREE.Vector3(Math.sin(a), 0, -Math.cos(a)),
       back = facing.clone().multiplyScalar(-1).addScaledVector(this.up, facing.dot(this.up)).normalize(),
       side = new THREE.Vector3().crossVectors(this.up, back).normalize()
