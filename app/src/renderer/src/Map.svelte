@@ -1040,18 +1040,26 @@
     made.setMaxBounds(WORLD_BOUNDS.pad(0.2)) // after a view: leaflet-rotate asks for the centre as the bounds are set
     pins.addTo(made)
     made.on('dragstart', () => (following = false))
-    // The right button turns the 2D map round its middle, as it turns the 3D view (MapControls): a whole turn across
-    // the map's height, the same way round. Taken by hand, as a drag: the character is no longer followed.
-    let twist: { x: number; bearing: number; moved: boolean } | null = null
+    // The right button turns the 2D map round its middle as a knob is turned: the map goes round with the pointer, by
+    // the angle it sweeps round the middle, above the middle as below it. Taken by hand, as a drag: the character is no
+    // longer followed.
+    let twist: { angle: number; bearing: number; moved: boolean; x: number; y: number } | null = null
+    const angleAt = (e: PointerEvent): number => {
+      const r = holder.getBoundingClientRect()
+      return (Math.atan2(e.clientY - r.top - r.height / 2, e.clientX - r.left - r.width / 2) * 180) / Math.PI
+    }
     holder.addEventListener('pointerdown', (e) => {
       if (e.button !== 2 || threeD) return
-      twist = { x: e.clientX, bearing: made.getBearing(), moved: false }
+      twist = { angle: angleAt(e), bearing: made.getBearing(), moved: false, x: e.clientX, y: e.clientY }
       holder.setPointerCapture(e.pointerId)
     })
     holder.addEventListener('pointermove', (e) => {
-      if (!twist || (!twist.moved && Math.abs(e.clientX - twist.x) <= 3)) return
+      if (!twist || (!twist.moved && Math.hypot(e.clientX - twist.x, e.clientY - twist.y) <= 3)) return
       if (!twist.moved) ((twist.moved = true), (following = false), (northing = false))
-      made.setBearing(twist.bearing - (360 * (e.clientX - twist.x)) / holder.clientHeight)
+      const now = angleAt(e)
+      twist.bearing += ((((now - twist.angle) % 360) + 540) % 360) - 180 // clockwise on screen, clockwise the map
+      twist.angle = now
+      made.setBearing(twist.bearing)
       spinSoon()
     })
     const untwist = (): void => void (twist = null)
