@@ -170,6 +170,8 @@ export function coins(copper: number): [number, 'g' | 's' | 'c'][] {
 
 /** The colours the game gives the qualities, poor to heirloom. */
 export const QUALITY_COLORS = ['#9d9d9d', '#ffffff', '#1eff00', '#0070dd', '#a335ee', '#ff8000', '#e6cc80', '#00ccff']
+/** The same as text in a list on the dark ground: the blue and the purple lighter, so they read (design/ah/mock.html). */
+export const QUALITY_TEXT = ['#9d9d9d', '#ffffff', '#1eff00', '#3d9bff', '#b866f5', '#ff8000', '#e6cc80', '#00ccff']
 
 // The page of slots (M10-F14): what is worn in the places the game's character window gives it,
 // and the bags and the bank as grids, their items packed and the free slots at the end.

@@ -5,12 +5,13 @@
   // Two views (M10-F14, mockup design/vendors/mockup/items2.html): Slots, what is worn as the game's
   // character window lays it and the bags and the bank as grids; Table, a row for each item.
   import { ago, type Known } from '../../shared/characters'
-  import { coins, filterRows, gridsOf, itemMatches, itemRows, othersHolding, PLACES, QUALITY_COLORS, sortRows, wornOf, WORN_LEFT, WORN_RIGHT, WORN_WEAPONS, type Cell, type Column, type Grid, type ItemFacts, type ItemRow, type Place } from '../../shared/items'
+  import { coins, filterRows, gridsOf, itemMatches, itemRows, othersHolding, PLACES, QUALITY_COLORS, QUALITY_TEXT, sortRows, wornOf, WORN_LEFT, WORN_RIGHT, WORN_WEAPONS, type Cell, type Column, type Grid, type ItemFacts, type ItemRow, type Place } from '../../shared/items'
   import type { PortraitsTold } from '../../shared/portrait'
   import type { Sheets } from '../../shared/sheet'
   import { statsOf } from '../../shared/stats'
   import { lowestOf, type Listing } from '../../shared/ah'
   import { itemTip } from './item-tip.svelte'
+  import { columns } from './columns'
   import { inApp, TILES } from './web'
 
   // listing: the prices of the auction house on show (M18-F8), for what each item fetches there; null without them.
@@ -70,7 +71,7 @@
 {#snippet item(r: ItemRow)}
   <span class="it">
     <span class="ico"><img src="{TILES}/items/{r.id}.png" alt="" onerror={(e) => e.currentTarget.remove()} /></span>
-    <span class="nm" style:color={QUALITY_COLORS[r.quality] ?? 'var(--text)'}>{r.name}</span>
+    <span class="nm" style:color={QUALITY_TEXT[r.quality] ?? 'var(--text)'}>{r.name}</span>
   </span>
 {/snippet}
 
@@ -191,7 +192,7 @@
         </section>
       </div>
     {:else}
-    <table>
+    <table use:columns={'items-table'}>
       {@render heads(COLUMNS)}
       <tbody>
         {#each rows as r (r.place + r.id)}
@@ -206,7 +207,7 @@
 
     {#if othersSorted.length}
       <h2>Other characters<span>kept on this PC</span></h2>
-      <table>
+      <table use:columns={'items-others'}>
         {@render heads([['name', 'Item'], [null, 'Character'], ['type', 'Type'], ['place', 'Where'], ['n', 'Qty'], ['value', 'Value'], ...(listing ? [['auction', 'At the AH'] as [Column, string]] : [])])}
         <tbody>
           {#each othersSorted as r (r.who?.key + r.place + r.id)}
@@ -533,14 +534,19 @@
     width: 100%;
     border-collapse: collapse;
   }
+  /* As the tables of the Auction House: the headings on a bar of their own that stays on top. */
   th {
-    padding: 6px 10px;
+    position: sticky;
+    top: -14px; /* over the padding of the page */
+    z-index: 1;
+    padding: 8px 10px 6px;
     border-bottom: 1px solid var(--bronze-700);
+    background: var(--stone-800);
     text-align: left;
-    font: 500 13px/17px var(--font);
-    letter-spacing: 0.04em;
+    font: 600 12px/16px var(--font);
+    letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: var(--text-dim);
+    color: var(--bronze-400);
     white-space: nowrap;
   }
   th button {
@@ -567,9 +573,11 @@
     padding: 3px 10px;
     border-bottom: 1px solid #ffffff0a;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
-  tr:nth-child(even) td {
-    background: #ffffff05;
+  tbody tr:hover td {
+    background: #ffffff08;
   }
   .num {
     text-align: right;
@@ -589,13 +597,14 @@
     flex: none;
     width: 26px;
     height: 26px;
-    background: var(--stone-950);
-    box-shadow: 0 0 0 1px #000;
+    border: 1px solid #000;
+    background: #000;
+    box-shadow: 0 0 0 1px var(--bronze-700);
   }
   .ico img {
     display: block;
-    width: 26px;
-    height: 26px;
+    width: 100%;
+    height: 100%;
   }
   .nm {
     text-shadow: 0 1px 0 #000;

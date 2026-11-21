@@ -629,6 +629,32 @@ body {
   }
 }
 
+/* The line at the edge of a table's heading: dragged, the column is wider or narrower (columns.ts). */
+th .grip {
+  position: absolute;
+  right: -4px;
+  top: 0;
+  bottom: 0;
+  width: 9px;
+  cursor: col-resize;
+  z-index: 2;
+}
+th .grip::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 7px;
+  bottom: 7px;
+  width: 1px;
+  background: var(--bronze-700);
+}
+th:last-child .grip {
+  right: 0;
+}
+th:hover .grip::after {
+  background: var(--bronze-300);
+}
+
 /* A coin after a number of it: gold, silver, copper (Items, and the panel of a vendor or a trainer). */
 .coin {
   display: inline-block;

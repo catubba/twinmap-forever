@@ -4,7 +4,7 @@
   // a row for each item with its kinds, the page of an item with what is on sale cheapest first, a
   // search that forgives a letter, and the line Blizzard's terms ask for. Data: shared/ah.ts.
   import { afterCut, ahItems, categoriesOf, disenchantOf, disenchantValue, houseLine, houseNumber, lowestOf, nextPrices, countsAt, ownedOf, priceOf, suffixOf, REGIONS, rulesetName, rulesetOf, RULESETS, search, SIDES, type AhItem, type AhNames, type Category, type Home, type House, type HouseHints, type Kind, type Listing, type Owned, type OwnedPlace, type PricesTold, type Region, type Side } from '../../shared/ah'
-  import { coins, typeOf, type ItemFacts } from '../../shared/items'
+  import { coins, QUALITY_TEXT as QUALITY_COLORS, typeOf, type ItemFacts } from '../../shared/items'
   import type { Known } from '../../shared/characters'
   import type { Sheets } from '../../shared/sheet'
   import { columns } from './columns'
@@ -95,8 +95,6 @@
     const top = cats.find((c) => c.key === parts[0]), mid = top?.kids.find((c) => c.key === parts.slice(0, 2).join('.')), low = mid?.kids.find((c) => c.key === key)
     return [top, mid, low].filter(Boolean).map((c) => c!.name).join(' · ')
   }
-  // The colours of the qualities as text on the dark ground: the game's, its blue and purple lighter (design/ah/mock.html).
-  const QUALITY_COLORS = ['#9d9d9d', '#ffffff', '#1eff00', '#3d9bff', '#b866f5', '#ff8000', '#e6cc80', '#00ccff']
   // After the name of a kind, as the game's list has it: the level the item asks for, between brackets.
   const levelOf = (it: AhItem): string => (it.level ? ` (${it.level})` : '')
   const kindName = (it: AhItem, k: Kind): string => (k.suffix ? `${it.name} ${k.suffix}` : it.name)
@@ -596,31 +594,6 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-  }
-  /* The line at the edge of a heading: dragged, the column is wider or narrower (columns.ts). */
-  th :global(.grip) {
-    position: absolute;
-    right: -4px;
-    top: 0;
-    bottom: 0;
-    width: 9px;
-    cursor: col-resize;
-    z-index: 2;
-  }
-  th :global(.grip)::after {
-    content: '';
-    position: absolute;
-    left: 4px;
-    top: 7px;
-    bottom: 7px;
-    width: 1px;
-    background: var(--bronze-700);
-  }
-  th:last-child :global(.grip) {
-    right: 0;
-  }
-  th:hover :global(.grip)::after {
-    background: var(--bronze-300);
   }
   tr.item {
     cursor: pointer;
