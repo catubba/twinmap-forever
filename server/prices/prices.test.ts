@@ -2,6 +2,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { keyOf, listingOf, nextDay, nextHours, pointOf, signed } from './prices.ts'
+import cron from './cron.ts'
 
 test('a kind of an item is its number and its bonus lists', () => {
   assert.equal(keyOf({ id: 2589 }), '2589')
@@ -52,4 +53,22 @@ test('the signature is the one of AWS Signature Version 4 (the GET example of th
     id: 'AKIAIOSFODNN7EXAMPLE', secret: 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY', region: 'us-east-1', now: new Date('2013-05-24T00:00:00Z'),
   })
   assert.equal(h.authorization, 'AWS4-HMAC-SHA256 Credential=AKIAIOSFODNN7EXAMPLE/20130524/us-east-1/s3/aws4_request, SignedHeaders=host;range;x-amz-content-sha256;x-amz-date, Signature=f0e8bdb87c964420e857bd35b5d6ed310bd44f0170aba48dd91039c6036bdb41')
+})
+
+test('every hour the cron asks GitHub to run the Action of the prices, and without its token asks nothing', async () => {
+  const real = globalThis.fetch
+  const asked: Request[] = []
+  globalThis.fetch = async (url, init) => (asked.push(new Request(url as string, init)), new Response(null, { status: 204 }))
+  try {
+    await cron.scheduled(null, { ACTIONS_TOKEN: 'actions' })
+    assert.equal(asked.length, 1)
+    assert.equal(asked[0]!.url, 'https://api.github.com/repos/catubba/twinmap-forever/actions/workflows/prices.yml/dispatches')
+    assert.equal(asked[0]!.method, 'POST')
+    assert.equal(asked[0]!.headers.get('authorization'), 'Bearer actions')
+    assert.deepEqual(await asked[0]!.json(), { ref: 'main' })
+    await cron.scheduled(null, {})
+    assert.equal(asked.length, 1)
+  } finally {
+    globalThis.fetch = real
+  }
 })

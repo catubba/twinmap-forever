@@ -3,7 +3,6 @@
 #   publish: npx wrangler@4 deploy            (from this folder)
 #   secret:  npx wrangler@4 secret put GITHUB_TOKEN
 #            npx wrangler@4 secret put ADMIN_TOKEN    (for /kept: who has it may list and read the bucket)
-#            npx wrangler@4 secret put ACTIONS_TOKEN  (for the hour: a fine-grained token, twinmap-forever only, Actions read and write)
 #   rules:   a file named rules in the bucket narrows what is taken, with nothing published again (Rules in src/index.ts)
 name = "twinmap-api"
 main = "src/index.ts"
@@ -37,9 +36,10 @@ namespace_id = "1002"
 limit = 100
 period = 60
 
-# Every hour at 35 the Worker asks GitHub to run the Action of the prices (runPrices in src/index.ts).
+# No cron here: the hour of the prices is a Worker of its own, with no address (server/prices/cron.ts). Empty, so a
+# publish takes away the cron this Worker had for a moment (21 November 2026).
 [triggers]
-crons = ["35 * * * *"]
+crons = []
 
 # The prices of the auction houses are not in this Worker: the hourly Action (prices.yml) writes them to a bucket of
 # their own, public, that the app reads straight from prices.twinmap.app. Made with:

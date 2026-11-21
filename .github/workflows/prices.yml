@@ -1,7 +1,6 @@
 # The prices of the auction houses, once an hour: Blizzard's API to the bucket behind prices.twinmap.app
 # (server/prices/prices.ts). Blizzard makes a new snapshot of every house a little after the hour; this runs after it.
-# Run every hour at 35 by the Worker of api.twinmap.app (its cron, server/wrangler.toml): GitHub's own schedule never
-# ran it. Never on a pull request: a fork must not see the keys.
+# Run every hour at 35 by the Worker twinmap-prices-cron (server/prices/cron.ts): GitHub's own schedule never ran it. Never on a pull request: a fork must not see the keys.
 name: Prices
 
 on:

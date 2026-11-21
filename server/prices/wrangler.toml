@@ -1,0 +1,8 @@
+# The Worker that runs the Action of the prices every hour at 35 (cron.ts). No address: workers_dev off, no routes.
+name = "twinmap-prices-cron"
+main = "cron.ts"
+compatibility_date = "2026-11-01"
+workers_dev = false
+
+[triggers]
+crons = ["35 * * * *"]
