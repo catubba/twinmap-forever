@@ -28,6 +28,8 @@
   import Settings from './Settings.svelte'
   import Picker from './Picker.svelte'
   import Items from './Items.svelte'
+  import Auction from './Auction.svelte'
+  import { houseFrom, houseNumber, houseOf, type House, type PricesTold } from '../../shared/ah'
   import ItemPopup from './ItemPopup.svelte'
   import NpcPanel from './NpcPanel.svelte'
   import { firstName, knownOf, shownOf } from '../../shared/characters'
@@ -73,6 +75,8 @@
   let onSettings = $state(false)
   // Items lies over the map as Settings does, as wide as the window.
   let onItems = $state(false)
+  // Auction House lies over the map as Items does.
+  let onAh = $state(false)
   // Feedback is a small window over whatever is on show.
   let onFeedback = $state(false)
   let answered = $state(false) // Help improve Twinmap was answered in this run: the setup may tell it a moment later
@@ -157,6 +161,36 @@
     if (inGame) lastInGame = inGame
   })
   const characters = $derived(knownOf(sheets, inGame))
+  // The auction house (M18-F7): the one of the character in game, kept for when the game is closed,
+  // unless the player chose another; its prices are asked for at once, wherever the window is.
+  const stored = (key: string): House | null => {
+    try {
+      return houseFrom(JSON.parse(localStorage.getItem(key) ?? 'null'))
+    } catch {
+      return null
+    }
+  }
+  let seenHouse = $state(stored('ahSeen'))
+  let chosenHouse = $state(stored('ahChosen'))
+  const liveHouse = $derived(live ? houseOf(char) : null)
+  $effect(() => {
+    if (!liveHouse || JSON.stringify(liveHouse) === JSON.stringify(seenHouse)) return
+    seenHouse = liveHouse
+    localStorage.setItem('ahSeen', JSON.stringify(liveHouse))
+  })
+  const house = $derived(chosenHouse ?? seenHouse)
+  $effect(() => {
+    if (house) void window.twinmap.ahHouse(house.region, houseNumber(house))
+  })
+  function chooseHouse(h: House | null): void {
+    chosenHouse = h
+    if (h) localStorage.setItem('ahChosen', JSON.stringify(h))
+    else localStorage.removeItem('ahChosen')
+  }
+  let prices = $state.raw<PricesTold | null>(null)
+  window.twinmap.onPrices((told) => {
+    prices = told
+  })
   // The vendor or trainer whose label is open on the map: its panel tops the side panel until closed.
   let npc = $state.raw<FixedPin | null>(null)
   const shown = $derived(shownOf(characters, picked))
@@ -222,12 +256,14 @@
   {/if}
   {#if !onSetup}
     <nav aria-label="Sections">
-      <button class="tab" title="Now" aria-label="Now" aria-current={onSettings || onItems ? undefined : 'page'} onclick={() => ((onSettings = false), (onItems = false))}><Glyph name="pin" size={18} /><span class="word">Now</span></button>
-      <button class="tab" title="Items" aria-label="Items" aria-current={onItems && !onSettings ? 'page' : undefined} onclick={() => ((onSettings = false), (onItems = true))}><Glyph name="bag" size={18} /><span class="word">Items</span></button>
+      <button class="tab" title="Now" aria-label="Now" aria-current={onSettings || onItems || onAh ? undefined : 'page'} onclick={() => ((onSettings = false), (onItems = false), (onAh = false))}><Glyph name="pin" size={18} /><span class="word">Now</span></button>
+      <button class="tab" title="Items" aria-label="Items" aria-current={onItems && !onSettings ? 'page' : undefined} onclick={() => ((onSettings = false), (onItems = true), (onAh = false))}><Glyph name="bag" size={18} /><span class="word">Items</span></button>
+      <!-- Its name gives first: Auction House, then AH, then the glyph alone with the others. -->
+      <button class="tab" title="Auction House" aria-label="Auction House" aria-current={onAh && !onSettings ? 'page' : undefined} onclick={() => ((onSettings = false), (onItems = false), (onAh = true))}><Glyph name="coins" size={18} /><span class="word long">Auction House</span><span class="word short">AH</span></button>
     </nav>
   {/if}
   {#if onSetup === false && !onSettings && mapReady}
-    <Search ready={mapReady} {pos} side={char?.side} onpick={(place) => ((onItems = false), mapView?.goTo(place))} />
+    <Search ready={mapReady} {pos} side={char?.side} onpick={(place) => ((onItems = false), (onAh = false), mapView?.goTo(place))} />
   {/if}
   {#if status}
     <!-- The state of the link is the Pause button too: two bars to pause, the arrow of play to resume. -->
@@ -273,8 +309,13 @@
     <Items {sheets} {portraits} {shown} known={characters} {now} onpick={(key) => (picked = key)} />
   </div>
 {/if}
+{#if onAh && onSetup === false && !onSettings}
+  <div class="over" in:fade={screen} out:fade={gone}>
+    <Auction {house} chosen={!!chosenHouse} hints={char ?? null} who={char?.name ?? null} {prices} {now} onchoose={chooseHouse} />
+  </div>
+{/if}
 {#if onSetup === false}
-<div class="work" class:shut={!panelOpen} class:map-right={layout.mapRight} in:fade={screen} inert={onSettings || onItems} style:--peek="{peek}px" style:--panel-w="{layout.width}px" bind:this={work}>
+<div class="work" class:shut={!panelOpen} class:map-right={layout.mapRight} in:fade={screen} inert={onSettings || onItems || onAh} style:--peek="{peek}px" style:--panel-w="{layout.width}px" bind:this={work}>
   <div class="mapbox">
     {#if mapReady}
       <Map {pos} {group} {death} bind:back kills={live ? link?.state.sections.kills : undefined} bind:looking at={link?.state.updatedAt.pos} bind:this={mapView} {insideReady} {quests} {fixed} side={char?.side} {live} {inbox} removed={live ? goneFrom(link?.state.sections.marks) : []} set={live ? setFrom(link?.state.sections.marks) : []} gameFollows={live ? followFrom(link?.state.sections.follow) : null} {journey} {route} onroute={(stop) => setRoute(addStop(route, stop))} onnpc={(pin) => (npc = pin)} />
@@ -921,6 +962,21 @@
         0 -3px 0 var(--bronze-600),
         0 -4px 0 #000,
         0 -10px 24px #000a;
+    }
+  }
+  /* The name of the Auction House gives before the others: AH where the row runs short, then the
+     glyph alone, before the row would reach under the three buttons of Windows. */
+  .word.short {
+    display: none;
+  }
+  @media (max-width: 1280px) {
+    :global(html:not(.web)) .word.long {
+      display: none;
+    }
+  }
+  @media (max-width: 1280px) and (min-width: 801px) {
+    :global(html:not(.web)) .word.short {
+      display: inline;
     }
   }
   /* The app's window narrower than its top row at full size: nothing may go under the three buttons of Windows.

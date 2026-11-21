@@ -34,6 +34,15 @@ test('the side of the character goes out as one letter', () => {
   assert.deepEqual(blocks(addon, 'char').at(-1), { level: 13 });
 });
 
+test('the region, the ruleset and a town of the neutral auction house go out with the level', () => {
+  const addon = enterWorld('GAME.level, GAME.region, GAME.guid, GAME.presence = 13, "EU", "Player-6941-00691C4A", "Forever - Normal - Stormwind City"; GAME.areas = { [35] = "Booty Bay", [976] = "Gadgetzan" }; GAME.sub = "Old Town"');
+  addon.run(10);
+  assert.deepEqual(blocks(addon, 'char'), [{ level: 13, region: 'EU', rs: 'Normal' }]);
+  addon.lua('GAME.sub, GAME.presence = "Booty Bay", "Forever - Roleplay PvP"');
+  addon.run(4);
+  assert.deepEqual(blocks(addon, 'char').at(-1), { level: 13, region: 'EU', rs: 'Roleplay PvP', nh: true });
+});
+
 test('when the game tells nothing of the character, nothing is sent about it', () => {
   const addon = enterWorld();
   addon.run(10);

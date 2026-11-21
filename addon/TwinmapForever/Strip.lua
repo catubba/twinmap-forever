@@ -151,8 +151,30 @@ local function BuildPos()
   return out
 end
 
+-- The towns of the neutral auction house, by the game's area numbers: Booty Bay, Gadgetzan, Everlook.
+local NEUTRAL_TOWNS = { 35, 976, 2255 }
+-- Whether the character is in one of them: the name of where it stands against the game's own name of each town, in its language.
+local function AtNeutralHouse()
+  local here = Str(Try(GetSubZoneText))
+  if not here or here == "" or not C_Map then return end
+  for _, area in ipairs(NEUTRAL_TOWNS) do
+    if Str(Try(C_Map.GetAreaInfo, area)) == here then return true end
+  end
+end
+
+-- The ruleset the character plays on, as the game names it in its language: the second piece of what
+-- Battle.net tells friends ("Forever - Normal - Stormwind City"). The game has no other way to say it.
+local function Ruleset()
+  if not C_BattleNet then return end
+  local me = Try(C_BattleNet.GetGameAccountInfoByGUID, Try(UnitGUID, "player"))
+  local presence = type(me) == "table" and Str(me.richPresence)
+  if not presence then return end
+  return presence:match("^.- %- (.-) %- ") or presence:match("^.- %- (.+)$")
+end
+
 -- Level and experience, for the bar at the foot of the app's panel. Nothing at the level cap but the level.
--- The side too ("A" or "H"): the app shows only who serves it.
+-- The side too ("A" or "H"): the app shows only who serves it. And what tells the auction house the
+-- character sells at (the app's Auction House section): the region, the ruleset, the neutral town.
 local function BuildChar()
   local level = Num(Try(UnitLevel, "player"))
   if not level then return end
@@ -162,7 +184,8 @@ local function BuildChar()
   local name, surname = Try(UnitFullName, "player")
   name, surname = Str(name), Str(surname)
   if name and surname and surname ~= "" then name = name .. " " .. surname end
-  return { level = level, xp = Num(Try(UnitXP, "player")), max = Num(Try(UnitXPMax, "player")), rested = Num(Try(GetXPExhaustion)), side = side, name = name }
+  return { level = level, xp = Num(Try(UnitXP, "player")), max = Num(Try(UnitXPMax, "player")), rested = Num(Try(GetXPExhaustion)), side = side, name = name,
+    region = Str(Try(GetCurrentRegionName)), rs = Ruleset(), nh = AtNeutralHouse() }
 end
 
 -- name, seconds between checks, builder. combat: also sent during a fight; the rest waits for its end.

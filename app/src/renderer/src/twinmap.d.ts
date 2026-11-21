@@ -23,6 +23,9 @@ declare global {
       savePortrait: (key: string) => Promise<void>
       onTips: (listener: (tips: import('../../shared/tips').Tips) => void) => void
       itemSources: (item: number) => Promise<import('../../shared/tips').ItemSources>
+      onPrices: (listener: (told: import('../../shared/ah').PricesTold) => void) => void
+      ahHouse: (region: string, house: number) => Promise<void>
+      ahAgain: () => Promise<void>
       onUpdate: (listener: (updating: import('../../main/update').Updating) => void) => void
       chooseGameFolder: () => Promise<string | null>
       openCurseForge: (addon?: import('../../shared/setup').Optional) => Promise<void>

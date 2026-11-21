@@ -10,15 +10,17 @@ const ITEM_FILE = 841626 // class column 0, subclass column 1
 const ITEM_SPARSE_FILE = 1572924
 const ITEM_SPARSE_TABLE = 0x919be54e // its number among the server's rows (DBCache.bin)
 const ITEM_SPARSE_TEXTS = [0, 1, 2, 3, 4] // description and the four names
-const NAME = 4, SELL = 22, BUY = 23, PER_BUY = 24, HOLIDAY = 37, QUALITY = 66
+const NAME = 4, STACK = 17, SELL = 22, BUY = 23, PER_BUY = 24, HOLIDAY = 37, ITEM_LEVEL = 50, LEVEL = 64, SLOT = 65, QUALITY = 66
 
 /**
  * By the item's number: name, quality (0 poor to 7), sell price in copper, class, subclass, buy
- * price in copper (for perBuy of them), perBuy, and the holiday (Holidays table) it is sold for, 0 if none.
+ * price in copper (for perBuy of them), perBuy, the holiday (Holidays table) it is sold for, 0 if none;
+ * then its item level, the level it asks for, where it is worn (the game's inventory type, 0 for
+ * nowhere) and how many make a stack. The last four are missing from a file an older app made.
  */
-export type ItemFacts = Record<string, [string, number, number, number, number, number, number, number]>
+export type ItemFacts = Record<string, [string, number, number, number, number, number, number, number, number?, number?, number?, number?]>
 /** How many facts an item has: a file with fewer was made by an older app. */
-export const FACTS = 8
+export const FACTS = 12
 
 /** What the game's tables say of every item. hotfixes: the server's rows of ItemSparse (null where taken away). */
 export function itemFacts(item: Table, sparse: Table, hotfixes: Map<number, Buffer | null>): ItemFacts {
@@ -37,7 +39,7 @@ export function itemFacts(item: Table, sparse: Table, hotfixes: Map<number, Buff
   for (const [id, r] of rows) {
     try {
       const [cls, sub] = kind.get(id) ?? [-1, 0]
-      out[id] = [r.text(NAME), r.int(QUALITY), Math.max(0, r.int(SELL)), cls, sub, Math.max(0, r.int(BUY)), Math.max(1, r.int(PER_BUY)), r.int(HOLIDAY)]
+      out[id] = [r.text(NAME), r.int(QUALITY), Math.max(0, r.int(SELL)), cls, sub, Math.max(0, r.int(BUY)), Math.max(1, r.int(PER_BUY)), r.int(HOLIDAY), r.int(ITEM_LEVEL), r.int(LEVEL), r.int(SLOT), Math.max(1, r.int(STACK))]
     } catch {
       // A row cut short: the item goes without its facts.
     }

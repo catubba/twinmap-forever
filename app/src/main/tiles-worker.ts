@@ -4,6 +4,7 @@ import { existsSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync 
 import { join } from 'node:path'
 import { parentPort, workerData } from 'node:worker_threads'
 import { FACTS, gameItemFacts, type ItemFacts, ITEMS_FILE } from '../shared/items'
+import { AH_NAMES_FILE, gameAhNames } from '../shared/ah'
 import { trainerFacts, TRAINERS_FILE, TRAINERS_FORMAT } from '../shared/trainers'
 import { gameMaps, UI_MAP_ASSIGNMENT_FILE, UI_MAP_FILE, type GameMap } from '../shared/maps'
 import { AREA_POI_FILE, AREA_TABLE_FILE, places, UI_MAP_X_MAP_ART_FILE, WORLD_MAP_OVERLAY_FILE } from '../shared/places'
@@ -149,6 +150,15 @@ try {
     }
   } catch {
     // Items shows numbers and no prices; tried again at the next start.
+  }
+  // The names of the auction house's categories and of the kinds of items ("of the Eagle"): once for each build.
+  try {
+    if (!existsSync(join(folder, AH_NAMES_FILE))) {
+      const names = gameAhNames(open())
+      if (names) writeFileSync(join(folder, AH_NAMES_FILE), JSON.stringify(names))
+    }
+  } catch {
+    // The auction house names its categories by number; tried again at the next start.
   }
   // What the class trainers teach (shared/trainers.ts): made once for each build, and again for an older format.
   try {

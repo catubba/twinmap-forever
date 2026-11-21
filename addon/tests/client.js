@@ -125,7 +125,12 @@ const STUB = `
   -- game's own choice: available only). The spell is told only by a tooltip set on the line.
   -- GAME.target, GAME.mouseover: the GUID of what is targeted or under the mouse. GAME.loot: the GUIDs the loot window says it comes from.
   -- GAME.npc: the GUID of the NPC whose window is open (gossip, vendor, quest...); an open trainer is one too.
+  -- GAME.region: what GetCurrentRegionName says ("EU"). GAME.presence: what Battle.net tells friends of the
+  -- character ("Forever - Normal - Stormwind City"), found by GAME.guid. GAME.areas: the game's names of its areas, by number.
+  function GetCurrentRegionName() return GAME.region end
+  C_BattleNet = { GetGameAccountInfoByGUID = function(guid) if guid and guid == GAME.guid and GAME.presence then return { richPresence = GAME.presence } end end }
   function UnitGUID(unit)
+    if unit == "player" then return GAME.guid end
     if unit == "npc" and GAME.npc then return GAME.npc end
     if unit == "npc" and GAME.trainer then return "Creature-0-5250-0-11-" .. GAME.trainer.npc .. "-0000ABCDEF" end
     if unit == "target" or unit == "mouseover" then return GAME[unit] end
@@ -221,6 +226,7 @@ const STUB = `
       if other then return other.x and map == other.map and { x = other.x, y = other.y } or nil end
       return GAME.x and (map == nil or map == GAME.map) and { x = GAME.x, y = GAME.y } or nil
     end,
+    GetAreaInfo = function(area) return GAME.areas and GAME.areas[area] end,
     CanSetUserWaypointOnMap = function(map) return map ~= GAME.noPinMap end,
     SetUserWaypoint = function(point) WAYPOINT = point end,
     ClearUserWaypoint = function() WAYPOINT, TRACKED = nil, nil end,

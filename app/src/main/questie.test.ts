@@ -344,6 +344,9 @@ test.skipIf(!real)('the innkeeper of Ironforge sells his 17 goods at the prices 
     'Jug of Badlands Bourbon 2000/1', 'Melon Juice 500/5', 'Moonberry Juice 2000/5', 'Morning Glory Dew 4000/5', 'Mutton Chop 500/5', 'Refreshing Spring Water 25/5',
     'Roasted Quail 4000/5', 'Skin of Dwarven Stout 120/1', 'Sweet Nectar 1000/5', 'Tough Jerky 25/5', 'Wild Hog Shank 1000/5',
   ])
+  // Thunderfury: item level, level asked for, worn in one hand, one to a stack. Linen Cloth: 20 to a stack.
+  expect(facts[19019]!.slice(8)).toEqual([80, 60, 13, 1])
+  expect(facts[2589]![11]).toBe(20)
   // Toxic Skullcap, from Tawny Grisette: the game has no row of it, the server sent one.
   expect(gameItemFacts(files, [])![281246]).toBeUndefined()
   expect(shopRows(sold.get(4554)!, facts).find((r) => r.id === 281246)).toEqual({ id: 281246, name: 'Toxic Skullcap', quality: expect.any(Number), buy: 150, perBuy: 1 })

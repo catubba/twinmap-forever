@@ -97,5 +97,7 @@ export const GLYPHS = {
   bug: 'M5 8.500a3 3 0 0 1 6 0v2a3 3 0 0 1-6 0ZM6.500 5.600 5.250 3M9.500 5.600 10.750 3M5 8 2.500 6.750M5 10H2.250M5.250 11.750 2.750 13.250M11 8 13.500 6.750M11 10h2.750M10.750 11.750 13.250 13.250',
   pause: 'M6 4v8M10 4v8',
   play: 'M5.500 3.750 12 8 5.500 12.250Z',
+  // A stack of coins and one standing in front, like the game's mark of the auction house.
+  coins: 'M1.5 4.5a3.5 1.5 0 1 0 7 0a3.5 1.5 0 1 0-7 0ZM1.5 4.5v7a3.5 1.5 0 0 0 7 0v-7M1.5 7a3.5 1.5 0 0 0 7 0M1.5 9.25a3.5 1.5 0 0 0 7 0M14.5 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0ZM11.5 9.25v2.5',
 } as const
 export type GlyphName = keyof typeof GLYPHS

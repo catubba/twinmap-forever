@@ -153,6 +153,7 @@ test('a folder finished in the older layout is made again', () => {
 
 test('the window is given only the files the converter writes', () => {
   const base = join('C:', 'data', 'tiles', 'abc')
+  expect(servedFile(base, '/ah-names.json')).toBe(join(base, 'ah-names.json'))
   expect(servedFile(base, '/azeroth/blocks/31/49.dxt')).toBe(join(base, 'azeroth', 'blocks', '31', '49.dxt'))
   expect(servedFile(base, '/kalimdor/5/12/7.png')).toBe(join(base, 'kalimdor', '5', '12', '7.png'))
   expect(servedFile(base, '/maps.json')).toBe(join(base, 'maps.json'))

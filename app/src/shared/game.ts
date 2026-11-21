@@ -34,6 +34,10 @@ export interface Character {
   side?: string
   /** Name and surname, as the character sheets are kept by (shared/sheet.ts). */
   name?: string
+  /** What tells the auction house (shared/ah.ts): the region ("EU"), the ruleset as the game names it, in a town of the neutral house. */
+  region?: string
+  rs?: string
+  nh?: boolean
 }
 
 export interface Instance {
