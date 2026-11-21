@@ -149,6 +149,7 @@
           {#if inApp}<div><dt><kbd>Ctrl</kbd><kbd>+</kbd><kbd>-</kbd><kbd>0</kbd></dt><dd>Text size, also Ctrl and the wheel outside the map</dd></div>{/if}
           <div><dt><kbd>Esc</kbd></dt><dd>Closes a label, Layers, these settings</dd></div>
           <div><dt><kbd>Arrows</kbd><kbd>+</kbd><kbd>-</kbd></dt><dd>Move and zoom the map</dd></div>
+          <div><dt><kbd>Right drag</kbd></dt><dd>Turn the map</dd></div>
           <div><dt><kbd>Space</kbd></dt><dd>Label on the middle of the map</dd></div>
         </dl>
       </section>

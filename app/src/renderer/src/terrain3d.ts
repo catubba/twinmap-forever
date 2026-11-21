@@ -541,11 +541,13 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
 
   // The heading comes already smooth (the arrow's turn): the view keeps to it. Only from far off, as heading up is
   // turned on or the character is followed again, it goes a fifth of the way there at every frame.
+  // The angles from where the camera is (looking()), not from the controls: in the frame a turn() ends they still hold
+  // the ones it started from, and the view came out flat when it opened with heading up on.
   private steer(): void {
-    const a = this.controls.getAzimuthalAngle(),
+    const { polar, azimuth: a } = this.looking(),
       da = Math.atan2(Math.sin(this.heading! - a), Math.cos(this.heading! - a))
     if (Math.abs(da) < 0.0005) return
-    this.place(this.camera.position.distanceTo(this.controls.target), this.controls.getPolarAngle(), a + (Math.abs(da) < 0.15 ? da : da * 0.2))
+    this.place(this.eye.distanceTo(this.controls.target), polar, a + (Math.abs(da) < 0.15 ? da : da * 0.2))
   }
 
   private resize(): void {

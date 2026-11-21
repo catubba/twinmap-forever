@@ -1040,6 +1040,24 @@
     made.setMaxBounds(WORLD_BOUNDS.pad(0.2)) // after a view: leaflet-rotate asks for the centre as the bounds are set
     pins.addTo(made)
     made.on('dragstart', () => (following = false))
+    // The right button turns the 2D map round its middle, as it turns the 3D view (MapControls): a whole turn across
+    // the map's height, the same way round. Taken by hand, as a drag: the character is no longer followed.
+    let twist: { x: number; bearing: number; moved: boolean } | null = null
+    holder.addEventListener('pointerdown', (e) => {
+      if (e.button !== 2 || threeD) return
+      twist = { x: e.clientX, bearing: made.getBearing(), moved: false }
+      holder.setPointerCapture(e.pointerId)
+    })
+    holder.addEventListener('pointermove', (e) => {
+      if (!twist || (!twist.moved && Math.abs(e.clientX - twist.x) <= 3)) return
+      if (!twist.moved) ((twist.moved = true), (following = false), (northing = false))
+      made.setBearing(twist.bearing - (360 * (e.clientX - twist.x)) / holder.clientHeight)
+      spinSoon()
+    })
+    const untwist = (): void => void (twist = null)
+    holder.addEventListener('pointerup', untwist)
+    holder.addEventListener('pointercancel', untwist)
+    holder.addEventListener('contextmenu', (e) => e.preventDefault()) // the right button is for turning, here and in 3D
     made.on('move', look)
     made.on('zoomend', layout)
     made.on('moveend', layoutSoon)
