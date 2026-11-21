@@ -153,7 +153,7 @@ test('after a yes a trainer seen is written down once a session, every line of i
   addon.fire('TRAINER_SHOW');
   addon.run(4);
   const { sessions, texts, file } = logout(addon);
-  assert.deepEqual(sessions[0].e.map((e) => e.slice(2)), [[5145, 8, 6, 122, 9, 10, 0], [5145, 8, 6, 205, 90, 8, 0]]);
+  assert.deepEqual(sessions[0].e.filter((e) => e[0] === 'trainer').map((e) => e.slice(2)), [[5145, 8, 6, 122, 9, 10, 0], [5145, 8, 6, 205, 90, 8, 0]]);
   assert.ok(!('error' in logFor(new URLSearchParams({ app: '0.14.0', build: '1.60.1.70938', locale: 'enUS' }), texts[0])));
   assert.doesNotMatch(file.replace(/\["TwinmapForeverSheet"\][\s\S]*$/, ''), /Juli|Frostbolt/);
   // A profession trainer: class 0.
@@ -164,7 +164,7 @@ test('after a yes a trainer seen is written down once a session, every line of i
   addon.run(4);
   addon.fire('TRAINER_SHOW');
   addon.run(4);
-  assert.deepEqual(logout(addon).sessions[1].e.map((e) => e.slice(2)), [[5174, 0, 4, 4038, 4500, 20, 125]]);
+  assert.deepEqual(logout(addon).sessions[1].e.filter((e) => e[0] === 'trainer').map((e) => e.slice(2)), [[5174, 0, 4, 4038, 4500, 20, 125]]);
 });
 
 test('with no yes, a trainer seen leaves nothing of the log', () => {
@@ -224,5 +224,25 @@ test('with the strip paused a trainer seen is still written down', () => {
   atTrainer(addon);
   addon.fire('TRAINER_CLOSED');
   const { sessions } = logout(addon);
-  assert.deepEqual(sessions[0].e.map((e) => e.slice(2)), [[5145, 8, 6, 122, 9, 10, 0], [5145, 8, 6, 205, 90, 8, 0]]);
+  assert.deepEqual(sessions[0].e.filter((e) => e[0] === 'trainer').map((e) => e.slice(2)), [[5145, 8, 6, 122, 9, 10, 0], [5145, 8, 6, 205, 90, 8, 0]]);
+});
+
+test('after a yes an NPC talked to is written down once a session, where the character is; not inside, not with no yes (M15-F24)', () => {
+  const addon = world('true');
+  for (const event of ['GOSSIP_SHOW', 'MERCHANT_SHOW', 'QUEST_DETAIL']) {
+    addon.lua(`GAME.npc = "${FIREBREW}"`);
+    addon.fire(event);
+  }
+  addon.lua('GAME.npc = "Player-5250-0ABCDEF1"');
+  addon.fire('GOSSIP_SHOW'); // a player's window is no NPC
+  addon.lua(DUNGEON);
+  addon.lua('GAME.npc = "Creature-0-5250-0-11-3586-0000ABCDEF"');
+  addon.fire('GOSSIP_SHOW');
+  const { sessions, texts } = logout(addon);
+  assert.deepEqual(sessions[0].e.filter((e) => e[0] === 'talk').map((e) => e.slice(0, 1).concat(e.slice(2))), [['talk', 5111, 1455, 0.3012, 0.62]]);
+  assert.ok(!('error' in logFor(new URLSearchParams({ app: '0.14.0', build: '1.60.1.70938', locale: 'enUS' }), texts[0])));
+  const off = world(undefined);
+  off.lua(`GAME.npc = "${FIREBREW}"`);
+  off.fire('GOSSIP_SHOW');
+  assert.doesNotMatch(logout(off).file, /talk/);
 });

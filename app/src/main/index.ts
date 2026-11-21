@@ -24,7 +24,7 @@ import { gameFolderFrom, installedBuild, registryInstallPath } from './client-fi
 import { homeAddress, LAN_PORT, startLan, type Lan, type Served } from './lan'
 import { startLink } from './link'
 import { startBosses } from './bosses'
-import { sendLog, startGameLog } from './gamelog'
+import { sendLog, startGameLog, type Ask } from './gamelog'
 import { describe, fault, startHealth } from './health'
 import { startLog } from './log'
 import type { Answer, Asked, Placed, Sources } from './questie-worker'
@@ -32,7 +32,7 @@ import startQuestieWorker from './questie-worker?nodeWorker'
 import { gameLocale, sendSamples, startSamples } from './samples'
 import { addonHearsFonts, addonsFolder, readSettings, setupStatus, writeSettings } from './setup'
 import { hear, installChannel, removeSlots, send as sendSignal, sendOld, sentParts } from './signal'
-import { servedFile } from './tiles'
+import { MAPS_FILE, servedFile } from './tiles'
 import startTilesWorker from './tiles-worker?nodeWorker'
 import { updateFirst } from './update'
 import startWalkWorker from './walk-worker?nodeWorker'
@@ -96,9 +96,9 @@ function startTiles(gameFolder: string | null): { status: () => TilesStatus; ite
 function startQuests(
   gameFolder: string | null,
   tell: (status: QuestsStatus) => void,
-): { show: (section: unknown, log?: unknown) => void; search: (typed: string) => Promise<Found[]>; sources: (item: number) => Promise<ItemSources>; placed: (asks: [string, number][]) => Promise<boolean[]>; stop: () => void } {
+): { show: (section: unknown, log?: unknown) => void; search: (typed: string) => Promise<Found[]>; sources: (item: number) => Promise<ItemSources>; placed: (asks: Ask[], maps: string | null) => Promise<boolean[]>; stop: () => void } {
   const NONE: ItemSources = { sold: [], drops: [], found: [] }
-  const ALL = (asks: [string, number][]): Promise<boolean[]> => Promise.resolve(asks.map(() => true))
+  const ALL = (asks: Ask[]): Promise<boolean[]> => Promise.resolve(asks.map(() => true))
   if (!gameFolder) return { show: () => {}, search: () => Promise.resolve([]), sources: () => Promise.resolve(NONE), placed: ALL, stop: () => {} }
   const worker = startQuestieWorker({ workerData: { gameFolder } })
   // A search waits for the answer that carries its number.
@@ -145,11 +145,11 @@ function startQuests(
         askedSources.set(++searches, answer)
         post({ sources: item, id: searches })
       }),
-    placed: (asks) =>
+    placed: (asks, maps) =>
       new Promise((answer, fail) => {
         if (dead) return fail(new Error('QuestieDB could not be read'))
         askedPlaced.set(++searches, { answer, fail })
-        post({ placed: asks, id: searches })
+        post({ placed: asks, id: searches, maps })
       }),
     stop: () => void worker.terminate(),
   }
@@ -336,7 +336,11 @@ function createWindow(): void {
     participates,
     record.say,
     process.env.TWINMAP_SAMPLES?.replace(/sample$/, 'log'),
-    (asks) => quests.placed(asks), // what QuestieDB has with a place is not sent
+    // What QuestieDB has with a place is not sent; an NPC talked to, unless QuestieDB has it elsewhere.
+    (asks) => {
+      const made = tiles.status()
+      return quests.placed(asks, made.state === 'ready' ? join(made.folder, MAPS_FILE) : null)
+    },
   )
   // The app's health, for the same programme: its errors and the times of its looks at the minimap (health.ts).
   const health = startHealth(

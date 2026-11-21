@@ -114,7 +114,9 @@ const STUB = `
   -- filter "available", "unavailable" or "used"; the window shows a line only while its filter is on (GAME.filters, the
   -- game's own choice: available only). The spell is told only by a tooltip set on the line.
   -- GAME.target, GAME.mouseover: the GUID of what is targeted or under the mouse. GAME.loot: the GUIDs the loot window says it comes from.
+  -- GAME.npc: the GUID of the NPC whose window is open (gossip, vendor, quest...); an open trainer is one too.
   function UnitGUID(unit)
+    if unit == "npc" and GAME.npc then return GAME.npc end
     if unit == "npc" and GAME.trainer then return "Creature-0-5250-0-11-" .. GAME.trainer.npc .. "-0000ABCDEF" end
     if unit == "target" or unit == "mouseover" then return GAME[unit] end
   end

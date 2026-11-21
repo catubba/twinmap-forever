@@ -2,6 +2,7 @@
 // are. Nothing of it is copied or shipped: without Questie the app has no such data and says so.
 // QuestieDB keeps every entity in its .toc, as base64 CBOR, one metadata line per field.
 import { readFileSync } from 'node:fs'
+import type { GameMap } from '../shared/maps'
 import { join } from 'node:path'
 import type { GameQuest, LogQuest, ObjectiveKind, QuestIcon, QuestieShown, QuestPin } from '../shared/quests'
 import { best, fold, wordsMatch, type Found } from '../shared/search'
@@ -390,6 +391,47 @@ export function placed(db: Questie, kind: string, id: number): boolean {
   // ponytail: a quest as a whole, not the one objective that moved; the objective's number is in the entry if that is ever needed.
   if (kind === 'quest') return shownFromLog(db, [{ id, done: false, objectives: [] }]).icons.objective.length > 0
   return Object.values(db.places(kind === 'npc' ? 'Npc' : 'Object', id)).some((spots) => spots.length > 0)
+}
+
+/** How far, in yards, the player may meet an NPC from where QuestieDB has it before it counts as elsewhere (M15-F24). */
+export const NEAR_NPC = 25
+
+/** Every spot QuestieDB has for an NPC, by zone, in hundredths of the zone: its spawns and every point of its paths. */
+export function npcSpots(db: Questie, id: number): Places {
+  const out: Places = {}
+  for (const [zone, spots] of Object.entries(db.places('Npc', id))) out[zone] = [...spots]
+  for (const [zone, paths] of keyed(db.get('Npc', id, NPC.waypoints)))
+    for (const path of list(paths))
+      for (const p of list(path)) {
+        const x = at(p, 1), y = at(p, 2)
+        if (typeof x === 'number' && typeof y === 'number' && x > 0) (out[zone] ??= []).push([x, y])
+      }
+  return out
+}
+
+/**
+ * Whether QuestieDB has an NPC where the player talked to it, within `near` yards: what the
+ * addon's log need not send (M15-F24). place: the entry's map, x and y on it from 0 to 1, and where
+ * the game told them the continent and the yards of the world (north, west). An NPC QuestieDB lacks
+ * is not where it says. Without the maps, or a place the maps cannot put in the world, it cannot be
+ * told: yes, and nothing is sent.
+ */
+export function metWhereQuestieSays(db: Questie, id: number, place: number[], maps: GameMap[] | null, near = NEAR_NPC): boolean {
+  const spots = Object.entries(npcSpots(db, id)).filter(([, list]) => list.length > 0)
+  if (spots.length === 0) return false
+  if (!maps) return true
+  const [map, x, y, continent, north, west] = place
+  const on = maps.find((m) => m.id === map)
+  const met = north !== undefined && west !== undefined && continent !== undefined
+    ? { continent, north, west }
+    : on?.rect && x !== undefined && y !== undefined && on.continent !== null ? { continent: on.continent, north: on.rect.maxX - y * (on.rect.maxX - on.rect.minX), west: on.rect.maxY - x * (on.rect.maxY - on.rect.minY) } : null
+  if (!met) return true
+  let nearest = Infinity
+  for (const [zone, list] of spots)
+    for (const m of maps.filter((m) => m.area === Number(zone) && m.rect && m.continent === met.continent))
+      for (const [sx, sy] of list) nearest = Math.min(nearest, Math.hypot(m.rect!.maxX - (sy / 100) * (m.rect!.maxX - m.rect!.minX) - met.north, m.rect!.maxY - (sx / 100) * (m.rect!.maxY - m.rect!.minY) - met.west))
+  // ponytail: a zone of QuestieDB no map of this continent has (another continent, or a map the game lacks) cannot be measured: yes, as above.
+  return nearest === Infinity || nearest <= near
 }
 
 /** The quests of the log, each by the name its pins carry. */

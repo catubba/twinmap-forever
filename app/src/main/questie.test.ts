@@ -6,7 +6,8 @@ import { logFrom, shownFrom } from '../shared/quests'
 import { gameItemFacts, shopRows } from '../shared/items'
 import { gameFolderFrom, openClientFiles, registryInstallPath } from './client-files'
 import { sentKeys } from './keys'
-import { cbor, doerIndex, fixedPins, ITEM, NPC, OBJECT, openQuestie, placed, QUEST, questLog, questPins, search, searchIndex, shops, shownFromLog } from './questie'
+import type { GameMap } from '../shared/maps'
+import { cbor, doerIndex, fixedPins, ITEM, metWhereQuestieSays, NPC, OBJECT, openQuestie, placed, QUEST, questLog, questPins, search, searchIndex, shops, shownFromLog } from './questie'
 
 // Writes a value the way QuestieDB does: CBOR, then base64. Only what these tests need.
 function enc(v: unknown): Buffer {
@@ -353,4 +354,21 @@ test("what the addon's log need not send: a creature, an object or a quest Quest
   expect(['npc 101', 'npc 103', 'npc 104', 'object 900', 'object 901'].map((k) => placed(db, k.split(' ')[0]!, +k.split(' ')[1]!))).toEqual([true, true, false, true, false])
   // A quest whose rats stand somewhere; one that asks for nothing with a place; one QuestieDB has not.
   expect([11, 8, 12345].map((id) => placed(db, 'quest', id))).toEqual([true, false, false])
+})
+
+test('an NPC met where QuestieDB has it is not sent, one met elsewhere or that QuestieDB lacks is (M15-F24)', () => {
+  const db = openQuestie(game(LINES))!
+  const maps: GameMap[] = [
+    { id: 1429, name: 'Elwynn Forest', parent: 1415, level: 'zone', continent: 0, rect: { minX: -10000, minY: -1000, maxX: -8000, maxY: 1000 }, area: 12 },
+    { id: 1436, name: 'Westfall', parent: 1415, level: 'zone', continent: 0, rect: { minX: -12000, minY: -3000, maxX: -10000, maxY: -1000 }, area: 40 },
+  ]
+  // Miller Odo at 42.5, 65.25 of Elwynn: north -9305, west 150 in the world's yards.
+  const met = (id: number, north: number, west: number): boolean => metWhereQuestieSays(db, id, [1429, 0.5, 0.5, 0, north, west], maps)
+  expect([met(101, -9305, 150), met(101, -9285, 150), met(101, -9265, 150), met(101, -9305, 190)]).toEqual([true, true, false, false])
+  // Without the world's yards, from the map: the same place.
+  expect(metWhereQuestieSays(db, 101, [1429, 0.425, 0.6525], maps)).toBe(true)
+  // A patrol: any point of its path counts. Its second point, 34, 45 of Westfall: north -10900, west -1680.
+  expect([met(103, -10900, -1680), met(103, -10900, -1600)]).toEqual([true, false])
+  // QuestieDB lacks it: sent. No maps, or a place they cannot put in the world: not sent.
+  expect([met(104, -9305, 150), metWhereQuestieSays(db, 101, [1429, 0.5, 0.5, 0, -9000, 0], null), metWhereQuestieSays(db, 101, [9999, 0.5, 0.5], maps)]).toEqual([false, true, true])
 })

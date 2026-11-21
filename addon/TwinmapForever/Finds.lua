@@ -7,6 +7,9 @@
 -- Entry "object": the object's number, then the place. On Forever the tooltip of an object has no
 -- number: an object is known by its loot, whose source the game tells.
 -- Entry "quest": the quest's number, the objective's (from 1), then the place.
+-- Entry "talk": an NPC the player talked to (its window opened: gossip, vendor, quest, trainer,
+-- flights, bank), the creature's number, then the place: a few steps from the NPC itself. The app
+-- sends it only where QuestieDB lacks the NPC or has it somewhere else (M15-F24).
 local _, ns = ...
 
 local function Ok(ok, ...) if ok then return ... end end
@@ -62,12 +65,20 @@ local function Objectives()
   end
 end
 
+-- The windows an NPC opens when the player talks to it; while one is open the game calls the NPC "npc".
+local TALKS = { "GOSSIP_SHOW", "MERCHANT_SHOW", "QUEST_GREETING", "QUEST_DETAIL", "QUEST_PROGRESS", "QUEST_COMPLETE", "TRAINER_SHOW", "TAXIMAP_OPENED", "BANKFRAME_OPENED" }
+local talking = {}
+for _, event in ipairs(TALKS) do talking[event] = true end
+
 local frame = CreateFrame("Frame")
-for _, event in ipairs({ "PLAYER_TARGET_CHANGED", "UPDATE_MOUSEOVER_UNIT", "LOOT_OPENED", "QUEST_LOG_UPDATE" }) do
+for _, event in ipairs({ "PLAYER_TARGET_CHANGED", "UPDATE_MOUSEOVER_UNIT", "LOOT_OPENED", "QUEST_LOG_UPDATE", unpack(TALKS) }) do
   pcall(frame.RegisterEvent, frame, event)
 end
 frame:SetScript("OnEvent", function(_, event)
-  if event == "PLAYER_TARGET_CHANGED" then
+  if talking[event] then
+    local id = Entry(Try(UnitGUID, "npc"), CREATURES)
+    if id then Once("talk", id) end
+  elseif event == "PLAYER_TARGET_CHANGED" then
     Npc("target")
   elseif event == "UPDATE_MOUSEOVER_UNIT" then
     Npc("mouseover")

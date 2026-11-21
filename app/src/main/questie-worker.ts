@@ -5,10 +5,13 @@ import { parentPort, workerData } from 'node:worker_threads'
 import type { GameQuest, QuestieShown, QuestsStatus } from '../shared/quests'
 import type { Found } from '../shared/search'
 import type { ItemSources } from '../shared/tips'
-import { doerIndex, fixedPins, itemSources, openQuestie, placed, questLog, questPins, search, searchIndex, shownFromLog } from './questie'
+import { readFileSync } from 'node:fs'
+import type { GameMap } from '../shared/maps'
+import type { Ask } from './gamelog'
+import { doerIndex, fixedPins, itemSources, metWhereQuestieSays, openQuestie, placed, questLog, questPins, search, searchIndex, shownFromLog } from './questie'
 
 /** What the main process asks. */
-export type Asked = { shown: QuestieShown } | { log: GameQuest[] } | { search: string; id: number } | { sources: number; id: number } | { placed: [string, number][]; id: number }
+export type Asked = { shown: QuestieShown } | { log: GameQuest[] } | { search: string; id: number } | { sources: number; id: number } | { placed: Ask[]; id: number; maps: string | null }
 /** The answer to a search, with the number it was asked with. */
 export interface Answer { id: number; found: Found[] }
 /** Who sells, drops or holds an item, with the number it was asked with. */
@@ -17,6 +20,19 @@ export interface Sources { id: number; sources: ItemSources }
 export interface Placed { id: number; placed: boolean[] }
 
 const db = openQuestie((workerData as { gameFolder: string }).gameFolder)
+// The game's maps, to measure where an NPC was met against QuestieDB (M15-F24): read once for each build's file.
+let maps: { file: string; read: GameMap[] | null } | null = null
+const mapsOf = (file: string | null): GameMap[] | null => {
+  if (!file) return null
+  if (maps?.file !== file) {
+    try {
+      maps = { file, read: JSON.parse(readFileSync(file, 'utf8')) as GameMap[] }
+    } catch {
+      maps = { file, read: null }
+    }
+  }
+  return maps.read
+}
 const tell = (status: QuestsStatus | Answer | Sources | Placed): void => parentPort?.postMessage(status)
 tell({ questie: db?.version ?? null, pins: [], fixed: db ? fixedPins(db) : [] })
 // The names to search, read once: twenty thousand items that nothing else decodes.
@@ -24,7 +40,10 @@ const index = db ? searchIndex(db) : []
 const doers = db ? doerIndex(db) : []
 parentPort?.on('message', (asked: Asked) => {
   if ('search' in asked) tell({ id: asked.id, found: db ? search(db, index, asked.search, undefined, doers) : [] })
-  else if ('placed' in asked) tell({ id: asked.id, placed: asked.placed.map(([kind, id]) => !db || placed(db, kind, id)) })
+  else if ('placed' in asked) {
+    const maps = mapsOf(asked.maps)
+    tell({ id: asked.id, placed: asked.placed.map(([kind, id, ...rest]) => !db || (kind === 'talk' ? metWhereQuestieSays(db, id, rest, maps) : placed(db, kind, id))) })
+  }
   else if ('sources' in asked) tell({ id: asked.id, sources: db ? itemSources(db, asked.sources) : { sold: [], drops: [], found: [] } })
   else if (db) {
     const shown = 'log' in asked ? shownFromLog(db, asked.log) : asked.shown
