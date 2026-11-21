@@ -625,9 +625,13 @@
     place(true)
   }
 
+  // A continent picked while the character is in a dungeon stays on show, as a dungeon opened from outside does:
+  // until Back, Follow, or the character going out of the instance or into another.
   function choose(which: Continent): void {
+    const keep = browsing?.inst != null ? browsing : inside && pos?.inst ? { inst: pos.inst.id, following: true, dungeon: true, from: inside.name } : null
     following = false
     show(which, true)
+    if (keep && map) browsing = { ...keep, continent: which, center: map.getCenter(), zoom: map.getZoom() }
   }
 
   /**
@@ -696,7 +700,9 @@
 
   function follow(): void {
     following = !following
-    if (following) place(true)
+    if (!following) return
+    browsing = null // back to the character, out of whatever was opened to look at
+    place(true)
   }
 
   // The arrow goes to a new place, it does not jump there: at every frame it is put where the
