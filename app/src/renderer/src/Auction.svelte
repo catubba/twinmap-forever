@@ -11,7 +11,7 @@
   import { coins, QUALITY_TEXT as QUALITY_COLORS, typeOf, type ItemFacts } from '../../shared/items'
   import type { Known } from '../../shared/characters'
   import type { Sheets } from '../../shared/sheet'
-  import Chart, { placed, runs } from './Chart.svelte'
+  import Chart, { placed } from './Chart.svelte'
   import { columns } from './columns'
   import { untrack } from 'svelte'
   import Glyph from './Glyph.svelte'
@@ -200,7 +200,7 @@
   {@const X = (i: number): number => 2 + (i / 23) * 86}
   {@const color = pts.length < 2 ? '#b9a88c' : pts.at(-1)!.low >= pts[0]!.low ? '#8fe39a' : '#ff8a7a'}
   <svg class="spark" viewBox="0 0 90 20" aria-hidden="true">
-    {#each runs(pts) as run (run[0]!.i)}{#if run.length > 1}<polyline fill="none" stroke={color} stroke-width="1.5" points={run.map((x) => `${X(x.i)},${Y(x.low)}`).join(' ')} />{:else}<circle cx={X(run[0]!.i)} cy={Y(run[0]!.low)} r="1.5" fill={color} />{/if}{/each}
+    {#if pts.length > 1}<polyline fill="none" stroke={color} stroke-width="1.5" points={pts.map((x) => `${X(x.i)},${Y(x.low)}`).join(' ')} />{/if}
     {#if pts.length}<circle cx={X(pts.at(-1)!.i)} cy={Y(pts.at(-1)!.low)} r="2.5" fill={color} />{/if}
   </svg>
 {/snippet}

@@ -1,6 +1,6 @@
 <script lang="ts" module>
   // Where the points of a history go: a slot an hour (24 hours) or a day (7 days), the last slot the
-  // snapshot shown. Only points really collected; two are joined only when their slots touch.
+  // snapshot shown. Only points really collected, joined by one line across the slots with nothing between them.
   import type { History } from '../../shared/ah'
 
   export const HOUR = 3_600_000
@@ -25,8 +25,6 @@
     return out.filter((x) => x.i >= 0 && x.i < slots).sort((a, b) => a.i - b.i)
   }
 
-  /** The runs of points in touching slots, each drawn as one line. */
-  export const runs = (pts: Placed[]): Placed[][] => pts.reduce<Placed[][]>((all, x, j) => (j && x.i === pts[j - 1]!.i + 1 ? all.at(-1)!.push(x) : all.push([x]), all), [])
 </script>
 
 <script lang="ts">
@@ -71,9 +69,7 @@
     <rect x={X(x.i) - 6} y={H - B - (x.n / most) * 34} width="12" height={(x.n / most) * 34} fill="#4e4033" />
   {/each}
   {#each [['low', '#eacba4', 1.5], ['typ', '#7fc8ff', 2.5]] as const as [field, color, width] (field)}
-    {#each runs(pts) as run (run[0]!.i)}
-      {#if run.length > 1}<polyline fill="none" stroke={color} stroke-width={width} points={run.map((x) => `${X(x.i)},${Y(x[field])}`).join(' ')} />{/if}
-    {/each}
+    {#if pts.length > 1}<polyline fill="none" stroke={color} stroke-width={width} points={pts.map((x) => `${X(x.i)},${Y(x[field])}`).join(' ')} />{/if}
     {#each pts as x (x.i)}
       <circle class={field} cx={X(x.i)} cy={Y(x[field])} r={width + 1.5} fill={color} data-at={x.at} data-low={x.low} data-typ={x.typ} data-n={x.n}><title>{said(x)}</title></circle>
     {/each}
