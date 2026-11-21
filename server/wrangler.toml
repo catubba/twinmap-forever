@@ -36,6 +36,14 @@ namespace_id = "1002"
 limit = 100
 period = 60
 
+# The prices of the auction houses are not in this Worker: the hourly Action (prices.yml) writes them to a bucket of
+# their own, public, that the app reads straight from prices.twinmap.app. Made with:
+#   npx wrangler@4 r2 bucket create twinmap-prices
+#   npx wrangler@4 r2 bucket domain add twinmap-prices --domain prices.twinmap.app --zone-id <zone of twinmap.app> --min-tls 1.2
+#   npx wrangler@4 r2 bucket lifecycle add twinmap-prices days prices/ --expire-days 8
+# and a Cache Rule on twinmap.app: hostname prices.twinmap.app, eligible for cache, edge TTL from the file's
+# Cache-Control. The Action writes with an R2 token limited to that bucket (secrets R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY).
+
 # The bucket is in the EU and deletes what is older than twelve months:
 #   npx wrangler@4 r2 bucket create twinmap-samples --jurisdiction eu
 #   npx wrangler@4 r2 bucket lifecycle add twinmap-samples year --expire-days 365 --jurisdiction eu

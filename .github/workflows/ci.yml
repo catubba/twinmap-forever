@@ -30,6 +30,7 @@ jobs:
         with:
           node-version: 24
       - run: node --test server/src/index.test.ts
+      - run: node --test server/prices/prices.test.ts
 
   addon:
     runs-on: ubuntu-latest
