@@ -356,3 +356,21 @@ test("a creature's name is the one text a session takes, in its own entry (M15-F
   assert.equal((await send(logOf(named), e)).response.status, 201)
   assert.deepEqual(JSON.parse(String(samples.kept.get(`${today}/log/fedcba9876543210.json`)!.value)), named)
 })
+
+test('every hour the Worker asks GitHub to run the Action of the prices, and without its token asks nothing', async () => {
+  const real = globalThis.fetch
+  const asked: Request[] = []
+  globalThis.fetch = async (url, init) => (asked.push(new Request(url as string, init)), new Response(null, { status: 204 }))
+  try {
+    await worker.scheduled(null, { ...env(), ACTIONS_TOKEN: 'actions' })
+    assert.equal(asked.length, 1)
+    assert.equal(asked[0]!.url, 'https://api.github.com/repos/catubba/twinmap-forever/actions/workflows/prices.yml/dispatches')
+    assert.equal(asked[0]!.method, 'POST')
+    assert.equal(asked[0]!.headers.get('authorization'), 'Bearer actions')
+    assert.deepEqual(await asked[0]!.json(), { ref: 'main' })
+    await worker.scheduled(null, env())
+    assert.equal(asked.length, 1)
+  } finally {
+    globalThis.fetch = real
+  }
+})

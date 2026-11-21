@@ -34,6 +34,22 @@ export interface Env {
   LOG_DAILY: string // sessions of the addon's log taken in a day, from everyone; 0 takes none
   ERRORS_DAILY?: string // reports of the app's health taken in a day, from everyone; 0 or none takes none
   ADMIN_TOKEN?: string // a secret: who has it may list and read the bucket (/kept); without it nobody may
+  ACTIONS_TOKEN?: string // a secret: may run the workflows of PRICES and nothing else; without it the hour does nothing
+}
+
+// The prices of the auction houses: once an hour (the cron of wrangler.toml) this asks GitHub to run the Action
+// that writes them (.github/workflows/prices.yml). GitHub's own schedule never ran it (21 November 2026).
+export const PRICES = 'catubba/twinmap-forever/prices.yml'
+
+export async function runPrices(env: Env): Promise<void> {
+  if (!env.ACTIONS_TOKEN) return void console.error('prices: no ACTIONS_TOKEN')
+  const [owner, repo, workflow] = PRICES.split('/')
+  const r = await fetch(`https://api.github.com/repos/${owner}/${repo}/actions/workflows/${workflow}/dispatches`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${env.ACTIONS_TOKEN}`, accept: 'application/vnd.github+json', 'user-agent': 'twinmap-api' },
+    body: JSON.stringify({ ref: 'main' }),
+  })
+  if (r.status !== 204) console.error(`prices: GitHub answered ${r.status} ${await r.text()}`)
 }
 interface Limit {
   limit(options: { key: string }): Promise<{ success: boolean }>
@@ -394,6 +410,9 @@ async function kept(request: Request, env: Env): Promise<Response> {
 }
 
 export default {
+  async scheduled(_controller: unknown, env: Env): Promise<void> {
+    await runPrices(env)
+  },
   async fetch(request: Request, env: Env): Promise<Response> {
     const path = new URL(request.url).pathname
     if (path !== '/feedback' && path !== '/sample' && path !== '/log' && path !== '/errors' && path !== '/want' && path !== '/kept') return answer(404, 'not found')
