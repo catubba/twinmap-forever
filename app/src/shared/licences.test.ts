@@ -15,6 +15,6 @@ test('the entries of a licence file come back with name, what it is for, and the
 
 test('the file the app ships names everything it is built with, each with its licence', () => {
   const entries = thirdParties(readFileSync(join(__dirname, '..', '..', '..', 'THIRD-PARTY-LICENSES'), 'utf8'))
-  expect(entries.map((e) => e.name)).toEqual(['koffi', 'qrcode-generator', 'wow-ai', 'Leaflet', 'three.js', 'Svelte', 'One for All', 'CMaNGOS', 'Shortest Path Forever', 'MapUtils', 'Forever Simple World Map', 'Forever Dungeon Routes', 'Marcellus', 'Barlow Semi Condensed', 'electron-updater'])
+  expect(entries.map((e) => e.name)).toEqual(['koffi', 'qrcode-generator', 'wow-ai', 'Leaflet', 'leaflet-rotate', 'three.js', 'Svelte', 'One for All', 'CMaNGOS', 'Shortest Path Forever', 'MapUtils', 'Forever Simple World Map', 'Forever Dungeon Routes', 'Marcellus', 'Barlow Semi Condensed', 'electron-updater'])
   for (const e of entries) expect(e.licence.length, e.name).toBeGreaterThan(100)
 })

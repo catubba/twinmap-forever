@@ -62,6 +62,7 @@
     "electron-updater": "^6.8.11",
     "koffi": "^3.3.7",
     "leaflet": "^1.9.4",
+    "leaflet-rotate": "^0.6.2",
     "three": "^0.187.0"
   }
 }

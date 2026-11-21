@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { addFix, BEHIND, PERIOD, whereAt, type Fix } from './glide'
+import { addFix, BEHIND, PERIOD, TURN, turnAt, whereAt, type Fix } from './glide'
 
 const told = (fixes: Fix[]): Fix[] => fixes.reduce(addFix, [] as Fix[])
 
@@ -25,4 +25,12 @@ test('the same place told again changes nothing, and the way does not grow witho
 
 test('the arrow is behind by more than a period, so the next reading is there when it is needed', () => {
   expect(BEHIND).toBeGreaterThan(PERIOD)
+})
+
+test('an arrow turns to a new heading at an even pace, and stays there', () => {
+  const turn = { from: 90, to: 120, at: 1000 }
+  expect(turnAt(turn, 1000)).toBe(90)
+  expect(turnAt(turn, 1000 + TURN / 2)).toBe(105)
+  expect(turnAt(turn, 1000 + TURN)).toBe(120)
+  expect(turnAt(turn, 1000 + TURN * 4)).toBe(120)
 })

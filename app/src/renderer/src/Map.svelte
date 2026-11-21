@@ -5,12 +5,14 @@
   import { TILES } from './web'
   import { layout as sides, setMapRight } from './layout.svelte'
   import type { Terrain } from './terrain3d'
+  import type { Compass } from './compass'
   import { Arrow3d } from './arrow3d'
   import type { Inside3d } from './inside3d'
   import { Names3d } from './names3d'
   import { ARC, paintFixed, Pins3d, ROUTE } from './pins3d'
   import L from 'leaflet'
   import 'leaflet/dist/leaflet.css'
+  import 'leaflet-rotate' // after Leaflet: it adds turning the map to the L that Leaflet puts on the page
   import { onMount, untrack } from 'svelte'
   import { DUNGEON_PINS } from '../../shared/dungeon-pins'
   import { NEW_DUNGEON_PINS } from '../../shared/new-dungeon-pins'
@@ -18,7 +20,7 @@
   import type { Position } from '../../shared/game'
   import { coloursFor, type Companion } from '../../shared/group'
   import { clearOf, gathered, unitsOfPlace, unitsOfRect, type Point } from '../../shared/geo'
-  import { addFix, BEHIND, PERIOD, whereAt, type Fix } from '../../shared/glide'
+  import { addFix, BEHIND, PERIOD, TURN, turnAt, whereAt, type Fix, type Turn } from '../../shared/glide'
   import { boxOf, buildingsAt, killedIn, nameOfBoss, piecesIn, RARE_BOSSES, roomPixels, yardsInside, YARDS_PER_UNIT, type Box, type InteriorMap, type Interiors, type Piece, type UnderRoom, type Yards } from '../../shared/inside'
   import type { Continent, GameMap } from '../../shared/maps'
   import type { QuestPin } from '../../shared/quests'
@@ -306,11 +308,44 @@
     })
   })
 
+  // Where the arrow is to point, in degrees clockwise from north, and its turn there: in a quarter of a second at an
+  // even pace (turnAt, glide.ts), drawn frame by frame with the bearing of the map under it (spin).
   let turned = 0
+  let turn2d: Turn = { from: 0, to: 0, at: 0 }
   function turnTo(degrees: number): void {
-    turned += ((((degrees - turned) % 360) + 540) % 360) - 180 // the short way round
+    const to = turned + ((((degrees - turned) % 360) + 540) % 360) - 180 // the short way round
+    if (to === turned) return // the same facing told again: the turn under way goes on as it is
+    const now = performance.now()
+    turn2d = { from: turnAt(turn2d, now), to: (turned = to), at: now }
+    spinSoon()
+  }
+
+  // The 2D map turned (leaflet-rotate): its bearing is the way at the top, in degrees anticlockwise from north as the
+  // game counts its facing. With the character, heading up: the bearing keeps to the arrow, so the arrow points up.
+  // North up asked: it goes back to 0. Each a fifth of the way at every frame from far off, as the 3D view does.
+  let northing = false
+  let spinning = 0
+  const spinSoon = (): void => {
+    spinning ||= requestAnimationFrame(spin)
+  }
+  function spin(): void {
+    spinning = 0
+    if (!map) return
+    const now = performance.now(),
+      pointing = turnAt(turn2d, now),
+      bearing = map.getBearing(),
+      aim = threeD ? null : turning ? -pointing : northing ? 0 : null
+    let next = bearing
+    if (aim !== null) {
+      // Near enough is there: a hundredth of a degree is not seen, and every turn of the map fits its names again.
+      const off = ((((aim - bearing) % 360) + 540) % 360) - 180
+      if (Math.abs(off) >= 0.01) map.setBearing((next = bearing + (Math.abs(off) < 9 ? off : off * 0.2)))
+      else if (northing) northing = false
+    }
     const svg = arrow.getElement()?.firstElementChild as SVGElement | null
-    if (svg) svg.style.transform = `rotate(${turned}deg)`
+    if (svg) svg.style.transform = `rotate(${pointing + next}deg)`
+    if (!threeD) compassAt(next)
+    if (now - turn2d.at < TURN || (aim !== null && Math.abs(((((aim - next) % 360) + 540) % 360) - 180) >= 0.01)) spinSoon()
   }
 
   // The ground of a continent or of a dungeon, from its folder. The halved tiles stay under
@@ -833,9 +868,18 @@
   let pins3d: Pins3d | undefined
   // Where a point of the map is on screen, on the view on show: a label stays on its point in 3D too.
   const spotOf = (ll: L.LatLng): L.Point => (threeD && pins3d ? pins3d.spot(ll) : map!.latLngToContainerPoint(ll))
-  let tilted = { polar: 0.9, azimuth: 0 } // how the 3D view was left
-  // Heading up: while the 3D view follows the character it turns with it, the way it faces at the top. The compass
-  // or N turns it on and off; a drag lets the character go, and the view stays as it was turned until Follow.
+  let tilted = 0.9 // how far the 3D view was tilted when it was left; it comes back turned as the 2D map is
+  // The compass, under the 2D map and the 3D view alike: lying flat and turned as the 2D map is, or as the 3D view
+  // looks (terrain3d.ts turns it there). three.js comes with it, after the map is up.
+  let compass = $state<Compass | undefined>()
+  const compassReady = async (): Promise<Compass> => (compass ??= new (await import('./compass')).Compass(compassHost))
+  function compassAt(bearing: number): void {
+    compass?.turn(0, (bearing * Math.PI) / 180)
+    compass?.render()
+  }
+  // Heading up: while the map follows the character it turns with it, the way it faces at the top, in 2D (spin) and
+  // in 3D (terrain3d.ts). The compass or N turns it on and off; a drag lets the character go, and the map stays as it
+  // was turned until Follow.
   // headingUp is the choice, kept; turning is what the view does now, and what the compass shows: a click on a
   // compass gone dark after a drag turns with the character again, it does not turn the choice off.
   let headingUp = $state(localStorage.getItem('headingUp') === '1')
@@ -844,8 +888,14 @@
     headingUp = on
     localStorage.setItem('headingUp', on ? '1' : '0')
     if (on && !following) follow()
-    else if (!on) void terrain?.north()
+    else if (!on && threeD) void terrain?.north()
+    else if (!on) northing = true
+    spinSoon()
   }
+  $effect(() => {
+    void turning
+    untrack(spinSoon)
+  })
   let zoomed2d = false // the 2D map was zoomed by itself, not to follow the 3D view
   // Followed, the character stays in the middle: the wheel, a double click and two fingers zoom on it,
   // not on the pointer, and Follow stays on.
@@ -923,7 +973,7 @@
     if (on) {
       if (!terrain) {
         const { Terrain } = await import('./terrain3d')
-        terrain ??= new Terrain(terrainHost, compassHost)
+        terrain ??= new Terrain(terrainHost, await compassReady())
         // For the trials (design/terrain3d): the view within reach of a script, when the page is told so.
         if (localStorage.getItem('trial')) (window as unknown as { terrain3d: unknown }).terrain3d = terrain
         terrain.onGrab = () => (following = false)
@@ -943,16 +993,19 @@
         names3dSet()
         terrain.onFrame = onFrame
       }
+      // The view looks the way the 2D map is turned; the 2D map under it lies north up meanwhile, as its pins are copied from it.
+      const azimuth = (map.getBearing() * Math.PI) / 180
       threeD = true
+      map.setBearing(0)
       for (const layer of shown) layer.remove()
       terrain.show(folder!)
-      lookAsTheMap(0, 0)
+      lookAsTheMap(0, azimuth)
       terrain.start()
-      await terrain.turn(tilted.polar, tilted.azimuth)
+      await terrain.turn(tilted, azimuth)
     } else if (terrain) {
       const left = terrain.looking()
-      tilted = { polar: left.polar, azimuth: left.azimuth }
-      await terrain.turn(0, 0)
+      tilted = left.polar
+      await terrain.turn(0, left.azimuth)
       back2d()
     }
   }
@@ -961,12 +1014,15 @@
     if (!terrain || !map) return
     tiedTo = ''
     mapAsTheView()
+    // The 2D map turned as the view was looking.
+    map.setBearing((((terrain.looking().azimuth * 180) / Math.PI) % 360 + 360) % 360)
     threeD = false
     for (const layer of shown) layer.addTo(map)
     terrain.stop()
     terrain.heading = null
     pins3d?.clear()
     names3d?.clear()
+    spinSoon()
   }
   // Inside a dungeon there is no ground to show: back to 2D.
   $effect(() => {
@@ -974,9 +1030,14 @@
   })
 
   onMount(() => {
-    const made = L.map(holder, { scrollWheelZoom: 'center', doubleClickZoom: 'center', touchZoom: 'center', zoomControl: false, crs: L.CRS.Simple, minZoom: 1, maxZoom: 9, zoomSnap: 0.5, zoomDelta: 0.5, wheelPxPerZoomLevel: 90, attributionControl: false, zoomAnimation: !still(), fadeAnimation: !still(), maxBounds: WORLD_BOUNDS.pad(0.2) })
+    const made = L.map(holder, { scrollWheelZoom: 'center', doubleClickZoom: 'center', touchZoom: 'center', zoomControl: false, crs: L.CRS.Simple, minZoom: 1, maxZoom: 9, zoomSnap: 0.5, zoomDelta: 0.5, wheelPxPerZoomLevel: 90, attributionControl: false, zoomAnimation: !still(), fadeAnimation: !still(), rotate: true, rotateControl: false, shiftKeyRotate: false, pitchDrag: false, touchRotate: false })
     map = made
+    // For the trials (design/map-2d-rotate): the 2D map within reach of a script, when the page is told so.
+    if (localStorage.getItem('trial')) (window as unknown as { map2d: unknown }).map2d = made
+    void compassReady().then(() => compassAt(made.getBearing()))
+    made.on('rotate', layoutSoon) // the names, upright, are fitted again as the map turns under them
     made.setView([-128, 128], 2)
+    made.setMaxBounds(WORLD_BOUNDS.pad(0.2)) // after a view: leaflet-rotate asks for the centre as the bounds are set
     pins.addTo(made)
     made.on('dragstart', () => (following = false))
     made.on('move', look)
@@ -1513,7 +1574,7 @@
     else if (arrow.getLatLng().lat || arrow.getLatLng().lng) place()
   })
 
-  // L opens and closes Layers, F turns Follow on and off, N (in 3D) turns the view with the character, M sends the map to the other side of the panel, Esc closes the label and then Layers; with the
+  // L opens and closes Layers, F turns Follow on and off, N turns the map with the character, M sends the map to the other side of the panel, Esc closes the label and then Layers; with the
   // keyboard on the map, the space bar puts the label on its middle. Not while Settings lie over the map.
   function key(e: KeyboardEvent): void {
     if (holder.closest('[inert]')) return
@@ -1525,7 +1586,7 @@
     else if (e.key === 'f' || e.key === 'F') follow()
     else if (e.key === 'm' || e.key === 'M') setMapRight(!sides.mapRight)
     else if (e.key === '3' && !inside) void view3d(!threeD)
-    else if ((e.key === 'n' || e.key === 'N') && threeD) setHeadingUp(!turning)
+    else if (e.key === 'n' || e.key === 'N') setHeadingUp(!turning)
     else if (e.target === holder && e.key.startsWith('Arrow')) following = false // moved by hand, like a drag
     else if (e.key === ' ' && e.target === holder && map) {
       e.preventDefault()
@@ -1571,7 +1632,7 @@
 <div class="map" class:under={threeD} bind:this={holder}></div>
 <div class="terrain" class:on={threeD} bind:this={terrainHost}><div class="map pins3d" bind:this={pinsHost}></div></div>
 {#if counting && threeD}<p class="fps">{fps} fps</p>{/if}
-<button class="compass" class:on={threeD} class:turning bind:this={compassHost} tabindex={threeD ? 0 : -1} aria-hidden={!threeD} title={turning ? 'North up (N)' : 'Turn with your character (N)'} aria-label="Turn with your character" aria-pressed={turning} onclick={() => setHeadingUp(!turning)}></button>
+<button class="compass" class:on={!!compass} class:turning bind:this={compassHost} tabindex={compass ? 0 : -1} aria-hidden={!compass} title={turning ? 'North up (N)' : 'Turn with your character (N)'} aria-label="Turn with your character" aria-pressed={turning} onclick={() => setHeadingUp(!turning)}></button>
 {#if labelled}
   {#key labelled.units}
     <PointLabel
@@ -1715,7 +1776,7 @@
     font: 14px monospace;
     pointer-events: none;
   }
-  /* The compass: bottom left, in 3D only; a click turns the view with the character, or the north up again. */
+  /* The compass: bottom left, in 2D and 3D; a click turns the map with the character, or the north up again. */
   .compass {
     position: absolute;
     left: 12px;
@@ -1959,9 +2020,6 @@
     box-shadow: 0 0 9px 4px color-mix(in srgb, var(--objective) 55%, transparent);
   }
 
-  .map :global(.me svg) {
-    transition: transform 0.25s linear;
-  }
 
   /* The names lie over the map as if hung above it: light letters, a close dark edge to read on
      any ground, and a wide soft shadow under them. Each kind has its size; the larger the thing

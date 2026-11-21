@@ -5,6 +5,7 @@
 // a soft shadow where it touches, its outline through a hill that hides it, and a stem from afar.
 import * as THREE from 'three'
 import type { Terrain } from './terrain3d'
+import { turnAt, type Turn } from '../../shared/glide'
 
 const LENGTH = 8 // yards from tip to tail
 const LEAST = 30 // pixels on the screen it never goes under
@@ -14,7 +15,6 @@ const BAND = 0.02 // half the band round its edge
 const FLAT = 0.1 // the flat on its top, of its outline
 const TIP = 0.55 // how round the tip is, of the other corners
 const EASE = 0.25 // seconds the slope takes to follow the ground
-const TURN_MS = 250 // the 2D arrow's transition (.me svg in Map.svelte)
 const SHADOW = 0.5
 const GHOST = 0.4 // its outline through a hill
 const FLOOR = 3 // yards over the ground from which the character is on a floor, not on the ground (a bridge)
@@ -106,9 +106,9 @@ export class Arrow3d {
   private y: number | null = null
   private last = 0
   private drawn = ''
-  // The way it points, turned to a new heading in a quarter of a second at an even pace, as the 2D arrow's
-  // transition does: the game tells the facing a few times a second, and a jump each time reads as a stutter.
-  private turn = { from: 0, to: 0, at: 0 }
+  // The way it points, turned to a new heading in a quarter of a second at an even pace, as the 2D arrow is
+  // (turnAt, glide.ts): the game tells the facing a few times a second, and a jump each time reads as a stutter.
+  private turn: Turn = { from: 0, to: 0, at: 0 }
   /** Where the arrow points as drawn, in degrees clockwise from north; null while there is none. */
   pointing: number | null = null
 
@@ -169,7 +169,7 @@ export class Arrow3d {
     }
     if (this.pointing === null) this.turn = { from: w.heading, to: w.heading, at: now }
     else if (w.heading !== this.turn.to) this.turn = { from: this.pointing, to: w.heading, at: now }
-    this.pointing = this.turn.from + (this.turn.to - this.turn.from) * Math.min(1, (now - this.turn.at) / TURN_MS)
+    this.pointing = turnAt(this.turn, now)
     // On a floor over the ground (a bridge): at its height and level. Else on the ground, as it slopes.
     // In a room under the ground, as it opens: down on its floor, level, and drawn with the rooms, before the ground.
     const lifted = w.floor !== null && w.floor > ground + FLOOR,

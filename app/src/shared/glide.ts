@@ -38,3 +38,12 @@ export function whereAt(way: Fix[], time: number): { x: number; y: number; arriv
   }
   return { x: last.x, y: last.y, arrived: true }
 }
+
+/** Milliseconds an arrow takes to turn to a new heading, at an even pace. */
+export const TURN = 250
+
+/** A turn of the arrow under way, in degrees clockwise from north: from one heading to the next, begun at a moment. */
+export interface Turn { from: number; to: number; at: number }
+
+/** Where a turn has got to at a moment. */
+export const turnAt = (turn: Turn, now: number): number => turn.from + (turn.to - turn.from) * Math.min(1, (now - turn.at) / TURN)
