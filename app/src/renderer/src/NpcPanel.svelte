@@ -13,8 +13,10 @@
   import Glyph from './Glyph.svelte'
   import { itemTip } from './item-tip.svelte'
   import { TILES } from './web'
+  import { lowestOf, type Listing } from '../../shared/ah'
 
-  let { pin, sheets, shown, now, onclose }: { pin: FixedPin; sheets: Sheets; shown: Known | null; now: number; onclose: () => void } = $props()
+  // listing: the prices of the auction house on show (M18-F8): beside a vendor's price, the lowest there for as many.
+  let { pin, sheets, shown, now, listing = null, onclose }: { pin: FixedPin; sheets: Sheets; shown: Known | null; now: number; listing?: Listing | null; onclose: () => void } = $props()
 
   // What the game says of the items and of the trainers, made beside the map (tiles-worker.ts).
   let items = $state.raw<ItemFacts | null>(null)
@@ -143,12 +145,17 @@
     {/if}
     {#if goods.length}
       {#if list}<h3 class="grp"><span>Sells · {goods.length}</span></h3>{/if}
-      <div class="head"><span></span><span>Item</span><span>Price</span><span>Bags</span><span>Bank</span></div>
+      <div class="head"><span></span><span>Item</span><span>Price{#if listing}<small title="The lowest price at the auction house, for as many">&nbsp;· AH</small>{/if}</span><span>Bags</span><span>Bank</span></div>
       {#each goods as g (g.id)}
-        <div class="r" use:itemTip={{ item: g.id }}>
+        <div class="r" class:two={!!listing} use:itemTip={{ item: g.id }}>
           {@render pic(`${TILES}/items/${g.id}.png`, g.perBuy)}
           <span class="name" style:color={QUALITY_COLORS[g.quality]}>{g.name}</span>
-          {@render price(g.buy)}
+          {#if listing}
+            {@const ah = lowestOf(listing, `${g.id}`)}
+            <span class="both">{@render price(g.buy)}<span class="price ah" title="The lowest price at the auction house, for as many">AH {#if ah}{#each coins(ah * g.perBuy) as [n, coin]}{n}<i class="coin {coin}"></i>{/each}{:else}-{/if}</span></span>
+          {:else}
+            {@render price(g.buy)}
+          {/if}
           <span class="own" class:zero={!g.bags}>{g.bags || '-'}</span>
           <span class="own" class:zero={!g.bank}>{g.bank || '-'}</span>
         </div>
@@ -287,6 +294,23 @@
   .tag {
     font: var(--t-small);
     color: var(--service);
+  }
+  /* With the auction house's price under the vendor's, a row is two lines tall. */
+  .r.two {
+    height: 40px;
+  }
+  .both {
+    display: grid;
+    justify-items: end;
+    line-height: 17px;
+  }
+  .both .ah {
+    font: var(--t-small);
+    color: var(--text-dim);
+  }
+  .head small {
+    font: inherit;
+    color: var(--text-dim);
   }
   .own.zero {
     color: var(--text-off);

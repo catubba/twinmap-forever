@@ -2,6 +2,7 @@
 // keeps (sheet.ts), with what the game's own tables say of each item: name, quality, what a vendor
 // gives for it, its type. Those come from the player's game (items.json, made beside the map by
 // tiles-worker.ts): ItemSparse with the rows the server has sent over it, and Item for the type.
+import { keyOfLink } from './ah'
 import type { Sheet, Sheets } from './sheet'
 import { readHotfixes, readTable, type Table } from './wdc5'
 
@@ -104,32 +105,38 @@ export interface ItemRow {
   type: string
   /** What a vendor gives for all of them, in copper; 0 for what cannot be sold. */
   value: number
+  /** What all of them fetch at the auction house at the lowest price of each one's kind, in copper; 0 for what is not on sale. */
+  auction: number
 }
 
 type Held = { b?: unknown; s?: unknown }
-const slotsOf = (piece: unknown): { bag: number; item: number; n: number }[] =>
+const slotsOf = (piece: unknown): { bag: number; item: number; n: number; link?: unknown }[] =>
   (Array.isArray(piece) ? (piece as Held[]) : []).flatMap((c) =>
-    Array.isArray(c?.s) ? (c.s as unknown[]).filter(Array.isArray).map((s) => ({ bag: Number(c.b), item: Number(s[1]), n: Number(s[2]) || 1 })) : [],
+    Array.isArray(c?.s) ? (c.s as unknown[]).filter(Array.isArray).map((s) => ({ bag: Number(c.b), item: Number(s[1]), n: Number(s[2]) || 1, link: s[3] })) : [],
   )
 
-/** One row for each item in each place of a sheet. */
-export function itemRows(sheet: Sheet, facts: ItemFacts): ItemRow[] {
+/**
+ * One row for each item in each place of a sheet. lowest: the auction house's lowest price of one of a
+ * kind (shared/ah.ts), by its key; items of other kinds in a row each count at their own.
+ */
+export function itemRows(sheet: Sheet, facts: ItemFacts, lowest: (key: string) => number | undefined = () => undefined): ItemRow[] {
   const rows = new Map<string, ItemRow>()
-  const add = (place: Place, id: number, n: number): void => {
+  const add = (place: Place, id: number, n: number, link?: unknown): void => {
     if (!Number.isInteger(id) || id <= 0) return
+    const auction = (lowest(keyOfLink(id, link)) ?? 0) * n
     const had = rows.get(`${place} ${id}`)
-    if (had) return void (had.n += n)
+    if (had) return void ((had.n += n), (had.auction += auction))
     const [name, quality, sell, cls, sub] = facts[id] ?? [`Item ${id}`, 1, 0, -1, 0]
-    rows.set(`${place} ${id}`, { id, place, n, name, quality, type: typeOf(cls, sub), value: sell })
+    rows.set(`${place} ${id}`, { id, place, n, name, quality, type: typeOf(cls, sub), value: sell, auction })
   }
-  for (const s of slotsOf(sheet.pieces.bags)) add(s.bag === KEYRING ? 'Keyring' : 'Bags', s.item, s.n)
-  for (const s of slotsOf(sheet.pieces.bank)) add('Bank', s.item, s.n)
-  for (const g of Array.isArray(sheet.pieces.gear) ? sheet.pieces.gear : []) if (Array.isArray(g)) add('Worn', Number(g[1]), 1)
+  for (const s of slotsOf(sheet.pieces.bags)) add(s.bag === KEYRING ? 'Keyring' : 'Bags', s.item, s.n, s.link)
+  for (const s of slotsOf(sheet.pieces.bank)) add('Bank', s.item, s.n, s.link)
+  for (const g of Array.isArray(sheet.pieces.gear) ? sheet.pieces.gear : []) if (Array.isArray(g)) add('Worn', Number(g[1]), 1, g[4])
   // The sell price is of one: the row is worth all of them.
   return [...rows.values()].map((r) => ({ ...r, value: r.value * r.n }))
 }
 
-export type Column = 'name' | 'type' | 'place' | 'n' | 'value'
+export type Column = 'name' | 'type' | 'place' | 'n' | 'value' | 'auction'
 
 /** The rows sorted by a column; ties by name. up: smallest first (A to Z). */
 export function sortRows(rows: ItemRow[], column: Column, up: boolean): ItemRow[] {
@@ -147,11 +154,11 @@ export function filterRows(rows: ItemRow[], typed: string): ItemRow[] {
 }
 
 /** The other characters that hold what is typed: who, and the rows found. */
-export function othersHolding(sheets: Sheets, shown: string, facts: ItemFacts, typed: string): { key: string; rows: ItemRow[] }[] {
+export function othersHolding(sheets: Sheets, shown: string, facts: ItemFacts, typed: string, lowest?: (key: string) => number | undefined): { key: string; rows: ItemRow[] }[] {
   if (!typed.trim()) return []
   return Object.entries(sheets)
     .filter(([key]) => key !== shown)
-    .map(([key, sheet]) => ({ key, rows: filterRows(itemRows(sheet, facts), typed) }))
+    .map(([key, sheet]) => ({ key, rows: filterRows(itemRows(sheet, facts, lowest), typed) }))
     .filter((o) => o.rows.length > 0)
 }
 

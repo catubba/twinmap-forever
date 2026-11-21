@@ -29,7 +29,7 @@
   import Picker from './Picker.svelte'
   import Items from './Items.svelte'
   import Auction from './Auction.svelte'
-  import { houseFrom, houseNumber, houseOf, type House, type PricesTold } from '../../shared/ah'
+  import { homeOf, houseFrom, houseNumber, houseOf, type Home, type House, type PricesTold } from '../../shared/ah'
   import ItemPopup from './ItemPopup.svelte'
   import NpcPanel from './NpcPanel.svelte'
   import { firstName, knownOf, shownOf } from '../../shared/characters'
@@ -191,6 +191,21 @@
   window.twinmap.onPrices((told) => {
     prices = told
   })
+  // The prices of the house on show only: a house changed a moment ago has none until they come.
+  const listing = $derived(house && prices?.house === houseNumber(house) && prices.region === house.region ? prices.listing : null)
+  // Each character's own house, as the game told it while it was played: whose items count at the house on show (M18-F8).
+  let homes = $state.raw<Record<string, Home>>({})
+  try {
+    homes = JSON.parse(localStorage.getItem('ahHomes') ?? '{}') as Record<string, Home>
+  } catch {
+    // none kept
+  }
+  $effect(() => {
+    const name = live ? char?.name : undefined, home = homeOf(char)
+    if (!name || !home || JSON.stringify(homes[name]) === JSON.stringify(home)) return
+    homes = { ...homes, [name]: home }
+    localStorage.setItem('ahHomes', JSON.stringify(homes))
+  })
   // The vendor or trainer whose label is open on the map: its panel tops the side panel until closed.
   let npc = $state.raw<FixedPin | null>(null)
   const shown = $derived(shownOf(characters, picked))
@@ -306,12 +321,12 @@
 {/if}
 {#if onItems && onSetup === false && !onSettings}
   <div class="over" in:fade={screen} out:fade={gone}>
-    <Items {sheets} {portraits} {shown} known={characters} {now} onpick={(key) => (picked = key)} />
+    <Items {sheets} {portraits} {shown} known={characters} {now} {listing} onpick={(key) => (picked = key)} />
   </div>
 {/if}
 {#if onAh && onSetup === false && !onSettings}
   <div class="over" in:fade={screen} out:fade={gone}>
-    <Auction {house} chosen={!!chosenHouse} hints={char ?? null} who={char?.name ?? null} {prices} {now} onchoose={chooseHouse} />
+    <Auction {house} chosen={!!chosenHouse} hints={char ?? null} who={char?.name ?? null} {prices} {listing} {sheets} known={characters} {homes} {now} onchoose={chooseHouse} />
   </div>
 {/if}
 {#if onSetup === false}
@@ -371,7 +386,7 @@
       </p>
     {/if}
     {#if npc}
-      {#key npc}<NpcPanel pin={npc} {sheets} {shown} {now} onclose={() => (npc = null)} />{/key}
+      {#key npc}<NpcPanel pin={npc} {sheets} {shown} {now} {listing} onclose={() => (npc = null)} />{/key}
     {/if}
     <Now
       {pos}
@@ -415,7 +430,7 @@
 {/if}
 
 <!-- The popup of the item under the pointer, over everything (M10-F15). -->
-<ItemPopup {sheets} known={characters} side={char?.side} {pos} />
+<ItemPopup {sheets} known={characters} side={char?.side} {pos} {listing} />
 
 <style>
   /* Over everything, the top row too; it drags the window as the top row does. */

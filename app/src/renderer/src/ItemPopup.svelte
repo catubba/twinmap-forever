@@ -2,6 +2,7 @@
   // The popup of the item under the pointer (M10-F15, mockup design/vendors/mockup/popups.html): the
   // lines of the game's own tooltip where the addon sent them, what the game's files say otherwise,
   // and under a line what the app adds: who holds it, who sells it and where (the nearest first), who drops it.
+  import { keyOfLink, lowestOf, type Listing } from '../../shared/ah'
   import { firstName, type Known } from '../../shared/characters'
   import { coins, QUALITY_COLORS, typeOf, type ItemFacts } from '../../shared/items'
   import type { Position } from '../../shared/game'
@@ -14,7 +15,8 @@
   import { hover, kept } from './item-tip.svelte'
   import { TILES } from './web'
 
-  let { sheets, known, side, pos }: { sheets: Sheets; known: Known[]; side?: string; pos?: Position } = $props()
+  // listing: the prices of the auction house on show (M18-F8): under the vendor's price, what one of its kind costs there.
+  let { sheets, known, side, pos, listing = null }: { sheets: Sheets; known: Known[]; side?: string; pos?: Position; listing?: Listing | null } = $props()
 
   // What the game says of every item, and the names of the zones: read once, when an item is first shown.
   let facts = $state.raw<ItemFacts>({})
@@ -96,6 +98,11 @@
       <div class="tl"><span>{typeOf(fact[3], fact[4])}</span></div>
     {/if}
     {#if fact && fact[2] > 0}<div class="tl"><span>Sell Price: {@render money(fact[2] * (shown.n ?? 1))}</span></div>{/if}
+    {#if listing}
+      {@const ah = lowestOf(listing, keyOfLink(shown.item, shown.key))}
+      {@const n = shown.n ?? 1}
+      <div class="tl ah"><span>Auction House: {#if ah}{@render money(ah * n)}{#if n > 1}&nbsp;({@render money(ah)} each){/if}{:else}not on sale{/if}</span></div>
+    {/if}
     {#if holders.length || sold.length || sources?.drops.length || sources?.found.length}
       <div class="ours">
         {#each holders as h (h.key)}
@@ -159,5 +166,9 @@
   }
   .tip .coin {
     margin-right: 3px;
+  }
+  /* What the auction house asks, under what a vendor gives: the game's own line is the one above. */
+  .tl.ah {
+    color: var(--text-dim);
   }
 </style>

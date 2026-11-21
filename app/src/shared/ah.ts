@@ -172,7 +172,8 @@ export function typical(ladder: [number, number][]): number {
   return ladder.at(-1)?.[0] ?? 0
 }
 
-const suffixOf = (key: string, names: AhNames): string =>
+/** What the bonuses of a key add to the name of the item ("of the Eagle"); "" for the item alone. */
+export const suffixOf = (key: string, names: AhNames): string =>
   (key.split(':')[1] ?? '')
     .split('.')
     .map((b) => names.suffixes[b])
@@ -351,3 +352,146 @@ export function priceOf(typed: string): number | undefined {
   if (!parts.length || parts.map((p) => p[0]).join('').replace(/\s/g, '') !== t.replace(/\s/g, '')) return undefined
   return parts.reduce((n, [, v, c]) => n + Number(v) * (c === 'g' ? 10000 : c === 's' ? 100 : 1), 0)
 }
+
+// What the player owns (M18-F8): the items of every character of the house, with the price of their kind.
+
+/** The key of the bucket of an item held, from the link the addon keeps of it (Sheet.lua, KeyOf): field 13 is how many bonuses, then the bonuses. */
+export function keyOfLink(item: number, link?: unknown): string {
+  const f = typeof link === 'string' ? link.split(':') : []
+  const n = Number(f[13]) || 0
+  return n > 0 ? `${item}:${f.slice(14, 14 + n).join('.')}` : `${item}`
+}
+
+/** The lowest price of one of a kind on sale; undefined for what is not on sale. */
+export function lowestOf(listing: Listing | null | undefined, key: string): number | undefined {
+  const lots = listing?.items[key]
+  if (!Array.isArray(lots) || !lots.length) return undefined
+  return Math.min(...lots.map((l) => l[0]))
+}
+
+/** Where a character's own house is: the house of its region, ruleset and side, never the neutral one. */
+export type Home = Omit<House, 'side'> & { side: 'A' | 'H' }
+
+/** The home of the character in game, from what the addon tells; null while something is missing. */
+export function homeOf(hints: HouseHints | null | undefined): Home | null {
+  const h = houseOf(hints ? { ...hints, nh: false } : null)
+  return h && h.side !== 'N' ? { ...h, side: h.side } : null
+}
+
+/** Whether a character of that home sells at the house: its own, or the neutral house of its ruleset. */
+export const sellsAt = (home: Home, house: House): boolean => home.region === house.region && home.ruleset === house.ruleset && (house.side === 'N' || house.side === home.side)
+
+/** The side of a race, by the game's token of it (Sheet.lua, who.race); undefined for a race not known here. */
+export function sideOfRace(race: unknown): 'A' | 'H' | undefined {
+  if (typeof race !== 'string') return undefined
+  if (['Human', 'Dwarf', 'NightElf', 'Gnome', 'Draenei', 'Worgen', 'HighElf'].includes(race)) return 'A'
+  if (['Orc', 'Scourge', 'Tauren', 'Troll', 'BloodElf', 'Goblin'].includes(race)) return 'H'
+  return undefined
+}
+
+/**
+ * Whether a character's items count at a house: by its home where the game told it, else by the side of
+ * its race, taken to play on the house's region and ruleset (guessed: true). A race not known counts too.
+ */
+export function countsAt(home: Home | undefined, race: unknown, house: House): { counts: boolean; guessed: boolean } {
+  if (home) return { counts: sellsAt(home, house), guessed: false }
+  const side = sideOfRace(race)
+  return { counts: house.side === 'N' || !side || side === house.side, guessed: true }
+}
+
+export type OwnedPlace = 'Bags' | 'Bank' | 'Worn'
+
+/** One item a character holds: stacks of the same kind in the same place added up. */
+export interface Owned {
+  who: string
+  place: OwnedPlace
+  id: number
+  key: string
+  n: number
+}
+
+/** What a sheet holds that can be sold: bags (the keyring left out), bank, worn; by kind and place. */
+export function ownedOf(who: string, pieces: Record<string, unknown>): Owned[] {
+  const out = new Map<string, Owned>()
+  const add = (place: OwnedPlace, id: unknown, n: unknown, link: unknown): void => {
+    if (!Number.isInteger(id) || (id as number) <= 0) return
+    const key = keyOfLink(id as number, link), at = `${place} ${key}`
+    const had = out.get(at)
+    if (had) had.n += Number(n) || 1
+    else out.set(at, { who, place, id: id as number, key, n: Number(n) || 1 })
+  }
+  const containers = (piece: unknown, take: (bag: number) => boolean, place: OwnedPlace): void => {
+    for (const c of Array.isArray(piece) ? (piece as { b?: unknown; s?: unknown }[]) : [])
+      if (take(Number(c?.b)) && Array.isArray(c.s)) for (const s of c.s as unknown[]) if (Array.isArray(s)) add(place, s[1], s[2], s[3])
+  }
+  containers(pieces.bags, (b) => b >= 0 && b <= 5, 'Bags')
+  containers(pieces.bank, (b) => b >= 6, 'Bank') // an older addon sent the keyring with the bank: the bank is 6 and after
+  for (const g of Array.isArray(pieces.gear) ? pieces.gear : []) if (Array.isArray(g)) add('Worn', g[1], 1, g[4])
+  return [...out.values()]
+}
+
+// Disenchanting, as Classic has it: for an uncommon item, dust, essence and now and then a shard by its
+// item level; a rare one gives a shard, an epic one shards or Nexus Crystals. A weapon gives the
+// essence where armour gives the dust, and the other way round.
+const DUST = { strange: 10940, soul: 11083, vision: 11137, dream: 11176, illusion: 16204 }
+const ESSENCE = { lesserMagic: 10938, greaterMagic: 10939, lesserAstral: 10998, greaterAstral: 11082, lesserMystic: 11134, greaterMystic: 11135, lesserNether: 11174, greaterNether: 11175, lesserEternal: 16202, greaterEternal: 16203 }
+const SHARD = { smallGlimmering: 10978, largeGlimmering: 11084, smallGlowing: 11138, largeGlowing: 11139, smallRadiant: 11177, largeRadiant: 11178, smallBrilliant: 14343, largeBrilliant: 14344, nexus: 20725 }
+type Draw = [item: number, chance: number, least: number, most: number]
+// Uncommon: up to this item level, [dust, how many], [essence, how many], the chances of armour (dust, essence), and the shard with its chance.
+const UNCOMMON: [number, Draw, Draw, Draw | null][] = [
+  [15, [DUST.strange, 0.8, 1, 2], [ESSENCE.lesserMagic, 0.2, 1, 2], null],
+  [20, [DUST.strange, 0.75, 2, 3], [ESSENCE.greaterMagic, 0.2, 1, 2], [SHARD.smallGlimmering, 0.05, 1, 1]],
+  [25, [DUST.strange, 0.75, 4, 6], [ESSENCE.lesserAstral, 0.15, 1, 2], [SHARD.smallGlimmering, 0.1, 1, 1]],
+  [30, [DUST.soul, 0.75, 1, 2], [ESSENCE.greaterAstral, 0.2, 1, 2], [SHARD.largeGlimmering, 0.05, 1, 1]],
+  [35, [DUST.soul, 0.75, 2, 5], [ESSENCE.lesserMystic, 0.2, 1, 2], [SHARD.smallGlowing, 0.05, 1, 1]],
+  [40, [DUST.vision, 0.75, 1, 2], [ESSENCE.greaterMystic, 0.2, 1, 2], [SHARD.largeGlowing, 0.05, 1, 1]],
+  [45, [DUST.vision, 0.75, 2, 5], [ESSENCE.lesserNether, 0.2, 1, 2], [SHARD.smallRadiant, 0.05, 1, 1]],
+  [50, [DUST.dream, 0.75, 1, 2], [ESSENCE.greaterNether, 0.2, 1, 2], [SHARD.largeRadiant, 0.05, 1, 1]],
+  [55, [DUST.dream, 0.75, 2, 5], [ESSENCE.lesserEternal, 0.2, 1, 2], [SHARD.smallBrilliant, 0.05, 1, 1]],
+  [60, [DUST.illusion, 0.75, 1, 2], [ESSENCE.greaterEternal, 0.2, 1, 2], [SHARD.largeBrilliant, 0.05, 1, 1]],
+  [Infinity, [DUST.illusion, 0.75, 2, 5], [ESSENCE.greaterEternal, 0.2, 2, 3], [SHARD.largeBrilliant, 0.05, 1, 1]],
+]
+const RARE: [number, Draw[]][] = [
+  [25, [[SHARD.smallGlimmering, 1, 1, 1]]],
+  [30, [[SHARD.largeGlimmering, 1, 1, 1]]],
+  [35, [[SHARD.smallGlowing, 1, 1, 1]]],
+  [40, [[SHARD.largeGlowing, 1, 1, 1]]],
+  [45, [[SHARD.smallRadiant, 1, 1, 1]]],
+  [50, [[SHARD.largeRadiant, 1, 1, 1]]],
+  [55, [[SHARD.smallBrilliant, 1, 1, 1]]],
+  [Infinity, [[SHARD.largeBrilliant, 0.995, 1, 1], [SHARD.nexus, 0.005, 1, 1]]],
+]
+const EPIC: [number, Draw[]][] = [
+  [45, [[SHARD.smallRadiant, 1, 2, 4]]],
+  [50, [[SHARD.largeRadiant, 1, 2, 4]]],
+  [55, [[SHARD.smallBrilliant, 1, 2, 4]]],
+  [60, [[SHARD.nexus, 1, 1, 1]]],
+  [Infinity, [[SHARD.nexus, 1, 1, 2]]],
+]
+const LEAST: Record<number, number> = { 2: 5, 3: 11, 4: 40 } // the lowest item level that gives anything, by quality
+
+/** What disenchanting an item gives, with the chance of each draw; null for what cannot be disenchanted (not a weapon nor armour, or poor and common). */
+export function disenchantOf(item: Pick<AhItem, 'cls' | 'quality' | 'itemLevel'>): Draw[] | null {
+  if ((item.cls !== 2 && item.cls !== 4) || !LEAST[item.quality] || item.itemLevel < LEAST[item.quality]!) return null
+  const level = item.itemLevel
+  if (item.quality === 3) return RARE.find(([top]) => level <= top)![1]
+  if (item.quality === 4) return EPIC.find(([top]) => level <= top)![1]
+  const [, dust, essence, shard] = UNCOMMON.find(([top]) => level <= top)!
+  const draws: Draw[] = item.cls === 2 ? [[dust[0], essence[1], dust[2], dust[3]], [essence[0], dust[1], essence[2], essence[3]]] : [dust, essence]
+  return shard ? [...draws, shard] : draws
+}
+
+/** What disenchanting is worth on average at the house's lowest prices; null when something it gives is not on sale. */
+export function disenchantValue(draws: Draw[] | null, listing: Listing | null | undefined): number | null {
+  if (!draws) return null
+  let worth = 0
+  for (const [item, chance, least, most] of draws) {
+    const price = lowestOf(listing, `${item}`)
+    if (price === undefined) return null
+    worth += chance * ((least + most) / 2) * price
+  }
+  return Math.round(worth)
+}
+
+/** What the auction house keeps of a sale (5%), so what reaches the seller of a lot sold at that price. */
+export const afterCut = (price: number): number => Math.floor(price * 0.95)

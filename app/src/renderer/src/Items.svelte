@@ -9,10 +9,12 @@
   import type { PortraitsTold } from '../../shared/portrait'
   import type { Sheets } from '../../shared/sheet'
   import { statsOf } from '../../shared/stats'
+  import { lowestOf, type Listing } from '../../shared/ah'
   import { itemTip } from './item-tip.svelte'
   import { inApp, TILES } from './web'
 
-  let { sheets, portraits, shown, known, now, onpick }: { sheets: Sheets; portraits: PortraitsTold; shown: Known | null; known: Known[]; now: number; onpick: (key: string) => void } = $props()
+  // listing: the prices of the auction house on show (M18-F8), for what each item fetches there; null without them.
+  let { sheets, portraits, shown, known, now, listing = null, onpick }: { sheets: Sheets; portraits: PortraitsTold; shown: Known | null; known: Known[]; now: number; listing?: Listing | null; onpick: (key: string) => void } = $props()
 
   // What the game says of each item, made beside the map (tiles-worker.ts). Without it the items have their numbers and no prices.
   let facts = $state.raw<ItemFacts>({})
@@ -30,17 +32,19 @@
   let column = $state<Column>('value')
   let up = $state(false)
   const sheet = $derived(shown ? sheets[shown.key] : undefined)
-  const all = $derived(sheet ? itemRows(sheet, facts) : [])
+  const lowest = $derived((key: string) => lowestOf(listing, key))
+  const all = $derived(sheet ? itemRows(sheet, facts, lowest) : [])
   const rows = $derived(sortRows(filterRows(all, typed).filter((r) => !place || r.place === place), column, up))
-  const others = $derived(shown ? othersHolding(sheets, shown.key, facts, typed).flatMap((o) => o.rows.map((r) => ({ ...r, who: known.find((k) => k.key === o.key) }))) : [])
+  const others = $derived(shown ? othersHolding(sheets, shown.key, facts, typed, lowest).flatMap((o) => o.rows.map((r) => ({ ...r, who: known.find((k) => k.key === o.key) }))) : [])
   const othersSorted = $derived(sortRows(others, column, up) as typeof others)
   const worn = $derived(sheet ? wornOf(sheet) : new Map())
   const grids = $derived(sheet ? gridsOf(sheet) : null)
   const worth = $derived(all.reduce((n, r) => n + r.value, 0))
+  const auction = $derived(all.reduce((n, r) => n + r.auction, 0))
   const money = $derived(typeof sheet?.pieces.money === 'number' ? sheet.pieces.money : null)
   const places = $derived(PLACES.map((p) => ({ p, n: all.filter((r) => r.place === p).length })).filter(({ p, n }) => n > 0 || p !== 'Keyring'))
 
-  const COLUMNS: [Column, string][] = [['name', 'Item'], ['type', 'Type'], ['place', 'Where'], ['n', 'Qty'], ['value', 'Value']]
+  const COLUMNS = $derived<[Column, string][]>([['name', 'Item'], ['type', 'Type'], ['place', 'Where'], ['n', 'Qty'], ['value', 'Value'], ...(listing ? [['auction', 'At the AH'] as [Column, string]] : [])])
   // A click sorts by the column; another click turns it round. Names and types start from A, numbers from the most.
   function sortBy(c: Column): void {
     if (c === column) up = !up
@@ -102,7 +106,7 @@
   <thead>
     <tr>
       {#each columns as [c, label] (label)}
-        <th class:num={c === 'n' || c === 'value'} class:on={c === column} aria-sort={c === column ? (up ? 'ascending' : 'descending') : undefined}>
+        <th class:num={c === 'n' || c === 'value' || c === 'auction'} class:on={c === column} aria-sort={c === column ? (up ? 'ascending' : 'descending') : undefined}>
           {#if c}
             <button onclick={() => sortBy(c)}>{label}{#if c === column}<svg viewBox="0 0 10 10" aria-hidden="true"><path d={up ? 'M1 7h8L5 2z' : 'M1 3h8L5 8z'} /></svg>{/if}</button>
           {:else}{label}{/if}
@@ -130,7 +134,7 @@
           {/each}
         </div>
       {/if}
-      <p class="sum">Worth {@render money_(worth)} at a vendor{#if money !== null}{' · '}Money {@render money_(money)}{/if}</p>
+      <p class="sum">Worth {@render money_(worth)} at a vendor{#if listing}{' · '}{@render money_(auction)} at the auction house{/if}{#if money !== null}{' · '}Money {@render money_(money)}{/if}</p>
     </div>
     {#if view === 'slots' && grids}
       <div class="page">
@@ -191,9 +195,9 @@
       {@render heads(COLUMNS)}
       <tbody>
         {#each rows as r (r.place + r.id)}
-          <tr use:itemTip={{ item: r.id, n: r.n }}><td>{@render item(r)}</td><td class="dim">{r.type}</td><td>{r.place}</td><td class="num">{r.n}</td><td class="num">{@render money_(r.value)}</td></tr>
+          <tr use:itemTip={{ item: r.id, n: r.n }}><td>{@render item(r)}</td><td class="dim">{r.type}</td><td>{r.place}</td><td class="num">{r.n}</td><td class="num">{@render money_(r.value)}</td>{#if listing}<td class="num">{@render money_(r.auction)}</td>{/if}</tr>
         {:else}
-          <tr><td colspan="5" class="none">{typed ? `${shown.key} has nothing like "${typed}".` : 'Nothing here.'}</td></tr>
+          <tr><td colspan={COLUMNS.length} class="none">{typed ? `${shown.key} has nothing like "${typed}".` : 'Nothing here.'}</td></tr>
         {/each}
       </tbody>
     </table>
@@ -203,11 +207,11 @@
     {#if othersSorted.length}
       <h2>Other characters<span>kept on this PC</span></h2>
       <table>
-        {@render heads([['name', 'Item'], [null, 'Character'], ['type', 'Type'], ['place', 'Where'], ['n', 'Qty'], ['value', 'Value']])}
+        {@render heads([['name', 'Item'], [null, 'Character'], ['type', 'Type'], ['place', 'Where'], ['n', 'Qty'], ['value', 'Value'], ...(listing ? [['auction', 'At the AH'] as [Column, string]] : [])])}
         <tbody>
           {#each othersSorted as r (r.who?.key + r.place + r.id)}
             <tr class="other" onclick={() => r.who && onpick(r.who.key)} title="Show {r.who?.key}">
-              <td>{@render item(r)}</td><td style:color={r.who?.color}>{r.who?.key}</td><td class="dim">{r.type}</td><td>{r.place}</td><td class="num">{r.n}</td><td class="num">{@render money_(r.value)}</td>
+              <td>{@render item(r)}</td><td style:color={r.who?.color}>{r.who?.key}</td><td class="dim">{r.type}</td><td>{r.place}</td><td class="num">{r.n}</td><td class="num">{@render money_(r.value)}</td>{#if listing}<td class="num">{@render money_(r.auction)}</td>{/if}
             </tr>
           {/each}
         </tbody>

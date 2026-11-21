@@ -3,13 +3,16 @@
   // as approved on design/ah/mock.html (design/ui.md, section 5). The game's categories on the left,
   // a row for each item with its kinds, the page of an item with what is on sale cheapest first, a
   // search that forgives a letter, and the line Blizzard's terms ask for. Data: shared/ah.ts.
-  import { ahItems, categoriesOf, houseLine, houseNumber, nextPrices, priceOf, REGIONS, rulesetName, rulesetOf, RULESETS, search, SIDES, type AhItem, type AhNames, type Category, type House, type HouseHints, type Kind, type PricesTold, type Region, type Side } from '../../shared/ah'
+  import { afterCut, ahItems, categoriesOf, disenchantOf, disenchantValue, houseLine, houseNumber, lowestOf, nextPrices, countsAt, ownedOf, priceOf, suffixOf, REGIONS, rulesetName, rulesetOf, RULESETS, search, SIDES, type AhItem, type AhNames, type Category, type Home, type House, type HouseHints, type Kind, type Listing, type Owned, type OwnedPlace, type PricesTold, type Region, type Side } from '../../shared/ah'
   import { coins, typeOf, type ItemFacts } from '../../shared/items'
+  import type { Known } from '../../shared/characters'
+  import type { Sheets } from '../../shared/sheet'
   import { columns } from './columns'
   import Glyph from './Glyph.svelte'
   import { TILES } from './web'
 
-  let { house, chosen, hints, who, prices, now, onchoose }: { house: House | null; chosen: boolean; hints: HouseHints | null; who: string | null; prices: PricesTold | null; now: number; onchoose: (h: House | null) => void } = $props()
+  // listing: the prices of the house on show (App.svelte). homes: each character's own house, as the game told it.
+  let { house, chosen, hints, who, prices, listing, sheets, known, homes, now, onchoose }: { house: House | null; chosen: boolean; hints: HouseHints | null; who: string | null; prices: PricesTold | null; listing: Listing | null; sheets: Sheets; known: Known[]; homes: Record<string, Home>; now: number; onchoose: (h: House | null) => void } = $props()
 
   // What the game says of each item and the names of its categories and kinds, made beside the map.
   let facts = $state.raw<ItemFacts>({})
@@ -19,8 +22,6 @@
     void fetch(`${TILES}/ah-names.json`).then((r) => (r.ok ? r.json() : null)).then((n: AhNames | null) => n && (names = n)).catch(() => {})
   })
 
-  // The prices are of the house on show only: a house changed a moment ago has none until they come.
-  const listing = $derived(house && prices?.house === houseNumber(house) && prices.region === house.region ? prices.listing : null)
   const items = $derived(listing ? ahItems(listing, facts, names) : [])
   const cats = $derived(categoriesOf(items, names))
 
@@ -31,7 +32,21 @@
   const level = (v: string): number | undefined => (/^\d+$/.test(v.trim()) ? Number(v) : undefined)
   const filters = $derived({ typed, category, minLevel: level(minLevel), maxLevel: level(maxLevel), quality: quality === '' ? undefined : Number(quality), minPrice: priceOf(minPrice), maxPrice: priceOf(maxPrice) })
   const active = $derived([minLevel, maxLevel, quality, minPrice, maxPrice].filter((v) => v.trim() !== '').length)
-  const found = $derived(search(items, filters))
+  // A click on a heading sorts by its column; another turns it round. Names from A, numbers from the most.
+  type Sort = { by: string; up: boolean } | null
+  let browseSort = $state<Sort>(null), mineSort = $state<Sort>(null)
+  const turn = (now: Sort, by: string, text: boolean): Sort => (now?.by === by ? { by, up: !now.up } : { by, up: text })
+  const order = <T,>(rows: T[], sort: Sort, value: (row: T, by: string) => string | number): T[] => {
+    if (!sort) return rows
+    const by = (a: T, b: T): number => {
+      const x = value(a, sort.by), y = value(b, sort.by)
+      return typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y))
+    }
+    return [...rows].sort((a, b) => (sort.up ? by(a, b) : by(b, a)))
+  }
+  const found = $derived(
+    order(search(items, filters), browseSort, (it, by) => (by === 'name' ? it.name : by === 'lowest' ? it.lowest : by === 'typical' ? Math.min(...it.kinds.map((k) => k.typical)) : by === 'available' ? it.available : it.vendor)),
+  )
   const SHOWN = 300 // rows drawn at once: more on asking
   let most = $state(SHOWN)
   $effect(() => {
@@ -85,6 +100,30 @@
   // After the name of a kind, as the game's list has it: the level the item asks for, between brackets.
   const levelOf = (it: AhItem): string => (it.level ? ` (${it.level})` : '')
   const kindName = (it: AhItem, k: Kind): string => (k.suffix ? `${it.name} ${k.suffix}` : it.name)
+  // My items (M18-F8): what the characters of this house hold, each kind at its own lowest price.
+  let mine = $state(false)
+  let fromMine = $state(false) // the page of an item was opened from My items: Back goes there
+  let where = $state<OwnedPlace | null>(null)
+  const race = (key: string): unknown => (sheets[key]?.pieces.who as { race?: unknown } | undefined)?.race
+  const ours = $derived(house ? Object.keys(sheets).filter((key) => countsAt(homes[key], race(key), house!).counts) : [])
+  // Counted by the side of their race: the game has not told their ruleset yet (an addon older than M18-F7 when they last played).
+  const guessed = $derived(ours.filter((key) => !homes[key]))
+  const owned = $derived(ours.flatMap((key) => ownedOf(key, sheets[key]!.pieces)))
+  const ownedRows = $derived(
+    owned
+      .filter((o) => !where || o.place === where)
+      .map((o) => {
+        const f = facts[o.id], each = lowestOf(listing, o.key), vendor = (f?.[2] ?? 0) * o.n
+        const at = each === undefined ? 0 : each * o.n
+        return { ...o, name: f?.[0] ?? `Item ${o.id}`, suffix: suffixOf(o.key, names), quality: f?.[1] ?? 1, each, at, vendor, better: each === undefined && !vendor ? '' : afterCut(at) > vendor ? 'AH' : 'VENDOR' }
+      })
+      .sort((a, b) => ours.indexOf(a.who) - ours.indexOf(b.who) || b.at - a.at || b.vendor - a.vendor || a.name.localeCompare(b.name)),
+  )
+  // Sorted by the heading clicked, each character's items kept together.
+  const ownedSorted = $derived(
+    order(ownedRows, mineSort, (o, by) => (by === 'name' ? `${o.name} ${o.suffix}` : by === 'place' ? o.place : by === 'n' ? o.n : by === 'each' ? (o.each ?? -1) : by === 'at' ? o.at : by === 'vendor' ? o.vendor : o.better)).sort((a, b) => ours.indexOf(a.who) - ours.indexOf(b.who)),
+  )
+  const colorOf = (key: string): string | undefined => known.find((k) => k.key === key)?.color
   let copied = $state(false)
   function copy(text: string): void {
     void navigator.clipboard.writeText(text).then(() => {
@@ -102,9 +141,13 @@
   <span class="ico" class:big><img src="{TILES}/items/{id}.png" alt="" onerror={(e) => e.currentTarget.remove()} /></span>
 {/snippet}
 
+{#snippet head(by: string, label: string, sort: Sort, set: (now: Sort) => void)}
+  <th aria-sort={sort?.by === by ? (sort.up ? 'ascending' : 'descending') : undefined}><button class="sort" class:on={sort?.by === by} onclick={() => set(sort)}>{label}{#if sort?.by === by}<svg viewBox="0 0 10 10" aria-hidden="true"><path d={sort.up ? 'M1 7h8L5 2z' : 'M1 3h8L5 8z'} /></svg>{/if}</button></th>
+{/snippet}
+
 {#snippet tree(list: Category[], depth: number)}
   {#each list as c (c.key)}
-    <button class="cat" class:on={category === c.key} style:padding-left="{16 + depth * 16}px" onclick={() => ((category = category === c.key && !c.kids.length ? null : c.key), (page = null))}>{c.name} <small>{c.n}</small></button>
+    <button class="cat" class:on={category === c.key} style:padding-left="{16 + depth * 16}px" onclick={() => ((category = category === c.key && !c.kids.length ? null : c.key), (page = null), (mine = false))}>{c.name} <small>{c.n}</small></button>
     {#if c.kids.length && category?.split('.').slice(0, depth + 1).join('.') === c.key}{@render tree(c.kids, depth + 1)}{/if}
   {/each}
 {/snippet}
@@ -174,16 +217,20 @@
       </div>
     {:else}
       <nav class="cats" aria-label="Categories">
+        <h4>YOURS</h4>
+        <button class="cat" class:on={mine} onclick={() => ((mine = true), (page = null))}>My items <small>{owned.length}</small></button>
         <h4>CATEGORIES</h4>
-        <button class="cat" class:on={!category} onclick={() => ((category = null), (page = null))}>All items <small>{items.length}</small></button>
+        <button class="cat" class:on={!category && !mine} onclick={() => ((category = null), (page = null), (mine = false))}>All items <small>{items.length}</small></button>
         {@render tree(cats, 0)}
       </nav>
       {#if page && pageItem && pageKind}
         {@const it = pageItem}
         {@const k = pageKind}
+        {@const have = owned.filter((o) => o.id === it.id)}
+        {@const draws = disenchantOf(it)}
         <div class="itempage">
           <div class="kinds">
-            <button class="back" onclick={() => (page = null)}>‹ Back to {typed.trim() ? 'the search' : category_(category)}</button>
+            <button class="back" onclick={() => ((page = null), (mine = fromMine), (fromMine = false))}>‹ Back to {fromMine ? 'My items' : typed.trim() ? 'the search' : category_(category)}</button>
             {#each it.kinds as x (x.key)}
               <button class="kind" class:on={x.key === k.key} onclick={() => (page = { id: it.id, key: x.key })}><span style:color={QUALITY_COLORS[it.quality]}>{x.suffix || it.name}{levelOf(it)}</span><span>{@render money(x.lowest)}</span></button>
             {/each}
@@ -211,14 +258,59 @@
             <p class="note">As the house was at {clock(snapshot)}. Prices are per unit; what is on sale now may differ.</p>
           </div>
           <div class="side">
+            <h5 class="first">You have</h5>
+            {#each have as o (o.who + o.place + o.key)}
+              <div>{o.n} · <span style:color={colorOf(o.who)}>{o.who}</span>, {o.place.toLowerCase()}{#if o.key !== k.key}<span class="dim"> ({suffixOf(o.key, names) || 'plain'})</span>{/if}</div>
+            {:else}
+              <div class="dim">None, on any character of this house</div>
+            {/each}
+            {#if draws}
+              {@const worth = disenchantValue(draws, listing)}
+              <h5>If you disenchant it</h5>
+              <div class="facts two">
+                <div><small>EXPECTED</small><span>{#if worth !== null}{@render money(worth)}{:else}<span class="dim small">not all on sale</span>{/if}</span></div>
+                <div><small>BEST</small><span class="dim small">{worth !== null && worth > afterCut(k.lowest) && worth > it.vendor ? 'disenchant it' : afterCut(k.lowest) >= it.vendor ? 'sell it' : 'vendor it'}</span></div>
+              </div>
+              <div class="note">{draws.map(([id, chance, least, most]) => `${facts[id]?.[0] ?? `Item ${id}`} ${least === most ? least : `${least}-${most}`} (${Math.round(chance * 1000) / 10}%)`).join(', ')}, at the lowest prices of {clock(snapshot)}.</div>
+            {/if}
             <h5>Find it in the game</h5>
             <div class="dim">"{it.name}" · <button class="link" onclick={() => copy(it.name)}>{copied ? 'Copied' : 'Copy'}</button></div>
           </div>
         </div>
+      {:else if mine}
+        {@const ah = ownedRows.reduce((n, o) => n + o.at, 0)}
+        {@const vendor = ownedRows.reduce((n, o) => n + o.vendor, 0)}
+        <div class="main">
+          <div class="tot">
+            <div><small>WORTH AT THE AUCTION HOUSE</small><span>{@render money(ah)}</span></div>
+            <div><small>AT A VENDOR</small><span>{@render money(vendor)}</span></div>
+            <div><small>NOT ON SALE NOW</small><span>{ownedRows.filter((o) => o.each === undefined).length} items</span></div>
+            <span class="seg" role="group" aria-label="Where">{#each [[null, 'Everything'], ['Bags', 'Bags'], ['Bank', 'Bank'], ['Worn', 'Worn']] as [p, label] (label)}<button aria-pressed={where === p} onclick={() => (where = p as OwnedPlace | null)}>{label}</button>{/each}</span>
+          </div>
+          <table class="list" use:columns={'ah-mine'}>
+            <thead><tr>{#each [['name', 'ITEM', true], ['place', 'WHERE', true], ['n', 'HOW MANY'], ['each', 'LOWEST EACH'], ['at', 'AT THE AH'], ['vendor', 'AT A VENDOR'], ['better', 'BETTER', true]] as [by, label, text] (by)}{@render head(by as string, label as string, mineSort, (s) => (mineSort = turn(s, by as string, !!text)))}{/each}</tr></thead>
+            <tbody>
+              {#each ownedSorted as o, i (o.who + o.place + o.key)}
+                {#if o.who !== ownedSorted[i - 1]?.who}<tr class="who"><td colspan="7" style:color={colorOf(o.who)}>{o.who}</td></tr>{/if}
+                <tr data-key={o.key} data-who={o.who} data-place={o.place} class:item={o.each !== undefined} onclick={() => o.each !== undefined && ((mine = false), (fromMine = true), (page = { id: o.id, key: o.key }))}>
+                  <td><span class="nm">{@render icon(o.id)}<span class="n" style:color={QUALITY_COLORS[o.quality]}>{o.name}{o.suffix ? ` ${o.suffix}` : ''}</span></span></td>
+                  <td class="dim">{o.place}</td>
+                  <td>{o.n.toLocaleString('en')}</td>
+                  <td>{#if o.each !== undefined}{@render money(o.each)}{:else}<span class="off">not on sale</span>{/if}</td>
+                  <td>{#if o.at}{@render money(o.at)}{/if}</td>
+                  <td>{@render money(o.vendor)}</td>
+                  <td>{#if o.better}<span class="tag {o.better.toLowerCase()}">{o.better}</span>{/if}</td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+          {#if !ours.length}<p class="none">No character of this house yet. Play one with the Twinmap Forever addon on, and its bags show here.</p>{/if}
+          <p class="note pad">"Better" counts the 5% the auction house keeps; the deposit is not counted.{#if guessed.length && house}{' '}{guessed.join(', ')}: counted as playing {house.region} {rulesetName(house.ruleset)}, which the game has not told yet for {guessed.length > 1 ? 'them' : 'this character'}.{/if}</p>
+        </div>
       {:else}
         <div class="main">
           <table class="list" use:columns={'ah-browse'}>
-            <thead><tr><th>NAME</th><th>LOWEST</th><th>TYPICAL</th><th>AVAILABLE</th><th>VENDOR</th></tr></thead>
+            <thead><tr>{#each [['name', 'NAME', true], ['lowest', 'LOWEST'], ['typical', 'TYPICAL'], ['available', 'AVAILABLE'], ['vendor', 'VENDOR']] as [by, label, text] (by)}{@render head(by as string, label as string, browseSort, (s) => (browseSort = turn(s, by as string, !!text)))}{/each}</tr></thead>
             <tbody>
               {#each found.slice(0, most) as it (it.id)}
                 {@const many = it.kinds.length > 1}
@@ -471,6 +563,28 @@
     background: var(--stone-800);
     border-bottom: 1px solid var(--bronze-700);
   }
+  /* The heading is a button that sorts: it reads as the heading, the arrow says which way. */
+  .sort {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    letter-spacing: inherit;
+    color: inherit;
+    cursor: pointer;
+  }
+  .sort:hover,
+  .sort.on {
+    color: var(--gold);
+  }
+  .sort svg {
+    width: 9px;
+    height: 9px;
+    fill: currentColor;
+  }
   th:first-child,
   td:first-child {
     text-align: left;
@@ -647,6 +761,59 @@
   }
   .body {
     grid-row: 3;
+  }
+  .tot {
+    display: flex;
+    align-items: flex-end;
+    gap: 28px;
+    padding: 10px 18px;
+    border-bottom: 1px solid var(--bronze-900);
+  }
+  .tot small {
+    display: block;
+    font: 600 11.5px/14px var(--font);
+    letter-spacing: 0.07em;
+    color: var(--bronze-400);
+  }
+  .tot span {
+    font: 500 20px/24px var(--font);
+  }
+  .tot .seg {
+    margin-left: auto;
+  }
+  .tot .seg button {
+    font: var(--t-label);
+  }
+  tr.who td {
+    background: var(--stone-700);
+    font: var(--t-label);
+    text-align: left;
+  }
+  .tag {
+    font: 600 11px/15px var(--font);
+    letter-spacing: 0.06em;
+    padding: 0 6px;
+    border-radius: 3px;
+  }
+  .tag.ah {
+    background: #1f4d2a;
+    color: #8fe39a;
+  }
+  .tag.vendor {
+    background: #4d3a1f;
+    color: #e3c48f;
+  }
+  .facts.two {
+    grid-template-columns: auto auto;
+  }
+  .facts span.small {
+    font-size: 16px;
+  }
+  .side h5.first {
+    margin-top: 4px;
+  }
+  .note.pad {
+    padding: 0 18px;
   }
   .foot {
     grid-row: 4;

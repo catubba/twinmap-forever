@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest'
+import * as ah from './ah'
 import { ahItems, categoriesOf, gameAhNames, houseFrom, houseNumber, houseOf, listingFrom, nameRank, oneApart, priceOf, search, typical, type AhNames, type Listing } from './ah'
 import type { ItemFacts } from './items'
 import { gameFolderFrom, openClientFiles, registryInstallPath } from '../main/client-files'
@@ -114,3 +115,49 @@ test.skipIf(!real)('the game names its categories and the kinds of its items', (
   expect([names.subs['2.1'], names.subs['4.1'], names.subs['7.9']]).toEqual(['Two-Handed Axes', 'Cloth', 'Herb'])
   expect(Object.values(names.suffixes)).toContain('of the Eagle')
 }, 60_000)
+
+test('the key of an item held comes from its link: the bonuses, never the modifiers', () => {
+  const { keyOfLink } = ah
+  expect(keyOfLink(15212, 'item:15212::::::::::::1:12726:1:28:5242')).toBe('15212:12726')
+  expect(keyOfLink(6567, 'item:6567:::::::::::1:1:12718:1:28:5242')).toBe('6567:12718')
+  expect(keyOfLink(2034, 'item:2034:::::::::::1::1:28:5237')).toBe('2034')
+  expect(keyOfLink(6948, 'item:6948:::::::::::75')).toBe('6948')
+  expect(keyOfLink(1970)).toBe('1970')
+})
+
+test('what a character holds, by kind and place, and which characters sell at a house', () => {
+  const { ownedOf, sellsAt, homeOf } = ah
+  const pieces = {
+    bags: [{ b: 0, n: 16, s: [[1, 2589, 20], [2, 2589, 7], [3, 15212, 1, 'item:15212::::::::::::1:12726:1:28:5242'], [4, 15212, 1]] }, { b: -1, n: 6, s: [[1, 5396, 1]] }],
+    bank: [{ b: -1, s: [[1, 5396, 1]] }, { b: 6, n: 8, s: [[1, 2589, 3]] }],
+    gear: [[16, 15212, 40, 45, 'item:15212::::::::::::1:12718']],
+  }
+  expect(ownedOf('Catubbio Sucameli', pieces).map((o) => `${o.place} ${o.key} ${o.n}`)).toEqual(['Bags 2589 27', 'Bags 15212:12726 1', 'Bags 15212 1', 'Bank 2589 3', 'Worn 15212:12718 1'])
+  const home = homeOf({ region: 'EU', rs: 'Normal', side: 'A', nh: true })!
+  expect(home).toEqual({ region: 'EU', ruleset: 2, side: 'A' })
+  expect(sellsAt(home, { region: 'EU', ruleset: 2, side: 'A' })).toBe(true)
+  expect(sellsAt(home, { region: 'EU', ruleset: 2, side: 'N' })).toBe(true)
+  expect(sellsAt(home, { region: 'EU', ruleset: 2, side: 'H' })).toBe(false)
+  expect(sellsAt(home, { region: 'US', ruleset: 2, side: 'A' })).toBe(false)
+  // A character the game has not told the house of: by the side of its race.
+  const { countsAt } = ah
+  expect(countsAt(undefined, 'Gnome', { region: 'EU', ruleset: 2, side: 'A' })).toEqual({ counts: true, guessed: true })
+  expect(countsAt(undefined, 'Orc', { region: 'EU', ruleset: 2, side: 'A' })).toEqual({ counts: false, guessed: true })
+  expect(countsAt(undefined, 'Orc', { region: 'EU', ruleset: 2, side: 'N' })).toEqual({ counts: true, guessed: true })
+  expect(countsAt(home, 'Gnome', { region: 'EU', ruleset: 1, side: 'A' })).toEqual({ counts: false, guessed: false })
+})
+
+test('disenchanting: dust and essence by item level, swapped for a weapon; a shard for a rare; worth at the lowest prices', () => {
+  const { disenchantOf, disenchantValue } = ah
+  expect(disenchantOf({ cls: 4, quality: 2, itemLevel: 18 })).toEqual([[10940, 0.75, 2, 3], [10939, 0.2, 1, 2], [10978, 0.05, 1, 1]])
+  expect(disenchantOf({ cls: 2, quality: 2, itemLevel: 18 })).toEqual([[10940, 0.2, 2, 3], [10939, 0.75, 1, 2], [10978, 0.05, 1, 1]])
+  expect(disenchantOf({ cls: 2, quality: 3, itemLevel: 18 })).toEqual([[10978, 1, 1, 1]])
+  expect(disenchantOf({ cls: 4, quality: 4, itemLevel: 66 })).toEqual([[20725, 1, 1, 2]])
+  expect(disenchantOf({ cls: 7, quality: 2, itemLevel: 18 })).toBeNull()
+  expect(disenchantOf({ cls: 4, quality: 1, itemLevel: 18 })).toBeNull()
+  expect(disenchantOf({ cls: 4, quality: 2, itemLevel: 4 })).toBeNull()
+  const listing: Listing = { ...LISTING, items: { 10940: [[100, 5]], 10939: [[1000, 2]], 10978: [[400, 1], [300, 9]] } }
+  // 0.75 x 2.5 x 100 + 0.2 x 1.5 x 1000 + 0.05 x 1 x 300
+  expect(disenchantValue(disenchantOf({ cls: 4, quality: 2, itemLevel: 18 }), listing)).toBe(503)
+  expect(disenchantValue(disenchantOf({ cls: 4, quality: 2, itemLevel: 30 }), listing)).toBeNull()
+})

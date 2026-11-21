@@ -32,14 +32,22 @@ test('stacks of an item add up in each place; keyring, bank and what is worn are
   ])
 })
 
+test('a row is worth at the auction house the lowest price of each kind in it', () => {
+  const held = sheet({ bags: [{ b: 0, n: 16, s: [[1, 2589, 20], [2, 15212, 1, 'item:15212::::::::::::1:12726:1:28:5242'], [3, 15212, 1]] }] })
+  const prices: Record<string, number> = { 2589: 30, 15212: 500, '15212:12726': 9000, '15212:12718': 1 }
+  expect(itemRows(held, FACTS, (key) => prices[key]).map((r) => [r.id, r.n, r.auction])).toEqual([[2589, 20, 600], [15212, 2, 9500]])
+  expect(itemRows(held, FACTS).map((r) => r.auction)).toEqual([0, 0])
+})
+
 test('every column sorts both ways', () => {
-  const rows = itemRows(CATUBBIO, FACTS)
+  const rows = itemRows(CATUBBIO, FACTS, (key) => (key === '2589' ? 30 : undefined))
   const first: Record<Column, [string, string]> = {
     name: ['Item 99999', 'Shadow Goggles'],
     type: ['Shadow Goggles', 'Linen Cloth'],
     place: ['Item 99999', 'Shadow Goggles'],
     n: ['Item 99999', 'Linen Cloth'],
     value: ['Item 99999', 'Shadow Goggles'],
+    auction: ['Item 99999', 'Linen Cloth'],
   }
   for (const [column, [up, down]] of Object.entries(first) as [Column, [string, string]][]) {
     expect([sortRows(rows, column, true)[0]!.name, sortRows(rows, column, false)[0]!.name], column).toEqual([up, down])
