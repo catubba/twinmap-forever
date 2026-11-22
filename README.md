@@ -58,7 +58,7 @@ Every version of the app, with its notes, is on the [releases page](https://gith
 
 ### 2D or 3D, one switch
 
-One click turns the flat map into the land itself: mountains, valleys, coasts and rivers in relief, to turn, tilt and zoom, with your arrow, your quests and your route standing on the ground. Come close to a cave, a mine or Ironforge and the ground opens over it.
+One click turns the flat map into the land itself: mountains, valleys, coasts and rivers in relief, to turn, tilt and zoom, with your arrow, your quests and your route standing on the ground. In 2D and in 3D the map can turn with your character, as Rotate Minimap does in the game, or keep north up. Come close to a cave, a mine or Ironforge and the ground opens over it.
 
 ![Twinmap goes from the flat map to 3D with one click, down to Ironforge open inside its mountain](https://twinmap.app/media/3d.gif)
 
@@ -82,6 +82,7 @@ Bags, bank, gear and statistics of every character you play, with a picture of e
 
 ### And more
 
+- **Auction House.** The prices of your character's auction house, every hour: what your bags, bank and gear are worth, how a price moved over a day or a week, and an alert when it crosses your line.
 - **Your quests.** Where to hand in what is done and where to find what is left, for every quest of your log. With Questie installed, the ones to take as well.
 - **Services and resources.** Flight masters, inns, vendors, repair, trainers, banks, ore and herbs, each one a layer you turn on or off.
 - **Caves and mines.** Zoom in on a zone and their galleries show through the ground, before you go in.
@@ -105,7 +106,7 @@ Twinmap never touches the game's memory and never plays for you.
 
 - **From the game to the app.** The addon draws a line one pixel tall at the edge of the game window and writes your position, your zone, your quests and what your character carries, wears and knows in the colors of its pixels. The app reads that line from the screen.
 - **The map.** The app builds the map from the files of your own game, so it always matches your version of the game. No map is downloaded.
-- **Inside dungeons.** The game does not tell addons where you are in a dungeon, so the app reads your place from the game's minimap on the screen. Keep the minimap visible and not rotating.
+- **Inside dungeons.** The game does not tell addons where you are in a dungeon, so the app reads your place from the game's minimap on the screen. Keep the minimap visible, not rotating and zoomed all the way out.
 - **The picture of your character.** When you open the character window, the app reads the picture of your character from the screen, as it does the minimap.
 - **From the app to the game.** Points and routes go back through a few small files next to the addon, which the game reads by itself.
 - **Your group.** The game tells the addon where your companions are. From far away it tells it only every few seconds, so in a group each Twinmap addon also tells the others where its own character is, through the game. Inside a dungeon the game tells nothing at all: there each Twinmap tells the group the place it reads from its own minimap.
@@ -126,7 +127,7 @@ None of these is needed. When one is installed, Twinmap shows more.
 <summary><b>Privacy</b></summary>
 
 - The app sends nothing by itself unless you turn on Help improve Twinmap, in Settings: it is off until you do. There is no account and no tracking.
-- It connects to the internet to look for a newer version of itself, on GitHub; when you press Send in the Feedback window; and, if you turn on Help improve Twinmap, to send anonymous data about the world of Forever. What is sent and where it goes: [twinmap.app/privacy.html](https://twinmap.app/privacy.html).
+- It connects to the internet to look for a newer version of itself, on GitHub; to fetch the prices of your auction house from prices.twinmap.app, about once an hour, asking for that house and nothing about you; when you press Send in the Feedback window; and, if you turn on Help improve Twinmap, to send anonymous data about the world of Forever. What is sent and where it goes: [twinmap.app/privacy.html](https://twinmap.app/privacy.html).
 - The map on your home network is off until you turn it on.
 - What the app keeps of your characters, their picture included, stays on your computer.
 </details>
@@ -150,7 +151,7 @@ Here is what is planned, in no particular order. These are plans, not promises: 
 - **Global shortcuts** and a **signed installer**
 </details>
 
-> **Photosensitivity warning.** The addon sends data by changing the colors of a one pixel line at the edge of the game window, many times per second. Its settings in the game can slow it down or pause it.
+> **Photosensitivity warning.** The addon sends data by changing the colors of a one pixel line at the edge of the game window, many times per second. Its settings in the game can slow it down or pause it, and the pause button at the top of the app pauses it too.
 
 ## Feedback
 

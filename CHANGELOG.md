@@ -2,6 +2,28 @@
 
 What changed in each version of Twinmap, newest first. The section of a version is also the text of its release on GitHub and of the addon's file on CurseForge.
 
+## 0.15.0 - 2026-11-22
+
+### New
+
+- **Auction House.** A new section after Items, with the prices of the auction house your character sells at. Twinmap finds the house by itself from where you play; the house button picks another one. The categories are the game's own, each kind of an item has its own price ("of the Eagle" is not "of the Monkey"), and the page of an item lists its lots, the cheapest first. The search forgives a wrong letter, with filters for level, quality and price. The prices come every hour and are kept on your computer, so without the network the last ones still show.
+- **What your things are worth.** My items, in the Auction House, prices the bags, bank and gear of all your characters on that house, beside what a vendor pays, and says which pays more once the house has taken its cut. The page of an item says who holds it, and for a weapon or a piece of armour what disenchanting it gives on average. Auction prices also show in Items, in a vendor's panel and in the popup of every item.
+- **How a price moved.** The page of an item charts its lowest and typical price and how many were on sale, over the last 24 hours or 7 days. The list has a 24 hours column with a small line of the lowest price, green when it went up or stayed, red when it went down.
+- **Price alerts.** Set a line on the lowest price of an item, and Twinmap tells you when the price goes below or above it, or when the item is on sale again. A met alert shows in Now, under Attention, and in the new Alerts view, and if you like the addon says it in chat to the character that set it. Alerts are checked while Twinmap is open.
+- **The map turns with you.** A click on the compass, or the N key, turns the map so that your character faces up, as Rotate Minimap does in the game, in 2D and in 3D. Another click puts north up again. The 2D map has the compass now, and a drag with the right button turns it by hand.
+- **Text size.** Settings, Window, Text size, from 80% to 200%, makes the whole window bigger or smaller, for screens where the text was too small to read. Ctrl with + and -, Ctrl and 0, or Ctrl with the mouse wheel do the same.
+- **Pause.** The state of the link at the top of the window is a button now. Press it and Twinmap stops reading the game, and the game stops drawing the line at its edge; the map stays where you were. Press it again and it goes on.
+
+### Changed
+
+- **Keep the minimap clear.** Entering a dungeon or a raid, the addon shows a line in red under the minimap: Twinmap finds your place from that minimap, so keep it clear, not rotated and zoomed all the way out. A right click hides the line until the next dungeon.
+- **Items like the Auction House.** The table of Items has the look of the Auction House tables: a heading bar that stays on top as you scroll, and columns you resize with the mouse.
+- **Help improve Twinmap** also sends, while it is on, the NPCs you talk to that Questie does not know or places somewhere else, and what the game shows of them. What is sent, in full: [twinmap.app/privacy.html](https://twinmap.app/privacy.html#participation).
+
+### Fixed
+
+- **The world map from a dungeon.** Inside a dungeon, Eastern Kingdoms and Kalimdor now open the continent and keep it on show, where the map went back into the dungeon a moment later. Follow always goes back to your character.
+
 ## 0.14.0 - 2026-11-21
 
 ### New
