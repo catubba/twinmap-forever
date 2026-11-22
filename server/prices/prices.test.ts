@@ -1,7 +1,7 @@
 // node --test server/prices/prices.test.ts
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { keyOf, listingOf, nextDay, nextHours, pointOf, signed } from './prices.ts'
+import { again, keyOf, listingOf, nextDay, nextHours, pointOf, signed } from './prices.ts'
 import cron from './cron.ts'
 
 test('a kind of an item is its number and its bonus lists', () => {
@@ -71,4 +71,22 @@ test('every hour the cron asks GitHub to run the Action of the prices, and witho
   } finally {
     globalThis.fetch = real
   }
+})
+
+test('a request R2 fails on its side is sent again, one it refuses is not, and the last answer is kept', async () => {
+  const answers = (...statuses: (number | Error)[]) => {
+    let sent = 0
+    const send = async () => { const s = statuses[sent++]!; if (s instanceof Error) throw s; return new Response(null, { status: s }) }
+    return { send, sent: () => sent }
+  }
+  let a = answers(500, new Error('reset'), 200)
+  assert.equal((await again(a.send, 3, 0)).status, 200)
+  assert.equal(a.sent(), 3)
+  a = answers(403, 200)
+  assert.equal((await again(a.send, 3, 0)).status, 403, 'a 4xx is an answer, not a failure of R2')
+  assert.equal(a.sent(), 1)
+  a = answers(500, 503, 502, 200)
+  assert.equal((await again(a.send, 3, 0)).status, 502, 'three tries at most')
+  assert.equal(a.sent(), 3)
+  await assert.rejects(again(answers(new Error('down'), new Error('down')).send, 2, 0), /down/)
 })

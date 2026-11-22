@@ -114,19 +114,33 @@ export function signed(o: { method: string; url: string; headers?: Record<string
   return { ...sent, authorization: `AWS4-HMAC-SHA256 Credential=${o.id}/${scope}, SignedHeaders=${names.join(';')}, Signature=${signature}` }
 }
 
+/** A request sent again, after 2 s and then 4 s, when R2 fails it on its side (5xx) or the network does: R2 answers
+ *  500 InternalError now and then (22 November 2026), and one failed file stopped the whole hour. */
+export async function again(send: () => Promise<Response>, tries = 3, wait = 2000): Promise<Response> {
+  for (let i = 1; ; i++) {
+    try {
+      const r = await send()
+      if (r.status < 500 || i === tries) return r
+    } catch (e) {
+      if (i === tries) throw e
+    }
+    await new Promise((done) => setTimeout(done, wait * i))
+  }
+}
+
 export function r2(account: string, id: string, secret: string, bucket = 'twinmap-prices'): Store {
   const url = (key: string) => `https://${account}.r2.cloudflarestorage.com/${bucket}/${key}`
   const sign = (method: string, key: string, headers: Record<string, string> = {}, body?: string) => signed({ method, url: url(key), headers, body, id, secret, region: 'auto', now: new Date() })
   return {
     async get(key) {
-      const r = await fetch(url(key), { headers: sign('GET', key) })
+      const r = await again(() => fetch(url(key), { headers: sign('GET', key) }))
       if (r.status === 404) return null
       if (!r.ok) throw new Error(`R2 GET ${key}: ${r.status}`)
       return r.text()
     },
     async put(key, body) {
-      const headers = sign('PUT', key, { 'content-type': 'application/json', 'cache-control': CACHE }, body)
-      const r = await fetch(url(key), { method: 'PUT', headers, body })
+      const headers = { 'content-type': 'application/json', 'cache-control': CACHE }
+      const r = await again(() => fetch(url(key), { method: 'PUT', headers: sign('PUT', key, headers, body), body }))
       if (!r.ok) throw new Error(`R2 PUT ${key}: ${r.status} ${await r.text()}`)
     },
   }
