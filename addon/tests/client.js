@@ -315,6 +315,7 @@ const STUB = `
     function f:SetScript(kind, fn) self[kind] = fn end
     function f:SetPoint(point, _, _, x, y) self.point, self.x, self.y = point, x, y end
     function f:Hide() self.shown = false end
+    function f:Show() self.shown = true end
     function f:SetScale(scale) self.scale = scale end
     function f:SetText(text) self.text = text end
     function f:CreateFontString()

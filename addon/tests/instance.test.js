@@ -169,3 +169,32 @@ test('the minimap is put at its widest on the way into a dungeon and back as it 
   assert.equal(zoom(addon), 1);
   assert.equal(addon.lua('return SETS'), 3);
 });
+
+test('inside a dungeon a line in red under the minimap asks to keep it clear; a right click hides it until the next', () => {
+  const addon = enterWorld(`
+    GAME.width, GAME.height = 2560, 1440
+    Minimap = {
+      GetCenter = function() return 2006.5, 1043.75 end, GetWidth = function() return 198 end,
+      GetEffectiveScale = function() return 0.64 end, GetZoom = function() return 0 end,
+    }`);
+  addon.run(10);
+  const shown = () => addon.lua('return TwinmapForeverReminder and tostring(TwinmapForeverReminder.shown) or "none"');
+  assert.equal(shown(), 'none', 'nothing in the open world');
+  addon.lua(DEADMINES);
+  addon.run(2);
+  assert.equal(shown(), 'true', 'on the way in');
+  assert.equal(addon.lua('return TwinmapForeverReminder.text.text'), 'Twinmap: keep the minimap clear,\nnot rotated, zoomed all the way out');
+  assert.equal(addon.lua('return TwinmapForeverReminder.point'), 'TOP');
+  addon.lua('TwinmapForeverReminder.OnMouseUp(TwinmapForeverReminder, "LeftButton")');
+  assert.equal(shown(), 'true', 'a left click leaves it');
+  addon.lua('TwinmapForeverReminder.OnMouseUp(TwinmapForeverReminder, "RightButton")');
+  assert.equal(shown(), 'false', 'a right click hides it');
+  addon.run(5);
+  assert.equal(shown(), 'false', 'and it stays hidden in this dungeon');
+  addon.lua('GAME.instance = nil; GAME.zone, GAME.sub, GAME.map, GAME.x = "Westfall", "Moonbrook", 1436, 0.42');
+  addon.run(2);
+  assert.equal(shown(), 'false', 'gone on the way out');
+  addon.lua(DEADMINES);
+  addon.run(2);
+  assert.equal(shown(), 'true', 'there again in the next dungeon');
+});

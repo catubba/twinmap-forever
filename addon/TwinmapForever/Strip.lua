@@ -89,6 +89,42 @@ local function Widen(inside)
   end
 end
 
+-- Inside a dungeon or a raid, a line in red under the minimap: the app finds the place from its picture there, so
+-- it must be in view, with nothing over it, not turning and at its widest. It shows on the way in; a right click
+-- hides it until the next dungeon; on the way out it goes.
+local reminder, reminded
+local function Remind(inside)
+  if not Minimap or inside == reminded then return end
+  reminded = inside
+  if not reminder then
+    if not inside then return end -- made on the first way in, not for who never goes in
+    reminder = CreateFrame("Frame", "TwinmapForeverReminder", UIParent)
+    reminder:SetSize(260, 30)
+    reminder:SetPoint("TOP", Minimap, "BOTTOM", 0, -16) -- clear of the square the app reads, and of a line of coordinates under it
+    reminder:EnableMouse(true)
+    reminder.text = reminder:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    reminder.text:SetPoint("TOP", reminder, "TOP", 0, 0)
+    reminder.text:SetWidth(260)
+    reminder.text:SetTextColor(1, 0.16, 0.12)
+    reminder.text:SetText("Twinmap: keep the minimap clear,\nnot rotated, zoomed all the way out")
+    reminder:SetScript("OnEnter", function(self)
+      if not GameTooltip then return end
+      GameTooltip:SetOwner(self, "ANCHOR_BOTTOMLEFT")
+      GameTooltip:SetText("Twinmap Forever")
+      GameTooltip:AddLine("Inside dungeons the app finds your place from this minimap.", 1, 1, 1, true)
+      GameTooltip:AddLine("Right-click to hide it until the next dungeon.", 0, 1, 0)
+      GameTooltip:Show()
+    end)
+    reminder:SetScript("OnLeave", function() if GameTooltip then GameTooltip:Hide() end end)
+    reminder:SetScript("OnMouseUp", function(self, button)
+      if button ~= "RightButton" then return end
+      self:Hide()
+      if GameTooltip then GameTooltip:Hide() end
+    end)
+  end
+  if inside then reminder:Show() else reminder:Hide() end
+end
+
 -- Whether the mouse is over the minimap: the game then shows the names of the players nearby on it.
 -- Looked at every frame, and said with the position for a few seconds after, so that a moment
 -- between two positions is not missed: the app takes no picture of the minimap for the
@@ -121,6 +157,7 @@ local function BuildPos()
   local name, kind, _, _, _, _, _, id = Try(GetInstanceInfo)
   watching = kind == "party" or kind == "raid"
   Widen(watching)
+  Remind(watching)
   if Str(kind) and kind ~= "none" and Num(id) then
     local inst = { id = id, name = Str(name), kind = kind }
     -- Where in it, if the game tells addons: yards of the world, north then west, to the yard.
