@@ -28,6 +28,8 @@ export interface Settings {
   participate?: boolean
   /** The size of the whole window, one of ZOOMS; missing is 1. */
   zoom?: number
+  /** Hardware acceleration turned off. Read as the app starts: a change counts from the next run. */
+  noGpu?: boolean
 }
 
 /** The settings as they were saved; nothing where the file is missing or is not ours. */
@@ -35,12 +37,13 @@ export function readSettings(file: string): Settings {
   try {
     const read: unknown = JSON.parse(readFileSync(file, 'utf8'))
     if (typeof read !== 'object' || !read) return {}
-    const { gameFolder, setupDone, onTop, lan, lanCode, participate, zoom } = read as Record<string, unknown>
+    const { gameFolder, setupDone, onTop, lan, lanCode, participate, zoom, noGpu } = read as Record<string, unknown>
     return {
       ...(typeof gameFolder === 'string' ? { gameFolder } : {}),
       ...(setupDone === true ? { setupDone } : {}),
       ...(onTop === true ? { onTop } : {}),
       ...(lan === true ? { lan } : {}),
+      ...(noGpu === true ? { noGpu } : {}),
       ...(typeof participate === 'boolean' ? { participate } : {}),
       ...(ZOOMS.some((z) => z === zoom) ? { zoom: zoom as number } : {}),
       ...(typeof lanCode === 'string' && /^[\w-]{8,64}$/.test(lanCode) ? { lanCode } : {}),

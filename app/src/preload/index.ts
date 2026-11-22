@@ -92,6 +92,9 @@ contextBridge.exposeInMainWorld('twinmap', {
   drawn: (): void => ipcRenderer.send('drawn'),
   setOnTop: (on: boolean): Promise<void> => ipcRenderer.invoke('set-on-top', on),
   setZoom: (zoom: number): Promise<void> => ipcRenderer.invoke('set-zoom', zoom),
+  // Hardware acceleration, from the next start; restart starts the app again now.
+  setGpu: (on: boolean): Promise<void> => ipcRenderer.invoke('set-gpu', on),
+  restart: (): Promise<void> => ipcRenderer.invoke('restart'),
   // A step bigger (1) or smaller (-1): Ctrl and the wheel.
   zoomBy: (by: 1 | -1): Promise<void> => ipcRenderer.invoke('zoom-by', by),
   // Shows the map to the other devices of the home network, or stops showing it.

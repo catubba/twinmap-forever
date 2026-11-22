@@ -49,6 +49,11 @@ const SHOW_AFTER = 3000 // ms after which the window shows itself even if its pa
 
 const BLANK = Buffer.from('R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==', 'base64') // a see-through picture of one pixel
 
+// Hardware acceleration, as the settings had it when the app started: Electron takes it only before it is ready.
+// Without it Chromium draws WebGL on the processor (WARP), so the compass and the 3D view still work, slower.
+const GPU = readSettings(join(app.getPath('userData'), 'settings.json')).noGpu !== true
+if (!GPU) app.disableHardwareAcceleration()
+
 // The window gets the map's files through an address of its own, twinmap://tiles/..., and only those.
 protocol.registerSchemesAsPrivileged([{ scheme: 'twinmap', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }])
 
@@ -506,7 +511,7 @@ function createWindow(): void {
   // turns it on in the settings. The same page, the same map files, and what a page may ask for above.
   let lan: Lan | null = null
   let lanWord: SetupStatus['lan'] = null
-  const lookSetup = (): SetupStatus => ({ ...setupStatus(gameFolder, settings, app.getVersion()), lan: lanWord, zoom: settings.zoom ?? 1 })
+  const lookSetup = (): SetupStatus => ({ ...setupStatus(gameFolder, settings, app.getVersion()), lan: lanWord, zoom: settings.zoom ?? 1, gpu: { chosen: settings.noGpu !== true, running: GPU } })
   const lanUrl = async (): Promise<void> => {
     const address = await homeAddress()
     if (lan) lanWord = address ? { url: `http://${address}:${LAN_PORT}/?k=${settings.lanCode}` } : { error: 'This computer is on no home network.' }
@@ -807,6 +812,17 @@ function createWindow(): void {
     win.setAlwaysOnTop(settings.onTop)
     setup = lookSetup()
   })
+  // Hardware acceleration on or off: kept, and taken at the next start. Restart starts the app again at once.
+  ipcMain.handle('set-gpu', (_event, on: unknown) => {
+    settings.noGpu = on !== true
+    writeSettings(settingsFile, settings)
+    setup = lookSetup()
+  })
+  ipcMain.handle('restart', () => {
+    record.say('restart: asked from the settings')
+    app.relaunch()
+    app.quit()
+  })
   // The size of the whole window: from the settings, Ctrl with + - 0, Ctrl with the wheel. The choice is kept.
   // Windows' three buttons grow with the top row they sit in. The page loaded again keeps the size too.
   const showZoom = (): void => {
@@ -974,6 +990,8 @@ function createWindow(): void {
     ipcMain.removeHandler('open-feedback')
     ipcMain.removeHandler('set-on-top')
     ipcMain.removeHandler('set-zoom')
+    ipcMain.removeHandler('set-gpu')
+    ipcMain.removeHandler('restart')
     ipcMain.removeHandler('zoom-by')
     ipcMain.removeHandler('set-lan')
     ipcMain.removeHandler('set-participate')
@@ -997,7 +1015,7 @@ if (app.isPackaged) Menu.setApplicationMenu(null)
 
 // A newer version of the app, if there is one, comes first: see update.ts.
 void app.whenReady().then(() => {
-  record.say(`started: Twinmap ${app.getVersion()}`)
+  record.say(`started: Twinmap ${app.getVersion()}${GPU ? '' : ', hardware acceleration off'}`)
   updateFirst(createWindow, (line) => record.say(`update: ${line}`))
 })
 

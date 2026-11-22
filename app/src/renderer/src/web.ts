@@ -76,6 +76,8 @@ if (!inApp) {
     },
     setOnTop: () => Promise.resolve(),
     setZoom: () => Promise.resolve(),
+    setGpu: () => Promise.resolve(),
+    restart: () => Promise.resolve(),
     zoomBy: () => Promise.resolve(),
     setLan: () => Promise.resolve(),
     setParticipate: () => Promise.resolve(),

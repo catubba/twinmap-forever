@@ -22,6 +22,8 @@ export interface SetupStatus {
   participate: boolean | null
   /** The size of the whole app window the player picked, 1 being as made. A phone's browser has its own. */
   zoom?: number
+  /** Hardware acceleration: as the player chose it, and as this run of the app has it (the choice counts from the next start). */
+  gpu?: { chosen: boolean; running: boolean }
   /** The map on the home network: the address a phone opens, or why it cannot be had. Absent or null while it is off. */
   lan?: { url: string } | { error: string } | null
 }

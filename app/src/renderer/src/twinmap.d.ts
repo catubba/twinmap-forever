@@ -40,6 +40,8 @@ declare global {
       drawn: () => void
       setOnTop: (on: boolean) => Promise<void>
       setZoom: (zoom: number) => Promise<void>
+      setGpu: (on: boolean) => Promise<void>
+      restart: () => Promise<void>
       zoomBy: (by: 1 | -1) => Promise<void>
       setLan: (on: boolean) => Promise<void>
       setParticipate: (on: boolean) => Promise<void>

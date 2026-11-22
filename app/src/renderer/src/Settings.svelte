@@ -73,6 +73,11 @@
             <div class="in">
               <label class="choice"><input type="checkbox" class="check" checked={setup.onTop} onchange={(e) => window.twinmap.setOnTop(e.currentTarget.checked)} />Keep Twinmap on top of other windows</label>
               <label class="choice">Text size <select class="field size" value={setup.zoom ?? 1} onchange={(e) => window.twinmap.setZoom(Number(e.currentTarget.value))}>{#each ZOOMS as z (z)}<option value={z}>{Math.round(z * 100)}%</option>{/each}</select></label>
+              <label class="choice"><input type="checkbox" class="check" checked={setup.gpu?.chosen ?? true} onchange={(e) => window.twinmap.setGpu(e.currentTarget.checked)} />Use hardware acceleration</label>
+              <p class="hint">Turn it off if the map flickers or stays black. Without it the 3D view is slower.</p>
+              {#if setup.gpu && setup.gpu.chosen !== setup.gpu.running}
+                <div class="line"><span class="hint">Takes effect when Twinmap restarts.</span><button class="btn" onclick={() => window.twinmap.restart()}>Restart now</button></div>
+              {/if}
             </div>
           </section>
           <section class="group">
