@@ -31,26 +31,31 @@ function codeIn(dir, files = [], bundles = []) {
 }
 
 if (process.argv[2] === 'sign') {
-  // TWINMAP_MAC_IDENTITY: a Developer ID ("Developer ID Application: …") keeps macOS permissions such as
-  // Screen Recording across rebuilds; without it the build is signed ad hoc, which this Mac alone accepts
-  // and which loses those permissions with every rebuild.
+  // TWINMAP_MAC_IDENTITY: absent means ad hoc, which loses Screen Recording permission on rebuilds.
+  // A self-signed certificate keeps permission across updates signed with the same certificate.
+  // "Developer ID Application: …" also enables hardened runtime, timestamps and optional notarization.
   const identity = process.env.TWINMAP_MAC_IDENTITY || '-'
+  // A SHA-1 identity has no certificate name to check, so it is treated as non-Developer ID.
+  const developerId = identity.startsWith('Developer ID Application: ')
+  const profile = process.env.TWINMAP_MAC_NOTARY_PROFILE
+  if (profile && !developerId) throw new Error('TWINMAP_MAC_NOTARY_PROFILE requires a Developer ID Application: … identity; ad hoc and self-signed certificates cannot be notarized.')
   if (identity === '-') {
     run('codesign', ['--force', '--deep', '--sign', '-', bundle])
   } else {
-    // Notarization needs the hardened runtime and a secure timestamp on every binary, inside out.
-    const flags = ['--force', '--options', 'runtime', '--timestamp', '--sign', identity]
+    // Notarization needs the hardened runtime and a secure timestamp on every binary, inside out. A self-signed
+    // certificate gets neither: Apple's timestamp server serves only its own certificates, and the hardened
+    // runtime's library validation refuses code without a Team ID, Electron's own frameworks included.
+    const flags = ['--force', ...(developerId ? ['--options', 'runtime', '--timestamp'] : []), '--sign', identity]
     const jit = ['--entitlements', join(app, 'build', 'entitlements.mac.plist')] // apps only: Electron's V8
     const { files, bundles } = codeIn(join(bundle, 'Contents'))
     for (const path of [...files.sort((a, b) => depth(b) - depth(a)), ...bundles.sort((a, b) => depth(b) - depth(a)), bundle]) {
-      run('codesign', [...flags, ...(path.endsWith('.app') ? jit : []), path])
+      run('codesign', [...flags, ...(developerId && path.endsWith('.app') ? jit : []), path])
     }
   }
   run('codesign', ['--verify', '--deep', '--strict', bundle])
   // TWINMAP_MAC_NOTARY_PROFILE: a notarytool keychain profile (xcrun notarytool store-credentials). The secret
   // stays in the keychain; this only names it. Notarized and stapled, the app opens on any Mac without a warning.
-  const profile = process.env.TWINMAP_MAC_NOTARY_PROFILE
-  if (profile && identity !== '-') {
+  if (profile && developerId) {
     const zip = join(app, 'dist', 'Twinmap-notarize.zip')
     rmSync(zip, { force: true })
     run('ditto', ['-c', '-k', '--keepParent', bundle, zip])
