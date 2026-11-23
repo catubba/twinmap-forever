@@ -12,6 +12,39 @@
   src: url('./fonts/Marcellus-Regular.ttf') format('truetype');
 }
 
+/* Cyrillic, which Barlow and Marcellus have not got: two fonts made for it and close to them, for its letters alone, so a
+   Russian text or a Russian name of the game reads in the same hand. Forum is drawn smaller than Marcellus: brought up to it.
+   Korean and Chinese take the fonts of the system, named for each language below (Windows has them, and so has a phone). */
+@font-face {
+  font-family: 'Sofia Sans Semi Condensed';
+  font-weight: 400;
+  font-display: swap;
+  src: url('../../../node_modules/@fontsource/sofia-sans-semi-condensed/files/sofia-sans-semi-condensed-cyrillic-400-normal.woff2') format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+@font-face {
+  font-family: 'Sofia Sans Semi Condensed';
+  font-weight: 500;
+  font-display: swap;
+  src: url('../../../node_modules/@fontsource/sofia-sans-semi-condensed/files/sofia-sans-semi-condensed-cyrillic-500-normal.woff2') format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+@font-face {
+  font-family: 'Sofia Sans Semi Condensed';
+  font-weight: 600;
+  font-display: swap;
+  src: url('../../../node_modules/@fontsource/sofia-sans-semi-condensed/files/sofia-sans-semi-condensed-cyrillic-600-normal.woff2') format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+@font-face {
+  font-family: Forum;
+  font-weight: 400;
+  font-display: block;
+  size-adjust: 110%;
+  src: url('../../../node_modules/@fontsource/forum/files/forum-cyrillic-400-normal.woff2') format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+
 :root {
   /* Ground */
   --stone-950: #0c0a08;
@@ -78,8 +111,8 @@
   --float-edge: #cfb08a;
 
   /* Type */
-  --font: 'Barlow Semi Condensed', 'Segoe UI', sans-serif;
-  --display: Marcellus, Georgia, serif;
+  --font: 'Barlow Semi Condensed', 'Sofia Sans Semi Condensed', 'Segoe UI', sans-serif;
+  --display: Marcellus, Forum, Georgia, serif;
   --t-small: 400 13px/17px var(--font);
   --t-body: 400 15.5px/21px var(--font);
   --t-label: 400 14px/18px var(--display);
@@ -95,6 +128,21 @@
   --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='.9' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 .85 0 0 0 0 .6 0 0 0 .24 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
 
   caret-color: var(--gold);
+}
+
+/* The page says its language (main.ts): Korean and Chinese get their fonts, the Latin letters and the numbers staying in
+   Barlow and Marcellus. Korean breaks a line between words, as it is written; Chinese anywhere but before a stop or a comma,
+   and in the forms of mainland China, not those of Japan or Taiwan that the system might pick by itself. */
+:root:lang(ko) {
+  --font: 'Barlow Semi Condensed', 'Malgun Gothic', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Noto Sans CJK KR', sans-serif;
+  --display: Marcellus, 'Malgun Gothic', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Noto Sans CJK KR', sans-serif;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+:root:lang(zh) {
+  --font: 'Barlow Semi Condensed', 'Microsoft YaHei', 'PingFang SC', 'Noto Sans SC', 'Noto Sans CJK SC', sans-serif;
+  --display: Marcellus, 'Microsoft YaHei', 'PingFang SC', 'Noto Sans SC', 'Noto Sans CJK SC', sans-serif;
+  line-break: strict;
 }
 
 *,

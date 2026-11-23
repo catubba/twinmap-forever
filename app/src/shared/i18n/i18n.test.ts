@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, expect, test } from 'vitest'
 import en from './en'
-import { around, clock, day, langFor, LANGS, num, offerAll, offered, planned, pseudo, PSEUDO, setLang, t, type Key, type Table } from '.'
+import { around, clock, day, langFor, LANGS, langTag, num, offerAll, offered, planned, pseudo, PSEUDO, setLang, t, type Key, type Table } from '.'
 
 afterEach(() => setLang('enUS'))
 
@@ -60,6 +60,23 @@ test('the pseudo-language marks every text, keeps its names, and is 40% longer',
   expect(pseudo('Go to {zone}')).toBe('[Ĝö ţö {zone}·····]')
   setLang(PSEUDO)
   expect(t('participate.title')).toMatch(/^\[Ĥéĺþ .*·+\]$/)
+})
+
+test('the pseudo-languages of the other scripts: no Latin letter left, names kept, the page told its language', () => {
+  expect(pseudo('Go to {zone}', 'pseudo-ru')).toBe('[Го то {zone}·····]')
+  // Two letters a sign: G+o, t+o, and a letter alone gets its own.
+  const sign = (from: number, a: string, b?: string): string => {
+    const at = (c: string): number => 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'.indexOf(c)
+    return String.fromCodePoint(from + at(a) * 53 + (b ? at(b) : 52))
+  }
+  expect(pseudo('Go to {zone} a', 'pseudo-ko')).toBe(`[${sign(0xac00, 'G', 'o')} ${sign(0xac00, 't', 'o')} {zone} ${sign(0xac00, 'a')}]`)
+  expect(pseudo('Go to {zone}', 'pseudo-zh')).toBe(`[${sign(0x4e00, 'G', 'o')}的${sign(0x4e00, 't', 'o')}的{zone}]`)
+  for (const [code, tag] of [['pseudo-ru', 'ru-RU'], ['pseudo-ko', 'ko-KR'], ['pseudo-zh', 'zh-CN']] as const) {
+    expect(setLang(code)).toBe(code)
+    expect(langTag()).toBe(tag)
+    expect(t('participate.title').replace(/\{\w+\}/g, '')).not.toMatch(/[a-zA-Z]/)
+  }
+  expect(langFor(undefined, 'pseudo-ru')).toBe('enUS')
 })
 
 // The texts of a table by key, plurals as one entry per form.
