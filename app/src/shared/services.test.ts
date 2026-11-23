@@ -39,7 +39,8 @@ test('ore and herbs are told by their English names, with their kind and the ski
 })
 
 test('a node is red under the skill it asks, then orange, yellow, green, and grey a hundred points over it', () => {
-  expect([0, 1, 26, 51, 101].map((skill) => gatherColour(1, skill))).toEqual(['red', 'orange', 'yellow', 'green', 'grey'])
+  // One that asks 1 is counted as 5, as the server does: grey at 105, not 101.
+  expect([0, 1, 29, 30, 55, 104, 105].map((skill) => gatherColour(1, skill))).toEqual(['red', 'orange', 'orange', 'yellow', 'green', 'green', 'grey'])
   expect([124, 149, 174, 224, 225].map((skill) => gatherColour(125, skill))).toEqual(['red', 'orange', 'yellow', 'green', 'grey'])
 })
 

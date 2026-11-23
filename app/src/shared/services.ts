@@ -43,10 +43,13 @@ export function resourceOf(name: string): { layer: 'ore' | 'herbs'; kind?: strin
   return kind ? { layer: 'ore', kind, need: ORES[kind][0] } : { layer: 'ore' }
 }
 
-// ponytail: the steps of classic (25, 50, 100 over the skill asked), not read from Forever.
-/** The colour the game gives a node for a skill: red not yet, then orange, yellow, green, and grey when it gives no more points. */
-export const gatherColour = (need: number, skill: number): 'red' | 'orange' | 'yellow' | 'green' | 'grey' =>
-  skill < need ? 'red' : skill < need + 25 ? 'orange' : skill < need + 50 ? 'yellow' : skill < need + 100 ? 'green' : 'grey'
+// ponytail: the steps of CMaNGOS classic (Player::UpdateGatherSkill: 25, 50 and 100 over the skill asked, a node of 1 counted
+// as 5), the server One for All takes its trainers from; Forever's own server may differ, and nothing of it says so.
+/** The colour of a node for a skill, by the chance of a point: red not yet, then orange, yellow, green, and grey for none. */
+export function gatherColour(need: number, skill: number): 'red' | 'orange' | 'yellow' | 'green' | 'grey' {
+  const from = need === 1 ? 5 : need // "stuff that starts at 1 should stop at 105 not 101"
+  return skill < need ? 'red' : skill < from + 25 ? 'orange' : skill < from + 50 ? 'yellow' : skill < from + 100 ? 'green' : 'grey'
+}
 
 /** One pin: a place in percent of the map of a zone, the zone by the game's area number. */
 export interface FixedPin {
