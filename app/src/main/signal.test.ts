@@ -124,7 +124,7 @@ test('the number in the letter A is new at every write, goes round after 60 and 
   expect(new Set(numbers).size).toBe(60)
   expect(Math.min(...numbers)).toBe(1)
   expect(numbers[59]).toBe(first)
-})
+}, 15_000) // 60 writes can take more than 5 seconds in the macOS sandbox
 
 test('an addon from before is told the old way: the change alone in the font, everything in the slots, which are made for it', async () => {
   expect(await installChannel(addons, true), 'the slots were made').toBe(true)

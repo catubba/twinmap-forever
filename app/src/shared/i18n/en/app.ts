@@ -35,6 +35,7 @@ export default {
     // The line under "Update the app" or "Update the addon" (shared/game.ts): {addon} and {app} are the numbers of the
     // protocol the addon and the app speak.
     newerAddon: 'The Twinmap Forever addon is newer than this app (protocol {addon}, this app speaks {app}). Close Twinmap and open it again: it updates itself when it starts.',
+    newerAddonMac: 'The Twinmap Forever addon is newer than this app (protocol {addon}, this app speaks {app}). Download the newest Twinmap for macOS.',
     olderAddon: 'The Twinmap Forever addon is older than this app (protocol {addon}, this app speaks {app}). Update the addon from CurseForge, then restart the game.',
     connecting: 'Connecting',
     lost: 'Link lost',
@@ -229,6 +230,7 @@ export default {
       notYet: 'Not installed yet.',
       // _forever_\Interface\AddOns is a folder of the game: as it is.
       howTo: 'Install it with the CurseForge app. Without that app, download the file from the same page and unpack it into _forever_\\Interface\\AddOns.',
+      howToMac: 'Install it with the CurseForge app. Without that app, download the file from the same page and unpack it into _forever_/Interface/AddOns.',
       notices: 'This page notices by itself when the addon is there.',
     },
     extras: {
@@ -283,6 +285,7 @@ export default {
     scanAgain: "Open Twinmap's settings on the computer and scan the code again.",
     // When something sent to the game cannot go.
     nothingToSend: 'There is nothing to send.',
+    screenRecording: 'Allow Twinmap under System Settings > Privacy & Security > Screen Recording',
     cannotWrite: 'Twinmap could not write next to the addon in the game folder.',
   },
 

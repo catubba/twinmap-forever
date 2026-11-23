@@ -14,6 +14,7 @@
 //   root                   file number -> content key
 import { execFileSync } from 'node:child_process'
 import { closeSync, existsSync, openSync, readdirSync, readFileSync, readSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { inflateSync } from 'node:zlib'
 import { salsa20 } from '../shared/salsa20'
@@ -84,6 +85,7 @@ export function gameFolderFrom(paths: (string | null)[]): string | null {
 
 /** Where the game's installer said it put the game, or null. */
 export function registryInstallPath(): string | null {
+  if (process.platform !== 'win32') return null
   try {
     const out = execFileSync('reg', ['query', 'HKLM\\SOFTWARE\\WOW6432Node\\Blizzard Entertainment\\World of Warcraft', '/v', 'InstallPath'], {
       encoding: 'utf8',
@@ -93,6 +95,12 @@ export function registryInstallPath(): string | null {
   } catch {
     return null
   }
+}
+
+/** Common install locations, in the order they are checked for the Forever build. */
+export function gameInstallPaths(): (string | null)[] {
+  if (process.platform !== 'darwin') return [registryInstallPath()]
+  return ['/Applications/World of Warcraft', join(homedir(), 'Applications', 'World of Warcraft')].filter((folder) => existsSync(folder))
 }
 
 /**

@@ -24,7 +24,7 @@ export type Updating = { version: string; percent: number; installing?: boolean 
  */
 export function updateFirst(open: () => void, say: (line: string) => void): void {
   // Started by the installer after an update: it says so, and there is nothing newer to look for.
-  if (!app.isPackaged || process.argv.includes('--updated')) return open()
+  if (process.platform !== 'win32' || !app.isPackaged || process.argv.includes('--updated')) return open()
   let opened = false
   let win: BrowserWindow | null = null
   // Whatever goes wrong, at any point, the app opens as it is: an update is never a reason not to start.

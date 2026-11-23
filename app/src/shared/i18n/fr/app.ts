@@ -25,6 +25,7 @@ export default {
     updateApp: 'Mettre à jour l’app',
     updateAddon: 'Mettre à jour l’addon',
     newerAddon: 'L’addon Twinmap Forever est plus récent que cette application (protocole {addon}, cette application utilise le {app}). Fermez Twinmap et rouvrez-le : il se met à jour au démarrage.',
+    newerAddonMac: 'L’addon Twinmap Forever est plus récent que cette application (protocole {addon}, cette application utilise le {app}). Téléchargez le Twinmap le plus récent pour macOS.',
     olderAddon: 'L’addon Twinmap Forever est plus ancien que cette application (protocole {addon}, cette application utilise le {app}). Mettez l’addon à jour depuis CurseForge, puis relancez le jeu.',
     connecting: 'Connexion',
     lost: 'Connexion perdue',
@@ -174,6 +175,7 @@ export default {
       inFolder: 'Twinmap Forever {version} est dans le dossier AddOns du jeu.',
       notYet: 'Pas encore installé.',
       howTo: 'Installez-le avec l’application CurseForge. Sans elle, téléchargez le fichier sur la même page et décompressez-le dans _forever_\\Interface\\AddOns.',
+      howToMac: 'Installez-le avec l’application CurseForge. Sans elle, téléchargez le fichier sur la même page et décompressez-le dans _forever_/Interface/AddOns.',
       notices: 'Cette page détecte d’elle-même la présence de l’addon.',
     },
     extras: {
@@ -218,6 +220,7 @@ export default {
     portTaken: 'Le port {port} est utilisé par un autre programme.',
     scanAgain: 'Ouvrez les options de Twinmap sur l’ordinateur et scannez à nouveau le code.',
     nothingToSend: 'Il n’y a rien à envoyer.',
+    screenRecording: 'Autorisez Twinmap dans Réglages Système > Confidentialité et sécurité > Enregistrement de l’écran',
     cannotWrite: 'Twinmap n’a pas pu écrire à côté de l’addon dans le dossier du jeu.',
   },
 

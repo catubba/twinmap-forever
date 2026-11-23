@@ -58,7 +58,7 @@ export function startLink(
   // Paused, a strip was seen on the game's window: the addon draws again (a /reload, a login) and is to be asked once more.
   drawnWhilePaused: () => void = () => {},
 ): { snapshot: () => LinkSnapshot; inside: () => ReturnType<ReturnType<typeof startInside>['report']>; cut: (x: number, y: number, width: number, height: number) => ReturnType<typeof readRect>; pause: (on: boolean) => void; stop: () => void } {
-  const game = createGame()
+  const game = createGame(process.platform === 'win32')
   // Inside a dungeon the game tells addons no place: there, and only there, it is found from the minimap on the screen.
   const inside = startInside(tilesFolder)
   let found: (Inside & { at: number }) | null = null

@@ -82,13 +82,14 @@ export interface GameState {
 // covered by anything we can check. Believe it when it comes this many times in a row.
 const MISMATCH_AFTER = 3
 
-export function protocolMismatch(addon: number): ProtocolMismatch {
+export function protocolMismatch(addon: number, automaticUpdates = true): ProtocolMismatch {
   const update = addon > PROTOCOL ? 'app' : 'addon'
-  const message = t(update === 'app' ? 'app.link.newerAddon' : 'app.link.olderAddon', { addon, app: PROTOCOL })
+  const newer = automaticUpdates ? 'app.link.newerAddon' : 'app.link.newerAddonMac'
+  const message = t(update === 'app' ? newer : 'app.link.olderAddon', { addon, app: PROTOCOL })
   return { addon, app: PROTOCOL, update, message }
 }
 
-export function createGame(): { state: GameState; feed: (reading: Reading, now?: number) => void } {
+export function createGame(automaticUpdates = true): { state: GameState; feed: (reading: Reading, now?: number) => void } {
   const state: GameState = { sections: {}, updatedAt: {}, protocol: null, blocks: 0, lost: 0, corrupt: 0 }
   const pending = new Map<string, { version: number; parts: Map<number, string> }>()
   let lastId: number | null = null
@@ -103,7 +104,7 @@ export function createGame(): { state: GameState; feed: (reading: Reading, now?:
     }
     if (reading.kind === 'protocol') {
       foreign = { protocol: reading.protocol, times: foreign.protocol === reading.protocol ? foreign.times + 1 : 1 }
-      if (foreign.times >= MISMATCH_AFTER) state.protocol = protocolMismatch(reading.protocol)
+      if (foreign.times >= MISMATCH_AFTER) state.protocol = protocolMismatch(reading.protocol, automaticUpdates)
       return
     }
     foreign = { protocol: -1, times: 0 }

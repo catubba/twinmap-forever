@@ -5,6 +5,8 @@ import { num, t } from './i18n'
 
 /** What the main process tells the window about the game folder and the addons in it. */
 export interface SetupStatus {
+  /** The desktop app is on macOS. */
+  mac?: true
   /** The folder of World of Warcraft: Forever, or null while none is found. */
   gameFolder: string | null
   /** The version of the Twinmap Forever addon found in it, or null. */
@@ -106,7 +108,7 @@ export function setupPages(setup: SetupStatus, tiles: TilesStatus | null, link: 
       ? { state: 'done', lines: [t('app.firstRun.addon.installed'), t('app.firstRun.addon.inFolder', { version: setup.addon })] }
       : {
           state: 'todo',
-          lines: [t('app.firstRun.addon.notYet'), t('app.firstRun.addon.howTo'), t('app.firstRun.addon.notices')],
+          lines: [t('app.firstRun.addon.notYet'), t(setup.mac ? 'app.firstRun.addon.howToMac' : 'app.firstRun.addon.howTo'), t('app.firstRun.addon.notices')],
           action: 'curseforge',
         }),
   }

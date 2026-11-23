@@ -56,6 +56,12 @@ The addon is also attached to every release on GitHub, for addon managers that i
 Every version of the app, with its notes, is on the [releases page](https://github.com/catubba/twinmap-forever/releases).
 </details>
 
+## macOS
+
+On an Apple Silicon Mac with Node.js 24 and Xcode, run `cd app && npm ci && npm run dist:mac`. Open the ad-hoc signed `app/dist/mac-arm64/Twinmap.app`. Allow Twinmap under **System Settings > Privacy & Security > Screen Recording**, then reopen Twinmap.
+
+Twinmap checks `/Applications/World of Warcraft` and `~/Applications/World of Warcraft` for Forever. It reads the game and addon files. Pins and routes stay in Twinmap on macOS. To verify capture with a synthetic window, run `npm run probe:mac` from `app/` with Screen Recording access for the Electron app used by the probe.
+
 ## What it does
 
 ### 2D or 3D, one switch

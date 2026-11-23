@@ -8,11 +8,16 @@
   "homepage": "https://twinmap.app",
   "main": "out/main/index.js",
   "scripts": {
+    "predev": "node scripts/mac-build.cjs",
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "test": "vitest run",
-    "dist": "electron-vite build && electron-builder --win nsis --publish never"
+    "dist": "electron-vite build && electron-builder --win nsis --publish never",
+    "predist:mac": "node scripts/mac-build.cjs",
+    "dist:mac": "electron-vite build && electron-builder --mac dir --arm64 --publish never",
+    "postdist:mac": "node scripts/mac-build.cjs sign",
+    "probe:mac": "node scripts/mac-build.cjs && electron scripts/capture-mac.cjs"
   },
   "build": {
     "appId": "app.twinmap",
@@ -32,6 +37,21 @@
     ],
     "win": {
       "target": "nsis"
+    },
+    "mac": {
+      "category": "public.app-category.games",
+      "minimumSystemVersion": "14.0",
+      "extendInfo": {
+        "NSScreenCaptureUsageDescription": "Twinmap reads the addon's pixel strip from the World of Warcraft window."
+      },
+      "identity": null,
+      "notarize": false,
+      "extraFiles": [
+        {
+          "from": "dist-native/twinmap-capture",
+          "to": "Helpers/twinmap-capture"
+        }
+      ]
     },
     "nsis": {
       "artifactName": "Twinmap-Setup-${version}.${ext}"

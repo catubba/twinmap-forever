@@ -18,9 +18,9 @@ import { feedbackLink, sendFeedback } from '../shared/feedback'
 import { pageOf, setupComplete, setupPages, type SetupStatus } from '../shared/setup'
 import { tilesLine, type TilesStatus } from '../shared/tiles-status'
 import { placeWindow, WINDOW, ZOOMS, zoomStep } from '../shared/window'
-import { findGameWindow, programOf } from './capture'
+import { captureAllowed, findGameWindow, loadCapture, programOf, stopCapture } from './capture'
 import { readHdr } from './hdr'
-import { gameFolderFrom, installedBuild, registryInstallPath } from './client-files'
+import { gameFolderFrom, gameInstallPaths, installedBuild } from './client-files'
 import { homeAddress, LAN_PORT, startLan, type Lan, type Served } from './lan'
 import { startLink } from './link'
 import { startBosses } from './bosses'
@@ -44,6 +44,8 @@ import { startPrices } from './prices'
 import { startAlerts } from './alerts'
 import type { Listing } from '../shared/ah'
 
+const captureReady = loadCapture().catch((error) => `capture: ${describe(error)}`)
+
 const SHOW_EVERY = 50 // ms between updates of the window: a position must be there well before the arrow needs it (BEHIND in glide.ts)
 const LOG_EVERY = 5000 // ms between writes of the measures
 const SHOW_AFTER = 3000 // ms after which the window shows itself even if its page has not said it is drawn
@@ -63,7 +65,7 @@ protocol.registerSchemesAsPrivileged([{ scheme: 'twinmap', privileges: { standar
 function findGameFolder(picked: string | undefined): string | null {
   if (process.env.TWINMAP_GAME !== undefined) return gameFolderFrom([process.env.TWINMAP_GAME])
   const running = findGameWindow()
-  return gameFolderFrom([picked ?? null, running === null ? null : programOf(running), registryInstallPath()])
+  return gameFolderFrom([picked ?? null, running === null ? null : programOf(running), ...gameInstallPaths()])
 }
 
 // Makes the map tiles from the game's files, once per build of the game, and keeps the latest word on it.
@@ -215,6 +217,35 @@ const send = (addons: string, changed: Record<string, unknown>, fonts: boolean):
 // The addon reads news every 5 s: a pause asked again sooner would only ask the same twice.
 const PAUSE_AGAIN = 10_000
 
+// macOS window buttons: they would cover the character name in our top row,
+// so they stay hidden and fade in only while the pointer is near the top-left corner of that row,
+// centred in it. Polled in the main process: no page or preload change, and nothing on Windows.
+const MAC_BUTTON_HEIGHT = 16, MAC_CORNER_WIDTH = 96, MAC_HIDE_AFTER = 600 // px, px, ms
+const macButtonsAt = (zoom: number): { x: number; y: number } =>
+  ({ x: 14, y: Math.max(0, Math.round((WINDOW.top * zoom - MAC_BUTTON_HEIGHT) / 2)) })
+function macButtons(win: BrowserWindow): void {
+  let shown = true, hideAt = 0
+  const check = (): void => {
+    if (win.isDestroyed()) return
+    const zoom = win.webContents.getZoomFactor(), point = screen.getCursorScreenPoint(), bounds = win.getBounds()
+    // Fullscreen: macOS shows the buttons with the menu bar; hiding them there would also hide the
+    // green exit button, so they stay visible until fullscreen ends and corner hiding resumes.
+    const full = win.isFullScreen()
+    const near = win.isVisible() && !full
+      && point.x >= bounds.x && point.x < bounds.x + MAC_CORNER_WIDTH * zoom
+      && point.y >= bounds.y && point.y < bounds.y + WINDOW.top * zoom
+    if (near) hideAt = Date.now() + MAC_HIDE_AFTER
+    const want = full || near || Date.now() < hideAt
+    if (want !== shown) {
+      win.setWindowButtonVisibility(want)
+      shown = want
+    }
+  }
+  const timer = setInterval(check, 100)
+  win.on('closed', () => clearInterval(timer))
+  check()
+}
+
 function createWindow(): void {
   // The window opens where it was closed: monitor, place, size, and maximized if it was.
   const placeFile = join(app.getPath('userData'), 'window.json')
@@ -236,8 +267,11 @@ function createWindow(): void {
     opacity: 0, // see-through until the opening screen is drawn on it: never an empty window
     titleBarStyle: 'hidden',
     titleBarOverlay: { color: '#00000000', symbolColor: WINDOW.symbols, height: WINDOW.top },
+    // macOS: the three buttons sit centred in our top row (see macButtons below).
+    ...(process.platform === 'darwin' ? { trafficLightPosition: macButtonsAt(1) } : {}),
     webPreferences: { preload: join(__dirname, '../preload/index.js') },
   })
+  if (process.platform === 'darwin') macButtons(win)
   if ((saved as { maximized?: unknown } | null)?.maximized === true) win.maximize()
   // The page says when its opening screen is drawn; a page that never says so is shown all the same.
   // (A window kept hidden instead draws nothing new until it is shown, and is seen empty for a moment.)
@@ -520,7 +554,7 @@ function createWindow(): void {
   // turns it on in the settings. The same page, the same map files, and what a page may ask for above.
   let lan: Lan | null = null
   let lanWord: SetupStatus['lan'] = null
-  const lookSetup = (): SetupStatus => ({ ...setupStatus(gameFolder, settings, app.getVersion()), lan: lanWord, zoom: settings.zoom ?? 1, gpu: { chosen: settings.noGpu !== true, running: GPU }, lang: langNow(), langs: planned(), gameLang: gameLang(), askLang })
+  const lookSetup = (): SetupStatus => ({ ...setupStatus(gameFolder, settings, app.getVersion()), ...(process.platform === 'darwin' ? { mac: true } : {}), lan: lanWord, zoom: settings.zoom ?? 1, gpu: { chosen: settings.noGpu !== true, running: GPU }, lang: langNow(), langs: planned(), gameLang: gameLang(), askLang })
   const lanUrl = async (): Promise<void> => {
     const address = await homeAddress()
     if (lan) lanWord = address ? { url: `http://${address}:${LAN_PORT}/?k=${settings.lanCode}` } : { error: t('app.main.noNetwork') }
@@ -853,7 +887,9 @@ function createWindow(): void {
   const showZoom = (): void => {
     const zoom = settings.zoom ?? 1
     win.webContents.setZoomFactor(zoom)
-    win.setTitleBarOverlay({ height: Math.round(WINDOW.top * zoom) })
+    // The title bar overlay exists only on Windows; on macOS the call throws and stopped the zoom.
+    if (process.platform === 'win32') win.setTitleBarOverlay({ height: Math.round(WINDOW.top * zoom) })
+    if (process.platform === 'darwin') win.setWindowButtonPosition(macButtonsAt(zoom))
   }
   const zoomTo = (zoom: unknown): void => {
     if (!ZOOMS.some((z) => z === zoom)) return
@@ -1028,6 +1064,7 @@ function createWindow(): void {
     lan?.stop()
     if (marksTimer) clearTimeout(marksTimer)
     link.stop()
+    stopCapture()
     gameLog.stop()
     health.stop()
     tiles.stop()
@@ -1038,14 +1075,25 @@ function createWindow(): void {
   })
 }
 
-// The shipped app has no menu: with no title bar there is no place for one, and Alt must not bring one up.
-if (app.isPackaged) Menu.setApplicationMenu(null)
+// The shipped Windows app has no menu, and Alt must not bring one up.
+if (process.platform !== 'darwin' && app.isPackaged) Menu.setApplicationMenu(null)
 
 // A newer version of the app, if there is one, comes first: see update.ts.
-void app.whenReady().then(() => {
+void Promise.all([captureReady, app.whenReady()]).then(([captureError]) => {
+  if (process.platform === 'darwin') {
+    Menu.setApplicationMenu(Menu.buildFromTemplate([
+      { label: app.name, submenu: [{ role: 'about' }, { role: 'hide' }, { role: 'quit' }] },
+      { label: 'Edit', submenu: [
+        { role: 'undo' }, { role: 'redo' }, { type: 'separator' },
+        { role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { role: 'selectAll' },
+      ] },
+    ]))
+  }
   record.say(`started: Twinmap ${app.getVersion()}${GPU ? '' : ', hardware acceleration off'}`)
+  if (captureError) record.say(captureError)
+  if (!captureAllowed()) record.say(t('app.main.screenRecording'))
   updateFirst(createWindow, (line) => record.say(`update: ${line}`))
 })
 
-// Windows only: closing the last window closes the app.
+// Closing the last window closes Twinmap.
 app.on('window-all-closed', () => app.quit())

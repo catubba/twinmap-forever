@@ -26,6 +26,7 @@ export default {
     updateApp: 'App aktualisieren',
     updateAddon: 'Addon aktualisieren',
     newerAddon: 'Das Twinmap-Forever-Addon ist neuer als diese App (Protokoll {addon}, diese App nutzt {app}). Schließt Twinmap und öffnet es erneut: Beim Start aktualisiert es sich selbst.',
+    newerAddonMac: 'Das Twinmap-Forever-Addon ist neuer als diese App (Protokoll {addon}, diese App nutzt {app}). Ladet das neueste Twinmap für macOS herunter.',
     olderAddon: 'Das Twinmap-Forever-Addon ist älter als diese App (Protokoll {addon}, diese App nutzt {app}). Aktualisiert das Addon über CurseForge und startet dann das Spiel neu.',
     connecting: 'Verbinde',
     // "Disconnected": short, the line under it says why.
@@ -173,6 +174,7 @@ export default {
       inFolder: 'Twinmap Forever {version} ist im AddOns-Ordner des Spiels.',
       notYet: 'Noch nicht installiert.',
       howTo: 'Installiert es mit der CurseForge-App. Ohne diese App ladet die Datei von derselben Seite herunter und entpackt sie nach _forever_\\Interface\\AddOns.',
+      howToMac: 'Installiert es mit der CurseForge-App. Ohne diese App ladet die Datei von derselben Seite herunter und entpackt sie nach _forever_/Interface/AddOns.',
       notices: 'Diese Seite bemerkt von selbst, wenn das Addon da ist.',
     },
     extras: {
@@ -217,6 +219,7 @@ export default {
     portTaken: 'Port {port} wird von einem anderen Programm belegt.',
     scanAgain: 'Öffnet die Optionen von Twinmap auf dem Computer und scannt den Code erneut.',
     nothingToSend: 'Es gibt nichts zu senden.',
+    screenRecording: 'Erlaubt Twinmap unter Systemeinstellungen > Datenschutz & Sicherheit > Bildschirmaufnahme',
     cannotWrite: 'Twinmap konnte im Spielordner nicht neben das Addon schreiben.',
   },
 

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- The one hardened-runtime exception Electron needs: V8's JIT. Given only to the app and its Electron
+     helper apps; libraries, frameworks, koffi and the capture helper are signed without exceptions, so
+     library validation stays on (koffi is signed with the same team). -->
+<plist version="1.0">
+<dict>
+  <key>com.apple.security.cs.allow-jit</key><true/>
+</dict>
+</plist>
