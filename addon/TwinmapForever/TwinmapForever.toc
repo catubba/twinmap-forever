@@ -9,6 +9,7 @@
 ## SavedVariables: TwinmapForeverDB
 ## SavedVariablesPerCharacter: TwinmapForeverSheet
 
+Locale.lua
 TwinmapForever.lua
 Strip.lua
 Sheet.lua

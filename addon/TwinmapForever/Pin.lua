@@ -11,8 +11,8 @@ ns.receivers.pin = function(pin)
   -- The same pin is told again at every login: a point reached or let go must not come back.
   if pin.t == ns.db.pinAt then return end
   ns.db.pinAt = pin.t
-  local name = type(pin.name) == "string" and pin.name or "The point"
+  local name = type(pin.name) == "string" and pin.name or ns.L["pin.point"]
   if type(pin.m) ~= "number" or not (InRange(pin.x) and InRange(pin.y)) then return end
   ns.SetTarget("pin", { m = pin.m, x = pin.x / 100, y = pin.y / 100, name = name })
-  print("Twinmap Forever: " .. name .. " is followed: the arrow points to it.")
+  ns.Say("arrow.followed", { name = name })
 end

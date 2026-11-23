@@ -27,7 +27,6 @@ ns.receivers.alert = function(a, part)
   if said[part] or a.who ~= ns.Key() or type(a.name) ~= "string" or not (Whole(a.at) and Whole(a.price)) then return end
   said[part] = true
   local name, hour = a.name:gsub("|", "||"), type(a.h) == "string" and a.h:match("^%d%d:%d%d$")
-  local line = a.when == "appears" and ("%s is on sale again, from %s"):format(name, Money(a.at))
-    or ("%s is at %s, %s %s"):format(name, Money(a.at), a.when == "above" and "above" or "below", Money(a.price))
-  print("Twinmap Forever: " .. line .. " at the auction house" .. (hour and (" (prices of " .. hour .. ").") or "."))
+  local key = a.when == "appears" and "alerts.again" or a.when == "above" and "alerts.above" or "alerts.below"
+  ns.Say(hour and key .. "Hour" or key, { item = name, price = Money(a.at), limit = Money(a.price), hour = hour })
 end

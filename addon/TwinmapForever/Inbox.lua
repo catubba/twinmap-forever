@@ -98,7 +98,7 @@ ns.receivers.latest = function(version)
   if announced or type(version) ~= "string" or not version:match("^%d+%.%d+%.%d+$") then return end
   if not Newer(version, ns.VERSION) then return end
   announced = true
-  print(("Twinmap Forever: a newer version (%s) is available on CurseForge. You are using %s."):format(version, ns.VERSION))
+  ns.Say("inbox.newer", { version = version, current = ns.VERSION })
 end
 
 local text, reading

@@ -21,6 +21,7 @@ const STUB = `
   -- The world the addon reads. A test changes it with lua().
   GAME = { width = 1920, height = 1080, zone = "Elwynn Forest", sub = "Goldshire", map = 1429, x = 0.4234, y = 0.6571, facing = 1.5708 }
   function GetTime() return now end
+  function GetLocale() return GAME.locale or "enUS" end -- the language of the game, as the game is installed
   function GetPhysicalScreenSize() return GAME.width, GAME.height end
   function GetZoneText() return GAME.zone end
   function GetSubZoneText() return GAME.sub end
@@ -484,7 +485,8 @@ function readToc(file) {
 }
 
 // addons: the AddOns folder the fonts and the slots are read from, as the app wrote them; without it there are none.
-function loadAddon(dir, { addons } = {}) {
+// locale: the language of the game (GetLocale()), enUS without it.
+function loadAddon(dir, { addons, locale } = {}) {
   const name = path.basename(dir), toc = readToc(path.join(dir, name + '.toc'));
   const L = lauxlib.luaL_newstate();
   lualib.luaL_openlibs(L);
@@ -529,6 +531,7 @@ function loadAddon(dir, { addons } = {}) {
   if (lauxlib.luaL_dostring(L, to_luastring(STUB)) !== lua.LUA_OK) throw new Error(to_jsstring(lua.lua_tostring(L, -1)));
   // The game draws its random numbers anew at each start; this VM would give the same ones every time.
   lauxlib.luaL_dostring(L, to_luastring(`math.randomseed(${Date.now() % 2 ** 31 ^ (Math.random() * 2 ** 31)})`));
+  if (locale) lauxlib.luaL_dostring(L, to_luastring(`GAME.locale = ${JSON.stringify(locale)}`));
   const run = () => {
     for (const f of toc.files) call('T_load', name, fs.readFileSync(path.join(dir, f), 'utf8'), f);
   };

@@ -11,7 +11,6 @@ local route   -- the route the app sent, checked
 local index   -- the stop to walk to; past the last one: the route is done
 local acc = 0
 
-local function Say(line) print("Twinmap Forever: " .. line) end
 
 local function Mark(stop)
   ns.SetTarget("route", stop and { m = stop.m, x = stop.x / 100, y = stop.y / 100, name = stop.name } or nil)
@@ -24,7 +23,7 @@ local function Go(i, quiet)
   local stop = route.stops[index]
   pcall(Mark, stop)
   if quiet then return end
-  if stop then Say(("stop %d of %d, %s."):format(index, #route.stops, stop.name)) else Say("route complete.") end
+  if stop then ns.Say("route.stop", { index = index, count = #route.stops, name = stop.name }) else ns.Say("route.complete") end
 end
 
 local function Checked(value)
@@ -34,7 +33,7 @@ local function Checked(value)
     local ok = type(s) == "table"
     for _, key in ipairs({ "m", "x", "y", "rx", "ry" }) do ok = ok and type(s[key]) == "number" end
     if not ok or s.rx <= 0 or s.ry <= 0 then return end
-    stops[i] = { m = s.m, x = s.x, y = s.y, rx = s.rx, ry = s.ry, name = type(s.name) == "string" and s.name or ("Stop " .. i) }
+    stops[i] = { m = s.m, x = s.x, y = s.y, rx = s.rx, ry = s.ry, name = type(s.name) == "string" and s.name or ns.T("route.defaultStop", { index = i }) }
   end
   return { t = value.t, at = type(value.at) == "number" and value.at or 1, stops = stops }
 end

@@ -21,7 +21,6 @@ local flags = {} -- the frames, used again from one drawing to the next
 local hooked = false
 local Redraw
 
-local function Say(line) print("Twinmap Forever: " .. line) end
 
 -- Kept through a /reload and from one run of the game to the next: the marks removed here that
 -- the app has not taken away yet, by part, and the ones set here that it has not taken, by id.
@@ -36,7 +35,7 @@ local function InRange(v) return type(v) == "number" and v >= 0 and v <= 100 end
 
 local function Mark(value)
   if type(value) == "table" and type(value.m) == "number" and InRange(value.x) and InRange(value.y) then
-    return { m = value.m, x = value.x / 100, y = value.y / 100, name = type(value.name) == "string" and value.name or "Pin" }
+    return { m = value.m, x = value.x / 100, y = value.y / 100, name = type(value.name) == "string" and value.name or ns.L["pin.default"] }
   end
 end
 
@@ -67,7 +66,7 @@ local function Remove(flag)
     return
   end
   if flag.followed and ns.Forget then ns.Forget() end
-  Say(flag.name .. ((flag.id or flag.part) and " is no longer among your pins." or " is no longer followed."))
+  ns.Say((flag.id or flag.part) and "marks.removed" or "arrow.unfollowed", { name = flag.name })
   Redraw()
 end
 
@@ -93,8 +92,8 @@ function ns.NewFlag(parent, mouse)
     if not GameTooltip then return end
     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
     GameTooltip:SetText(self.name)
-    GameTooltip:AddLine(self.followed and "Twinmap pin, followed. Click stops following it." or "Twinmap pin. Click follows it.", 1, 1, 1)
-    GameTooltip:AddLine("Alt and right click removes it.", 1, 1, 1)
+    GameTooltip:AddLine(ns.L[self.followed and "marks.tipFollowed" or "marks.tip"], 1, 1, 1)
+    GameTooltip:AddLine(ns.L["marks.tipRemove"], 1, 1, 1)
     GameTooltip:Show()
   end)
   flag:SetScript("OnLeave", function() if GameTooltip then GameTooltip:Hide() end end)
@@ -150,7 +149,7 @@ local function OnMapClick(map, button, x, y)
   local new, count = New(), 0
   for _ in pairs(new) do count = count + 1 end
   if count >= WAITING then
-    Say("open Twinmap before setting more pins: it has not taken the last " .. WAITING .. " yet.")
+    ns.Say("marks.waiting", { count = WAITING })
     return true
   end
   local px, py = math.floor(x * 10000 + 0.5) / 100, math.floor(y * 10000 + 0.5) / 100
@@ -159,7 +158,7 @@ local function OnMapClick(map, button, x, y)
   local id = ("%dx%dy%d"):format(m, math.floor(px * 100 + 0.5), math.floor(py * 100 + 0.5))
   new[id] = { m = m, x = px, y = py, name = name }
   fresh[id] = Mark(new[id])
-  Say(name .. " is a pin until you get there. Save it in Twinmap to keep it.")
+  ns.Say("marks.set", { name = name })
   Redraw()
   return true
 end

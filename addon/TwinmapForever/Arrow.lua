@@ -30,7 +30,6 @@ local targets = {} -- "route", "pin" -> { m, x, y (0 to 1), name }
 local arrow, minis = nil, {}
 local atan2 = math.atan2 or math.atan
 
-local function Say(line) print("Twinmap Forever: " .. line) end
 local function Num(v) if type(v) == "number" and not (issecretvalue and issecretvalue(v)) then return v end end
 
 -- The point followed: the stop of the route comes first.
@@ -52,12 +51,12 @@ function ns.Forget() ns.SetTarget("pin", nil) end
 -- A click on a flag of the map: it is followed, or no longer if it was.
 function ns.FollowClick(mark, followed)
   if followed then
-    if targets.route then return Say("that is the next stop of the route: /twinmap skip moves on.") end
-    Say(mark.name .. " is no longer followed.")
+    if targets.route then return ns.Say("arrow.nextStop") end
+    ns.Say("arrow.unfollowed", { name = mark.name })
     return ns.Forget()
   end
   ns.SetTarget("pin", { m = mark.m, x = mark.x, y = mark.y, name = mark.name })
-  Say(mark.name .. (targets.route and " is followed once the route is done." or " is followed: the arrow points to it."))
+  ns.Say(targets.route and "arrow.afterRoute" or "arrow.followed", { name = mark.name })
 end
 
 -- The app asks to let go of the point followed by itself: a number new each time, so that the same
@@ -66,7 +65,7 @@ ns.receivers.unfollow = function(asked)
   if asked == nil or asked == ns.db.unfollowSeen then return end
   ns.db.unfollowSeen = asked
   if targets.pin then
-    Say(targets.pin.name .. " is no longer followed.")
+    ns.Say("arrow.unfollowed", { name = targets.pin.name })
     ns.Forget()
   end
 end
@@ -119,9 +118,9 @@ local function NewArrow()
   end)
   f:SetScript("OnMouseUp", function(_, button)
     if button ~= "RightButton" then return end
-    if targets.route then return Say("the arrow follows the route: /twinmap skip moves on.") end
+    if targets.route then return ns.Say("arrow.onRoute") end
     if targets.pin then
-      Say(targets.pin.name .. " is no longer followed.")
+      ns.Say("arrow.unfollowed", { name = targets.pin.name })
       ns.Forget()
     end
   end)
@@ -157,7 +156,7 @@ local function Point()
   arrow = arrow or NewArrow()
   local yards, turn = Reading(point)
   if yards and yards <= ARRIVE and not targets.route then
-    Say("you are at " .. point.name .. ".")
+    ns.Say("arrow.arrived", { name = point.name })
     arrow:Hide()
     return ns.Forget()
   end
@@ -165,10 +164,10 @@ local function Point()
   if ns.Guiding and ns.Guiding() then return arrow:Hide() end
   arrow.name:SetText(point.name)
   -- Under the name: how far, and on a route which stop of how many.
-  local far = yards and ("%d yd"):format(math.floor(yards + 0.5)) or "no direction from here"
+  local far = yards and ns.T("arrow.yards", { yards = math.floor(yards + 0.5) }) or ns.L["arrow.noWay"]
   if targets.route and ns.RouteAt then
     local route, index = ns.RouteAt()
-    if route then far = ("%s · stop %d of %d"):format(far, index, #route.stops) end
+    if route then far = ns.T("arrow.stopOf", { far = far, index = index, count = #route.stops }) end
   end
   local color = yards and WHITE or GREY
   arrow.far:SetText(far)
@@ -215,7 +214,7 @@ frame:SetScript("OnEvent", function()
   -- The point followed before the /reload is followed again.
   local kept = ns.db.following
   if not targets.pin and type(kept) == "table" and type(kept.m) == "number" and type(kept.x) == "number" and type(kept.y) == "number" then
-    ns.SetTarget("pin", { m = kept.m, x = kept.x, y = kept.y, name = type(kept.name) == "string" and kept.name or "Pin" })
+    ns.SetTarget("pin", { m = kept.m, x = kept.x, y = kept.y, name = type(kept.name) == "string" and kept.name or ns.L["pin.default"] })
   end
 end)
 frame:SetScript("OnUpdate", function(_, elapsed)

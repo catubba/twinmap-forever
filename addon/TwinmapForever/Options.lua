@@ -1,32 +1,31 @@
 -- The addon's page in the game's settings: where the strip sits, how it is drawn, and its pause.
 local _, ns = ...
 
-local WARNING = "Photosensitivity warning: Twinmap sends data to the app by changing the colors of a one pixel line "
-  .. "at the edge of the game window, many times per second. If flickering light affects you, keep the mode on "
-  .. "Steady, or pause the strip. You can also pause it at any time with /twinmap pause."
+local L = ns.L
 
--- key in the saved settings, label, the values a click cycles through with their names, hint
+-- key in the saved settings, the values a click cycles through with the keys of their names (Locale.lua: options.<text>,
+-- options.<text>.<name>, options.<text>.hint)
 local ROWS = {
-  { key = "paused", label = "Strip", values = { false, true }, names = { "On", "Paused" },
-    hint = "Paused: nothing is drawn, and the app stops following your character." },
-  { key = "position", label = "Position", values = { "TOP", "BOTTOM" }, names = { "Top edge", "Bottom edge" },
-    hint = "The edge of the game window the line sits on." },
-  { key = "mode", label = "Mode", values = { "steady", "fast" }, names = { "Steady", "Fast" },
-    hint = "Steady: every block is followed by its negative, so the line looks still. Fast: twice the speed, more flicker." },
-  { key = "idle", label = "Between blocks", values = { "hide", "flat", "repeat" }, names = { "Hidden", "Even line", "Repeat last block" },
-    hint = "Trial. Repeat last block keeps the line busy all the time: the hardest case to hide, and the one to tune on." },
+  { key = "paused", text = "strip", values = { false, true }, names = { "on", "paused" } },
+  { key = "position", text = "position", values = { "TOP", "BOTTOM" }, names = { "top", "bottom" } },
+  { key = "mode", text = "mode", values = { "steady", "fast" }, names = { "steady", "fast" } },
+  { key = "idle", text = "idle", values = { "hide", "flat", "repeat" }, names = { "hide", "flat", "repeat" } },
 }
 
 -- Temporary, for the camouflage trials: remove with the settings they change once values are chosen.
--- key in the saved settings, label, lowest, highest, what follows the number
+-- key in the saved settings (and of its label, options.trials.<key>), lowest, highest, the unit after the number
 local SLIDERS = {
-  { key = "on", label = "Block shown", min = 0, max = 200, unit = " ms (0: one frame)" },
-  { key = "neg", label = "Negative shown", min = 0, max = 200, unit = " ms (0: one frame)" },
-  { key = "gap", label = "Rest after each showing", min = 0, max = 500, unit = " ms" },
-  { key = "cycles", label = "Times a block is shown", min = 1, max = 60, unit = "" },
-  { key = "base", label = "Dark level", min = 0, max = 254, unit = " of 255" },
-  { key = "amp", label = "Contrast", min = 1, max = 255, unit = " of 255" },
+  { key = "on", min = 0, max = 200, unit = "frames" },
+  { key = "neg", min = 0, max = 200, unit = "frames" },
+  { key = "gap", min = 0, max = 500, unit = "ms" },
+  { key = "cycles", min = 1, max = 60, unit = "none" },
+  { key = "base", min = 0, max = 254, unit = "of255" },
+  { key = "amp", min = 1, max = 255, unit = "of255" },
 }
+
+local function SliderText(s, value)
+  return ns.T("options.row", { label = L["options.trials." .. s.key], value = ns.T("options.unit." .. s.unit, { n = value }) })
+end
 
 -- The strip paints a block once and shows it many times: this tells it the looks changed.
 local function Changed()
@@ -50,15 +49,15 @@ local warning = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
 warning:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -12)
 warning:SetWidth(560)
 warning:SetJustifyH("LEFT")
-warning:SetText(WARNING)
+warning:SetText(L["options.warning"])
 
 local function Refresh()
   for _, row in ipairs(ROWS) do
-    row.button:SetText(row.label .. ": " .. row.names[IndexOf(row)])
+    row.button:SetText(ns.T("options.row", { label = L["options." .. row.text], value = L["options." .. row.text .. "." .. row.names[IndexOf(row)]] }))
   end
   for _, s in ipairs(SLIDERS) do
     s.slider:SetValue(ns.db[s.key])
-    s.text:SetText(s.label .. ": " .. ns.db[s.key] .. s.unit)
+    s.text:SetText(SliderText(s, ns.db[s.key]))
   end
 end
 
@@ -77,12 +76,12 @@ for i, row in ipairs(ROWS) do
   hint:SetPoint("TOPLEFT", button, "BOTTOMLEFT", 2, -4)
   hint:SetWidth(560)
   hint:SetJustifyH("LEFT")
-  hint:SetText(row.hint)
+  hint:SetText(L["options." .. row.text .. ".hint"])
 end
 
 local heading = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
 heading:SetPoint("TOPLEFT", ROWS[#ROWS].button, "BOTTOMLEFT", 0, -44)
-heading:SetText("Camouflage trials (temporary)")
+heading:SetText(L["options.trials"])
 
 -- No template: none is sure to exist on this client. Two columns; the mouse wheel moves by one.
 for i, s in ipairs(SLIDERS) do
@@ -109,7 +108,7 @@ for i, s in ipairs(SLIDERS) do
     if value == ns.db[s.key] then return end
     ns.db[s.key] = value
     Changed()
-    s.text:SetText(s.label .. ": " .. value .. s.unit)
+    s.text:SetText(SliderText(s, value))
   end)
   s.slider = slider
   s.text = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
@@ -119,7 +118,7 @@ end
 local reset = CreateFrame("Button", "TwinmapForeverTuneReset", panel, "UIPanelButtonTemplate")
 reset:SetSize(180, 24)
 reset:SetPoint("TOPLEFT", heading, "BOTTOMLEFT", 0, -26 - math.ceil(#SLIDERS / 2) * 44)
-reset:SetText("Reset to defaults")
+reset:SetText(L["options.reset"])
 -- Every choice on this page goes back to what this version of the addon starts with.
 reset:SetScript("OnClick", function()
   for _, row in ipairs(ROWS) do ns.db[row.key] = ns.DEFAULTS[row.key] end
