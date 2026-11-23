@@ -83,6 +83,17 @@ test('Korean writes numbers, hours and days as the Korean game does, with one fo
   expect([1, 2, 5, 21].map((count) => t('app.top.sendsLeft', { count }))).toEqual(['전송 1회 남음', '전송 2회 남음', '전송 5회 남음', '전송 21회 남음'])
 })
 
+test('Chinese writes numbers, hours and days as the Chinese game does, with one form for every number', () => {
+  setLang('zhCN')
+  expect(t('common.close')).toBe('关闭')
+  expect(num(1234567)).toBe('1,234,567')
+  expect(num(2.5)).toBe('2.5')
+  const at = Date.UTC(2026, 10, 23, 14, 5)
+  expect(clock(at + new Date(at).getTimezoneOffset() * 60000)).toBe('14:05')
+  expect(day(at, { day: 'numeric', month: 'short', timeZone: 'UTC' })).toBe('11月23日')
+  expect([1, 2, 5, 21].map((count) => t('app.top.sendsLeft', { count }))).toEqual(['还可发送1次', '还可发送2次', '还可发送5次', '还可发送21次'])
+})
+
 test('English writes numbers, hours and days as the app always has', () => {
   expect(num(1234567)).toBe('1,234,567')
   const at = Date.UTC(2026, 10, 23, 14, 5)
@@ -223,7 +234,8 @@ test('every language planned is listed, in its own words; the ones not out yet a
     expect(offered('deDE'), 'written').toBe(true)
     expect(offered('ruRU'), 'written').toBe(true)
     expect(offered('koKR'), 'written').toBe(true)
-    expect(offered('zhCN'), 'not written').toBe(false)
+    expect(offered('zhCN'), 'written').toBe(true)
+    expect(offered('ptBR'), 'not planned').toBe(false)
     expect(langFor(undefined, 'frFR'), 'the game language, now offered').toBe('frFR')
   } finally {
     offerAll(false)

@@ -16,6 +16,7 @@ Locale_esMX.lua
 Locale_deDE.lua
 Locale_ruRU.lua
 Locale_koKR.lua
+Locale_zhCN.lua
 TwinmapForever.lua
 Strip.lua
 Sheet.lua
