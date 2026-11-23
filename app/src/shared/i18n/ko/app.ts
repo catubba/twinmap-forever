@@ -26,11 +26,13 @@ export default {
     updateAddon: '애드온 업데이트',
     // The protocol numbers after a colon, so no particle follows them.
     newerAddon: 'Twinmap Forever 애드온이 이 앱보다 새 버전입니다(프로토콜: 애드온 {addon}, 앱 {app}). Twinmap을 닫았다가 다시 여십시오. 시작할 때 스스로 업데이트됩니다.',
+    newerAddonMac: 'Twinmap Forever 애드온이 이 앱보다 새 버전입니다(프로토콜: 애드온 {addon}, 앱 {app}). macOS용 최신 Twinmap을 내려받으십시오. macOS가 열지 않으면 "시스템 설정 > 개인정보 보호 및 보안"에서 "확인 없이 열기"를 선택하십시오.',
     olderAddon: 'Twinmap Forever 애드온이 이 앱보다 이전 버전입니다(프로토콜: 애드온 {addon}, 앱 {app}). CurseForge에서 애드온을 업데이트한 다음 게임을 다시 시작하십시오.',
     connecting: '연결 중',
     lost: '연결 끊김',
     // "the strip is not paused" said as "sending is not paused": the strip has no name the player knows.
     lostLine: '게임에서 신호가 없습니다. 게임에 접속한 다음, Twinmap Forever 애드온이 켜져 있고 전송이 일시 정지되지 않았는지 확인하십시오.',
+    screenRecording: 'Twinmap이 아직 게임 창을 읽을 수 없습니다. "시스템 설정 > 개인정보 보호 및 보안 > 화면 및 시스템 오디오 녹음"에서 Twinmap을 켜십시오(목록에 없으면 + 버튼으로 추가하십시오). 그런 다음 Twinmap을 다시 여십시오.',
     combat: '전투 중, 위치만',
     connected: '연결됨',
     // "미니맵 회전", as the game's setting (GS ROTATE_MINIMAP).
@@ -183,6 +185,7 @@ export default {
       inFolder: '게임의 AddOns 폴더에 Twinmap Forever {version} 버전이 있습니다.',
       notYet: '아직 설치되지 않았습니다.',
       howTo: 'CurseForge 앱으로 설치하십시오. 이 앱이 없으면 같은 페이지에서 파일을 내려받아 _forever_\\Interface\\AddOns 폴더에 압축을 푸십시오.',
+      howToMac: 'CurseForge 앱으로 설치하십시오. 이 앱이 없으면 같은 페이지에서 파일을 내려받아 _forever_/Interface/AddOns 폴더에 압축을 푸십시오.',
       notices: '애드온이 설치되면 이 페이지가 자동으로 알아챕니다.',
     },
     extras: {
