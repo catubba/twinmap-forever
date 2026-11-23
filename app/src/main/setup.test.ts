@@ -112,4 +112,6 @@ test('the language asked is kept between runs', () => {
   const file = join(mkdtempSync(join(tmpdir(), 'twinmap-')), 'settings.json')
   writeSettings(file, { setupDone: true, langAsked: true, lang: 'frFR' })
   expect(readSettings(file)).toEqual({ setupDone: true, langAsked: true, lang: 'frFR' })
+  writeSettings(file, { lang: 'pseudo-ko' }) // a pseudo-language of a script, for trials
+  expect(readSettings(file)).toEqual({ lang: 'pseudo-ko' })
 })
