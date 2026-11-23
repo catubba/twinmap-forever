@@ -13,6 +13,7 @@ interface Capture {
   showsOnly(window: WindowHandle, x: number, y: number, size: number): boolean
   readRow(window: WindowHandle, edge?: 'top' | 'bottom'): Buffer | null
   captureAllowed?(): boolean
+  requestCapture?(): boolean
   stopCapture?(): void
 }
 
@@ -35,4 +36,5 @@ export const readBox: Capture['readBox'] = (...args) => capture?.readBox(...args
 export const showsOnly: Capture['showsOnly'] = (...args) => capture?.showsOnly(...args) ?? false
 export const readRow: Capture['readRow'] = (...args) => capture?.readRow(...args) ?? null
 export const captureAllowed = (): boolean => capture?.captureAllowed?.() ?? true
+export const requestCapture = (): boolean => capture?.requestCapture?.() ?? true
 export const stopCapture = (): void => capture?.stopCapture?.()

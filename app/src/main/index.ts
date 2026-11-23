@@ -18,7 +18,7 @@ import { feedbackLink, sendFeedback } from '../shared/feedback'
 import { pageOf, setupComplete, setupPages, type SetupStatus } from '../shared/setup'
 import { tilesLine, type TilesStatus } from '../shared/tiles-status'
 import { placeWindow, WINDOW, ZOOMS, zoomStep } from '../shared/window'
-import { captureAllowed, findGameWindow, loadCapture, programOf, stopCapture } from './capture'
+import { captureAllowed, findGameWindow, loadCapture, programOf, requestCapture, stopCapture } from './capture'
 import { readHdr } from './hdr'
 import { gameFolderFrom, gameInstallPaths, installedBuild } from './client-files'
 import { homeAddress, LAN_PORT, startLan, type Lan, type Served } from './lan'
@@ -1091,7 +1091,11 @@ void Promise.all([captureReady, app.whenReady()]).then(([captureError]) => {
   }
   record.say(`started: Twinmap ${app.getVersion()}${GPU ? '' : ', hardware acceleration off'}`)
   if (captureError) record.say(captureError)
-  if (!captureAllowed()) record.say('Allow Twinmap under System Settings > Privacy & Security > Screen & System Audio Recording, then reopen Twinmap.')
+  if (!captureAllowed()) {
+    // Preflight alone never adds Twinmap to System Settings on a fresh install.
+    requestCapture()
+    record.say('Allow Twinmap under System Settings > Privacy & Security > Screen & System Audio Recording, then reopen Twinmap.')
+  }
   updateFirst(createWindow, (line) => record.say(`update: ${line}`))
 })
 

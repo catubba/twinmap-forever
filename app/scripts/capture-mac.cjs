@@ -61,7 +61,7 @@ async function probe() {
   console.log(`window ${id}, executable: ${capture.programOf(id)}, state: ${capture.windowState(id)}`)
   if (!row) throw new Error(capture.captureAllowed()
     ? 'ScreenCaptureKit provided no frame within 5 seconds'
-    : 'Allow Twinmap under System Settings > Privacy & Security > Screen Recording')
+    : 'Allow Twinmap under System Settings > Privacy & Security > Screen & System Audio Recording')
   console.log(`first frame: ${(performance.now() - started).toFixed(1)} ms after startup`)
   const decoded = decodeRow(row)
   console.log(`decoded strip: ${JSON.stringify(decoded)}`)

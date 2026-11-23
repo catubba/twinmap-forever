@@ -35,8 +35,11 @@ if (process.argv[2] === 'sign') {
   // A self-signed certificate keeps permission across updates signed with the same certificate.
   // "Developer ID Application: …" also enables hardened runtime, timestamps and optional notarization.
   const identity = process.env.TWINMAP_MAC_IDENTITY || '-'
-  // A SHA-1 identity has no certificate name to check, so it is treated as non-Developer ID.
-  const developerId = identity.startsWith('Developer ID Application: ')
+  // Resolve SHA-1 hashes and partial names; omit -v so untrusted self-signed certificates remain visible.
+  const identities = identity === '-' ? '' : execFileSync('security', ['find-identity', '-p', 'codesigning'], { encoding: 'utf8' })
+  const name = [...identities.matchAll(/^\s*\d+\)\s+([0-9a-f]{40})\s+"([^"]+)"/gim)]
+    .find(([, hash, name]) => hash.toLowerCase() === identity.toLowerCase() || name.includes(identity))?.[2] ?? identity
+  const developerId = name.startsWith('Developer ID Application: ')
   const profile = process.env.TWINMAP_MAC_NOTARY_PROFILE
   if (profile && !developerId) throw new Error('TWINMAP_MAC_NOTARY_PROFILE requires a Developer ID Application: … identity; ad hoc and self-signed certificates cannot be notarized.')
   if (identity === '-') {

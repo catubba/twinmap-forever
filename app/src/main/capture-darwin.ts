@@ -19,6 +19,7 @@ const CGRect = koffi.struct('CGRect', { x: 'double', y: 'double', width: 'double
 const listWindows = cg.func('void * CGWindowListCopyWindowInfo(uint32_t options, uint32_t id)')
 const rectFrom = cg.func('CGRectMakeWithDictionaryRepresentation', 'bool', ['void *', koffi.out(koffi.pointer(CGRect))])
 const preflight = cg.func('bool CGPreflightScreenCaptureAccess()')
+const request = cg.func('bool CGRequestScreenCaptureAccess()')
 const arrayCount = cf.func('long CFArrayGetCount(void *array)')
 const arrayValue = cf.func('void * CFArrayGetValueAtIndex(void *array, long index)')
 const dictValue = cf.func('void * CFDictionaryGetValue(void *dict, void *key)')
@@ -112,6 +113,7 @@ export function findGameWindow(): WindowHandle | null {
 }
 
 export const captureAllowed = (): boolean => preflight()
+export const requestCapture = (): boolean => request()
 
 // Quartz calls are shared by windowState, readRow and the occasional rectangle. Recheck often
 // enough to notice a resize or display change, without querying WindowServer every 15 ms.
