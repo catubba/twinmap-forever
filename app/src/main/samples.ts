@@ -5,8 +5,6 @@
 // samples of that dungeon it still wants today, and no more than that is sent. A sample says nothing of who sent
 // it: no name, no realm, and the number of its run is drawn anew at each dungeon entered.
 import { randomBytes } from 'node:crypto'
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
 import { SURE, type Box } from '../shared/minimap'
 import type { InsideReport } from './minimap'
 import { encodePng } from './png'
@@ -92,15 +90,6 @@ export function startSamples(on: () => boolean): { take: (report: InsideReport |
       }
       return done?.samples.length ? { id: done.id, samples: done.samples } : null
     },
-  }
-}
-
-/** The language of the game's words, as its settings file says; null when it does not. */
-export function gameLocale(gameFolder: string): string | null {
-  try {
-    return /^SET textLocale "([a-z]{2}[A-Z]{2})"/m.exec(readFileSync(join(gameFolder, '_forever_', 'WTF', 'Config.wtf'), 'utf8'))?.[1] ?? null
-  } catch {
-    return null
   }
 }
 

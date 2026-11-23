@@ -13,7 +13,7 @@ import type { TilesStatus } from '../shared/tiles-status'
 import { readTable } from '../shared/wdc5'
 import { LIQUID_TYPE_FILE, liquidOfName, WATER } from '../shared/water'
 import { WORLDS } from '../shared/world'
-import { installedBuild, openClientFiles, type ClientFiles } from './client-files'
+import { gameLocale, installedBuild, openClientFiles, type ClientFiles } from './client-files'
 import { convertInteriors, ENCOUNTERS_FILE, finishedInteriors, INTERIORS_FILE, MAP_FILE, mapEntries, ROOM_PICTURES_FILE, roomPictures } from './interiors'
 import { sentKeys } from './keys'
 import { convertHeights, heightsDone } from './heights'
@@ -29,6 +29,8 @@ const { gameFolder, base, nav } = workerData as { gameFolder: string; base: stri
 const tell = (status: TilesStatus): void => parentPort?.postMessage(status)
 /** In the folder of the build: the game's numbers of the keys the map was made with. */
 const KEYS_FILE = 'keys.json'
+/** In the folder of the build: the language of the game the names were read in (its textLocale). */
+const LOCALE_FILE = 'locale.txt'
 
 try {
   const started = Date.now()
@@ -50,10 +52,20 @@ try {
     // No list: a map made before the app opened anything, or none yet.
   }
   if ([...keys.keys()].some((k) => !usedKeys.includes(k))) for (const made of [PLACES_FILE, TRAVEL_FILE, INTERIORS_FILE]) rmSync(join(folder, made), { force: true })
+  // The names of zones, places, flights, dungeons, bosses, items, categories and spells are read in the game's language,
+  // English where a file has none in it: all made again when the player changes it. A folder that says none was made in English.
+  const locale = gameLocale(gameFolder) ?? 'enUS', localeFile = join(folder, LOCALE_FILE)
+  let madeIn = 'enUS'
+  try {
+    madeIn = readFileSync(localeFile, 'utf8').trim() || 'enUS'
+  } catch {
+    // A map made before the app read the game's language, or none yet.
+  }
+  if (madeIn !== locale) for (const made of [MAPS_FILE, PLACES_FILE, TRAVEL_FILE, INTERIORS_FILE, ITEMS_FILE, AH_NAMES_FILE, TRAINERS_FILE]) rmSync(join(folder, made), { force: true })
   // The game's archive is opened only when there is something to convert: it takes half a second
   // and a few hundred megabytes, and on most starts the tiles are already there.
   let client: ClientFiles | undefined
-  const open = (): ClientFiles => (client ??= openClientFiles(gameFolder, keys))
+  const open = (): ClientFiles => (client ??= openClientFiles(gameFolder, keys, locale))
   // The picture of an item, or of a spell by its file, when a screen asks for one the folder does not have yet (item-icons.ts).
   // Asked while the map is being made, it is answered once the making is done.
   const makers = { items: itemIcons(open, folder), pictures: gamePictures(open, folder) }
@@ -134,7 +146,10 @@ try {
   // (keys.ts), or when an older app made it with fewer facts.
   try {
     const caches = join(gameFolder, '_forever_', 'Cache', 'ADB')
-    const sent = existsSync(caches) ? readdirSync(caches).map((language) => join(caches, language, 'DBCache.bin')).filter((f) => existsSync(f)) : []
+    // The rows of the game's language, and those of the others for the items it has no row of (gameItemFacts).
+    const cacheOf = (language: string): string => join(caches, language, 'DBCache.bin')
+    const sent = (existsSync(caches) ? readdirSync(caches) : []).filter((language) => existsSync(cacheOf(language))).sort((a, b) => Number(b === locale) - Number(a === locale)).map(cacheOf)
+    const own = sent[0] === cacheOf(locale) ? 1 : 0
     const itemsFile = join(folder, ITEMS_FILE)
     const made = existsSync(itemsFile) ? statSync(itemsFile).mtimeMs : 0
     const older = (): boolean => {
@@ -145,7 +160,8 @@ try {
       }
     }
     if (!made || sent.some((f) => statSync(f).mtimeMs > made) || older()) {
-      const facts = gameItemFacts(open(), sent.map((f) => readFileSync(f)))
+      const read = sent.map((f) => readFileSync(f))
+      const facts = gameItemFacts(open(), read.slice(0, own), read.slice(own))
       if (facts) writeFileSync(itemsFile, JSON.stringify(facts))
     }
   } catch {
@@ -176,6 +192,8 @@ try {
   } catch {
     // The trainer panel goes without the game's lists; tried again at the next start.
   }
+  // The names are made again in this language: said so, for the next start. (The insides, after, are made in it too.)
+  writeFileSync(localeFile, locale)
   const ready = { state: 'ready', folder, version: build.version, tiles, missing, seconds: (Date.now() - started) / 1000, converted } as const
   tell(ready)
 

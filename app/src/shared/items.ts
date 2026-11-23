@@ -69,14 +69,19 @@ export function shopRows(items: number[], facts: ItemFacts): ShopRow[] {
     .sort((a, b) => a.name.localeCompare(b.name))
 }
 
-/** The facts of the player's game (ClientFiles of main), with the rows of the server's caches (DBCache.bin) over them; null without the tables. */
-export function gameItemFacts(files: { read(id: number, skipHidden?: boolean): Buffer | null; opens(keyName: string): boolean }, sent: Buffer[]): ItemFacts | null {
+/**
+ * The facts of the player's game (ClientFiles of main), with the rows of the server's caches (DBCache.bin) over them; null without the tables.
+ * sent: the caches in the game's language. elsewhere: those of other languages, for the items neither the tables nor sent have (new on
+ * Forever, before the game has run in its language): a name in another language rather than none, never over one in the game's own.
+ */
+export function gameItemFacts(files: { read(id: number, skipHidden?: boolean): Buffer | null; opens(keyName: string): boolean }, sent: Buffer[], elsewhere: Buffer[] = []): ItemFacts | null {
   const item = files.read(ITEM_FILE, true), sparse = files.read(ITEM_SPARSE_FILE, true)
   if (!item || !sparse) return null
-  // ponytail: every language's rows go over each other; the game runs in one.
   const hotfixes = new Map(sent.flatMap((cache) => [...readHotfixes(cache, ITEM_SPARSE_TABLE)]))
   const opens = (keyName: string): boolean => files.opens(keyName)
-  return itemFacts(readTable(item, opens), readTable(sparse, opens, ITEM_SPARSE_TEXTS), hotfixes)
+  const names = readTable(sparse, opens, ITEM_SPARSE_TEXTS), known = new Set(names.rows.map((r) => r.id))
+  for (const cache of elsewhere) for (const [id, row] of readHotfixes(cache, ITEM_SPARSE_TABLE)) if (!known.has(id) && !hotfixes.has(id)) hotfixes.set(id, row)
+  return itemFacts(readTable(item, opens), names, hotfixes)
 }
 
 // The names the game gives the classes of items, and the subclasses of weapons and armour: their keys, by the game's numbers.

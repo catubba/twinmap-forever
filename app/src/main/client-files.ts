@@ -138,7 +138,23 @@ export function decodeBlte(b: Buffer, skipHidden = false, keyOf: (keyName: strin
  * keys: the keys the server has sent to this PC, by the game's number of each (keys.ts); with them
  * the parts they lock are read like the rest.
  */
-export function openClientFiles(folder: string, keys: Map<number, Buffer> = new Map()): ClientFiles {
+/** The language of the game's words, as its settings file says; null when it does not. */
+export function gameLocale(gameFolder: string): string | null {
+  try {
+    return /^SET textLocale "([a-z]{2}[A-Z]{2})"/m.exec(readFileSync(join(gameFolder, '_forever_', 'WTF', 'Config.wtf'), 'utf8'))?.[1] ?? null
+  } catch {
+    return null
+  }
+}
+
+/** The root's bit for each language of the game (its textLocale), as the archive marks a file written in it. */
+export const LOCALE_BITS: Record<string, number> = {
+  enUS: 0x2, koKR: 0x4, frFR: 0x10, deDE: 0x20, zhCN: 0x40, esES: 0x80, zhTW: 0x100, enGB: 0x200, esMX: 0x1000, ruRU: 0x2000, ptBR: 0x4000,
+}
+
+/** The game's files; one written in several languages is read in `locale` (the game's own), else in English, else in one the PC holds. */
+export function openClientFiles(folder: string, keys: Map<number, Buffer> = new Map(), locale = 'enUS'): ClientFiles {
+  const wanted = LOCALE_BITS[locale] ?? EN_US
   const build = installedBuild(folder)
   if (!build) throw new Error(`no ${PRODUCT} game in ${folder}`)
   const key = build.buildKey
@@ -278,8 +294,11 @@ export function openClientFiles(folder: string, keys: Map<number, Buffer> = new 
   }
   const keyAt = new Map<number, number>() // file number -> where its content key is in the root
   // The same file in its other languages. A PC holds only the languages the player installed
-  // (issue 140: a game without English), so the English one is not always there to read.
+  // (issue 140: a game without English), so the one wanted is not always there to read.
+  // Each kept as where * 4 + how good its language is: 0 the game's, 1 English, 2 another.
   const others = new Map<number, number[]>()
+  // How good the language of the one in keyAt is.
+  const rank = new Map<number, number>()
   while (at < root.length) {
     const n = root.readUInt32LE(at)
     let flags: number, locale: number
@@ -293,18 +312,21 @@ export function openClientFiles(folder: string, keys: Map<number, Buffer> = new 
       at += 12
     }
     const keys = at + n * 4
+    const good = locale & wanted ? 0 : locale & EN_US ? 1 : 2
     for (let i = 0, id = -1; i < n; i++) {
       id += root.readInt32LE(at + i * 4) + 1
-      // ponytail: a file in several languages is read in English, or in the first language the PC holds. Choose by the game's language when texts are shown.
       const where = keys + i * 16, had = keyAt.get(id)
-      if (had === undefined) keyAt.set(id, where)
-      else {
+      if (had === undefined) {
+        keyAt.set(id, where)
+        rank.set(id, good)
+      } else {
         let rest = others.get(id)
         if (!rest) others.set(id, (rest = []))
-        if (locale & EN_US) {
+        if (good < rank.get(id)!) {
+          rest.push(had * 4 + rank.get(id)!)
           keyAt.set(id, where)
-          rest.push(had)
-        } else rest.push(where)
+          rank.set(id, good)
+        } else rest.push(where * 4 + good)
       }
     }
     at = keys + n * 16 + (total !== named && flags & NO_NAMES ? 0 : n * 8)
@@ -317,7 +339,9 @@ export function openClientFiles(folder: string, keys: Map<number, Buffer> = new 
     read(id, skipHidden) {
       const first = keyAt.get(id)
       if (first === undefined) return null
-      for (const where of [first, ...(others.get(id) ?? [])]) {
+      // The others when the best is not on the PC, the better languages first.
+      const rest = (others.get(id) ?? []).sort((a, b) => (a % 4) - (b % 4)).map((kept) => Math.floor(kept / 4))
+      for (const where of [first, ...rest]) {
         const bytes = naming(`game file ${id}`, () => readContent(root.subarray(where, where + 16), skipHidden))
         if (bytes) return bytes
       }
