@@ -59,6 +59,19 @@ test('German writes numbers, hours and days as the German game does', () => {
   expect(day(at, { day: 'numeric', month: 'short', timeZone: 'UTC' })).toBe('23. Nov.')
 })
 
+test('Russian writes numbers, hours and days as the Russian game does, and every plural with its four forms', () => {
+  setLang('ruRU')
+  expect(t('common.close')).toBe('Закрыть')
+  expect(num(1234567)).toBe('1\u00a0234\u00a0567')
+  expect(num(2.5)).toBe('2,5')
+  const at = Date.UTC(2026, 10, 23, 14, 5)
+  expect(clock(at + new Date(at).getTimezoneOffset() * 60000)).toBe('14:05')
+  expect(day(at, { day: 'numeric', month: 'short', timeZone: 'UTC' })).toBe('23 нояб.')
+  // One, few, many: 1 and 21 are one, 2 and 22 few, 5 and 11 many.
+  const said = [1, 2, 5, 11, 21, 22].map((count) => t('app.top.sendsLeft', { count }))
+  expect(said).toEqual(['Осталась 1 отправка', 'Осталось 2 отправки', 'Осталось 5 отправок', 'Осталось 11 отправок', 'Осталась 21 отправка', 'Осталось 22 отправки'])
+})
+
 test('English writes numbers, hours and days as the app always has', () => {
   expect(num(1234567)).toBe('1,234,567')
   const at = Date.UTC(2026, 10, 23, 14, 5)
@@ -197,7 +210,8 @@ test('every language planned is listed, in its own words; the ones not out yet a
     expect(offered('frFR')).toBe(true)
     expect(offered('esES') && offered('esMX'), 'written, both').toBe(true)
     expect(offered('deDE'), 'written').toBe(true)
-    expect(offered('ruRU'), 'not written').toBe(false)
+    expect(offered('ruRU'), 'written').toBe(true)
+    expect(offered('koKR'), 'not written').toBe(false)
     expect(langFor(undefined, 'frFR'), 'the game language, now offered').toBe('frFR')
   } finally {
     offerAll(false)
