@@ -2,6 +2,7 @@
 // are. Nothing of it is copied or shipped: without Questie the app has no such data and says so.
 // QuestieDB keeps every entity in its .toc, as base64 CBOR, one metadata line per field.
 import { readFileSync } from 'node:fs'
+import { inflateSync } from 'node:zlib'
 import type { GameMap } from '../shared/maps'
 import { join } from 'node:path'
 import type { GameQuest, LogQuest, ObjectiveKind, QuestIcon, QuestieShown, QuestPin } from '../shared/quests'
@@ -9,6 +10,7 @@ import { best, fold, wordsMatch, type Found } from '../shared/search'
 import type { ItemSources } from '../shared/tips'
 import { resourceOf, servicesOf, type FixedPin, type ServiceLayer } from '../shared/services'
 import { t, type Key } from '../shared/i18n'
+import { gameLocale } from './client-files'
 
 /** The file of QuestieDB this app reads, in a game folder. Questie without it gives the app nothing. */
 export const questieFile = (gameFolder: string): string => join(gameFolder, '_forever_', 'Interface', 'AddOns', 'QuestieDB', 'QuestieDB_Forever.toc')
@@ -73,7 +75,8 @@ export function cbor(buf: Buffer): unknown {
     if (major === 0) return n
     if (major === 1) return -1 - n
     if (major === 2 || major === 3) {
-      const s = buf.toString(major === 3 ? 'utf8' : 'latin1', i, i + n)
+      // QuestieDB writes its texts as Lua strings, bytes: the game's text in UTF-8 all the same.
+      const s = buf.toString('utf8', i, i + n)
       i += n
       return s
     }
@@ -94,8 +97,14 @@ export const list = (t: unknown): unknown[] => (Array.isArray(t) ? t : t && type
 /** A table with its keys, as Lua has them: a list is keyed from 1 (the zones of Dun Morogh, zone 1, are written as one). */
 export const keyed = (t: unknown): [string, unknown][] => (Array.isArray(t) ? t.map((v, i): [string, unknown] => [String(i + 1), v]) : t && typeof t === 'object' ? Object.entries(t) : [])
 
-/** Opens the QuestieDB in a game folder; null when the player has none, or it is not one this app can read. */
-export function openQuestie(gameFolder: string): Questie | null {
+// The fields QuestieDB has in other languages, by kind: field number -> its column in the language's block (its src/l10n/overlay.lua).
+const TRANSLATED: Record<Kind, Record<number, number>> = { Quest: { [QUEST.name]: 1 }, Npc: { [NPC.name]: 1, [NPC.sub]: 2 }, Object: { [OBJECT.name]: 1 }, Item: { [ITEM.name]: 1 } }
+
+/**
+ * Opens the QuestieDB in a game folder; null when the player has none, or it is not one this app can read. The names of
+ * quests, NPCs, objects and items come in the game's language (locale, its textLocale) where QuestieDB has them in it.
+ */
+export function openQuestie(gameFolder: string, locale = gameLocale(gameFolder) ?? 'enUS'): Questie | null {
   let text: string
   try {
     text = readFileSync(questieFile(gameFolder), 'utf8')
@@ -132,8 +141,40 @@ export function openQuestie(gameFolder: string): Questie | null {
     memo.set(key, v)
     return v
   }
-  // Scalars live in the -S row, tables on a line of their own.
+  // The names in the game's language: a block for each kind, zlib under base64, cut in pieces like a long value, holding a
+  // column for each field in the order of the kind's numbers (X-<Kind>-IDS, also zlib). None for English.
+  const words = new Map<string, string>()
+  if (locale !== 'enUS' && locale !== 'enGB')
+    for (const m of text.matchAll(new RegExp(`^## X-l10n-${locale}-(Quest|Npc|Object|Item)(-\\d+)?: ?(.*)$`, 'gm'))) words.set(`${m[1]}${m[2] ?? ''}`, m[3]!)
+  const unpacked = (from: Map<string, string>, key: string): unknown => {
+    let raw = from.get(key)
+    const pieces = raw && /^~(\d+)~$/.exec(raw)
+    if (pieces) {
+      raw = ''
+      for (let k = 1; k <= +pieces[1]!; k++) raw += from.get(`${key}-${k}`) ?? ''
+    }
+    try {
+      return raw ? cbor(inflateSync(Buffer.from(raw, 'base64'))) : undefined
+    } catch {
+      return undefined // a block this app cannot read leaves the English names
+    }
+  }
+  const blocks = new Map<Kind, { block: unknown; where: Map<number, number> }>()
+  const translated = (kind: Kind, id: number, field: number): unknown => {
+    const column = TRANSLATED[kind][field]
+    if (!column || !words.size) return undefined
+    if (!blocks.has(kind)) {
+      const order = list(unpacked(store, `${kind}-IDS`)).filter((n): n is number => typeof n === 'number')
+      blocks.set(kind, { block: unpacked(words, kind), where: new Map(order.map((n, i) => [n, i + 1])) })
+    }
+    const { block, where } = blocks.get(kind)!, position = where.get(id)
+    const said = position === undefined ? undefined : at(at(block, column), position)
+    return typeof said === 'string' && said ? said : undefined
+  }
+  // Scalars live in the -S row, tables on a line of their own; a name in the game's language before the English one.
   const get = (kind: Kind, id: number, field: number): unknown => {
+    const own = translated(kind, id, field)
+    if (own !== undefined) return own
     const scalar = (value(`${kind}-${id}-S`) as Record<string, unknown> | undefined)?.[field]
     return scalar !== undefined ? scalar : value(`${kind}-${id}-${field}`)
   }

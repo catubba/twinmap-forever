@@ -1,0 +1,251 @@
+// 简体中文 Twinmap: the notes on every key are in en/app.ts.
+export default {
+  top: {
+    sections: '分区',
+    now: '当前',
+    items: '物品',
+    auctionHouse: '拍卖行',
+    auctionHouseShort: '拍卖',
+    pause: '暂停Twinmap',
+    resume: '继续Twinmap',
+    sendsLeft: { other: '还可发送{count}次' },
+    // The app's own term (l10n.md): the game's button is "Bug及建议" (GS BUG_BUTTON). Named again in tiles.failedHelp.
+    feedback: '反馈',
+    feedbackHint: '报告Bug或提出建议',
+    settings: '设置',
+  },
+
+  link: {
+    paused: '已暂停',
+    closed: '游戏未运行',
+    closedLine: '游戏未运行。地图仍可使用，登录游戏后会显示你的位置。',
+    minimized: '游戏已最小化',
+    minimizedLine: '游戏已最小化。游戏窗口回到屏幕上后会显示你的位置。',
+    updateApp: '更新应用',
+    updateAddon: '更新插件',
+    newerAddon: 'Twinmap Forever插件比本应用新（协议版本：插件{addon}，本应用{app}）。请关闭Twinmap后重新打开：它会在启动时自动更新。',
+    olderAddon: 'Twinmap Forever插件比本应用旧（协议版本：插件{addon}，本应用{app}）。请在CurseForge更新插件，然后重启游戏。',
+    connecting: '正在连接',
+    lost: '连接中断',
+    // "its strip is not paused" said as "sending is not paused": the strip has no name the player knows.
+    lostLine: '没有收到游戏的信号。请登录游戏，并确认Twinmap Forever插件已启用、发送没有暂停。',
+    combat: '战斗中，仅显示位置',
+    connected: '已连接',
+    // "旋转微缩地图", as the game's setting (GS ROTATE_MINIMAP).
+    minimapTurns: '在地下城中，你的位置是从微缩地图读取的，而微缩地图旋转时无法读取：请在游戏中关闭“旋转微缩地图”。',
+    noRooms: 'Twinmap没有这个地下城的图片：在这里无法显示你的位置。',
+    noMinimap: '在地下城中，你的位置是从微缩地图读取的，但游戏没有提供微缩地图信息：请更新Twinmap Forever插件，并让微缩地图保持在屏幕上。',
+    looking: '正在寻找你的位置。位置从游戏的微缩地图读取：请让微缩地图保持在屏幕上，不要被遮挡。',
+  },
+
+  map: {
+    addonMissing: '你的游戏中没有Twinmap Forever插件，因此无法获取位置。请从CurseForge获取，然后重启游戏。',
+    getAddon: '从CurseForge获取',
+    paused: 'Twinmap已暂停：地图停留在你原来的位置，不再跟随你的角色。',
+    resume: '继续',
+    // As the game (GS UNKNOWN_ZONE).
+    unknownZone: '未知地区',
+  },
+
+  tiles: {
+    builtOnce: '只有第一次和游戏更新后才需要这样做。',
+    noGameHelp: '请选择World of Warcraft: Forever的安装文件夹，即包含_forever_的那个文件夹。',
+    failedHelp: 'Twinmap无法读取游戏文件。如果游戏启动器正在更新或修复游戏，请先关闭启动器，然后重试。如果仍然失败，请在启动器中修复游戏，并通过“反馈”告诉我们。',
+    looking: '正在寻找游戏。',
+    noGame: '未找到游戏文件夹。',
+    converting: '正在用你的游戏文件生成地图（{percent}%）。',
+    // "图块" for the tiles, with the measure word 个.
+    ready: '地图：{tiles}个图块已就绪，游戏版本{version}，{rooms}个房间',
+    readyReading: '地图：{tiles}个图块已就绪，游戏版本{version}，正在读取房间',
+    readyNoRooms: '地图：{tiles}个图块已就绪，游戏版本{version}，未能读取房间（{problem}）',
+    failed: '无法生成地图：{message}',
+    chooseFolder: '选择游戏文件夹',
+    retry: '重试',
+  },
+
+  elsewhere: {
+    title: '请在电脑上完成设置',
+    text: '电脑上的Twinmap仍在设置中，剩余的步骤显示在电脑上。设置完成后，地图会自动在这里打开。',
+  },
+
+  panel: {
+    close: '关闭',
+    open: '任务和附近',
+    mapLeft: '地图靠左（M）',
+    mapRight: '地图靠右（M）',
+    showing: '正在查看：{name}',
+    backTo: '返回{name}',
+    // As the game (GS UNIT_LEVEL_TEMPLATE "等级 %d", with its space).
+    level: '等级 {level}',
+    levelPercent: '等级 {level}，{percent}%',
+    // As the game (GS EXPERIENCE_COLON "经验值：", GS XP_TEXT "%s / %s").
+    xp: '经验值：{xp} / {max}',
+    experience: '经验值',
+    width: '面板宽度',
+    widthHint: '拖动以调整大小。双击以重置。',
+  },
+
+  now: {
+    attention: '注意',
+    inGame: '游戏中',
+    pins: '我的标记',
+    quests: '任务',
+    nearby: '附近',
+    // As the game (GS MAP_LEGEND_TURNIN, GS OBJECTIVES_LABEL).
+    handIn: '可完成',
+    objective: '任务目标',
+    quest: '任务',
+    entrance: '入口',
+    corpse: '尸体',
+    // Short forms of the game's names (minimap tracking): the full NPC names are in found.services.
+    flight: '飞行',
+    inn: '旅店',
+    bank: '银行',
+    auction: '拍卖',
+    stable: '兽栏',
+    trainer: '训练师',
+    repair: '修理',
+    vendor: '商人',
+    onSale: '在售',
+    cheaper: '更便宜',
+    dearer: '更贵',
+    otherContinent: '在另一块大陆上',
+    // As the game (GS SPELL_RANGE "%s码距离").
+    yards: '{yards}码',
+    // "行程" is Shortest Path's journey; "路线" stays Twinmap's own Route (l10n.md).
+    finding: '正在规划行程',
+    updateHint: '更新Shortest Path和Twinmap Forever插件，即可在这里看到完整行程',
+  },
+
+  journey: {
+    name: '行程',
+    seconds: '{seconds}秒',
+    minutes: '{minutes}分钟',
+    hours: '{hours}小时{minutes}分钟',
+  },
+
+  death: {
+    corpse: '你的尸体',
+  },
+
+  send: {
+    pointNoZone: '这个点不在游戏可以标记的任何地区内。',
+    stopNoZone: '有一个途经点不在游戏可以标记的地区内。',
+    notConnected: '游戏未连接。',
+    notListening: '游戏还没有准备好接收。如果一直这样，请更新插件并重启游戏。',
+    reload: '在游戏中输入/reload即可再次发送。',
+    restart: '请重启一次游戏：下次启动后，游戏才能接收Twinmap发送的内容。',
+    pin: '标记',
+    stop: '途经点',
+  },
+
+  firstRun: {
+    steps: '步骤',
+    building: '正在生成地图',
+    secondsLeft: { other: '大约还需{count}秒' },
+    minutesLeft: { other: '大约还需{count}分钟' },
+    skip: '跳过，查看地图',
+    // "返回" (l10n.md): the game's "后退" and "下一页" are for pages of a list; this is a setup wizard.
+    back: '返回',
+    next: '下一步',
+    toMap: '前往地图',
+    chooseFolder: '选择游戏文件夹',
+    chooseAnother: '选择其他文件夹',
+    getAddon: '从CurseForge获取Twinmap Forever',
+    getOptional: '从CurseForge获取{name}',
+    retry: '重试',
+    photosensitivity: '光敏性警告：插件通过每秒多次改变游戏窗口边缘一条1像素宽线条的颜色来发送数据。可以在游戏中的插件设置里降低发送速度或暂停发送。',
+    game: {
+      title: '查找游戏',
+      intro: 'Twinmap需要知道World of Warcraft: Forever的安装位置。它只读取该文件夹，绝不会修改其中的任何内容。',
+      found: '已找到。',
+      notFound: '在这台电脑上没有找到游戏。',
+      choose: '请选择游戏的安装文件夹：包含_forever_的那个文件夹。',
+    },
+    map: {
+      title: '生成地图',
+      intro: 'Twinmap用你自己的游戏文件绘制地图，因此总是与你的游戏版本一致。只需生成一次，之后只有游戏更新时才会重新生成。不会下载任何内容。',
+      waiting: '正在等待游戏文件夹。',
+      opening: '正在打开游戏文件。',
+      reading: '正在读取游戏自带的世界图片。',
+      failed: '无法生成地图。',
+      ready: '地图已就绪。',
+      tiles: '{count}个图块，来自游戏版本{version}。',
+    },
+    addon: {
+      title: '获取插件',
+      intro: 'Twinmap Forever插件会告诉本应用你的角色在哪里。它和其他插件一样，从CurseForge安装。',
+      installed: '已安装。',
+      inFolder: 'Twinmap Forever {version}已在游戏的AddOns文件夹中。',
+      notYet: '尚未安装。',
+      howTo: '请用CurseForge应用安装。如果没有该应用，可以从同一页面下载文件，然后解压到_forever_\\Interface\\AddOns。',
+      notices: '插件安装好后，此页面会自动发现。',
+    },
+    extras: {
+      title: '可选插件',
+      intro: '这些插件都不是必需的。安装后，Twinmap会显示更多内容。',
+      questie: 'QuestieDB：已安装。地图会显示提供服务的NPC、矿脉、草药和任务日志中的任务。如果同时运行Questie，地图会显示与Questie相同的任务，包括可接任务。',
+      noQuestie: 'QuestieDB：未安装。通过CurseForge应用安装Twinmap Forever时会一并安装。没有它，地图上不会显示NPC、服务和任务。',
+      shortestPath: 'Shortest Path：已安装。地图会显示它的行程，前往你发送到游戏的地点时会沿道路行进。',
+      noShortestPath: 'Shortest Path：未安装。安装后，地图会显示它规划的行程，前往你发送到游戏的地点时会沿道路行进。',
+    },
+    play: {
+      title: '启动游戏',
+      intro: '启动World of Warcraft: Forever并用一个角色登录。你的位置会自动显示在这里。',
+      connected: '已连接。正在接收你的位置。',
+      silent: '游戏已打开，但还没有收到插件的任何信息。',
+      minimized: '游戏已最小化。请让游戏窗口回到屏幕上。',
+      waiting: '正在等待游戏。',
+      // "插件", as the zhCN character list button (GS ADDONS).
+      tick: '在角色选择界面打开“插件”，确认已勾选Twinmap Forever。',
+    },
+  },
+
+  update: {
+    updating: '正在更新',
+    updatingTo: '正在更新至版本{version}',
+    installing: '正在安装版本{version}',
+    reopen: 'Twinmap将在几秒后重新打开',
+    downloading: '正在下载新版本',
+  },
+
+  web: {
+    noAnswer: '电脑上的Twinmap没有响应。',
+    chooseOnComputer: '请在电脑上的Twinmap中选择游戏文件夹。',
+  },
+
+  main: {
+    pickFolder: 'World of Warcraft: Forever的安装位置',
+    notGame: '该文件夹中没有World of Warcraft: Forever。请选择包含_forever_的那个文件夹。',
+    savePicture: '保存{name}的图片',
+    noNetwork: '这台电脑没有连接到家庭网络。',
+    portTaken: '端口{port}已被其他程序占用。',
+    // "二维码": the code a phone scans is a QR code.
+    scanAgain: '请在电脑上打开Twinmap的设置，然后重新扫描二维码。',
+    nothingToSend: '没有可发送的内容。',
+    cannotWrite: 'Twinmap无法在游戏文件夹中的插件旁写入文件。',
+  },
+
+  found: {
+    npc: 'NPC',
+    // The names after a colon, as the game's "首领掉落：%s".
+    quest: '任务，发布者：{giver}',
+    questLevel: '任务，等级 {level}，发布者：{giver}',
+    soldBy: '出售者：{name}',
+    droppedBy: '掉落自：{name}',
+    // "来源": the name can be an object (a chest, a plant) as well as a place.
+    foundIn: '来源：{name}',
+    questNumber: '任务{id}',
+    // Under an NPC: the game's names of the NPCs themselves (minimap tracking, GS MERCHANT).
+    services: {
+      flight: '飞行管理员',
+      inn: '旅店老板',
+      vendor: '商人',
+      repair: '修理',
+      trainer: '训练师',
+      bank: '银行职员',
+      auction: '拍卖师',
+      stable: '兽栏管理员',
+    },
+  },
+}

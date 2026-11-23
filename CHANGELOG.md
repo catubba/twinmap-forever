@@ -2,6 +2,13 @@
 
 What changed in each version of Twinmap, newest first. The section of a version is also the text of its release on GitHub and of the addon's file on CurseForge.
 
+## 0.16.0 - 2026-11-23
+
+### New
+
+- **Twinmap in eight languages.** English, Français, Deutsch, Español (España), Español (Latinoamérica), Русский, 한국어 and 简体中文: every text of the app and of the addon, written with the words your game uses in each. The first run asks which one, Twinmap asks once after this update if your game is in one of them, and Settings, Language, changes it at any time. If something reads wrong in your language, tell us with Feedback.
+- **Names in the language of your game.** Zones, places, quests, NPCs, items, bosses and professions come in the language your game is set to, also when Twinmap speaks another, and the search finds them as the game writes them.
+
 ## 0.15.1 - 2026-11-23
 
 ### New

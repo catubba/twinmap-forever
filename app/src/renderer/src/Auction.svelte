@@ -16,7 +16,7 @@
   import { untrack } from 'svelte'
   import Glyph from './Glyph.svelte'
   import { TILES } from './web'
-  import { around, clock, num, t, type Key } from '../../shared/i18n'
+  import { around, clock, langTag, num, t, type Key } from '../../shared/i18n'
 
   // listing: the prices of the house on show (App.svelte). homes: each character's own house, as the game told it.
   // alerts: of every character (M18-F10); showAlerts: a number new each time Now asks for the Alerts view.
@@ -46,9 +46,10 @@
   const turn = (now: Sort, by: string, text: boolean): Sort => (now?.by === by ? { by, up: !now.up } : { by, up: text })
   const order = <T,>(rows: T[], sort: Sort, value: (row: T, by: string) => string | number): T[] => {
     if (!sort) return rows
+    const words = new Intl.Collator(langTag()) // in the order of the language the app speaks
     const by = (a: T, b: T): number => {
       const x = value(a, sort.by), y = value(b, sort.by)
-      return typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y))
+      return typeof x === 'number' && typeof y === 'number' ? x - y : words.compare(String(x), String(y))
     }
     return [...rows].sort((a, b) => (sort.up ? by(a, b) : by(b, a)))
   }
@@ -156,7 +157,7 @@
   )
   // Sorted by the heading clicked, each character's items kept together.
   const ownedSorted = $derived(
-    order(ownedRows, mineSort, (o, by) => (by === 'name' ? `${o.name} ${o.suffix}` : by === 'place' ? o.place : by === 'n' ? o.n : by === 'each' ? (o.each ?? -1) : by === 'at' ? o.at : by === 'vendor' ? o.vendor : o.better)).sort((a, b) => ours.indexOf(a.who) - ours.indexOf(b.who)),
+    order(ownedRows, mineSort, (o, by) => (by === 'name' ? `${o.name} ${o.suffix}` : by === 'place' ? t(`auction.place.${PLACE[o.place]}`) : by === 'n' ? o.n : by === 'each' ? (o.each ?? -1) : by === 'at' ? o.at : by === 'vendor' ? o.vendor : o.better)).sort((a, b) => ours.indexOf(a.who) - ours.indexOf(b.who)),
   )
   const colorOf = (key: string): string | undefined => known.find((k) => k.key === key)?.color
   let copied = $state(false)

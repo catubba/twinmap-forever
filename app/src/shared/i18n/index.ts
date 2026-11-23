@@ -7,6 +7,9 @@ import fr from './fr'
 import esES from './es-ES'
 import esMX from './es-MX'
 import de from './de'
+import ru from './ru'
+import ko from './ko'
+import zh from './zh'
 
 /** A text that changes with a number, `count` among its values: the forms Intl.PluralRules names for the language. */
 export type Plural = { other: string } & Partial<Record<Intl.LDMLPluralRule, string>>
@@ -22,12 +25,15 @@ export type Key = Leaves<typeof en>
 /** The languages the app speaks, by the game's codes for them (textLocale in Config.wtf). */
 export const LANGS: Record<string, { name: string; intl: string; table: Table; soon?: true }> = {
   enUS: { name: 'English', intl: 'en-US', table: en },
-  // soon: written, not offered yet. Spoken only when chosen by hand in settings.json, never from the game's language,
+  // soon (none today): written, not offered yet. Spoken only when chosen by hand in settings.json, never from the game's language,
   // until all the languages come out together (design notes, M17-F15). Trials offer them with TWINMAP_LANGS=all.
-  frFR: { name: 'Français', intl: 'fr-FR', table: fr, soon: true },
-  esES: { name: 'Español (España)', intl: 'es-ES', table: esES, soon: true },
-  esMX: { name: 'Español (Latinoamérica)', intl: 'es-MX', table: esMX, soon: true },
-  deDE: { name: 'Deutsch', intl: 'de-DE', table: de, soon: true },
+  frFR: { name: 'Français', intl: 'fr-FR', table: fr },
+  esES: { name: 'Español (España)', intl: 'es-ES', table: esES },
+  esMX: { name: 'Español (Latinoamérica)', intl: 'es-MX', table: esMX },
+  deDE: { name: 'Deutsch', intl: 'de-DE', table: de },
+  ruRU: { name: 'Русский', intl: 'ru-RU', table: ru },
+  koKR: { name: '한국어', intl: 'ko-KR', table: ko },
+  zhCN: { name: '简体中文', intl: 'zh-CN', table: zh },
 }
 /** Every language planned (design notes, l10n.md), in its own words, in the order they are offered. The ones not in
  *  LANGS, or there but soon, show as coming, said in their own words too: the player who reads it is one who speaks it. */
@@ -49,7 +55,8 @@ export const offered = (code: unknown): boolean => typeof code === 'string' && c
 /** The languages planned, each with whether it can be had yet. */
 export const planned = (): { code: string; name: string; soon: string; ready: boolean }[] => PLANNED.map((l) => ({ ...l, ready: offered(l.code) }))
 
-/** For trials only, never offered: every text marked, accented and 40% longer, so one left in the code shows at a glance. */
+/** For trials only, never offered: every text marked, accented and 40% longer, so one left in the code shows at a glance.
+ *  pseudo-ru, pseudo-ko and pseudo-zh are the same in the letters of the other scripts (FAKES). */
 export const PSEUDO = 'pseudo'
 
 let lang = 'enUS'
@@ -59,20 +66,22 @@ let plurals = new Intl.PluralRules(intl)
 
 /** The language to speak: the one chosen, else the game's, else English. */
 export function langFor(chosen: unknown, game: unknown): string {
-  for (const code of [chosen, game]) if (typeof code === 'string' && ((code in LANGS && (offered(code) || code === chosen)) || (code === PSEUDO && code === chosen))) return code
+  for (const code of [chosen, game]) if (typeof code === 'string' && ((code in LANGS && (offered(code) || code === chosen)) || (code in FAKES && code === chosen))) return code
   return 'enUS'
 }
 
 /** Speaks this language from now on; an unknown one is English. Gives the language set. */
 export function setLang(code: unknown): string {
   lang = langFor(code, null)
-  table = lang === PSEUDO ? pseudoTable(en) : LANGS[lang]!.table
-  intl = lang === PSEUDO ? 'en-US' : LANGS[lang]!.intl
+  table = lang in FAKES ? pseudoTable(en, lang) : LANGS[lang]!.table
+  intl = FAKES[lang]?.intl ?? LANGS[lang]!.intl
   plurals = new Intl.PluralRules(intl)
   return lang
 }
 
 export const langNow = (): string => lang
+/** The language spoken as the web names it (lang of the page): the fonts and the line breaks of its script go by it. */
+export const langTag = (): string => intl
 
 function find(from: Table, key: string): string | Plural | Table | undefined {
   let at: string | Plural | Table | undefined = from
@@ -105,20 +114,34 @@ export const clock = (ms: number): string => new Date(ms).toLocaleTimeString(dat
 /** A day, as the options ask. */
 export const day = (ms: number, options: Intl.DateTimeFormatOptions): string => new Date(ms).toLocaleDateString(dates(), options)
 
-// The pseudo-language: letters swapped for accented ones, {names} kept, and a tail that makes it 40% longer, in brackets.
+// The pseudo-languages: letters swapped, {names} kept, in brackets, with a tail of dots for the length. Every swap can be
+// undone (design/l10n/screens.js does, to find a button by its English). Accented Latin and Cyrillic are 40% longer, as
+// French and Russian can be. Hangul and Han give one sign for two letters (a letter alone at the end of a word: one sign
+// too), about as wide as the English; Han without spaces, as Chinese is written (a space is 的).
 const PLAIN = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
-const ACCENTED = 'àƀçđéƒĝĥîĵķĺɱñöþǫŕšţûṽŵẋýžÀƁÇĐÉƑĜĤÎĴĶĹṀÑÖÞǪŔŠŢÛṼŴẊÝŽ'
-export function pseudo(text: string): string {
+const ACCENTED = [...'àƀçđéƒĝĥîĵķĺɱñöþǫŕšţûṽŵẋýžÀƁÇĐÉƑĜĤÎĴĶĹṀÑÖÞǪŔŠŢÛṼŴẊÝŽ']
+const CYRILLIC = [...'абцдефгхийклмнопярстувшжызАБЦДЕФГХИЙКЛМНОПЯРСТУВШЖЫЗ']
+const letters = (to: string[]) => (part: string): string => [...part].map((c) => to[PLAIN.indexOf(c)] ?? c).join('')
+const pairs = (from: number) => (part: string): string =>
+  part.replace(/[a-zA-Z]{1,2}/g, (two) => String.fromCodePoint(from + PLAIN.indexOf(two[0]!) * 53 + (two[1] ? PLAIN.indexOf(two[1]) : 52)))
+const FAKES: Record<string, { intl: string; swap: (part: string) => string; tail: number }> = {
+  [PSEUDO]: { intl: 'en-US', swap: letters(ACCENTED), tail: 0.4 },
+  'pseudo-ru': { intl: 'ru-RU', swap: letters(CYRILLIC), tail: 0.4 },
+  'pseudo-ko': { intl: 'ko-KR', swap: pairs(0xac00), tail: 0 },
+  'pseudo-zh': { intl: 'zh-CN', swap: (part) => pairs(0x4e00)(part).replace(/ /g, '的'), tail: 0 },
+}
+export function pseudo(text: string, code = PSEUDO): string {
+  const { swap, tail } = FAKES[code]!
   const swapped = text
     .split(/(\{\w+\})/)
-    .map((part) => (part.startsWith('{') ? part : [...part].map((c) => [...ACCENTED][PLAIN.indexOf(c)] ?? c).join('')))
+    .map((part) => (part.startsWith('{') ? part : swap(part)))
     .join('')
-  return `[${swapped}${'·'.repeat(Math.ceil(text.length * 0.4))}]`
+  return `[${swapped}${'·'.repeat(Math.ceil(text.length * tail))}]`
 }
-function pseudoTable(from: Table): Table {
+function pseudoTable(from: Table, code: string): Table {
   const out: Table = {}
   for (const [key, value] of Object.entries(from)) {
-    out[key] = typeof value === 'string' ? pseudo(value) : isPlural(value) ? Object.fromEntries(Object.entries(value).map(([form, text]) => [form, pseudo(text!)])) as Plural : pseudoTable(value)
+    out[key] = typeof value === 'string' ? pseudo(value, code) : isPlural(value) ? Object.fromEntries(Object.entries(value).map(([form, text]) => [form, pseudo(text!, code)])) as Plural : pseudoTable(value, code)
   }
   return out
 }

@@ -165,6 +165,24 @@ for (const rootVersion of [1, 2] as const) {
   })
 }
 
+for (const rootVersion of [1, 2] as const) {
+  test(`a file is read in the game's language, else in English, else in one the PC holds (root layout ${rootVersion})`, () => {
+    const files: FakeFile[] = [
+      { id: 9, chunks: [plain('in German')], locale: 0x20 },
+      { id: 9, chunks: [plain('in English')], locale: 2 },
+      { id: 9, chunks: [plain('in French')], locale: 0x10 },
+      { id: 11, chunks: [plain('in Russian, not here')], locale: 0x2000, absent: true },
+      { id: 11, chunks: [plain('in German')], locale: 0x20 },
+      { id: 11, chunks: [plain('in English')], locale: 2 },
+    ]
+    const french = openClientFiles(fakeClient(files, rootVersion), new Map(), 'frFR')
+    expect(french.read(9)?.toString()).toBe('in French')
+    expect(openClientFiles(fakeClient(files, rootVersion), new Map(), 'ruRU').read(11)?.toString(), 'English before another').toBe('in English')
+    expect(openClientFiles(fakeClient(files, rootVersion)).read(9)?.toString(), 'English when not told').toBe('in English')
+    expect(openClientFiles(fakeClient(files, rootVersion), new Map(), 'xxXX').read(9)?.toString(), 'English for a language unknown').toBe('in English')
+  })
+}
+
 test('a file with an encrypted part is refused, and the error names the key', () => {
   const client = openClientFiles(fakeClient(FILES, 2))
   expect(() => client.read(70000)).toThrow(EncryptedFileError)

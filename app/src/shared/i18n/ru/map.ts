@@ -1,0 +1,176 @@
+// Русский карты: the notes on every key are in en/map.ts.
+export default {
+  layers: {
+    button: 'Слои',
+    buttonTip: 'Слои (L)',
+    menu: 'Слои',
+    // Group after a colon: "все {group}" would need the case of each group name.
+    hideAll: 'Скрыть все: {group}',
+    showAll: 'Показать все: {group}',
+    groups: {
+      you: 'Вы',
+      quests: 'Задания',
+      services: 'Услуги',
+      resources: 'Ресурсы',
+      world: 'Мир',
+      group: 'Группа',
+    },
+    // Service layers follow the game's minimap tracking menu (glossary), so the NPC, not the place.
+    names: {
+      arrow: 'Стрелка',
+      route: 'Маршрут',
+      mypins: 'Мои точки',
+      death: 'Тело и кладбище',
+      available: 'Доступные',
+      // The game's map legend for quests to hand in.
+      turnin: 'Готово к сдаче',
+      objectives: 'Задачи',
+      flight: 'Распорядитель полетов',
+      inn: 'Хозяин таверны',
+      vendors: 'Торговцы',
+      repair: 'Ремонт',
+      trainers: 'Учителя',
+      bank: 'Банкир',
+      auction: 'Аукционер',
+      stable: 'Хозяин стойл',
+      ore: 'Руда',
+      herbs: 'Травы',
+      zones: 'Названия мест',
+      relief: 'Рельеф',
+      caves: 'Пещеры',
+      dungeons: 'Подземелья',
+      routes: 'Маршруты полетов',
+      bosses: 'Боссы подземелий',
+      companions: 'Группа',
+    },
+  },
+
+  continents: {
+    easternKingdoms: 'Восточные королевства',
+    kalimdor: 'Калимдор',
+  },
+
+  corner: {
+    // Place after a colon: "Назад в {place}" would need the case of each name.
+    back: 'Назад: {place}',
+    view3d: 'Вид 3D',
+    view3dTip: 'Вид 2D или 3D (3)',
+    turn: 'Поворот вместе с персонажем',
+    turnTip: 'Поворот вместе с персонажем (N)',
+    northUpTip: 'Север сверху (N)',
+    // Floors of a dungeon: "Этажи", since "Уровень" is the character's level in the game.
+    levels: 'Этажи',
+    levelsShown: 'Показанные этажи',
+    everyRoom: 'Все комнаты',
+    roomsUpTo: 'Комнаты до этажа {level}',
+    zoomIn: 'Приблизить',
+    zoomInTip: 'Приблизить (+)',
+    zoomOut: 'Отдалить',
+    zoomOutTip: 'Отдалить (-)',
+    follow: 'Следовать',
+    followTip: 'Следовать за персонажем (F)',
+  },
+
+  offMap: 'Этого места нет на карте.',
+  // "кадр/с" needs no plural agreement with the number; shown only in trials.
+  fps: '{fps} кадр/с',
+  nothingToSend: 'Нечего отправлять.',
+
+  pins: {
+    entrance: 'Вход',
+    entranceOf: 'Вход: {name}',
+    // Rare as the game's map legend says it for creatures (glossary): neuter, so it does not agree with the boss's name.
+    rareBoss: '{name} (редкое)',
+    graveyard: 'Кладбище',
+    corpse: 'Ваше тело',
+    // A verb, not a participle, so nothing agrees with the pin's name.
+    followed: '{name}, отслеживается в игре',
+    journey: '{name}, цель пути в игре',
+    quest: {
+      available: 'Доступное задание',
+      turnin: 'Сдать задание',
+      // "Задача задания" repeats the root; "по заданию" reads naturally.
+      objective: 'Задача по заданию',
+    },
+    objective: {
+      slay: 'Задача: убить',
+      loot: 'Задача: добыть',
+      object: 'Задача: использовать',
+      talk: 'Задача: поговорить',
+      event: 'Задача: добраться',
+    },
+  },
+
+  // x and y come from toFixed (a dot, as 42.3), so the comma between them stays unambiguous.
+  place: {
+    coords: '{x}, {y}',
+    inZone: '{zone} {x}, {y}',
+  },
+
+  way: {
+    north: '{yards} м к северу',
+    northEast: '{yards} м к северо-востоку',
+    east: '{yards} м к востоку',
+    southEast: '{yards} м к юго-востоку',
+    south: '{yards} м к югу',
+    southWest: '{yards} м к юго-западу',
+    west: '{yards} м к западу',
+    northWest: '{yards} м к северо-западу',
+    onFoot: '{time} пешком',
+  },
+
+  label: {
+    pinName: 'Название точки',
+    far: '{far}, {time}',
+    dungeonMap: 'Карта подземелья',
+    raidMap: 'Карта рейда',
+    send: 'Отправить в игру',
+    sending: 'Отправка',
+    sent: 'Отправлено',
+    stopFollowing: 'Не следовать',
+    addToRoute: 'В маршрут',
+    inRoute: 'Уже в маршруте',
+    save: 'Сохранить',
+    remove: 'Удалить',
+    noAnswer: 'Игра пока не ответила. Она примет точку, когда вы выйдете из боя.',
+  },
+
+  nextStop: {
+    none: 'Нет маршрута. Нажмите на карту, чтобы добавить остановку.',
+    title: 'Следующая остановка',
+    count: '{n} из {of}',
+    complete: 'Маршрут пройден',
+    // Other continent, or inside or outside a dungeon: "your current map" says it more plainly than "ground".
+    elsewhere: 'Не на вашей текущей карте',
+    here: 'Здесь',
+    minutes: 'мин. пешком',
+    skip: 'Пропустить',
+    // Three buttons side by side: the band is about the route already, so the verb alone.
+    edit: 'Изменить',
+    clear: 'Очистить',
+    unsent: 'Еще не в игре',
+    // Same reason: "Отправить маршрут в игру" is too long beside the note on the same line.
+    send: 'Отправить в игру',
+    onItsWay: 'Отправляется в игру.',
+    moveUp: 'Вверх: {name}',
+    moveDown: 'Вниз: {name}',
+    remove: 'Удалить: {name}',
+  },
+
+  search: {
+    // Without the verb, beside the magnifier, as in French and German.
+    placeholder: 'NPC, предметы, задания, зоны',
+    field: 'Поиск',
+    results: 'Результаты',
+    none: 'Ничего с таким названием.',
+    yards: '{yards} м',
+    zone: 'Зона',
+    myPin: 'Моя точка',
+    myPinIn: 'Моя точка, {zone}',
+    dungeon: 'Подземелье',
+    dungeonIn: 'Подземелье, {zone}',
+    raid: 'Рейд',
+    raidIn: 'Рейд, {zone}',
+    foundIn: '{what}, {zone}',
+  },
+}

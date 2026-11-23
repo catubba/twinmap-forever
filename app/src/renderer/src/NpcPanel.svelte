@@ -4,6 +4,7 @@
   // many are in bags and bank; a trainer's spells or recipes, what can be learned now with its total, then each
   // level or skill still to reach, the known folded at the foot. Read only. The logic is in shared/npc-panel.ts.
   import { ago, classNameAll, firstName, type Known } from '../../shared/characters'
+  import { gameName } from '../../shared/game-names'
   import { around, t } from '../../shared/i18n'
   import { coins, QUALITY_COLORS, type ItemFacts } from '../../shared/items'
   import { craftOf, forRace, grouped, knownSpells, trainerClass, vendorRows, whoOf, type Group } from '../../shared/npc-panel'
@@ -42,6 +43,8 @@
   const cls = $derived(pin.layers.includes('trainers') && !craft ? (reads.trainers.get(npc)?.c ?? trainerClass(pin.sub)) : null)
   const mine = $derived(!!cls && cls === who.class)
   const stand = $derived(craft ? craftOf(sheet, craft.profession, craft.ranks) : null)
+  // The profession and its ranks as the game names them in its language (shared/game-names.ts).
+  const profession = $derived(craft ? gameName(craft.profession) : '')
   const list = $derived.by(() => {
     if (!trainers.format) return null // not read yet: a list without the game's facts would show numbers for names
     if (craft && stand) return grouped(craft.rows, (r) => r.skill, stand.skill, stand.known)
@@ -64,7 +67,7 @@
   const foot = $derived.by(() => {
     if (!shown || !sheet) return t('items.npc.noCharacter')
     const name = firstName(shown.key)
-    if (craft) return t(stand?.read ? 'items.npc.recipesRead' : 'items.npc.recipesUnread', { name, profession: craft.profession })
+    if (craft) return t(stand?.read ? 'items.npc.recipesRead' : 'items.npc.recipesUnread', { name, profession })
     if (cls) return shown.live ? t('items.npc.spellsNow', { name, level: who.level ?? '?' }) : t('items.npc.spellsAsOf', { name, level: who.level ?? '?', ago: ago(sheet.at.spells ?? shown.seen, now) })
     return sheet.at.bank ? t('items.npc.bankSeen', { ago: ago(sheet.at.bank, now), name }) : t('items.npc.bankUnseen', { name })
   })
@@ -118,10 +121,10 @@
   {#if craft && stand}
     <div class="skill">
       {#if stand.most}
-        {craft.profession} {stand.skill} / {stand.most}{stand.rank ? ` · ${stand.rank}` : ''}
+        {profession} {stand.skill} / {stand.most}{stand.rank ? ` · ${gameName(stand.rank)}` : ''}
         <div class="bar"><i style:width="{(100 * stand.skill) / stand.most}%"></i></div>
       {:else}
-        {t('items.npc.notLearned', { profession: craft.profession })}
+        {t('items.npc.notLearned', { profession })}
       {/if}
     </div>
   {/if}
@@ -135,7 +138,7 @@
           <h3 class="grp"><span>{t('items.npc.nextRank')}</span></h3>
           <div class="t">
             {@render pic(`${TILES}/pictures/${trainers.spells[stand.next.spell]?.[1] ?? 0}.png`)}
-            <span class="name">{stand.next.name} {craft.profession}<span class="rank">{t('items.npc.nextNeeds', { skill: stand.next.skill, level: stand.next.level })}</span></span>
+            <span class="name">{profession} · {gameName(stand.next.name)}<span class="rank">{t('items.npc.nextNeeds', { skill: stand.next.skill, level: stand.next.level })}</span></span>
             {@render price(stand.next.cost)}
           </div>
         </div>

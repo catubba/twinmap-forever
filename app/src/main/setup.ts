@@ -52,7 +52,7 @@ export function readSettings(file: string): Settings {
       ...(typeof participate === 'boolean' ? { participate } : {}),
       ...(ZOOMS.some((z) => z === zoom) ? { zoom: zoom as number } : {}),
       ...(typeof lanCode === 'string' && /^[\w-]{8,64}$/.test(lanCode) ? { lanCode } : {}),
-      ...(typeof lang === 'string' && /^([a-z]{2}[A-Z]{2}|pseudo)$/.test(lang) ? { lang } : {}),
+      ...(typeof lang === 'string' && /^([a-z]{2}[A-Z]{2}|pseudo(-[a-z]{2})?)$/.test(lang) ? { lang } : {}),
     }
   } catch {
     return {}

@@ -195,6 +195,9 @@ test('values come back as QuestieDB wrote them', () => {
   expect(cbor(enc(value))).toEqual(value)
   expect(cbor(Buffer.from('gYEZAzc=', 'base64'))).toEqual([[823]])
   expect(cbor(Buffer.from([0xf9, 0x3e, 0x00]))).toBe(1.5) // a half-size float
+  // A Lua string comes as bytes, and they are UTF-8: Хоггер.
+  const bytes = Buffer.from('Хоггер')
+  expect(cbor(Buffer.concat([Buffer.from([0x40 + bytes.length]), bytes]))).toBe('Хоггер')
   expect(() => cbor(Buffer.from([0x82, 0x01]))).toThrow()
 })
 
@@ -350,7 +353,29 @@ test.skipIf(!real)('the innkeeper of Ironforge sells his 17 goods at the prices 
   // Toxic Skullcap, from Tawny Grisette: the game has no row of it, the server sent one.
   expect(gameItemFacts(files, [])![281246]).toBeUndefined()
   expect(shopRows(sold.get(4554)!, facts).find((r) => r.id === 281246)).toEqual({ id: 281246, name: 'Toxic Skullcap', quality: expect.any(Number), buy: 150, perBuy: 1 })
-}, 60_000)
+  // A game in Russian with the cache of English only: the game's own names in Russian, and the server's English row for
+  // the item only it knows, rather than nothing. (Skipped where the PC holds no Russian.)
+  const russian = gameItemFacts(openClientFiles(real!, sentKeys(real!), 'ruRU'), [], sent)!
+  if (russian[2589]![0] !== 'Linen Cloth') {
+    expect(russian[2589]![0]).toBe('Льняной материал')
+    expect(russian[281246]![0]).toBe('Toxic Skullcap')
+  }
+}, 120_000)
+
+// The names QuestieDB keeps in other languages, for a game in one of them. (Needs the player's QuestieDB.)
+test.skipIf(!real)('quests, NPCs, objects and items are named in the language of the game, English where QuestieDB has none', () => {
+  const english = openQuestie(real!, 'enUS')!, russian = openQuestie(real!, 'ruRU')!, korean = openQuestie(real!, 'koKR')!
+  expect(english.get('Npc', 448, NPC.name)).toBe('Hogger')
+  expect(russian.get('Npc', 448, NPC.name)).toMatch(/^[А-Яа-я ]+$/)
+  expect(korean.get('Npc', 448, NPC.name)).toMatch(/[가-힣]/)
+  // Every quest named in English has a name in Russian, its own or failing that the English one; most have their own.
+  const quests = english.ids.Quest.filter((id) => typeof english.get('Quest', id, QUEST.name) === 'string')
+  const named = quests.map((id) => russian.get('Quest', id, QUEST.name))
+  expect(named.every((n) => typeof n === 'string' && n.length > 0)).toBe(true)
+  expect(named.filter((n) => /[А-Яа-я]/.test(n as string)).length / named.length).toBeGreaterThan(0.8)
+  // What is not a name stays as it is.
+  expect(russian.get('Npc', 448, NPC.spawns)).toEqual(english.get('Npc', 448, NPC.spawns))
+}, 120_000)
 
 test("what the addon's log need not send: a creature, an object or a quest QuestieDB has with a place", () => {
   const db = openQuestie(game([...LINES, `## X-Quest-11-S: ${b64({ [QUEST.name]: 'Cull the Rats' })}`, `## X-Quest-11-${QUEST.objectives}: ${b64([[[102]]])}`]))!

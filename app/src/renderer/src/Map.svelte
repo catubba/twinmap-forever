@@ -15,6 +15,7 @@
   import 'leaflet-rotate' // after Leaflet: it adds turning the map to the L that Leaflet puts on the page
   import { onMount, untrack } from 'svelte'
   import { DUNGEON_PINS } from '../../shared/dungeon-pins'
+  import { gameName, setGameNames } from '../../shared/game-names'
   import { NEW_DUNGEON_PINS } from '../../shared/new-dungeon-pins'
   import { MORE_BOSS_PINS } from '../../shared/more-boss-pins'
   import type { Position } from '../../shared/game'
@@ -590,13 +591,13 @@
     const all = [...dungeons.flatMap((d) => d.bosses), ...MORE_BOSS_PINS.filter(([map]) => map === m.id).map(([, name, u, v]) => [name, u, v] as const)]
     for (const [name, u, v] of all) {
       // A rare boss is not there in every run: a silver ring, and said in its name.
-      const rare = RARE_BOSSES.has(nameOfBoss(name))
-      bossMarks.push({ name, rare, gone: false, marker: L.marker(atYards({ u, v }), { keyboard: false, icon: bossIcon(false, rare) }).bindTooltip(rare ? t('map.pins.rareBoss', { name }) : name, { permanent: true, direction: 'bottom', offset: [0, rare ? 11 : 9], className: 'boss-name' }).addTo(pins) })
+      const rare = RARE_BOSSES.has(nameOfBoss(name)), shown = gameName(name)
+      bossMarks.push({ name, rare, gone: false, marker: L.marker(atYards({ u, v }), { keyboard: false, icon: bossIcon(false, rare) }).bindTooltip(rare ? t('map.pins.rareBoss', { name: shown }) : shown, { permanent: true, direction: 'bottom', offset: [0, rare ? 11 : 9], className: 'boss-name' }).addTo(pins) })
     }
     for (const d of dungeons) {
       if (d.entrance)
         L.marker(atYards({ u: d.entrance[0], v: d.entrance[1] }), { keyboard: false, icon: doorIcon(m.kind === 'raid') })
-          .bindTooltip(dungeons.length > 1 ? t('map.pins.entranceOf', { name: d.name }) : t('map.pins.entrance'), { direction: 'top', offset: [0, -13], className: 'tip' })
+          .bindTooltip(dungeons.length > 1 ? t('map.pins.entranceOf', { name: gameName(d.name) }) : t('map.pins.entrance'), { direction: 'top', offset: [0, -13], className: 'tip' })
           .addTo(pins)
     }
     bosses = bossMarks
@@ -1123,6 +1124,11 @@
         show(continent, true)
         place()
       })
+    // What the pins and the trainers keep in English, in the game's language (shared/game-names.ts); none for a game in English.
+    void fetch(`${TILES}/game-names.json`)
+      .then((answer) => (answer.ok ? (answer.json() as Promise<Record<string, string>>) : {}))
+      .then(setGameNames)
+      .catch(() => {})
     void fetch(`${TILES}/travel.json`)
       .then((answer) => (answer.ok ? (answer.json() as Promise<Travel>) : travel))
       .then((told) => (travel = told))

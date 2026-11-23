@@ -107,9 +107,8 @@ ns.texts = {
   },
 }
 
--- Languages written but not spoken yet: they come out all together
--- (design notes, M17-F15). Until then the game in one of them speaks English.
-ns.soon = { frFR = true, esES = true, esMX = true, deDE = true }
+-- Languages written but not spoken yet (none today; design notes, M17-F15): the game in one of them speaks English.
+ns.soon = {}
 
 -- The texts of the game's language, read when first asked for (every file asks after all are loaded or at load,
 -- both after GetLocale() knows). enGB and any language without a table speak English.

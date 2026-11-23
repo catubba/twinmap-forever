@@ -1109,6 +1109,30 @@ This Font Software is licensed under the SIL Open Font License, Version 1.1,
 whose full text is printed above, under Marcellus.
 
 ================================================================================
+Sofia Sans Semi Condensed
+by The Sofia Sans Project Authors (Lettersoup), https://github.com/lettersoup/Sofia-Sans
+Used in: the app, for Cyrillic letters in text (from the npm package
+@fontsource/sofia-sans-semi-condensed)
+================================================================================
+
+Copyright 2019 The Sofia Sans Project Authors (https://github.com/lettersoup/Sofia-Sans)
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1,
+whose full text is printed above, under Marcellus.
+
+================================================================================
+Forum
+by Denis Masharov, https://github.com/google/fonts/tree/main/ofl/forum
+Used in: the app, for Cyrillic letters in titles (from the npm package
+@fontsource/forum)
+================================================================================
+
+Copyright (c) 2011, Denis Masharov <denis.masharov@gmail.com>
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1,
+whose full text is printed above, under Marcellus.
+
+================================================================================
 electron-updater
 https://github.com/electron-userland/electron-builder
 Used in: the app, to update itself when it starts (app/src/main/update.ts). It brings the libraries listed

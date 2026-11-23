@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, expect, test } from 'vitest'
 import en from './en'
-import { around, clock, day, langFor, LANGS, num, offerAll, offered, planned, pseudo, PSEUDO, setLang, t, type Key, type Table } from '.'
+import { around, clock, day, langFor, LANGS, langTag, num, offered, planned, pseudo, PSEUDO, setLang, t, type Key, type Table } from '.'
 
 afterEach(() => setLang('enUS'))
 
@@ -21,9 +21,10 @@ test('the language: the one chosen, else the game\'s, else English; the pseudo-l
   expect(setLang('nothing')).toBe('enUS')
 })
 
-test('a language not offered yet is spoken only when chosen, never from the game', () => {
-  expect(langFor(undefined, 'frFR')).toBe('enUS')
+test('a language the app speaks is spoken when chosen, else when the game is in it', () => {
+  expect(langFor(undefined, 'frFR')).toBe('frFR')
   expect(langFor('frFR', 'enUS')).toBe('frFR')
+  expect(langFor('enUS', 'koKR')).toBe('enUS')
 })
 
 test('French writes numbers, hours and days as France does', () => {
@@ -59,6 +60,41 @@ test('German writes numbers, hours and days as the German game does', () => {
   expect(day(at, { day: 'numeric', month: 'short', timeZone: 'UTC' })).toBe('23. Nov.')
 })
 
+test('Russian writes numbers, hours and days as the Russian game does, and every plural with its four forms', () => {
+  setLang('ruRU')
+  expect(t('common.close')).toBe('Закрыть')
+  expect(num(1234567)).toBe('1\u00a0234\u00a0567')
+  expect(num(2.5)).toBe('2,5')
+  const at = Date.UTC(2026, 10, 23, 14, 5)
+  expect(clock(at + new Date(at).getTimezoneOffset() * 60000)).toBe('14:05')
+  expect(day(at, { day: 'numeric', month: 'short', timeZone: 'UTC' })).toBe('23 нояб.')
+  // One, few, many: 1 and 21 are one, 2 and 22 few, 5 and 11 many.
+  const said = [1, 2, 5, 11, 21, 22].map((count) => t('app.top.sendsLeft', { count }))
+  expect(said).toEqual(['Осталась 1 отправка', 'Осталось 2 отправки', 'Осталось 5 отправок', 'Осталось 11 отправок', 'Осталась 21 отправка', 'Осталось 22 отправки'])
+})
+
+test('Korean writes numbers, hours and days as the Korean game does, with one form for every number', () => {
+  setLang('koKR')
+  expect(t('common.close')).toBe('닫기')
+  expect(num(1234567)).toBe('1,234,567')
+  expect(num(2.5)).toBe('2.5')
+  const at = Date.UTC(2026, 10, 23, 14, 5)
+  expect(clock(at + new Date(at).getTimezoneOffset() * 60000)).toBe('14:05')
+  expect(day(at, { day: 'numeric', month: 'short', timeZone: 'UTC' })).toBe('11월 23일')
+  expect([1, 2, 5, 21].map((count) => t('app.top.sendsLeft', { count }))).toEqual(['전송 1회 남음', '전송 2회 남음', '전송 5회 남음', '전송 21회 남음'])
+})
+
+test('Chinese writes numbers, hours and days as the Chinese game does, with one form for every number', () => {
+  setLang('zhCN')
+  expect(t('common.close')).toBe('关闭')
+  expect(num(1234567)).toBe('1,234,567')
+  expect(num(2.5)).toBe('2.5')
+  const at = Date.UTC(2026, 10, 23, 14, 5)
+  expect(clock(at + new Date(at).getTimezoneOffset() * 60000)).toBe('14:05')
+  expect(day(at, { day: 'numeric', month: 'short', timeZone: 'UTC' })).toBe('11月23日')
+  expect([1, 2, 5, 21].map((count) => t('app.top.sendsLeft', { count }))).toEqual(['还可发送1次', '还可发送2次', '还可发送5次', '还可发送21次'])
+})
+
 test('English writes numbers, hours and days as the app always has', () => {
   expect(num(1234567)).toBe('1,234,567')
   const at = Date.UTC(2026, 10, 23, 14, 5)
@@ -70,6 +106,23 @@ test('the pseudo-language marks every text, keeps its names, and is 40% longer',
   expect(pseudo('Go to {zone}')).toBe('[Ĝö ţö {zone}·····]')
   setLang(PSEUDO)
   expect(t('participate.title')).toMatch(/^\[Ĥéĺþ .*·+\]$/)
+})
+
+test('the pseudo-languages of the other scripts: no Latin letter left, names kept, the page told its language', () => {
+  expect(pseudo('Go to {zone}', 'pseudo-ru')).toBe('[Го то {zone}·····]')
+  // Two letters a sign: G+o, t+o, and a letter alone gets its own.
+  const sign = (from: number, a: string, b?: string): string => {
+    const at = (c: string): number => 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'.indexOf(c)
+    return String.fromCodePoint(from + at(a) * 53 + (b ? at(b) : 52))
+  }
+  expect(pseudo('Go to {zone} a', 'pseudo-ko')).toBe(`[${sign(0xac00, 'G', 'o')} ${sign(0xac00, 't', 'o')} {zone} ${sign(0xac00, 'a')}]`)
+  expect(pseudo('Go to {zone}', 'pseudo-zh')).toBe(`[${sign(0x4e00, 'G', 'o')}的${sign(0x4e00, 't', 'o')}的{zone}]`)
+  for (const [code, tag] of [['pseudo-ru', 'ru-RU'], ['pseudo-ko', 'ko-KR'], ['pseudo-zh', 'zh-CN']] as const) {
+    expect(setLang(code)).toBe(code)
+    expect(langTag()).toBe(tag)
+    expect(t('participate.title').replace(/\{\w+\}/g, '')).not.toMatch(/[a-zA-Z]/)
+  }
+  expect(langFor(undefined, 'pseudo-ru')).toBe('enUS')
 })
 
 // The texts of a table by key, plurals as one entry per form.
@@ -170,20 +223,10 @@ test('the keys are typed', () => {
   expect(t(key)).toBe(en.participate.title)
 })
 
-test('every language planned is listed, in its own words; the ones not out yet are coming, until a trial offers them', () => {
+test('every language planned is listed, in its own words, and every one of them is out (M17-F15)', () => {
   expect(planned().map((l) => l.code)).toEqual(['enUS', 'frFR', 'deDE', 'esES', 'esMX', 'ruRU', 'koKR', 'zhCN'])
-  expect(planned().filter((l) => l.ready).map((l) => l.code)).toEqual(['enUS'])
+  expect(planned().every((l) => l.ready)).toBe(true)
   expect(planned().find((l) => l.code === 'deDE')!.name).toBe('Deutsch')
-  expect(planned().find((l) => l.code === 'deDE')!.soon, 'coming, in its own words').toBe('Deutsch (demnächst)')
-  offerAll()
-  try {
-    expect(offered('frFR')).toBe(true)
-    expect(offered('esES') && offered('esMX'), 'written, both').toBe(true)
-    expect(offered('deDE'), 'written').toBe(true)
-    expect(offered('ruRU'), 'not written').toBe(false)
-    expect(langFor(undefined, 'frFR'), 'the game language, now offered').toBe('frFR')
-  } finally {
-    offerAll(false)
-  }
-  expect(offered('frFR')).toBe(false)
+  for (const code of ['frFR', 'deDE', 'esES', 'esMX', 'ruRU', 'koKR', 'zhCN']) expect(offered(code), code).toBe(true)
+  expect(offered('ptBR'), 'not planned').toBe(false)
 })

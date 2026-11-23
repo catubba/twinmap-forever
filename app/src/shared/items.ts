@@ -3,7 +3,7 @@
 // gives for it, its type. Those come from the player's game (items.json, made beside the map by
 // tiles-worker.ts): ItemSparse with the rows the server has sent over it, and Item for the type.
 import { keyOfLink } from './ah'
-import { t, type Key } from './i18n'
+import { langTag, t, type Key } from './i18n'
 import type { Sheet, Sheets } from './sheet'
 import { readHotfixes, readTable, type Table } from './wdc5'
 
@@ -69,14 +69,19 @@ export function shopRows(items: number[], facts: ItemFacts): ShopRow[] {
     .sort((a, b) => a.name.localeCompare(b.name))
 }
 
-/** The facts of the player's game (ClientFiles of main), with the rows of the server's caches (DBCache.bin) over them; null without the tables. */
-export function gameItemFacts(files: { read(id: number, skipHidden?: boolean): Buffer | null; opens(keyName: string): boolean }, sent: Buffer[]): ItemFacts | null {
+/**
+ * The facts of the player's game (ClientFiles of main), with the rows of the server's caches (DBCache.bin) over them; null without the tables.
+ * sent: the caches in the game's language. elsewhere: those of other languages, for the items neither the tables nor sent have (new on
+ * Forever, before the game has run in its language): a name in another language rather than none, never over one in the game's own.
+ */
+export function gameItemFacts(files: { read(id: number, skipHidden?: boolean): Buffer | null; opens(keyName: string): boolean }, sent: Buffer[], elsewhere: Buffer[] = []): ItemFacts | null {
   const item = files.read(ITEM_FILE, true), sparse = files.read(ITEM_SPARSE_FILE, true)
   if (!item || !sparse) return null
-  // ponytail: every language's rows go over each other; the game runs in one.
   const hotfixes = new Map(sent.flatMap((cache) => [...readHotfixes(cache, ITEM_SPARSE_TABLE)]))
   const opens = (keyName: string): boolean => files.opens(keyName)
-  return itemFacts(readTable(item, opens), readTable(sparse, opens, ITEM_SPARSE_TEXTS), hotfixes)
+  const names = readTable(sparse, opens, ITEM_SPARSE_TEXTS), known = new Set(names.rows.map((r) => r.id))
+  for (const cache of elsewhere) for (const [id, row] of readHotfixes(cache, ITEM_SPARSE_TABLE)) if (!known.has(id) && !hotfixes.has(id)) hotfixes.set(id, row)
+  return itemFacts(readTable(item, opens), names, hotfixes)
 }
 
 // The names the game gives the classes of items, and the subclasses of weapons and armour: their keys, by the game's numbers.
@@ -143,13 +148,16 @@ export function itemRows(sheet: Sheet, facts: ItemFacts, lowest: (key: string) =
 
 export type Column = 'name' | 'type' | 'place' | 'n' | 'value' | 'auction'
 
-/** The rows sorted by a column; ties by name. up: smallest first (A to Z). */
+/** The rows sorted by a column; ties by name. up: smallest first (A to Z), in the order of the language the app speaks. */
 export function sortRows(rows: ItemRow[], column: Column, up: boolean): ItemRow[] {
+  const words = new Intl.Collator(langTag())
+  // Where: by the word shown, not by the place's id.
+  const of = (r: ItemRow): string | number => (column === 'place' ? placeName(r.place) : r[column])
   const by = (a: ItemRow, b: ItemRow): number => {
-    const x = a[column], y = b[column]
-    return typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y))
+    const x = of(a), y = of(b)
+    return typeof x === 'number' && typeof y === 'number' ? x - y : words.compare(String(x), String(y))
   }
-  return [...rows].sort((a, b) => (up ? by(a, b) : by(b, a)) || a.name.localeCompare(b.name))
+  return [...rows].sort((a, b) => (up ? by(a, b) : by(b, a)) || words.compare(a.name, b.name))
 }
 
 /** The rows whose name or type holds every word typed. */

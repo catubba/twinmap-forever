@@ -2,7 +2,7 @@
 ## Title: Twinmap Forever
 ## Notes: Live map on your second screen. Reads and draws, never plays for you.
 ## Author: Twinmap contributors
-## Version: 0.15.1
+## Version: 0.16.0
 ## X-Website: https://twinmap.app
 ## X-License: GPL-3.0-only
 ## X-Channel: 2
@@ -14,6 +14,9 @@ Locale_frFR.lua
 Locale_esES.lua
 Locale_esMX.lua
 Locale_deDE.lua
+Locale_ruRU.lua
+Locale_koKR.lua
+Locale_zhCN.lua
 TwinmapForever.lua
 Strip.lua
 Sheet.lua
