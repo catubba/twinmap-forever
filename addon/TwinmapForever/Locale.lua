@@ -107,11 +107,16 @@ ns.texts = {
   },
 }
 
+-- Languages written but not spoken yet: they come out all together with the choice of the language in the app
+-- (design notes, M17-F14). Until then the game in one of them speaks English.
+ns.soon = { frFR = true }
+
 -- The texts of the game's language, read when first asked for (every file asks after all are loaded or at load,
 -- both after GetLocale() knows). enGB and any language without a table speak English.
 ns.L = setmetatable({}, {
   __index = function(_, key)
-    local own = ns.texts[GetLocale and GetLocale() or "enUS"]
+    local code = GetLocale and GetLocale() or "enUS"
+    local own = not ns.soon[code] and ns.texts[code]
     return own and own[key] or ns.texts.enUS[key] or key
   end,
 })

@@ -21,6 +21,21 @@ test('the language: the one chosen, else the game\'s, else English; the pseudo-l
   expect(setLang('nothing')).toBe('enUS')
 })
 
+test('a language not offered yet is spoken only when chosen, never from the game', () => {
+  expect(langFor(undefined, 'frFR')).toBe('enUS')
+  expect(langFor('frFR', 'enUS')).toBe('frFR')
+})
+
+test('French writes numbers, hours and days as France does', () => {
+  setLang('frFR')
+  expect(t('common.close')).toBe('Fermer')
+  expect(num(1234567)).toBe('1 234 567')
+  expect(num(2.5)).toBe('2,5')
+  const at = Date.UTC(2026, 10, 23, 14, 5)
+  expect(clock(at + new Date(at).getTimezoneOffset() * 60000)).toBe('14:05')
+  expect(day(at, { day: 'numeric', month: 'short', timeZone: 'UTC' })).toBe('23 nov.')
+})
+
 test('English writes numbers, hours and days as the app always has', () => {
   expect(num(1234567)).toBe('1,234,567')
   const at = Date.UTC(2026, 10, 23, 14, 5)

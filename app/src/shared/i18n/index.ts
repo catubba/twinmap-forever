@@ -3,6 +3,7 @@
 // languages are in the design notes (l10n.md). A key a language has not got shows its English, never the key.
 // The language is set once as a page or the main process starts (setLang): a new choice reloads the page.
 import en from './en'
+import fr from './fr'
 
 /** A text that changes with a number, `count` among its values: the forms Intl.PluralRules names for the language. */
 export type Plural = { other: string } & Partial<Record<Intl.LDMLPluralRule, string>>
@@ -16,8 +17,11 @@ type Leaves<T, P extends string = ''> = {
 export type Key = Leaves<typeof en>
 
 /** The languages the app speaks, by the game's codes for them (textLocale in Config.wtf). */
-export const LANGS: Record<string, { name: string; intl: string; table: Table }> = {
+export const LANGS: Record<string, { name: string; intl: string; table: Table; soon?: true }> = {
   enUS: { name: 'English', intl: 'en-US', table: en },
+  // soon: written, not offered yet. Spoken only when chosen by hand in settings.json, never from the game's language,
+  // until all the languages come out together with the choice of the language (design notes, M17-F14).
+  frFR: { name: 'Français', intl: 'fr-FR', table: fr, soon: true },
 }
 /** For trials only, never offered: every text marked, accented and 40% longer, so one left in the code shows at a glance. */
 export const PSEUDO = 'pseudo'
@@ -29,7 +33,7 @@ let plurals = new Intl.PluralRules(intl)
 
 /** The language to speak: the one chosen, else the game's, else English. */
 export function langFor(chosen: unknown, game: unknown): string {
-  for (const code of [chosen, game]) if (typeof code === 'string' && (code in LANGS || (code === PSEUDO && code === chosen))) return code
+  for (const code of [chosen, game]) if (typeof code === 'string' && ((code in LANGS && (!LANGS[code]!.soon || code === chosen)) || (code === PSEUDO && code === chosen))) return code
   return 'enUS'
 }
 

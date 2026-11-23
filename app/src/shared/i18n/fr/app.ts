@@ -1,0 +1,246 @@
+// Le français de app: les notes sur chaque clé sont dans en/app.ts.
+export default {
+  top: {
+    sections: 'Sections',
+    now: 'Maintenant',
+    items: 'Objets',
+    auctionHouse: 'Hôtel des ventes',
+    auctionHouseShort: 'HV',
+    pause: 'Mettre Twinmap en pause',
+    resume: 'Reprendre Twinmap',
+    sendsLeft: { one: '{count} envoi restant', many: '{count} d’envois restants', other: '{count} envois restants' },
+    // Our choice: the game has no "Feedback" button; "Avis" is short and reads as "tell us what you think". Named again in tiles.failedHelp.
+    feedback: 'Avis',
+    feedbackHint: 'Signaler un bug ou proposer une idée',
+    settings: 'Options',
+  },
+
+  link: {
+    paused: 'En pause',
+    closed: 'Jeu fermé',
+    closedLine: 'Le jeu n’est pas lancé. La carte fonctionne quand même ; votre position apparaît quand vous vous connectez.',
+    minimized: 'Jeu réduit',
+    minimizedLine: 'Jeu réduit. Votre position apparaît quand sa fenêtre revient à l’écran.',
+    // "app" in the short state words, where "application" would not fit; "application" in full sentences.
+    updateApp: 'Mettre à jour l’app',
+    updateAddon: 'Mettre à jour l’addon',
+    newerAddon: 'L’addon Twinmap Forever est plus récent que cette application (protocole {addon}, cette application utilise le {app}). Fermez Twinmap et rouvrez-le : il se met à jour au démarrage.',
+    olderAddon: 'L’addon Twinmap Forever est plus ancien que cette application (protocole {addon}, cette application utilise le {app}). Mettez l’addon à jour depuis CurseForge, puis relancez le jeu.',
+    connecting: 'Connexion',
+    lost: 'Connexion perdue',
+    lostLine: 'Aucun signal du jeu. Connectez-vous et vérifiez que l’addon Twinmap Forever est activé et que sa bande n’est pas en pause.',
+    combat: 'En combat, position seule',
+    connected: 'Connecté',
+    minimapTurns: 'Dans un donjon, votre position est lue sur la minicarte, ce qui est impossible quand elle tourne : désactivez « Rotation de la minicarte » dans le jeu.',
+    noRooms: 'Twinmap n’a pas d’images de ce donjon : votre position n’y est pas affichée.',
+    noMinimap: 'Dans un donjon, votre position est lue sur la minicarte, et le jeu n’en donne aucune : mettez à jour l’addon Twinmap Forever et gardez la minicarte à l’écran.',
+    looking: 'Recherche de votre position. Elle est lue sur la minicarte du jeu : gardez-la à l’écran, sans rien par-dessus.',
+  },
+
+  map: {
+    addonMissing: 'L’addon Twinmap Forever n’est pas dans votre jeu, aucune position ne peut donc arriver. Téléchargez-le sur CurseForge, puis relancez le jeu.',
+    getAddon: 'Obtenir sur CurseForge',
+    paused: 'Twinmap est en pause : la carte reste où vous étiez et votre personnage n’est pas suivi.',
+    resume: 'Reprendre',
+    unknownZone: 'Zone inconnue',
+  },
+
+  tiles: {
+    builtOnce: 'Cela n’arrive que la première fois, puis après chaque mise à jour du jeu.',
+    noGameHelp: 'Choisissez le dossier où World of Warcraft: Forever est installé, celui qui contient _forever_.',
+    failedHelp: 'Twinmap n’a pas pu lire les fichiers du jeu. Fermez le lanceur du jeu s’il est en train de le mettre à jour ou de le réparer, puis réessayez. Si cela échoue encore, réparez le jeu depuis le lanceur et prévenez-nous avec le bouton Avis.',
+    looking: 'Recherche du jeu.',
+    noGame: 'Le dossier du jeu est introuvable.',
+    converting: 'Création de la carte à partir des fichiers de votre jeu, {percent} %.',
+    ready: 'Carte : {tiles} tuiles prêtes, jeu {version}, {rooms} salles',
+    readyReading: 'Carte : {tiles} tuiles prêtes, jeu {version}, lecture des salles',
+    readyNoRooms: 'Carte : {tiles} tuiles prêtes, jeu {version}, salles non lues ({problem})',
+    failed: 'La carte n’a pas pu être créée : {message}',
+    chooseFolder: 'Choisir le dossier du jeu',
+    retry: 'Réessayer',
+  },
+
+  elsewhere: {
+    title: 'Terminez la configuration sur l’ordinateur',
+    text: 'Twinmap est encore en cours de configuration sur l’ordinateur, qui indique ce qu’il reste à faire. La carte s’ouvre ici d’elle-même une fois que c’est fait.',
+  },
+
+  panel: {
+    close: 'Fermer',
+    open: 'Quêtes et alentours',
+    mapLeft: 'Carte à gauche (M)',
+    mapRight: 'Carte à droite (M)',
+    // The name after a colon: "de {name}" would need d’ before a vowel.
+    showing: 'Affichage : {name}',
+    backTo: 'Retour : {name}',
+    level: 'Niveau {level}',
+    levelPercent: 'Niveau {level}, {percent} %',
+    xp: '{xp} sur {max} EXP',
+    experience: 'Expérience',
+    width: 'Largeur du panneau',
+    widthHint: 'Faites glisser pour redimensionner. Double-cliquez pour réinitialiser.',
+  },
+
+  now: {
+    attention: 'Attention',
+    inGame: 'En jeu',
+    pins: 'Mes repères',
+    quests: 'Quêtes',
+    nearby: 'À proximité',
+    // The game's "Rendre la quête", cut to its verb: the row already names the quest and the word must stay short.
+    handIn: 'Rendre',
+    objective: 'Objectif',
+    quest: 'Quête',
+    entrance: 'Entrée',
+    corpse: 'Cadavre',
+    flight: 'Maître de vol',
+    inn: 'Aubergiste',
+    bank: 'Banque',
+    // The game's own short form of Hôtel des ventes: "Commissaire-priseur" would take the room of the name beside it.
+    auction: 'HV',
+    // Cut from the game's "Maître des écuries": the word column widens to its longest word and squeezes the name.
+    stable: 'Écuries',
+    trainer: 'Maître',
+    repair: 'Réparations',
+    vendor: 'Marchand',
+    onSale: 'En vente',
+    cheaper: 'Moins cher',
+    dearer: 'Plus cher',
+    otherContinent: 'Sur l’autre continent',
+    yards: '{yards} m',
+    finding: 'Recherche du trajet',
+    updateHint: 'Mettez à jour Shortest Path et l’addon Twinmap Forever pour voir ici tout le trajet',
+  },
+
+  journey: {
+    // "Trajet", not "Itinéraire": Itinéraire is Twinmap's own Route.
+    name: 'Trajet',
+    seconds: '{seconds} s',
+    minutes: '{minutes} min',
+    hours: '{hours} h {minutes} min',
+  },
+
+  death: {
+    corpse: 'Votre cadavre',
+  },
+
+  send: {
+    pointNoZone: 'Ce point n’est dans aucune zone que le jeu peut marquer.',
+    stopNoZone: 'Une étape n’est dans aucune zone que le jeu peut marquer.',
+    notConnected: 'Le jeu n’est pas connecté.',
+    notListening: 'Le jeu n’écoute pas encore. Si cela dure, mettez à jour l’addon et relancez le jeu.',
+    reload: 'Tapez /reload dans le jeu pour envoyer de nouveau.',
+    restart: 'Relancez le jeu une fois : la liaison depuis Twinmap s’ouvrira au prochain démarrage.',
+    pin: 'Repère',
+    stop: 'Étape',
+  },
+
+  firstRun: {
+    steps: 'Étapes',
+    building: 'Création de la carte',
+    secondsLeft: { one: 'environ {count} seconde restante', many: 'environ {count} de secondes restantes', other: 'environ {count} secondes restantes' },
+    minutesLeft: { one: 'environ {count} min restante', many: 'environ {count} min restantes', other: 'environ {count} min restantes' },
+    skip: 'Passer, voir la carte',
+    back: 'Retour',
+    next: 'Suivant',
+    toMap: 'Aller à la carte',
+    chooseFolder: 'Choisir le dossier du jeu',
+    chooseAnother: 'Choisir un autre dossier',
+    getAddon: 'Obtenir Twinmap Forever sur CurseForge',
+    getOptional: 'Obtenir {name} sur CurseForge',
+    retry: 'Réessayer',
+    photosensitivity: 'Avertissement de photosensibilité : l’addon envoie des données en changeant les couleurs d’une ligne d’un pixel au bord de la fenêtre du jeu, plusieurs fois par seconde. Ses options en jeu permettent de le ralentir ou de le mettre en pause.',
+    game: {
+      title: 'Trouver le jeu',
+      intro: 'Twinmap doit savoir où World of Warcraft: Forever est installé. Il ne fait que lire ce dossier ; il n’y change jamais rien.',
+      found: 'Trouvé.',
+      notFound: 'Le jeu est introuvable sur ce PC.',
+      choose: 'Choisissez le dossier où il est installé : celui qui contient _forever_.',
+    },
+    map: {
+      title: 'Créer la carte',
+      intro: 'Twinmap dessine sa carte à partir des fichiers de votre propre jeu, elle correspond donc toujours à votre version du jeu. Cela se fait une fois, puis seulement après une mise à jour du jeu. Rien n’est téléchargé.',
+      waiting: 'En attente du dossier du jeu.',
+      opening: 'Ouverture des fichiers du jeu.',
+      reading: 'Lecture des images du monde fournies par le jeu.',
+      failed: 'La carte n’a pas pu être créée.',
+      ready: 'La carte est prête.',
+      tiles: '{count} tuiles de la version {version} du jeu.',
+    },
+    addon: {
+      title: 'Obtenir l’addon',
+      intro: 'L’addon Twinmap Forever indique à cette application où se trouve votre personnage. Il s’installe comme n’importe quel autre addon, depuis CurseForge.',
+      installed: 'Installé.',
+      inFolder: 'Twinmap Forever {version} est dans le dossier AddOns du jeu.',
+      notYet: 'Pas encore installé.',
+      howTo: 'Installez-le avec l’application CurseForge. Sans elle, téléchargez le fichier sur la même page et décompressez-le dans _forever_\\Interface\\AddOns.',
+      notices: 'Cette page détecte d’elle-même la présence de l’addon.',
+    },
+    extras: {
+      title: 'Addons facultatifs',
+      intro: 'Aucun n’est nécessaire. Quand l’un d’eux est installé, Twinmap en montre plus.',
+      questie: 'QuestieDB : installé. La carte montre les PNJ qui proposent un service, les gisements, les herbes et les quêtes de votre journal. Si Questie est aussi lancé, elle montre les mêmes quêtes que Questie, y compris celles à prendre.',
+      noQuestie: 'QuestieDB : non installé. Il est fourni avec Twinmap Forever par l’application CurseForge. Sans lui, la carte n’a ni PNJ, ni services, ni quêtes.',
+      shortestPath: 'Shortest Path : installé. La carte montrera son trajet, et les destinations que vous envoyez au jeu seront rejointes par les routes.',
+      noShortestPath: 'Shortest Path : non installé. Avec lui, la carte montre le trajet qu’il prévoit, et les destinations que vous envoyez au jeu sont rejointes par les routes.',
+    },
+    play: {
+      title: 'Lancer le jeu',
+      intro: 'Lancez World of Warcraft: Forever et connectez-vous avec un personnage. Votre position apparaît ici d’elle-même.',
+      connected: 'Connecté. Votre position arrive.',
+      silent: 'Le jeu est ouvert, mais rien n’arrive encore de l’addon.',
+      minimized: 'Le jeu est réduit. Ramenez sa fenêtre à l’écran.',
+      waiting: 'En attente du jeu.',
+      // "AddOns": the frFR character select button keeps the English word (to confirm in GS ADDONS for frFR).
+      tick: 'À l’écran de sélection des personnages, ouvrez AddOns et vérifiez que Twinmap Forever est coché.',
+    },
+  },
+
+  update: {
+    updating: 'Mise à jour',
+    updatingTo: 'Mise à jour vers la version {version}',
+    installing: 'Installation de la version {version}',
+    reopen: 'Twinmap va se rouvrir dans quelques secondes',
+    downloading: 'Téléchargement de la nouvelle version',
+  },
+
+  web: {
+    noAnswer: 'Twinmap sur l’ordinateur n’a pas répondu.',
+    chooseOnComputer: 'Choisissez le dossier du jeu dans Twinmap sur l’ordinateur.',
+  },
+
+  main: {
+    pickFolder: 'Où est installé World of Warcraft: Forever ?',
+    notGame: 'World of Warcraft: Forever n’est pas dans ce dossier. Choisissez celui qui contient _forever_.',
+    // The character after a colon: "de {name}" would need d’ before a vowel.
+    savePicture: 'Enregistrer l’image : {name}',
+    noNetwork: 'Cet ordinateur n’est connecté à aucun réseau local.',
+    portTaken: 'Le port {port} est utilisé par un autre programme.',
+    scanAgain: 'Ouvrez les options de Twinmap sur l’ordinateur et scannez à nouveau le code.',
+    nothingToSend: 'Il n’y a rien à envoyer.',
+    cannotWrite: 'Twinmap n’a pas pu écrire à côté de l’addon dans le dossier du jeu.',
+  },
+
+  found: {
+    npc: 'PNJ',
+    // "donnée par", not "de {giver}": "par" never elides before a name.
+    quest: 'Quête donnée par {giver}',
+    questLevel: 'Quête de niveau {level}, donnée par {giver}',
+    soldBy: 'Vendu par {name}',
+    // As the item page (fr/items.ts, dropsFrom): "Butin de {name}" would need d’ before a vowel.
+    droppedBy: 'Butin : {name}',
+    foundIn: 'Trouvé dans {name}',
+    questNumber: 'Quête {id}',
+    // Under an NPC: the game's names of the NPCs themselves (minimap tracking), lower case.
+    services: {
+      flight: 'maître de vol',
+      inn: 'aubergiste',
+      vendor: 'marchand',
+      repair: 'réparations',
+      trainer: 'maître',
+      bank: 'banquier',
+      auction: 'commissaire-priseur',
+      stable: 'maître des écuries',
+    },
+  },
+}

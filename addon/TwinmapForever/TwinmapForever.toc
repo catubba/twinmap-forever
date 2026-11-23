@@ -10,6 +10,7 @@
 ## SavedVariablesPerCharacter: TwinmapForeverSheet
 
 Locale.lua
+Locale_frFR.lua
 TwinmapForever.lua
 Strip.lua
 Sheet.lua

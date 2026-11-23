@@ -110,6 +110,8 @@ export default {
   character: {
     // {level}: a number; {race}: one of races; {class}: one of classes. "Level 24 Gnome Warlock".
     line: 'Level {level} {race} {class}',
+    // The same line when the level is not known yet.
+    kind: '{race} {class}',
   },
   // The races, by the game's tokens: in character.line.
   races: {

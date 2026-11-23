@@ -52,7 +52,7 @@ export function knownOf(sheets: Sheets, live: string | null): Known[] {
     const level = typeof who.level === 'number' ? who.level : undefined
     const race = typeof who.race === 'string' ? raceName(who.race) : '', named = cls ? className(cls) : ''
     // Without a level, race and class alone; with one, the whole line, room left by a part not told taken away.
-    const line = level === undefined ? [race, named].filter(Boolean).join(' ') : t('items.character.line', { level, race, class: named }).replace(/\s+/g, ' ').trim()
+    const line = (level === undefined ? t('items.character.kind', { race, class: named }) : t('items.character.line', { level, race, class: named })).replace(/\s+/g, ' ').trim()
     return { key, ...(cls && { class: cls }), color: (cls && CLASS_COLORS[cls]) ?? 'var(--text)', ...(level !== undefined && { level }), line, live: key === live, seen: Math.max(0, ...Object.values(sheet.at)) }
   })
   return out.sort((a, b) => Number(b.live) - Number(a.live) || b.seen - a.seen)

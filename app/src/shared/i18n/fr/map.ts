@@ -1,0 +1,174 @@
+// Le français de la carte: les notes sur chaque clé sont dans en/map.ts.
+export default {
+  layers: {
+    button: 'Calques',
+    buttonTip: 'Calques (L)',
+    menu: 'Calques',
+    // Group after a colon: "tous les {group}" would need the gender of each group name (les Quêtes, le Monde).
+    hideAll: 'Tout cacher : {group}',
+    showAll: 'Tout afficher : {group}',
+    groups: {
+      you: 'Vous',
+      quests: 'Quêtes',
+      services: 'Services',
+      resources: 'Ressources',
+      world: 'Monde',
+      group: 'Groupe',
+    },
+    // Service layers follow the game's minimap tracking menu (glossary), so the NPC, not the place.
+    names: {
+      arrow: 'Flèche',
+      route: 'Itinéraire',
+      mypins: 'Mes repères',
+      death: 'Cadavre et cimetière',
+      available: 'Disponibles',
+      turnin: 'Rendre la quête',
+      objectives: 'Objectifs',
+      flight: 'Maître de vol',
+      inn: 'Aubergiste',
+      vendors: 'Marchands',
+      repair: 'Réparations',
+      trainers: 'Maîtres',
+      bank: 'Banquier',
+      auction: 'Commissaire-priseur',
+      stable: 'Maître des écuries',
+      ore: 'Gisements',
+      herbs: 'Herbes',
+      zones: 'Noms des lieux',
+      relief: 'Relief',
+      caves: 'Grottes',
+      dungeons: 'Donjons',
+      routes: 'Trajets aériens',
+      bosses: 'Boss des donjons',
+      companions: 'Groupe',
+    },
+  },
+
+  continents: {
+    easternKingdoms: 'Royaumes de l’Est',
+    kalimdor: 'Kalimdor',
+  },
+
+  corner: {
+    // Place after a colon: "Retour à {place}" breaks on names with an article (au Cap).
+    back: 'Retour : {place}',
+    view3d: 'Vue 3D',
+    view3dTip: 'Vue 2D ou 3D (3)',
+    turn: 'Pivoter avec votre personnage',
+    turnTip: 'Pivoter avec votre personnage (N)',
+    northUpTip: 'Nord en haut (N)',
+    // Floors of a dungeon: "Étages", since "Niveau" is the character's level in the game.
+    levels: 'Étages',
+    levelsShown: 'Étages affichés',
+    everyRoom: 'Toutes les salles',
+    roomsUpTo: 'Salles jusqu’à l’étage {level}',
+    zoomIn: 'Zoom avant',
+    zoomInTip: 'Zoom avant (+)',
+    zoomOut: 'Zoom arrière',
+    zoomOutTip: 'Zoom arrière (-)',
+    follow: 'Suivre',
+    followTip: 'Suivre votre personnage (F)',
+  },
+
+  offMap: 'Ce lieu n’est pas sur la carte.',
+  // Images per second, the usual French abbreviation; shown only in trials.
+  fps: '{fps} i/s',
+  nothingToSend: 'Il n’y a rien à envoyer.',
+
+  pins: {
+    entrance: 'Entrée',
+    entranceOf: 'Entrée : {name}',
+    rareBoss: '{name} (rare)',
+    graveyard: 'Cimetière',
+    corpse: 'Votre cadavre',
+    // "suivi": a pin (repère) is masculine.
+    followed: '{name}, suivi en jeu',
+    journey: '{name}, destination du trajet en jeu',
+    quest: {
+      available: 'Quête disponible',
+      turnin: 'Quête à rendre',
+      objective: 'Objectif de quête',
+    },
+    objective: {
+      slay: 'Objectif : tuer',
+      loot: 'Objectif : ramasser',
+      object: 'Objectif : utiliser',
+      talk: 'Objectif : parler',
+      event: 'Objectif : s’y rendre',
+    },
+  },
+
+  // x and y come from toFixed (a dot, as 42.3), so the comma between them stays unambiguous.
+  place: {
+    coords: '{x}, {y}',
+    inZone: '{zone} {x}, {y}',
+  },
+
+  way: {
+    north: '{yards} m au nord',
+    northEast: '{yards} m au nord-est',
+    east: '{yards} m à l’est',
+    southEast: '{yards} m au sud-est',
+    south: '{yards} m au sud',
+    southWest: '{yards} m au sud-ouest',
+    west: '{yards} m à l’ouest',
+    northWest: '{yards} m au nord-ouest',
+    onFoot: '{time} à pied',
+  },
+
+  label: {
+    pinName: 'Nom du repère',
+    far: '{far}, {time}',
+    dungeonMap: 'Carte du donjon',
+    raidMap: 'Carte du raid',
+    send: 'Envoyer au jeu',
+    sending: 'Envoi',
+    sent: 'Envoyé',
+    stopFollowing: 'Ne plus suivre',
+    // A stop of the route is an "étape": shorter than "Ajouter à l’itinéraire" on a small button.
+    addToRoute: 'Ajouter une étape',
+    inRoute: 'Déjà une étape',
+    save: 'Enregistrer',
+    remove: 'Supprimer',
+    noAnswer: 'Pas encore de réponse du jeu. Il recevra le repère dès que vous serez hors combat.',
+  },
+
+  nextStop: {
+    none: 'Aucun itinéraire. Cliquez sur la carte pour ajouter une étape.',
+    title: 'Prochaine étape',
+    count: '{n} sur {of}',
+    complete: 'Itinéraire terminé',
+    // Other continent, or inside or outside a dungeon: "the same map" says it more plainly than "ground".
+    elsewhere: 'Pas sur la même carte que vous',
+    here: 'Ici',
+    minutes: 'min à pied',
+    skip: 'Passer',
+    // Three buttons side by side: the band is about the route already, so the verb alone.
+    edit: 'Modifier',
+    clear: 'Effacer',
+    unsent: 'Pas encore en jeu',
+    // Same reason: "Envoyer l’itinéraire au jeu" is too long beside the note on the same line.
+    send: 'Envoyer au jeu',
+    onItsWay: 'Envoi au jeu en cours.',
+    moveUp: 'Déplacer vers le haut : {name}',
+    moveDown: 'Déplacer vers le bas : {name}',
+    remove: 'Retirer : {name}',
+  },
+
+  search: {
+    // Without the verb, beside the magnifier: with "Rechercher" the last word did not fit the box.
+    placeholder: 'PNJ, objets, quêtes, zones',
+    field: 'Recherche',
+    results: 'Résultats',
+    none: 'Aucun résultat pour ce nom.',
+    yards: '{yards} m',
+    zone: 'Zone',
+    myPin: 'Mon repère',
+    myPinIn: 'Mon repère, {zone}',
+    dungeon: 'Donjon',
+    dungeonIn: 'Donjon, {zone}',
+    raid: 'Raid',
+    raidIn: 'Raid, {zone}',
+    foundIn: '{what}, {zone}',
+  },
+}

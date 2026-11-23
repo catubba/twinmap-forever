@@ -51,7 +51,7 @@ test('a language has the keys of English, no others, with the same {names}, and 
 
 test('a text of the game\'s language is said, its names filled in', () => {
   const addon = loadAddon(DIR, { locale: 'frFR' });
-  addon.lua('local ns = ...; ns.texts.frFR = { ["route.complete"] = "itinéraire terminé.", ["say"] = "Twinmap Forever : {line}" }');
+  addon.lua('local ns = ...; ns.soon.frFR = nil; ns.texts.frFR = { ["route.complete"] = "itinéraire terminé.", ["say"] = "Twinmap Forever : {line}" }');
   addon.lua('local ns = ...; ns.Say("route.complete"); ns.Say("arrow.arrived", { name = "Goldshire %1" })');
   assert.deepEqual(addon.printed().split('\n'), ['Twinmap Forever : itinéraire terminé.', 'Twinmap Forever : you are at Goldshire %1.']);
 });
@@ -69,4 +69,10 @@ test('no English written by hand where the addon speaks', () => {
     }
   }
   assert.deepEqual(found, []);
+});
+
+test('a language not out yet speaks English in the game', () => {
+  const addon = loadAddon(DIR, { locale: 'frFR' });
+  assert.equal(addon.lua('local ns = ...; return ns.L["route.complete"]'), 'route complete.');
+  assert.ok(addon.lua('local ns = ...; return ns.texts.frFR["route.complete"]'));
 });
