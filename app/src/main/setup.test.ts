@@ -5,7 +5,7 @@ import { expect, test } from 'vitest'
 import type { LinkStatus } from '../shared/link'
 import { setupComplete, setupPages, timeLeft, type SetupStatus, pageOf } from '../shared/setup'
 import type { TilesStatus } from '../shared/tiles-status'
-import { addonVersion, readSettings, setupStatus, writeSettings } from './setup'
+import { addonVersion, askLangOf, readSettings, setupStatus, writeSettings } from './setup'
 
 const folder = (): string => mkdtempSync(join(tmpdir(), 'twinmap-setup-'))
 const addons = (game: string, ...names: string[]): void => {
@@ -95,4 +95,21 @@ test('an optional addon that is missing gets a button to its own page, and no ot
   expect(pageOf('questie')).toBe('https://www.curseforge.com/wow/addons/questiedb')
   expect(pageOf('shortestPath')).toBe('https://www.curseforge.com/wow/addons/shortest-path-forever')
   for (const other of [undefined, 'toString', 'https://example.com', 7]) expect(pageOf(other)).toBe('https://www.curseforge.com/wow/addons/twinmap-forever')
+})
+
+test('the language is asked once after the update, only to a player whose game speaks one the app speaks now', () => {
+  const french = (code: string): boolean => code === 'frFR'
+  expect(askLangOf({ setupDone: true }, 'frFR', french), 'had Twinmap before, game in French').toBe(true)
+  expect(askLangOf({}, 'frFR', french), 'a new player: the first run asks').toBe(false)
+  expect(askLangOf({ setupDone: true, langAsked: true }, 'frFR', french), 'asked already').toBe(false)
+  expect(askLangOf({ setupDone: true, lang: 'enUS' }, 'frFR', french), 'chose one already').toBe(false)
+  expect(askLangOf({ setupDone: true }, 'enUS', french), 'game in English').toBe(false)
+  expect(askLangOf({ setupDone: true }, 'deDE', french), 'game in a language not out yet').toBe(false)
+  expect(askLangOf({ setupDone: true }, null, french), 'game folder not found').toBe(false)
+})
+
+test('the language asked is kept between runs', () => {
+  const file = join(mkdtempSync(join(tmpdir(), 'twinmap-')), 'settings.json')
+  writeSettings(file, { setupDone: true, langAsked: true, lang: 'frFR' })
+  expect(readSettings(file)).toEqual({ setupDone: true, langAsked: true, lang: 'frFR' })
 })

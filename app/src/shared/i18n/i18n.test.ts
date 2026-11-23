@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, expect, test } from 'vitest'
 import en from './en'
-import { around, clock, day, langFor, LANGS, num, pseudo, PSEUDO, setLang, t, type Key, type Table } from '.'
+import { around, clock, day, langFor, LANGS, num, offerAll, offered, planned, pseudo, PSEUDO, setLang, t, type Key, type Table } from '.'
 
 afterEach(() => setLang('enUS'))
 
@@ -145,4 +145,21 @@ test('no English written by hand in the scripts that speak to the player', () =>
 test('the keys are typed', () => {
   const key: Key = 'participate.title'
   expect(t(key)).toBe(en.participate.title)
+})
+
+test('every language planned is listed, in its own words; the ones not out yet are coming, until a trial offers them', () => {
+  expect(planned().map((l) => l.code)).toEqual(['enUS', 'frFR', 'deDE', 'esES', 'esMX', 'ruRU', 'koKR', 'zhCN'])
+  expect(planned().filter((l) => l.ready).map((l) => l.code)).toEqual(['enUS'])
+  expect(planned().find((l) => l.code === 'deDE')!.name).toBe('Deutsch')
+  setLang('frFR')
+  expect(t('language.soon', { name: 'Deutsch' })).toBe('Deutsch (bientôt)')
+  offerAll()
+  try {
+    expect(offered('frFR')).toBe(true)
+    expect(offered('deDE'), 'not written').toBe(false)
+    expect(langFor(undefined, 'frFR'), 'the game language, now offered').toBe('frFR')
+  } finally {
+    offerAll(false)
+  }
+  expect(offered('frFR')).toBe(false)
 })

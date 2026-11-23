@@ -3,16 +3,17 @@
   // the addon comes from CurseForge, never from here.
   import { fly } from 'svelte/transition'
   import type { LinkStatus } from '../../shared/link'
-  import { OPTIONAL, setupPages, timeLeft, type SetupStatus } from '../../shared/setup'
+  import { languagePage, OPTIONAL, setupPages, timeLeft, type SetupStatus } from '../../shared/setup'
   import type { TilesStatus } from '../../shared/tiles-status'
   import Glyph from './Glyph.svelte'
+  import LangList from './LangList.svelte'
   import Logo from './Logo.svelte'
   import { pageIn, pageOut } from './motion'
   import { t } from '../../shared/i18n'
 
   let { setup, tiles, link, onclose }: { setup: SetupStatus; tiles: TilesStatus | null; link: LinkStatus | null; onclose: () => void } = $props()
 
-  const pages = $derived(setupPages(setup, tiles, link))
+  const pages = $derived([languagePage(), ...setupPages(setup, tiles, link)])
   let at = $state(0)
   let dir = $state(1)
   const page = $derived(pages[at]!)
@@ -31,7 +32,7 @@
   let started: { at: number; percent: number } | null = null
   let left = $state('')
   $effect(() => {
-    const building = pages[1]!
+    const building = pages.find((p) => p.id === 'map')!
     if (building.state !== 'working' || building.progress === undefined) {
       started = null
       left = ''
@@ -55,15 +56,17 @@
   <div class="stage">
     {#key at}
       <section in:fly={pageIn(dir)} out:fly={pageOut(dir)} aria-labelledby="page-title">
-        <h1 id="page-title">{page.title}</h1>
+        <h1 id="page-title">{page.heading ?? page.title}</h1>
         <p class="intro">{page.intro}</p>
         {#if page.warning}<p class="warning">{page.warning}</p>{/if}
 
         <div class="now {page.state}" role="status">
-          <p class="first">
-            {#if page.state === 'done'}<Glyph name="check" />{/if}
-            {page.lines[0]}
-          </p>
+          {#if page.lines.length}
+            <p class="first">
+              {#if page.state === 'done'}<Glyph name="check" />{/if}
+              {page.lines[0]}
+            </p>
+          {/if}
           {#if page.progress !== undefined}
             <progress class="bar" value={page.progress} max="100" aria-label={t('app.firstRun.building')}></progress>
             <p class="count"><span>{Math.floor(page.progress)}%</span><span>{left}</span></p>
@@ -71,7 +74,10 @@
           {#each page.lines.slice(1) as line (line)}
             <p>{line}</p>
           {/each}
-          {#if page.action === 'choose-folder'}
+          {#if page.action === 'language'}
+            <LangList {setup} />
+            <p class="later">{t('language.later')}</p>
+          {:else if page.action === 'choose-folder'}
             {#if wrong}<p class="wrong">{wrong}</p>{/if}
             <button class="btn" onclick={choose}>{page.state === 'done' ? t('app.firstRun.chooseAnother') : t('app.firstRun.chooseFolder')}</button>
           {:else if page.action === 'curseforge'}
@@ -203,6 +209,9 @@
   }
   .now .btn + .btn {
     margin-left: 8px;
+  }
+  .now .later {
+    margin: 14px 0 0;
   }
   .now .bar {
     height: 10px;

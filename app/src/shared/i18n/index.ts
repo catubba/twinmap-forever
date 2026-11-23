@@ -20,9 +20,29 @@ export type Key = Leaves<typeof en>
 export const LANGS: Record<string, { name: string; intl: string; table: Table; soon?: true }> = {
   enUS: { name: 'English', intl: 'en-US', table: en },
   // soon: written, not offered yet. Spoken only when chosen by hand in settings.json, never from the game's language,
-  // until all the languages come out together with the choice of the language (design notes, M17-F14).
+  // until all the languages come out together (design notes, M17-F15). Trials offer them with TWINMAP_LANGS=all.
   frFR: { name: 'Français', intl: 'fr-FR', table: fr, soon: true },
 }
+/** Every language planned (design notes, l10n.md), in its own words, in the order they are offered. The ones not in
+ *  LANGS, or there but soon, show as coming. */
+export const PLANNED: { code: string; name: string }[] = [
+  { code: 'enUS', name: 'English' },
+  { code: 'frFR', name: 'Français' },
+  { code: 'deDE', name: 'Deutsch' },
+  { code: 'esES', name: 'Español (España)' },
+  { code: 'esMX', name: 'Español (Latinoamérica)' },
+  { code: 'ruRU', name: 'Русский' },
+  { code: 'koKR', name: '한국어' },
+  { code: 'zhCN', name: '简体中文' },
+]
+let all = false
+/** For trials (TWINMAP_LANGS=all): the languages written but not out yet are offered too. */
+export const offerAll = (on = true): void => void (all = on)
+/** Whether the player may have this language: written, and out (or a trial). */
+export const offered = (code: unknown): boolean => typeof code === 'string' && code in LANGS && (!LANGS[code]!.soon || all)
+/** The languages planned, each with whether it can be had yet. */
+export const planned = (): { code: string; name: string; ready: boolean }[] => PLANNED.map((l) => ({ ...l, ready: offered(l.code) }))
+
 /** For trials only, never offered: every text marked, accented and 40% longer, so one left in the code shows at a glance. */
 export const PSEUDO = 'pseudo'
 
@@ -33,7 +53,7 @@ let plurals = new Intl.PluralRules(intl)
 
 /** The language to speak: the one chosen, else the game's, else English. */
 export function langFor(chosen: unknown, game: unknown): string {
-  for (const code of [chosen, game]) if (typeof code === 'string' && ((code in LANGS && (!LANGS[code]!.soon || code === chosen)) || (code === PSEUDO && code === chosen))) return code
+  for (const code of [chosen, game]) if (typeof code === 'string' && ((code in LANGS && (offered(code) || code === chosen)) || (code === PSEUDO && code === chosen))) return code
   return 'enUS'
 }
 

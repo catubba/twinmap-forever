@@ -30,8 +30,8 @@ import { startLog } from './log'
 import type { Answer, Asked, Placed, Sources } from './questie-worker'
 import startQuestieWorker from './questie-worker?nodeWorker'
 import { gameLocale, sendSamples, startSamples } from './samples'
-import { langFor, langNow, setLang, t } from '../shared/i18n'
-import { addonHearsFonts, addonsFolder, readSettings, setupStatus, writeSettings } from './setup'
+import { langFor, langNow, offerAll, offered, planned, setLang, t } from '../shared/i18n'
+import { addonHearsFonts, addonsFolder, askLangOf, readSettings, setupStatus, writeSettings } from './setup'
 import { hear, installChannel, removeSlots, send as sendSignal, sendOld, sentParts } from './signal'
 import { MAPS_FILE, servedFile } from './tiles'
 import startTilesWorker from './tiles-worker?nodeWorker'
@@ -289,7 +289,12 @@ function createWindow(): void {
   const settings = readSettings(settingsFile)
   let gameFolder = findGameFolder(settings.gameFolder)
   // The language: the one chosen in the settings, else the game's, else English. The pages ask for it as they load.
-  setLang(langFor(settings.lang, gameFolder && gameLocale(gameFolder)))
+  // TWINMAP_LANGS=all, for trials, offers the languages written but not out yet.
+  if (process.env.TWINMAP_LANGS === 'all') offerAll()
+  const gameLang = (): string | null => (gameFolder ? gameLocale(gameFolder) : null)
+  setLang(langFor(settings.lang, gameLang()))
+  // Asked once, as the app starts, for a player who had Twinmap before it spoke the game's language (LangAsk.svelte).
+  let askLang = askLangOf(settings, gameLang(), offered)
   // The participation programme: with the choice on, the samples of a run in a dungeon are sent when the
   // character leaves it. With it off nothing is kept and nothing is sent. TWINMAP_SAMPLES, for trials, names another address.
   const participates = (): boolean => settings.participate === true
@@ -515,7 +520,7 @@ function createWindow(): void {
   // turns it on in the settings. The same page, the same map files, and what a page may ask for above.
   let lan: Lan | null = null
   let lanWord: SetupStatus['lan'] = null
-  const lookSetup = (): SetupStatus => ({ ...setupStatus(gameFolder, settings, app.getVersion()), lan: lanWord, zoom: settings.zoom ?? 1, gpu: { chosen: settings.noGpu !== true, running: GPU }, lang: langNow() })
+  const lookSetup = (): SetupStatus => ({ ...setupStatus(gameFolder, settings, app.getVersion()), lan: lanWord, zoom: settings.zoom ?? 1, gpu: { chosen: settings.noGpu !== true, running: GPU }, lang: langNow(), langs: planned(), gameLang: gameLang(), askLang })
   const lanUrl = async (): Promise<void> => {
     const address = await homeAddress()
     if (lan) lanWord = address ? { url: `http://${address}:${LAN_PORT}/?k=${settings.lanCode}` } : { error: t('app.main.noNetwork') }
@@ -825,6 +830,16 @@ function createWindow(): void {
   // A language chosen in the settings: kept, spoken here at once, and the pages load again in it (App.svelte).
   ipcMain.handle('set-lang', (_event, code: unknown) => {
     settings.lang = setLang(code)
+    settings.langAsked = true
+    writeSettings(settingsFile, settings)
+    setup = lookSetup()
+  })
+  // The window after the update closed, never asked again: with Done the language shown is kept, with the cross the
+  // app stays in English, as it was before the update.
+  ipcMain.handle('lang-asked', (_event, code: unknown) => {
+    askLang = false
+    settings.langAsked = true
+    settings.lang = setLang(offered(code) ? code : 'enUS')
     writeSettings(settingsFile, settings)
     setup = lookSetup()
   })
@@ -878,6 +893,7 @@ function createWindow(): void {
     void lanUrl() // the address of this computer may change while the app is open
     if (!settings.setupDone && setupComplete(setupPages(setup, tiles.status(), linkStatus(link.snapshot(), Date.now())))) {
       settings.setupDone = true
+      settings.langAsked = true // the first run asked for it
       writeSettings(settingsFile, settings)
     }
   }, 2000)
@@ -1001,6 +1017,8 @@ function createWindow(): void {
     ipcMain.removeHandler('set-on-top')
     ipcMain.removeHandler('set-zoom')
     ipcMain.removeHandler('set-gpu')
+    ipcMain.removeHandler('set-lang')
+    ipcMain.removeHandler('lang-asked')
     ipcMain.removeHandler('restart')
     ipcMain.removeHandler('zoom-by')
     ipcMain.removeHandler('set-lan')

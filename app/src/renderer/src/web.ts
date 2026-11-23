@@ -86,6 +86,7 @@ if (!inApp) {
     restart: () => Promise.resolve(),
     lang: call('lang', 'enUS'),
     setLang: () => Promise.resolve(), // the language is chosen on the computer
+    langAsked: () => Promise.resolve(),
     zoomBy: () => Promise.resolve(),
     setLan: () => Promise.resolve(),
     setParticipate: () => Promise.resolve(),

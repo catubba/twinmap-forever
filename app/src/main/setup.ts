@@ -32,6 +32,8 @@ export interface Settings {
   noGpu?: boolean
   /** The language the player chose, by the game's code for it (shared/i18n); missing is the game's own. */
   lang?: string
+  /** The language was chosen or asked for once (first run, the window after the update, Settings): never asked again. */
+  langAsked?: boolean
 }
 
 /** The settings as they were saved; nothing where the file is missing or is not ours. */
@@ -39,13 +41,14 @@ export function readSettings(file: string): Settings {
   try {
     const read: unknown = JSON.parse(readFileSync(file, 'utf8'))
     if (typeof read !== 'object' || !read) return {}
-    const { gameFolder, setupDone, onTop, lan, lanCode, participate, zoom, noGpu, lang } = read as Record<string, unknown>
+    const { gameFolder, setupDone, onTop, lan, lanCode, participate, zoom, noGpu, lang, langAsked } = read as Record<string, unknown>
     return {
       ...(typeof gameFolder === 'string' ? { gameFolder } : {}),
       ...(setupDone === true ? { setupDone } : {}),
       ...(onTop === true ? { onTop } : {}),
       ...(lan === true ? { lan } : {}),
       ...(noGpu === true ? { noGpu } : {}),
+      ...(langAsked === true ? { langAsked } : {}),
       ...(typeof participate === 'boolean' ? { participate } : {}),
       ...(ZOOMS.some((z) => z === zoom) ? { zoom: zoom as number } : {}),
       ...(typeof lanCode === 'string' && /^[\w-]{8,64}$/.test(lanCode) ? { lanCode } : {}),
@@ -55,6 +58,14 @@ export function readSettings(file: string): Settings {
     return {}
   }
 }
+
+/**
+ * Whether to ask once for the language, as the app starts: only for a player who had Twinmap before it spoke other
+ * languages (the first run went through, no language chosen, never asked), and whose game is in one it speaks now,
+ * other than English. A new player chooses it in the first run.
+ */
+export const askLangOf = (settings: Settings, gameLang: string | null, offered: (code: string) => boolean): boolean =>
+  settings.setupDone === true && !settings.langAsked && settings.lang === undefined && !!gameLang && gameLang !== 'enUS' && gameLang !== 'enGB' && offered(gameLang)
 
 export function writeSettings(file: string, settings: Settings): void {
   try {

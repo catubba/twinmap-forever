@@ -19,6 +19,7 @@
   import type { SetupStatus } from '../../shared/setup'
   import Feedback from './Feedback.svelte'
   import Participate from './Participate.svelte'
+  import LangAsk from './LangAsk.svelte'
   import FirstRun from './FirstRun.svelte'
   import Glyph from './Glyph.svelte'
   import { PANEL, layout, setMapRight, setWidth } from './layout.svelte'
@@ -73,9 +74,12 @@
 
   // The first run shows by itself until its steps were all done once; then the app opens on the map.
   let setup = $state<SetupStatus | null>(null)
-  let onSetup = $state<boolean | null>(null)
+  // A page loaded again in another language opens where the player chose it: the first run or Settings.
+  const keptView = sessionStorage.getItem('view')
+  sessionStorage.removeItem('view')
+  let onSetup = $state<boolean | null>(keptView === 'setup' ? true : null)
   // Settings lie over the map, which stays as it was underneath.
-  let onSettings = $state(false)
+  let onSettings = $state(keptView === 'settings')
   // Items lies over the map as Settings does, as wide as the window.
   let onItems = $state(false)
   // Auction House lies over the map as Items does.
@@ -83,9 +87,14 @@
   // Feedback is a small window over whatever is on show.
   let onFeedback = $state(false)
   let answered = $state(false) // Help improve Twinmap was answered in this run: the setup may tell it a moment later
+  let langClosed = $state(false) // the same for the language asked after the update
   window.twinmap.onSetup((told) => {
     // Another language chosen (here or on the computer): the page loads again, every text in it.
-    if (told.lang && told.lang !== langNow()) location.reload()
+    if (told.lang && told.lang !== langNow()) {
+      sessionStorage.setItem('view', onSetup ? 'setup' : onSettings ? 'settings' : '')
+      location.reload()
+      return
+    }
     setup = told
     // On a phone there are no steps to go through, only the wait for them to be done on the computer: it ends by itself.
     if (inApp) onSetup ??= !told.done
@@ -316,8 +325,10 @@
 {#if onFeedback && setup}
   <Feedback details={feedbackDetails(setup, tiles, status?.word ?? null)} onclose={() => (onFeedback = false)} />
 {/if}
-<!-- Help improve Twinmap is asked once, on this computer only, after the first run and never over another window. -->
-{#if inApp && setup && setup.participate === null && !answered && onSetup === false && !onFeedback}
+<!-- The language after the update, then Help improve Twinmap: each asked once, on this computer only, after the first run and never over another window. -->
+{#if inApp && setup?.askLang && !langClosed && onSetup === false && !onFeedback}
+  <LangAsk {setup} onclose={() => (langClosed = true)} />
+{:else if inApp && setup && setup.participate === null && !answered && onSetup === false && !onFeedback}
   <Participate onclose={() => (answered = true)} />
 {/if}
 {#if onSetup && setup}

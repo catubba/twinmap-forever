@@ -30,6 +30,30 @@ export default {
     yes: 'Yes, share',
     no: 'No thanks',
   },
+  // The choice of the language: the first page of the first run (FirstRun.svelte), the window asked once after the
+  // update to a version that speaks it (LangAsk.svelte), and its group in Settings. Each language is listed in its own
+  // words (shared/i18n, PLANNED), never translated.
+  language: {
+    // The first run's step, in the row of steps: one word.
+    step: 'Language',
+    // The title of the first run's page.
+    title: 'Choose your language',
+    intro: 'The language of Twinmap. Names that come from the game (zones, NPCs, items) stay in the language of your game.',
+    // Small, beside the name of the language the game is in.
+    game: 'the language of your game',
+    // A language not written yet. {name}: its name in its own words, as Deutsch.
+    soon: '{name} (coming soon)',
+    later: 'You can change it at any time in Settings.',
+    // The window after the update: its title and what it asks.
+    newTitle: 'Twinmap now speaks your language',
+    newIntro: 'Choose the language of Twinmap. Without a choice it stays in English.',
+    // Its button: short.
+    done: 'Done',
+    // The group in Settings: its title, the label before the list, and the line under it.
+    settingsTitle: 'Language',
+    label: 'Language of Twinmap',
+    hint: 'Changes at once. Names that come from the game stay in the language of the game.',
+  },
   app,
   map,
   items,

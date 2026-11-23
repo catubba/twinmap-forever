@@ -500,7 +500,7 @@ body {
   height: 26px;
   cursor: pointer;
 }
-.choice:has(:disabled) {
+.choice:has(> :disabled) {
   color: var(--text-off);
   cursor: default;
 }

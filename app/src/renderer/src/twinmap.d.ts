@@ -44,6 +44,7 @@ declare global {
       restart: () => Promise<void>
       lang: () => Promise<string>
       setLang: (code: string) => Promise<void>
+      langAsked: (keep: string | null) => Promise<void>
       zoomBy: (by: 1 | -1) => Promise<void>
       setLan: (on: boolean) => Promise<void>
       setParticipate: (on: boolean) => Promise<void>

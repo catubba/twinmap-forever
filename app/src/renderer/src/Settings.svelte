@@ -11,7 +11,7 @@
   import { inApp } from './web'
   import { ZOOMS } from '../../shared/window'
   import { layout, setMapRight } from './layout.svelte'
-  import { num, t } from '../../shared/i18n'
+  import { langNow, num, t } from '../../shared/i18n'
 
   let { setup, tiles, onback, onfirstrun, onfeedback }: { setup: SetupStatus; tiles: TilesStatus | null; onback: () => void; onfirstrun: () => void; onfeedback: () => void } = $props()
 
@@ -49,6 +49,16 @@
     </div>
     <div class="columns">
       <div class="column">
+        <!-- The language is the computer's: a phone's page follows it. A pick is spoken at once, the page loads again in it. -->
+        {#if inApp}
+          <section class="group">
+            <h2 class="band">{t('language.settingsTitle')}</h2>
+            <div class="in">
+              <label class="choice">{t('language.label')} <select class="field" value={langNow()} onchange={(e) => void window.twinmap.setLang(e.currentTarget.value)}>{#each setup.langs ?? [] as lang (lang.code)}<option value={lang.code} disabled={!lang.ready}>{lang.ready ? lang.name : t('language.soon', { name: lang.name })}</option>{/each}</select></label>
+              <p class="hint">{t('language.hint')}</p>
+            </div>
+          </section>
+        {/if}
         <section class="group">
           <h2 class="band">{t('settings.gameFolder.title')}</h2>
           <div class="in">

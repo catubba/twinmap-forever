@@ -29,6 +29,12 @@ export interface SetupStatus {
   lan?: { url: string } | { error: string } | null
   /** The language the app speaks (shared/i18n): a page that speaks another loads again in this one. */
   lang?: string
+  /** Every language planned, in its own words, and whether it can be had yet (shared/i18n, planned). */
+  langs?: { code: string; name: string; ready: boolean }[]
+  /** The language the game is in (textLocale), or null when it is not known. */
+  gameLang?: string | null
+  /** The window that asks for the language once after the update is due (askLangOf, main/setup.ts). */
+  askLang?: boolean
 }
 
 /** Where the addon is published. The app never installs it itself: every install is one CurseForge counts. */
@@ -46,8 +52,10 @@ export const pageOf = (asked: unknown): string => (typeof asked === 'string' && 
 
 export type PageState = 'done' | 'todo' | 'working' | 'problem'
 export interface Page {
-  id: 'game' | 'map' | 'addon' | 'extras' | 'play'
+  id: 'language' | 'game' | 'map' | 'addon' | 'extras' | 'play'
+  /** Its name in the row of steps, and its title unless it has a heading. */
   title: string
+  heading?: string
   /** Why this page is there, in a sentence or two. */
   intro: string
   state: PageState
@@ -55,7 +63,7 @@ export interface Page {
   lines: string[]
   /** Percent done, while the app is working on it. */
   progress?: number
-  action?: 'choose-folder' | 'curseforge' | 'retry'
+  action?: 'choose-folder' | 'curseforge' | 'retry' | 'language'
   /** The optional addons that are not installed: each gets a button to its page on CurseForge. */
   get?: Optional[]
   /** Said on the page whatever its state: it must be read before the thing it warns of is on. */
@@ -139,6 +147,9 @@ export function setupPages(setup: SetupStatus, tiles: TilesStatus | null, link: 
   }
   return [game, map, addon, extras, play]
 }
+
+/** The first page of the first run, before the five: the language, already on the game's when the app speaks it. */
+export const languagePage = (): Page => ({ id: 'language', title: t('language.step'), heading: t('language.title'), intro: t('language.intro'), state: 'done', lines: [], action: 'language' })
 
 /** Game found, map built, addon installed, position coming: nothing is left to do. */
 export const setupComplete = (pages: Page[]): boolean => pages.every((p) => p.state === 'done')

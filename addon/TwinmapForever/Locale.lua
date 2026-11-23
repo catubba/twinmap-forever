@@ -107,8 +107,8 @@ ns.texts = {
   },
 }
 
--- Languages written but not spoken yet: they come out all together with the choice of the language in the app
--- (design notes, M17-F14). Until then the game in one of them speaks English.
+-- Languages written but not spoken yet: they come out all together
+-- (design notes, M17-F15). Until then the game in one of them speaks English.
 ns.soon = { frFR = true }
 
 -- The texts of the game's language, read when first asked for (every file asks after all are loaded or at load,
