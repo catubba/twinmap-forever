@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, expect, test } from 'vitest'
 import en from './en'
-import { around, clock, day, langFor, LANGS, langTag, num, offerAll, offered, planned, pseudo, PSEUDO, setLang, t, type Key, type Table } from '.'
+import { around, clock, day, langFor, LANGS, langTag, num, offered, planned, pseudo, PSEUDO, setLang, t, type Key, type Table } from '.'
 
 afterEach(() => setLang('enUS'))
 
@@ -21,9 +21,10 @@ test('the language: the one chosen, else the game\'s, else English; the pseudo-l
   expect(setLang('nothing')).toBe('enUS')
 })
 
-test('a language not offered yet is spoken only when chosen, never from the game', () => {
-  expect(langFor(undefined, 'frFR')).toBe('enUS')
+test('a language the app speaks is spoken when chosen, else when the game is in it', () => {
+  expect(langFor(undefined, 'frFR')).toBe('frFR')
   expect(langFor('frFR', 'enUS')).toBe('frFR')
+  expect(langFor('enUS', 'koKR')).toBe('enUS')
 })
 
 test('French writes numbers, hours and days as France does', () => {
@@ -222,23 +223,10 @@ test('the keys are typed', () => {
   expect(t(key)).toBe(en.participate.title)
 })
 
-test('every language planned is listed, in its own words; the ones not out yet are coming, until a trial offers them', () => {
+test('every language planned is listed, in its own words, and every one of them is out (M17-F15)', () => {
   expect(planned().map((l) => l.code)).toEqual(['enUS', 'frFR', 'deDE', 'esES', 'esMX', 'ruRU', 'koKR', 'zhCN'])
-  expect(planned().filter((l) => l.ready).map((l) => l.code)).toEqual(['enUS'])
+  expect(planned().every((l) => l.ready)).toBe(true)
   expect(planned().find((l) => l.code === 'deDE')!.name).toBe('Deutsch')
-  expect(planned().find((l) => l.code === 'deDE')!.soon, 'coming, in its own words').toBe('Deutsch (demnächst)')
-  offerAll()
-  try {
-    expect(offered('frFR')).toBe(true)
-    expect(offered('esES') && offered('esMX'), 'written, both').toBe(true)
-    expect(offered('deDE'), 'written').toBe(true)
-    expect(offered('ruRU'), 'written').toBe(true)
-    expect(offered('koKR'), 'written').toBe(true)
-    expect(offered('zhCN'), 'written').toBe(true)
-    expect(offered('ptBR'), 'not planned').toBe(false)
-    expect(langFor(undefined, 'frFR'), 'the game language, now offered').toBe('frFR')
-  } finally {
-    offerAll(false)
-  }
-  expect(offered('frFR')).toBe(false)
+  for (const code of ['frFR', 'deDE', 'esES', 'esMX', 'ruRU', 'koKR', 'zhCN']) expect(offered(code), code).toBe(true)
+  expect(offered('ptBR'), 'not planned').toBe(false)
 })

@@ -71,8 +71,9 @@ test('no English written by hand where the addon speaks', () => {
   assert.deepEqual(found, []);
 });
 
-test('a language not out yet speaks English in the game', () => {
+test('the game in a language of the addon speaks it; one not out yet speaks English', () => {
   const addon = loadAddon(DIR, { locale: 'frFR' });
+  assert.notEqual(addon.lua('local ns = ...; return ns.L["route.complete"]'), 'route complete.');
+  addon.lua('local ns = ...; ns.soon.frFR = true');
   assert.equal(addon.lua('local ns = ...; return ns.L["route.complete"]'), 'route complete.');
-  assert.ok(addon.lua('local ns = ...; return ns.texts.frFR["route.complete"]'));
 });

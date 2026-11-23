@@ -25,15 +25,15 @@ export type Key = Leaves<typeof en>
 /** The languages the app speaks, by the game's codes for them (textLocale in Config.wtf). */
 export const LANGS: Record<string, { name: string; intl: string; table: Table; soon?: true }> = {
   enUS: { name: 'English', intl: 'en-US', table: en },
-  // soon: written, not offered yet. Spoken only when chosen by hand in settings.json, never from the game's language,
+  // soon (none today): written, not offered yet. Spoken only when chosen by hand in settings.json, never from the game's language,
   // until all the languages come out together (design notes, M17-F15). Trials offer them with TWINMAP_LANGS=all.
-  frFR: { name: 'Français', intl: 'fr-FR', table: fr, soon: true },
-  esES: { name: 'Español (España)', intl: 'es-ES', table: esES, soon: true },
-  esMX: { name: 'Español (Latinoamérica)', intl: 'es-MX', table: esMX, soon: true },
-  deDE: { name: 'Deutsch', intl: 'de-DE', table: de, soon: true },
-  ruRU: { name: 'Русский', intl: 'ru-RU', table: ru, soon: true },
-  koKR: { name: '한국어', intl: 'ko-KR', table: ko, soon: true },
-  zhCN: { name: '简体中文', intl: 'zh-CN', table: zh, soon: true },
+  frFR: { name: 'Français', intl: 'fr-FR', table: fr },
+  esES: { name: 'Español (España)', intl: 'es-ES', table: esES },
+  esMX: { name: 'Español (Latinoamérica)', intl: 'es-MX', table: esMX },
+  deDE: { name: 'Deutsch', intl: 'de-DE', table: de },
+  ruRU: { name: 'Русский', intl: 'ru-RU', table: ru },
+  koKR: { name: '한국어', intl: 'ko-KR', table: ko },
+  zhCN: { name: '简体中文', intl: 'zh-CN', table: zh },
 }
 /** Every language planned (design notes, l10n.md), in its own words, in the order they are offered. The ones not in
  *  LANGS, or there but soon, show as coming, said in their own words too: the player who reads it is one who speaks it. */
