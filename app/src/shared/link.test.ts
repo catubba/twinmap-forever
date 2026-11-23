@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest'
+import { t } from './i18n'
 import { protocolMismatch, type GameState } from './game'
 import { experience, linkStatus, LOST_AFTER, type LinkSnapshot } from './link'
 
@@ -24,6 +25,21 @@ test('game closed or minimized comes before anything the strip said earlier', ()
   expect(linkStatus(link('closed', heard(1000)), NOW)).toMatchObject({ kind: 'closed', word: 'Game not running', tone: 'objective' })
   expect(linkStatus(link('minimized', heard(1000)), NOW)).toMatchObject({ kind: 'minimized', word: 'Game minimized' })
   expect(linkStatus(link('closed'), NOW).line).toContain('The map still works')
+})
+
+test('missing Screen Recording permission comes before the protocol, connecting and a fresh position', () => {
+  for (const state of [{}, heard(1000), { protocol: protocolMismatch(3) }]) {
+    const snapshot = link('open', state, 5)
+    expect(linkStatus({ ...snapshot, screenRecording: false }, NOW)).toEqual({ kind: 'lost', word: 'Link lost', tone: 'objective', line: t('app.link.screenRecording') })
+    expect(linkStatus({ ...snapshot, screenRecording: undefined }, NOW)).toEqual(linkStatus(snapshot, NOW))
+  }
+})
+
+test('pause, closed and minimized still come before missing Screen Recording permission', () => {
+  for (const game of ['closed', 'minimized'] as const) {
+    expect(linkStatus({ ...link(game, heard(1000)), screenRecording: false }, NOW)).toEqual(linkStatus(link(game, heard(1000)), NOW))
+  }
+  expect(linkStatus({ ...link('open'), paused: true, screenRecording: false }, NOW)).toEqual({ kind: 'paused', word: 'Paused', tone: 'dim' })
 })
 
 test('a strip that stops, as when it is paused, is a lost link after two missed heartbeats', () => {

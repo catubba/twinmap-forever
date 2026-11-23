@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, test } from 'vitest'
+import { t } from '../shared/i18n'
 import type { LinkStatus } from '../shared/link'
 import { setupComplete, setupPages, timeLeft, type SetupStatus, pageOf } from '../shared/setup'
 import type { TilesStatus } from '../shared/tiles-status'
@@ -75,6 +76,25 @@ test('what went wrong is said on its page: a map not built, an addon to tick, on
   expect(setupPages(installed, READY, CLOSED).filter((p) => p.warning?.startsWith('Photosensitivity warning')).map((p) => p.id)).toEqual(['addon', 'play'])
   const old = setupPages(installed, READY, { kind: 'update-addon', word: 'Update the addon', tone: 'objective', line: 'Update the addon from CurseForge.' })[4]!
   expect(old).toMatchObject({ state: 'problem', lines: ['Update the addon from CurseForge.'] })
+})
+
+test('missing Screen Recording permission is first on the macOS play page until the link is live', () => {
+  const setup: SetupStatus = { mac: true, screenRecording: false, gameFolder: '/WoW', addon: '0.1.0', questie: false, shortestPath: false, done: false, version: '0.1.0', onTop: false, participate: false }
+  const update: LinkStatus = { kind: 'update-app', word: 'Update the app', tone: 'objective', line: 'Download Twinmap.' }
+  for (const link of [null, CLOSED, { ...CLOSED, kind: 'minimized' } as LinkStatus, { ...CLOSED, kind: 'lost' } as LinkStatus, update]) {
+    expect(setupPages(setup, READY, link)[4]).toMatchObject({ state: 'problem', lines: [t('app.link.screenRecording'), t('app.firstRun.play.tick')] })
+  }
+  for (const link of [CONNECTED, { ...CONNECTED, kind: 'combat' } as LinkStatus]) {
+    expect(setupPages(setup, READY, link)[4]).toMatchObject({ state: 'done', lines: [t('app.firstRun.play.connected')] })
+  }
+})
+
+test('without a missing permission the macOS play page behaves as on Windows', () => {
+  const setup: SetupStatus = { gameFolder: '/WoW', addon: '0.1.0', questie: false, shortestPath: false, done: false, version: '0.1.0', onTop: false, participate: false }
+  for (const link of [null, CLOSED, CONNECTED, { ...CLOSED, kind: 'lost' } as LinkStatus]) {
+    expect(setupPages({ ...setup, mac: true }, READY, link)[4]).toEqual(setupPages(setup, READY, link)[4])
+  }
+  expect(setupPages({ ...setup, mac: true }, READY, CLOSED)[4]).toMatchObject({ state: 'todo', lines: [t('app.firstRun.play.waiting'), t('app.firstRun.play.tick')] })
 })
 
 test('the time left is said once there is something to tell it from, in round numbers', () => {

@@ -7,6 +7,8 @@ import { num, t } from './i18n'
 export interface SetupStatus {
   /** The desktop app is on macOS. */
   mac?: true
+  /** Present only on macOS while Screen Recording permission is missing. */
+  screenRecording?: false
   /** The folder of World of Warcraft: Forever, or null while none is found. */
   gameFolder: string | null
   /** The version of the Twinmap Forever addon found in it, or null. */
@@ -133,19 +135,21 @@ export function setupPages(setup: SetupStatus, tiles: TilesStatus | null, link: 
     warning: t('app.firstRun.photosensitivity'),
     ...(live
       ? { state: 'done', lines: [t('app.firstRun.play.connected')] }
-      : link?.kind === 'update-app' || link?.kind === 'update-addon'
-        ? { state: 'problem', lines: [link.line ?? link.word] }
-        : {
-            state: 'todo',
-            lines: [
-              link?.kind === 'lost' || link?.kind === 'waiting'
-                ? t('app.firstRun.play.silent')
-                : link?.kind === 'minimized'
-                  ? t('app.firstRun.play.minimized')
-                  : t('app.firstRun.play.waiting'),
-              t('app.firstRun.play.tick'),
-            ],
-          }),
+      : setup.screenRecording === false
+        ? { state: 'problem', lines: [t('app.link.screenRecording'), t('app.firstRun.play.tick')] }
+        : link?.kind === 'update-app' || link?.kind === 'update-addon'
+          ? { state: 'problem', lines: [link.line ?? link.word] }
+          : {
+              state: 'todo',
+              lines: [
+                link?.kind === 'lost' || link?.kind === 'waiting'
+                  ? t('app.firstRun.play.silent')
+                  : link?.kind === 'minimized'
+                    ? t('app.firstRun.play.minimized')
+                    : t('app.firstRun.play.waiting'),
+                t('app.firstRun.play.tick'),
+              ],
+            }),
   }
   return [game, map, addon, extras, play]
 }

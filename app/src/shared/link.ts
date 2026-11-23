@@ -3,6 +3,8 @@ import type { GameState } from './game'
 import { t } from './i18n'
 
 export interface LinkSnapshot {
+  /** Present only on macOS while Screen Recording permission is missing. */
+  screenRecording?: false
   /** The game's window: not found, minimized (nothing to read), or on screen. */
   game: 'closed' | 'minimized' | 'open'
   state: GameState
@@ -40,6 +42,8 @@ export function linkStatus(link: LinkSnapshot, now: number): LinkStatus {
     return { kind: 'closed', word: t('app.link.closed'), tone: 'objective', line: t('app.link.closedLine') }
   if (link.game === 'minimized')
     return { kind: 'minimized', word: t('app.link.minimized'), tone: 'objective', line: t('app.link.minimizedLine') }
+  if (link.screenRecording === false)
+    return { kind: 'lost', word: t('app.link.lost'), tone: 'objective', line: t('app.link.screenRecording') }
   if (state.protocol)
     return { kind: `update-${state.protocol.update}`, word: state.protocol.update === 'app' ? t('app.link.updateApp') : t('app.link.updateAddon'), tone: 'objective', line: state.protocol.message }
   const heard = Math.max(0, ...Object.values(state.updatedAt))

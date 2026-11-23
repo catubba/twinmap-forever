@@ -6,7 +6,7 @@ import { decodeRow, readStrip } from '../shared/strip'
 import { readFileSync } from 'node:fs'
 import { worldOfYards } from '../shared/inside'
 import type { Box } from '../shared/minimap'
-import { findGameWindow, findWindow, readBox, readRect, readRow, showsOnly, windowState, type WindowHandle } from './capture'
+import { captureAllowed, findGameWindow, findWindow, readBox, readRect, readRow, showsOnly, windowState, type WindowHandle } from './capture'
 import { look } from './health'
 import { startInside, type Inside, type InsideReport } from './minimap'
 
@@ -73,6 +73,8 @@ export function startLink(
   // The Pause button: nothing is read but a look for the strip now and then, nothing changes the state, the minimap is not read.
   // Never kept: the app starts unpaused.
   let paused = false, pausedAt = 0, resumedAt: number | undefined
+  // Snapshots go to the window many times a second; permission needs only one look a second.
+  let permissionAt = -Infinity, allowed = true
 
   const replay = process.env.TWINMAP_REPLAY ? replayed(process.env.TWINMAP_REPLAY) : null
 
@@ -148,8 +150,13 @@ export function startLink(
   return {
     snapshot() {
       const cpu = process.cpuUsage(cpuAtStart)
-      const elapsed = Date.now() - startedAt
+      const now = Date.now(), elapsed = now - startedAt
+      if (process.platform === 'darwin' && now - permissionAt >= 1000) {
+        allowed = captureAllowed()
+        permissionAt = now
+      }
       return {
+        ...(process.platform === 'darwin' && !allowed ? { screenRecording: false as const } : {}),
         game: status,
         state: withInside(game.state, found),
         inside: ((said) => said && { why: said.why, lostFor: said.lostFor })(inside.report()?.report),
