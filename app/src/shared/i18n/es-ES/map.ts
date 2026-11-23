@@ -81,6 +81,7 @@ export default {
   nothingToSend: 'No hay nada que enviar.',
 
   pins: {
+    rewardXp: '{xp} PE',
     entrance: 'Entrada',
     entranceOf: 'Entrada: {name}',
     // Rare as the game's map legend says it for creatures in esES.

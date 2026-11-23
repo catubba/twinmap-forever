@@ -82,6 +82,7 @@ export default {
   nothingToSend: 'Es gibt nichts zu senden.',
 
   pins: {
+    rewardXp: '{xp} EP',
     entrance: 'Eingang',
     entranceOf: 'Eingang: {name}',
     // Rare as the game's map legend says it for creatures (glossary).

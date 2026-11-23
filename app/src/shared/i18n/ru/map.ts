@@ -83,6 +83,7 @@ export default {
   nothingToSend: 'Нечего отправлять.',
 
   pins: {
+    rewardXp: '{xp} опыта',
     entrance: 'Вход',
     entranceOf: 'Вход: {name}',
     // Rare as the game's map legend says it for creatures (glossary): neuter, so it does not agree with the boss's name.

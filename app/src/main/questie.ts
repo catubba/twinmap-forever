@@ -1,11 +1,11 @@
 // Reads the QuestieDB addon the player has installed: quests, NPCs, objects, items and where they
 // are. Nothing of it is copied or shipped: without Questie the app has no such data and says so.
 // QuestieDB keeps every entity in its .toc, as base64 CBOR, one metadata line per field.
-import { readFileSync } from 'node:fs'
+import { readFileSync, statSync } from 'node:fs'
 import { inflateSync } from 'node:zlib'
 import type { GameMap } from '../shared/maps'
 import { join } from 'node:path'
-import type { GameQuest, LogQuest, ObjectiveKind, QuestIcon, QuestieShown, QuestPin } from '../shared/quests'
+import type { GameQuest, LogQuest, ObjectiveKind, QuestIcon, QuestieShown, QuestPin, QuestReward } from '../shared/quests'
 import { best, fold, wordsMatch, type Found } from '../shared/search'
 import type { ItemSources } from '../shared/tips'
 import { resourceOf, servicesOf, type FixedPin, type ServiceLayer } from '../shared/services'
@@ -37,6 +37,8 @@ export interface Questie {
   places: (kind: 'Npc' | 'Object', id: number) => Places
   /** The NPCs and the objects of each zone. */
   zoneIndex: { Npc: Map<string, number[]>; Object: Map<string, number[]> }
+  /** The XP of each quest and the level it is given for, from the files QuestieDB keeps beside its data (support/.../QuestXP). */
+  xp: Map<number, [level: number, xp: number]>
 }
 
 function half(h: number): number {
@@ -206,7 +208,17 @@ export function openQuestie(gameFolder: string, locale = gameLocale(gameFolder) 
     }
   }
 
-  return { version: /^## Version: *(.+)$/m.exec(text)?.[1]?.trim() ?? 'unknown', ids, get, places, zoneIndex }
+  // The XP: the files the .toc lists, in its order, a later one over an earlier (Forever's own traces over the classic table).
+  const xp: Questie['xp'] = new Map()
+  for (const m of text.matchAll(/^(support[\\/][^\r\n]*QuestXP[\\/][^\r\n]+\.lua)\s*$/gm)) {
+    try {
+      const lua = readFileSync(join(gameFolder, '_forever_', 'Interface', 'AddOns', 'QuestieDB', ...m[1]!.split(/[\\/]/)), 'utf8')
+      for (const row of lua.matchAll(/\[(\d+)\] = \{(-?\d+), (\d+)\}/g)) xp.set(+row[1]!, [+row[2]!, +row[3]!])
+    } catch {
+      // a file of XP this QuestieDB does not have: those quests show no XP
+    }
+  }
+  return { version: /^## Version: *(.+)$/m.exec(text)?.[1]?.trim() ?? 'unknown', ids, get, places, zoneIndex, xp }
 }
 
 /** What each vendor sells, by the NPC's number: QuestieDB lists the sellers of each item, turned round here. Prices and names are the game's (shopRows in shared/items.ts). */
@@ -495,7 +507,7 @@ export function questLog(db: Questie, shown: QuestieShown): LogQuest[] {
  * many icons and where are Questie's own; QuestieDB gives the names: of the quest, and of who or
  * what stands there.
  */
-export function questPins(db: Questie, shown: QuestieShown): QuestPin[] {
+export function questPins(db: Questie, shown: QuestieShown, money: Map<number, number> = new Map()): QuestPin[] {
   type Who = ['Npc' | 'Object', number]
   const text = (v: unknown, or: string): string => (typeof v === 'string' && v ? v : or)
   const named = ([kind, id]: Who): string => text(db.get(kind, id, kind === 'Npc' ? NPC.name : OBJECT.name), kind === 'Npc' ? 'Someone' : 'Something')
@@ -542,12 +554,50 @@ export function questPins(db: Questie, shown: QuestieShown): QuestPin[] {
       const found = nearest(who, icon.area, icon.x, icon.y)
       const name = found && (type === 'objective' || found.far < SAME_SPOT) ? named(found.who) : who.length === 1 ? named(who[0]!) : title
       const key = `${type}:${icon.area}:${icon.x}:${icon.y}`
-      const pin = pins.get(key)
-      if (!pin) pins.set(key, { type, area: icon.area, x: icon.x, y: icon.y, ...(icon.kind && { kind: icon.kind }), name, quests: [quest] })
-      else if (!pin.quests.includes(quest)) pin.quests.push(quest)
+      const pin = pins.get(key) ?? { type, area: icon.area, x: icon.x, y: icon.y, ...(icon.kind && { kind: icon.kind }), name, quests: [] }
+      pins.set(key, pin)
+      if (pin.quests.includes(quest)) continue
+      pin.quests.push(quest)
+      const [xpLevel, xp] = db.xp.get(icon.quest) ?? [], copper = money.get(icon.quest)
+      const reward: QuestReward = { ...(xp && xpLevel && xpLevel > 0 && { level: xpLevel, xp }), ...(copper && copper > 0 && { copper }) }
+      if (reward.xp || reward.copper) pin.rewards = { ...pin.rewards, [quest]: reward }
     }
   }
   return [...pins.values()]
+}
+
+// ponytail: the layout of the cache of build 1.60.1.71037 (a header of 24 bytes, then the quest, the size of its record and
+// the record, whose 13th number is the money); read the other numbers too if XP is ever taken from the game itself.
+const QUEST_CACHE_MAGIC = 'TSQW', QUEST_MONEY = 12
+let moneyRead: { file: string; at: number; money: Map<number, number> } | null = null
+/**
+ * The money each quest gives, in copper, from the game's own cache of the quests it asked the server for
+ * (Cache/WDB/<language>/questcache.wdb): only those, so most quests are not in it. Read again when the game writes it.
+ */
+export function questMoney(gameFolder: string, locale = gameLocale(gameFolder) ?? 'enUS'): Map<number, number> {
+  const file = join(gameFolder, '_forever_', 'Cache', 'WDB', locale, 'questcache.wdb')
+  let at = 0
+  try {
+    at = statSync(file).mtimeMs
+  } catch {
+    return new Map()
+  }
+  if (moneyRead?.file === file && moneyRead.at === at) return moneyRead.money
+  const money = new Map<number, number>()
+  try {
+    const b = readFileSync(file)
+    if (b.toString('latin1', 0, 4) === QUEST_CACHE_MAGIC)
+      for (let off = 24; off + 8 <= b.length; ) {
+        const id = b.readUInt32LE(off), size = b.readUInt32LE(off + 4)
+        if (!size || off + 8 + size > b.length) break
+        if (size >= (QUEST_MONEY + 1) * 4 && b.readUInt32LE(off + 8) === id) money.set(id, b.readInt32LE(off + 8 + QUEST_MONEY * 4))
+        off += 8 + size
+      }
+  } catch {
+    // a cache being written, or of another layout: no money this time
+  }
+  moneyRead = { file, at, money }
+  return money
 }
 
 /** Who sells an item, who drops it and where it is found, from QuestieDB: with a place each, a few of each (the popup of an item, M10-F15). */

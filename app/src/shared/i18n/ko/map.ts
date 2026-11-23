@@ -87,6 +87,7 @@ export default {
   nothingToSend: '보낼 것이 없습니다.',
 
   pins: {
+    rewardXp: '경험치 {xp}',
     entrance: '입구',
     entranceOf: '입구: {name}',
     // Rare as the game's map legend says it for creatures (glossary).

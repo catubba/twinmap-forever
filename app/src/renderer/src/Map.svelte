@@ -24,14 +24,15 @@
   import { addFix, BEHIND, PERIOD, TURN, turnAt, whereAt, type Fix, type Turn } from '../../shared/glide'
   import { boxOf, buildingsAt, killedIn, nameOfBoss, piecesIn, RARE_BOSSES, roomPixels, yardsInside, YARDS_PER_UNIT, type Box, type InteriorMap, type Interiors, type Piece, type UnderRoom, type Yards } from '../../shared/inside'
   import type { Continent, GameMap } from '../../shared/maps'
-  import type { QuestPin } from '../../shared/quests'
+  import { questXp, type QuestPin, type QuestReward } from '../../shared/quests'
+  import { coins } from '../../shared/items'
   import { gatherColour, GATHER_SKILL, HERBS, iconOf, ORES, panelFor, serves, type FixedLayer, type FixedPin, type Travel } from '../../shared/services'
   import { pictureOfBlock, tileOfPicture } from '../../shared/pixels'
   import { WORLDS } from '../../shared/world'
   import { groupName, LAYER_GROUPS, layerName, layersFrom, type LayerId } from '../../shared/layers'
   import { fitNames, tierRank, tierShows, type Avoid, type NameBox, type NameTier, type Place } from '../../shared/places'
   import { placeText, wayTo, zoneAt, type Size } from '../../shared/point-label'
-  import { t } from '../../shared/i18n'
+  import { num, t } from '../../shared/i18n'
   import { fade, fly } from 'svelte/transition'
   import Glyph from './Glyph.svelte'
   import { drop, gone, still } from './motion'
@@ -48,7 +49,7 @@
 
   // at: when the position was read off the game, in milliseconds.
   // insideReady: the rooms of the buildings are converted, and their list can be asked for.
-  let { pos, group = [], at: readAt, insideReady, quests = [], fixed = [], side, live = false, inbox = null, removed = [], set = [], gameFollows = null, journey = null, route = noRoute(), onroute, onnpc, kills, death = null, skills, back = $bindable(null), looking = $bindable(null) }: { kills?: unknown; skills?: unknown; death?: Death | null; back?: (DeathPlace & { name: string; door: boolean }) | null; looking?: { zone: string; where: string } | null; journey?: Journey | null; pos: Position | undefined; at: number | undefined; insideReady: boolean; quests?: QuestPin[]; fixed?: FixedPin[]; side?: string; live?: boolean; inbox?: Inbox | null; removed?: string[]; set?: GameMark[]; gameFollows?: Pin | null; route?: Route; onroute?: (stop: Stop) => void; onnpc?: (pin: FixedPin | null) => void; group?: Companion[] } = $props()
+  let { pos, group = [], at: readAt, insideReady, quests = [], fixed = [], side, live = false, inbox = null, removed = [], set = [], gameFollows = null, journey = null, route = noRoute(), onroute, onnpc, kills, death = null, skills, xpLevel, back = $bindable(null), looking = $bindable(null) }: { kills?: unknown; skills?: unknown; xpLevel?: number | null; death?: Death | null; back?: (DeathPlace & { name: string; door: boolean }) | null; looking?: { zone: string; where: string } | null; journey?: Journey | null; pos: Position | undefined; at: number | undefined; insideReady: boolean; quests?: QuestPin[]; fixed?: FixedPin[]; side?: string; live?: boolean; inbox?: Inbox | null; removed?: string[]; set?: GameMark[]; gameFollows?: Pin | null; route?: Route; onroute?: (stop: Stop) => void; onnpc?: (pin: FixedPin | null) => void; group?: Companion[] } = $props()
 
   const TOP_ZOOM = 7 // the detail of the game itself: the picture of a block is four tiles
   const BLANK = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=='
@@ -1172,6 +1173,29 @@
   // The quests Questie shows, on the zones of the continent in view: where to take one, where to hand
   // one in, where what is still to find is. Each kind is a layer of its own.
   const questLayers = { available: L.layerGroup(), turnin: L.layerGroup(), objectives: L.layerGroup() }
+  /**
+   * Under a quest's line in a pin's tooltip, what it gives: its XP for the character (xpLevel: none at the level cap, as
+   * QuestieDB has it while the level is not known) and its money, where the game's cache tells it.
+   */
+  function rewardLine(r: QuestReward | undefined): HTMLElement | null {
+    const xp = r?.xp && r.level && xpLevel !== null ? (xpLevel === undefined ? r.xp : questXp(r.xp, r.level, xpLevel)) : 0
+    if (!r || (!xp && !r.copper)) return null
+    const line = Object.assign(document.createElement('span'), { className: 'reward' })
+    if (xp) line.append(t('map.pins.rewardXp', { xp: num(xp) }))
+    if (r.copper) {
+      if (xp) line.append(' \u00b7 ')
+      for (const [n, coin] of coins(r.copper)) line.append(num(n), Object.assign(document.createElement('i'), { className: `coin ${coin}` }))
+    }
+    return line
+  }
+  /** A pin's quests in its tooltip, each with what it gives; the one that is the pin's own name has only that. */
+  function questLines(tip: HTMLElement, p: QuestPin): void {
+    for (const quest of p.quests) {
+      if (quest !== p.name) tip.append(document.createElement('br'), quest)
+      const reward = rewardLine(p.rewards?.[quest])
+      if (reward) tip.append(document.createElement('br'), reward)
+    }
+  }
   const QUEST_PINS = { available: ['quest', 'available', 500], turnin: ['turnin', 'turnin', 1000], objective: ['objective', 'objectives', 0] } as const
   $effect(() => {
     for (const group of Object.values(questLayers)) group.clearLayers()
@@ -1195,7 +1219,7 @@
         group.of.forEach((q, i) => {
           if (i) tip.append(document.createElement('br'))
           tip.append(Object.assign(document.createElement('b'), { textContent: q.p.name }))
-          for (const quest of q.p.quests) if (quest !== q.p.name) tip.append(document.createElement('br'), quest)
+          questLines(tip, q.p)
         })
         L.marker(at(units), { keyboard: false, zIndexOffset: above, icon: L.divIcon({ className: 'door', iconSize: [size, size], html: pin(drawing) }) })
           .bindTooltip(tip, { direction: 'top', offset: [0, -size / 2], className: 'tip' })
@@ -1211,7 +1235,7 @@
       // Names come from the player's QuestieDB: written as text, never as markup.
       const tip = document.createElement('span')
       tip.append(Object.assign(document.createElement('b'), { textContent: p.name }))
-      for (const quest of p.quests) if (quest !== p.name) tip.append(document.createElement('br'), quest)
+      questLines(tip, p)
       const size = pinSize(drawing)
       const units = unitsOfPlace(zone.rect, p.x, p.y)
       L.marker(at(units), { keyboard: false, zIndexOffset: above, icon: L.divIcon({ className: p.type === 'objective' ? 'door task' : 'door', iconSize: [size, size], html: pin(drawing) }) })
@@ -2312,5 +2336,8 @@
   }
   .map :global(.tip::before) {
     display: none;
+  }
+  .map :global(.tip .reward) {
+    color: var(--text-dim);
   }
 </style>

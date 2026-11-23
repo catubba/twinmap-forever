@@ -117,6 +117,8 @@ export default {
 
   // Tooltips on the pins of the map, and the line under a pin's name on its label (Map.svelte).
   pins: {
+    // In the tooltip of a quest pin, under each quest: the XP it gives the character, before its money. {xp}: a number.
+    rewardXp: '{xp} XP',
     // On the door of a dungeon, and on the entrance inside its map.
     entrance: 'Entrance',
     // On the entrance inside the map of a dungeon of several wings. {name}: the wing.

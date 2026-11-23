@@ -9,7 +9,7 @@ import { readFileSync } from 'node:fs'
 import type { GameMap } from '../shared/maps'
 import { ABOUT_NPC, type Ask } from './gamelog'
 import { setLang } from '../shared/i18n'
-import { doerIndex, fixedPins, itemSources, metWhereQuestieSays, openQuestie, placed, questLog, questPins, search, searchIndex, shownFromLog } from './questie'
+import { doerIndex, fixedPins, itemSources, metWhereQuestieSays, openQuestie, placed, questLog, questMoney, questPins, search, searchIndex, shownFromLog } from './questie'
 
 /** What the main process asks. */
 export type Asked = { shown: QuestieShown } | { log: GameQuest[] } | { search: string; id: number } | { sources: number; id: number } | { placed: Ask[]; id: number; maps: string | null }
@@ -51,6 +51,6 @@ parentPort?.on('message', (asked: Asked) => {
   else if ('sources' in asked) tell({ id: asked.id, sources: db ? itemSources(db, asked.sources) : { sold: [], drops: [], found: [] } })
   else if (db) {
     const shown = 'log' in asked ? shownFromLog(db, asked.log) : asked.shown
-    tell({ questie: db.version, pins: questPins(db, shown), log: questLog(db, shown) })
+    tell({ questie: db.version, pins: questPins(db, shown, questMoney((workerData as { gameFolder: string }).gameFolder)), log: questLog(db, shown) })
   }
 })

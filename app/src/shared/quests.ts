@@ -42,6 +42,23 @@ export interface QuestPin {
   name: string
   /** The quests it is there for. */
   quests: string[]
+  /** What each of them gives, by its line in quests: missing where nothing is known. */
+  rewards?: Record<string, QuestReward>
+}
+
+/** What a quest gives: its XP at the level QuestieDB has it for, and the money the game's cache tells (copper). */
+export interface QuestReward {
+  level?: number
+  xp?: number
+  copper?: number
+}
+
+// ponytail: Questie's own reckoning (from CMaNGOS), its rounding included, so that the two show the same; Forever's own
+// multipliers of a quest (the game's cache has them) are not read.
+/** A quest's XP for a character: less for a quest under it, rounded as the game rounds it. */
+export function questXp(base: number, questLevel: number, level: number): number {
+  const v = (base * Math.min(10, Math.max(1, 2 * (questLevel - level) + 20))) / 10
+  return v <= 100 ? 5 * Math.floor((v + 2) / 5) : v <= 500 ? 10 * Math.floor((v + 5) / 10) : v <= 1000 ? 25 * Math.floor((v + 12) / 25) : 50 * Math.floor((v + 25) / 50)
 }
 
 /** A quest of the log, by the name its pins carry. */

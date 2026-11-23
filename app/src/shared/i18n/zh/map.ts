@@ -86,6 +86,7 @@ export default {
   nothingToSend: '没有可发送的内容。',
 
   pins: {
+    rewardXp: '{xp} 经验值',
     entrance: '入口',
     entranceOf: '入口：{name}',
     // Rare as the game's map legend says it for creatures (MAP_LEGEND_RARE).

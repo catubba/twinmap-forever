@@ -82,6 +82,7 @@ export default {
   nothingToSend: 'Il n’y a rien à envoyer.',
 
   pins: {
+    rewardXp: '{xp} EXP',
     entrance: 'Entrée',
     entranceOf: 'Entrée : {name}',
     rareBoss: '{name} (rare)',

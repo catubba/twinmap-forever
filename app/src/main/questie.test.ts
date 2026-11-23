@@ -8,7 +8,7 @@ import { gameItemFacts, shopRows } from '../shared/items'
 import { gameFolderFrom, openClientFiles, registryInstallPath } from './client-files'
 import { sentKeys } from './keys'
 import type { GameMap } from '../shared/maps'
-import { cbor, doerIndex, fixedPins, ITEM, metWhereQuestieSays, NPC, OBJECT, openQuestie, placed, QUEST, questLog, questPins, search, searchIndex, shops, shownFromLog } from './questie'
+import { cbor, doerIndex, fixedPins, ITEM, metWhereQuestieSays, NPC, OBJECT, openQuestie, placed, QUEST, questLog, questMoney, questPins, search, searchIndex, shops, shownFromLog } from './questie'
 
 // Writes a value the way QuestieDB does: CBOR, then base64. Only what these tests need.
 function enc(v: unknown): Buffer {
@@ -71,6 +71,33 @@ const shown = (icons: { available?: Icon[]; turnin?: Icon[]; objective?: Icon[] 
   const of = (list: Icon[] = []) => list.map(([quest, area, x, y]) => ({ quest, area, x, y }))
   return { icons: { available: of(icons.available), turnin: of(icons.turnin), objective: of(icons.objective) }, active: active.map((q) => ({ ...q, done: false })) }
 }
+
+test("a quest pin carries what each quest gives: XP from QuestieDB's own files, money from the game's cache of quests", () => {
+  // The .toc lists the files of XP, Forever's traces after the classic table: a quest in both takes the traces.
+  const folder = game([...LINES, 'support\\Forever\\QuestXP\\xpDB-classic.lua', 'support\\Forever\\QuestXP\\xpDB-traces.lua'])
+  const xp = join(folder, '_forever_', 'Interface', 'AddOns', 'QuestieDB', 'support', 'Forever', 'QuestXP')
+  mkdirSync(xp, { recursive: true })
+  writeFileSync(join(xp, 'xpDB-classic.lua'), 'QuestXP.db = {\n  [7] = {12, 600}, -- Classic: 12: 600\n  [8] = {3, 100},\n}\n')
+  writeFileSync(join(xp, 'xpDB-traces.lua'), 'QuestXP.db[7] = {12, 650}\n')
+  // The game's cache: its header, then each quest, the size of its record and the record, whose 13th number is the money.
+  const record = (id: number, copper: number): Buffer => {
+    const b = Buffer.alloc(8 + 64)
+    b.writeUInt32LE(id, 0)
+    b.writeUInt32LE(64, 4)
+    b.writeUInt32LE(id, 8)
+    b.writeInt32LE(copper, 8 + 48)
+    return b
+  }
+  const head = Buffer.alloc(24)
+  head.write('TSQW', 0, 'latin1')
+  mkdirSync(join(folder, '_forever_', 'Cache', 'WDB', 'enUS'), { recursive: true })
+  writeFileSync(join(folder, '_forever_', 'Cache', 'WDB', 'enUS', 'questcache.wdb'), Buffer.concat([head, record(7, 320), record(8, 0)]))
+  const db = openQuestie(folder)!
+  const pins = questPins(db, shown({ available: [[7, 12, 42.5, 65.25], [8, 40, 10, 20], [10, 40, 61.5, 30]] }), questMoney(folder))
+  expect(pins.map((p) => p.rewards)).toEqual([{ '[12] A Parcel for the Miller': { level: 12, xp: 650, copper: 320 } }, { '[3] Rats in the Cellar': { level: 3, xp: 100 } }, undefined])
+  // Without the game's cache, the XP alone.
+  expect(questPins(db, shown({ available: [[7, 12, 42.5, 65.25]] }))[0]!.rewards).toEqual({ '[12] A Parcel for the Miller': { level: 12, xp: 650 } })
+})
 
 test('an icon of a quest on offer is a pin on the same spot, named after who stands there', () => {
   const db = openQuestie(game(LINES))!
