@@ -126,5 +126,7 @@ test('a pin takes the picture of what it is', () => {
   expect(iconOf({ layers: ['ore'], kind: 'copper' })).toBe('ore-copper')
   expect(iconOf({ layers: ['ore'], kind: 'dark-iron' })).toBe('ore-dark-iron')
   expect(iconOf(pin('Strange Vein', ['ore']))).toBe('ore')
-  expect(iconOf(pin('Peacebloom', ['herbs']))).toBe('herbs')
+  // A herb by its own icon; one of no kind listed by the cursor.
+  expect(iconOf({ layers: ['herbs'], kind: "Khadgar's Whisker" })).toBe('herb-khadgars-whisker')
+  expect(iconOf(pin('Strange Weed', ['herbs']))).toBe('herbs')
 })

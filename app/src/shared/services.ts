@@ -32,6 +32,8 @@ export const ORES = {
 } as const satisfies Record<string, readonly [need: number, item: number]>
 const ORE = /\b(Vein|Deposit)$/
 const ORES_LONGEST_FIRST = Object.keys(ORES).sort((a, b) => b.length - a.length) // "Truesilver" is not silver, "Rich Thorium" not thorium
+/** The name of a herb's own icon (icons.ts): Khadgar's Whisker is herb-khadgars-whisker. */
+export const herbIcon = (kind: string): string => `herb-${kind.toLowerCase().replaceAll("'", '').replaceAll(' ', '-')}`
 /** The skill lines of the two professions that gather them. */
 export const GATHER_SKILL = { ore: 186, herbs: 182 } as const
 
@@ -176,5 +178,6 @@ export function iconOf(pin: Pick<FixedPin, 'sub' | 'layers' | 'kind'>, shown: (l
   if (layer === 'trainers') return CLASS_TRAINER.test(pin.sub ?? '') ? 'class' : 'profession'
   if (layer === 'vendors') return SOLD.find(([told]) => told.test(pin.sub ?? ''))?.[1] ?? 'vendors'
   if (layer === 'ore') return pin.kind ? `ore-${pin.kind}` : 'ore'
+  if (layer === 'herbs') return pin.kind ? herbIcon(pin.kind) : 'herbs'
   return layer ?? 'vendors'
 }

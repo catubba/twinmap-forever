@@ -1,12 +1,13 @@
 // The pictures of the pins of services, ore and herbs, taken from the player's own game and kept
 // beside the tiles as PNG files: what the minimap shows for who offers a service, the cursor of
-// the game over a herb or a vendor, for a vein the picture of its ore, and for the door of a
+// the game over a herb or a vendor, for a vein the picture of its ore, for a herb its own on a
+// dark disc (the cursor where its picture is missing), and for the door of a
 // dungeon or a raid the swirl the game's own maps mark it with, for a death its tombstone and a
 // ghost. Nothing of them is in the app: a game without them leaves the map its plain pins.
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { decodeBlpCutout, type Cutout } from '../shared/blp'
-import { ORES } from '../shared/services'
+import { herbIcon, HERBS, ORES } from '../shared/services'
 import { readTable } from '../shared/wdc5'
 import type { ClientFiles } from './client-files'
 import { encodePng } from './png'
@@ -25,7 +26,7 @@ const SHEET_PICTURES_FILE = 897532, PICTURE_NAME = 0, PICTURE_SHEET = 2, PICTURE
  * dungeon, green for a raid), the tombstone the game marks a corpse with, and a ghost for the graveyard. */
 const SHEET_NAMES: Record<string, string> = { dungeon: 'dungeon', raid: 'raid', 'Navigation-Tombstone-Icon': 'corpse', 'poi-soulspiritghost': 'ghost' }
 /** Written last in the folder of the icons: the icons there are the ones this app makes. An older folder is made again. */
-export const ICONS_MADE = 'made-4'
+export const ICONS_MADE = 'made-5'
 
 const SIZE = 32 // of an icon cut from an item's picture: the size of the others
 const FRAME = 5 // pixels of border an item's picture has on each side, of 64
@@ -73,6 +74,35 @@ export function withoutGround({ width, height, rgba }: Cutout): Cutout {
   return { width: w, height: h, rgba: lined }
 }
 
+const DISC = 64 // of a herb's icon: drawn at 20 pixels, as sharp on a screen of three times the density
+/**
+ * The picture of an item cut round, without its frame, on a dark disc in a gold ring with a black line around it:
+ * a herb on the map, its greens apart from the green of the grass.
+ */
+export function onDisc({ width, height, rgba }: Cutout): Cutout {
+  const out = new Uint8Array(DISC * DISC * 4), frame = (FRAME * width) / 64, mid = DISC / 2
+  // The rings from the outside in: the black line, the gold, the dark ground under the picture. Their edges are smoothed.
+  const rings: [number, number[]][] = [[mid, [0, 0, 0]], [mid - 3, [217, 183, 126]], [mid - 8, [8, 18, 24]]]
+  const inner = mid - 8, scale = (width - 2 * frame) / (inner * 2)
+  const at = (x: number, y: number, c: number): number => rgba[(Math.min(height - 1, Math.max(0, y)) * width + Math.min(width - 1, Math.max(0, x))) * 4 + c]!
+  for (let y = 0; y < DISC; y++) for (let x = 0; x < DISC; x++) {
+    const d = Math.hypot(x + 0.5 - mid, y + 0.5 - mid), px = [0, 0, 0, 0]
+    const over = (colour: number[], cover: number): void => {
+      if (cover <= 0) return
+      for (let c = 0; c < 3; c++) px[c] = px[c]! * (1 - cover) + colour[c]! * cover
+      px[3] = px[3]! + (1 - px[3]!) * cover
+    }
+    for (const [r, colour] of rings) over(colour, Math.min(1, r - d + 0.5))
+    // The picture, read between its pixels where it is drawn larger or smaller.
+    const u = frame + (x + 0.5 - (mid - inner)) * scale - 0.5, v = frame + (y + 0.5 - (mid - inner)) * scale - 0.5
+    const u0 = Math.floor(u), v0 = Math.floor(v), fu = u - u0, fv = v - v0
+    const sample = [0, 1, 2].map((c) => (at(u0, v0, c) * (1 - fu) + at(u0 + 1, v0, c) * fu) * (1 - fv) + (at(u0, v0 + 1, c) * (1 - fu) + at(u0 + 1, v0 + 1, c) * fu) * fv)
+    over(sample, Math.min(1, inner - d + 0.5))
+    out.set([Math.round(px[0]!), Math.round(px[1]!), Math.round(px[2]!), Math.round(px[3]! * 255)], (y * DISC + x) * 4)
+  }
+  return { width: DISC, height: DISC, rgba: out }
+}
+
 /** A part of a picture: the pixels from left to right (not included) and from top to bottom (not included). */
 export function cutOut({ width, rgba }: Cutout, left: number, right: number, top: number, bottom: number): Cutout {
   const w = right - left, h = bottom - top, out = new Uint8Array(w * h * 4)
@@ -107,6 +137,10 @@ export function writeIcons(files: ClientFiles, folder: string): void {
   for (const [ore, [, item]] of Object.entries(ORES)) {
     const picture = rows.get(item)?.int(ITEM_ICON)
     write(`ore-${ore}`, picture, (c) => (c.width === SIZE * 2 && c.height === SIZE * 2 ? withoutGround(c) : c))
+  }
+  for (const [herb, [, item]] of Object.entries(HERBS)) {
+    const picture = rows.get(item)?.int(ITEM_ICON)
+    write(herbIcon(herb), picture || CURSORS.herbs, picture ? onDisc : undefined)
   }
   try {
     const sheets = files.read(SHEETS_FILE, true), pictures = files.read(SHEET_PICTURES_FILE, true)

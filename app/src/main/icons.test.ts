@@ -1,7 +1,7 @@
 import { join } from 'node:path'
 import { expect, test } from 'vitest'
 import { decodeBlpCutout } from '../shared/blp'
-import { cutOut, withoutGround, withoutPointer } from './icons'
+import { cutOut, onDisc, withoutGround, withoutPointer } from './icons'
 import { servedFile } from './tiles'
 
 const alphaAt = (c: { width: number; rgba: Uint8Array }, x: number, y: number): number => c.rgba[(y * c.width + x) * 4 + 3]!
@@ -12,6 +12,20 @@ test('a picture is cut out of the sheet it is kept on', () => {
   const cut = cutOut(sheet, 2, 5, 1, 3)
   expect([cut.width, cut.height]).toEqual([3, 2])
   expect([0, 1, 2, 3, 4, 5].map((i) => cut.rgba[i * 4])).toEqual([10, 11, 12, 18, 19, 20])
+})
+
+test("a herb's picture is cut round, without its frame, on a dark disc in a gold ring with a black line", () => {
+  // A grey frame around red.
+  const rgba = new Uint8Array(64 * 64 * 4)
+  for (let y = 0; y < 64; y++) for (let x = 0; x < 64; x++) rgba.set(x < 5 || y < 5 || x > 58 || y > 58 ? [120, 120, 120, 255] : [200, 0, 0, 255], (y * 64 + x) * 4)
+  const disc = onDisc({ width: 64, height: 64, rgba })
+  const px = (x: number, y: number): number[] => [...disc.rgba.subarray((y * 64 + x) * 4, (y * 64 + x) * 4 + 4)]
+  expect([disc.width, disc.height]).toEqual([64, 64])
+  expect(px(32, 32), 'the middle: the picture').toEqual([200, 0, 0, 255])
+  expect(px(32, 9), 'its edge: the picture, never its grey frame').toEqual([200, 0, 0, 255])
+  expect(px(32, 5), 'the ring').toEqual([217, 183, 126, 255])
+  expect(px(32, 1), 'the line').toEqual([0, 0, 0, 255])
+  expect(px(0, 0)[3], 'the corner: nothing').toBe(0)
 })
 
 test('a cursor loses its pointer and keeps its picture', () => {
