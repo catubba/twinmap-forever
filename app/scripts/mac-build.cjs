@@ -37,8 +37,9 @@ if (process.argv[2] === 'sign') {
   const identity = process.env.TWINMAP_MAC_IDENTITY || '-'
   // Resolve SHA-1 hashes and partial names; omit -v so untrusted self-signed certificates remain visible.
   const identities = identity === '-' ? '' : execFileSync('security', ['find-identity', '-p', 'codesigning'], { encoding: 'utf8' })
-  const name = [...identities.matchAll(/^\s*\d+\)\s+([0-9a-f]{40})\s+"([^"]+)"/gim)]
-    .find(([, hash, name]) => hash.toLowerCase() === identity.toLowerCase() || name.includes(identity))?.[2] ?? identity
+  const matches = [...identities.matchAll(/^\s*\d+\)\s+([0-9a-f]{40})\s+"([^"]+)"/gim)]
+  const name = (matches.find(([, hash, candidate]) => hash.toLowerCase() === identity.toLowerCase() || candidate === identity)
+    ?? matches.find(([, , candidate]) => candidate.includes(identity)))?.[2] ?? identity
   const developerId = name.startsWith('Developer ID Application: ')
   const profile = process.env.TWINMAP_MAC_NOTARY_PROFILE
   if (profile && !developerId) throw new Error('TWINMAP_MAC_NOTARY_PROFILE requires a Developer ID Application: … identity; ad hoc and self-signed certificates cannot be notarized.')

@@ -39,15 +39,13 @@ jobs:
       - run: npm test
       - run: npm run build
       - run: npm run dist:mac
+      # Hosted runners cannot get Screen Recording without writing the protected permission database, so this job builds and checks the app but does not capture.
       - name: Verify macOS bundle and capture helper
         run: |
           codesign --verify --deep --strict dist/mac-arm64/Twinmap.app
           helper=dist/mac-arm64/Twinmap.app/Contents/Helpers/twinmap-capture
           test -f "$helper"
           test "$(lipo -archs "$helper")" = arm64
-      - name: Probe macOS Screen Recording capture
-        timeout-minutes: 5
-        run: npm run probe:mac
 
   server:
     runs-on: ubuntu-latest
