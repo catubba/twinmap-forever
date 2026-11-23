@@ -22,6 +22,33 @@ jobs:
       - run: npm test
       - run: npm run build
 
+  app-mac:
+    runs-on: macos-15
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci
+      - run: npm run check
+      - run: npm test
+      - run: npm run build
+      - run: npm run dist:mac
+      - name: Verify macOS bundle and capture helper
+        run: |
+          codesign --verify --deep --strict dist/mac-arm64/Twinmap.app
+          helper=dist/mac-arm64/Twinmap.app/Contents/Helpers/twinmap-capture
+          test -f "$helper"
+          test "$(lipo -archs "$helper")" = arm64
+      - name: Probe macOS Screen Recording capture
+        timeout-minutes: 5
+        run: npm run probe:mac
+
   server:
     runs-on: ubuntu-latest
     steps:
