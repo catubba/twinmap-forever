@@ -162,7 +162,7 @@
           <div><dt><kbd>N</kbd></dt><dd>{t('settings.keys.north')}</dd></div>
           <div><dt><kbd>M</kbd></dt><dd>{t('settings.keys.side')}</dd></div>
           {#if inApp}<div><dt><kbd>F11</kbd></dt><dd>{t('settings.keys.fullScreen')}</dd></div>{/if}
-          {#if inApp}<div><dt><kbd>Ctrl</kbd><kbd>+</kbd><kbd>-</kbd><kbd>0</kbd></dt><dd>{t('settings.keys.zoom')}</dd></div>{/if}
+          {#if inApp}<div><dt><kbd>{t('settings.keys.ctrl')}</kbd><kbd>+</kbd><kbd>-</kbd><kbd>0</kbd></dt><dd>{t('settings.keys.zoom')}</dd></div>{/if}
           <div><dt><kbd>Esc</kbd></dt><dd>{t('settings.keys.close')}</dd></div>
           <div><dt><kbd>{t('settings.keys.arrows')}</kbd><kbd>+</kbd><kbd>-</kbd></dt><dd>{t('settings.keys.move')}</dd></div>
           <div><dt><kbd>{t('settings.keys.rightDrag')}</kbd></dt><dd>{t('settings.keys.turn')}</dd></div>

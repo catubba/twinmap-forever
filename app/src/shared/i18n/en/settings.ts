@@ -100,6 +100,8 @@ export default {
     side: 'Map on the other side of the panel',
     // Beside the key F11.
     fullScreen: 'Full screen',
+    // The name of a key: Control, as printed on the keyboards of the language (Strg in German). Short.
+    ctrl: 'Ctrl',
     // Beside the keys Ctrl, +, -, 0.
     zoom: 'Text size, also Ctrl and the wheel outside the map',
     // Beside the key Esc.

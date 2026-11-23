@@ -73,6 +73,7 @@ export default {
     north: 'La carte tourne avec votre personnage, ou le nord en haut',
     side: 'Carte de l’autre côté du panneau',
     fullScreen: 'Plein écran',
+    ctrl: 'Ctrl',
     zoom: 'Taille du texte, aussi Ctrl et la molette hors de la carte',
     // "ces options": the page is called Options.
     close: 'Ferme une étiquette, les Calques, ces options',

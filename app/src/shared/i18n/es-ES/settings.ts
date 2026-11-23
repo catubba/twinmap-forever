@@ -74,6 +74,7 @@ export default {
     north: 'El mapa gira con tu personaje, o el norte arriba',
     side: 'Mapa al otro lado del panel',
     fullScreen: 'Pantalla completa',
+    ctrl: 'Ctrl',
     zoom: 'Tamaño del texto, también Ctrl y la rueda fuera del mapa',
     // "estas opciones": the page is called Opciones.
     close: 'Cierra una etiqueta, Capas, estas opciones',
