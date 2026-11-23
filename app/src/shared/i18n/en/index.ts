@@ -41,8 +41,6 @@ export default {
     intro: 'The language of Twinmap. Names that come from the game (zones, NPCs, items) stay in the language of your game.',
     // Small, beside the name of the language the game is in.
     game: 'the language of your game',
-    // A language not written yet. {name}: its name in its own words, as Deutsch.
-    soon: '{name} (coming soon)',
     later: 'You can change it at any time in Settings.',
     // The window after the update: its title and what it asks.
     newTitle: 'Twinmap now speaks your language',

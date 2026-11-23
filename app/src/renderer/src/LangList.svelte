@@ -1,6 +1,6 @@
 <script lang="ts">
   // The languages to pick from, each in its own words, in two columns: the one spoken in gold with its tick, the game's
-  // own said beside its name, the ones not written yet there but greyed and coming. A pick is spoken at once: the app
+  // own said beside its name, the ones not written yet there but greyed and coming, in their own words. A pick is spoken at once: the app
   // keeps it and the page loads again in it (App.svelte), this list included.
   import type { SetupStatus } from '../../shared/setup'
   import { langNow, t } from '../../shared/i18n'
@@ -14,7 +14,7 @@
     <li>
       <button role="radio" aria-checked={lang.code === spoken} disabled={!lang.ready} onclick={() => lang.code !== spoken && void window.twinmap.setLang(lang.code)}>
         <span class="tick" aria-hidden="true">{lang.code === spoken ? '✓' : ''}</span>
-        <span class="name"><span lang={lang.code.slice(0, 2)}>{lang.ready ? lang.name : t('language.soon', { name: lang.name })}</span>{#if lang.code === setup.gameLang && lang.ready}<small>{t('language.game')}</small>{/if}</span>
+        <span class="name"><span lang={lang.code.slice(0, 2)}>{lang.ready ? lang.name : lang.soon}</span>{#if lang.code === setup.gameLang && lang.ready}<small>{t('language.game')}</small>{/if}</span>
       </button>
     </li>
   {/each}

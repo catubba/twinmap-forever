@@ -24,16 +24,16 @@ export const LANGS: Record<string, { name: string; intl: string; table: Table; s
   frFR: { name: 'Français', intl: 'fr-FR', table: fr, soon: true },
 }
 /** Every language planned (design notes, l10n.md), in its own words, in the order they are offered. The ones not in
- *  LANGS, or there but soon, show as coming. */
-export const PLANNED: { code: string; name: string }[] = [
-  { code: 'enUS', name: 'English' },
-  { code: 'frFR', name: 'Français' },
-  { code: 'deDE', name: 'Deutsch' },
-  { code: 'esES', name: 'Español (España)' },
-  { code: 'esMX', name: 'Español (Latinoamérica)' },
-  { code: 'ruRU', name: 'Русский' },
-  { code: 'koKR', name: '한국어' },
-  { code: 'zhCN', name: '简体中文' },
+ *  LANGS, or there but soon, show as coming, said in their own words too: the player who reads it is one who speaks it. */
+export const PLANNED: { code: string; name: string; soon: string }[] = [
+  { code: 'enUS', name: 'English', soon: 'English (coming soon)' },
+  { code: 'frFR', name: 'Français', soon: 'Français (bientôt)' },
+  { code: 'deDE', name: 'Deutsch', soon: 'Deutsch (demnächst)' },
+  { code: 'esES', name: 'Español (España)', soon: 'Español (España) (próximamente)' },
+  { code: 'esMX', name: 'Español (Latinoamérica)', soon: 'Español (Latinoamérica) (próximamente)' },
+  { code: 'ruRU', name: 'Русский', soon: 'Русский (скоро)' },
+  { code: 'koKR', name: '한국어', soon: '한국어 (출시 예정)' },
+  { code: 'zhCN', name: '简体中文', soon: '简体中文 (即将推出)' },
 ]
 let all = false
 /** For trials (TWINMAP_LANGS=all): the languages written but not out yet are offered too. */
@@ -41,7 +41,7 @@ export const offerAll = (on = true): void => void (all = on)
 /** Whether the player may have this language: written, and out (or a trial). */
 export const offered = (code: unknown): boolean => typeof code === 'string' && code in LANGS && (!LANGS[code]!.soon || all)
 /** The languages planned, each with whether it can be had yet. */
-export const planned = (): { code: string; name: string; ready: boolean }[] => PLANNED.map((l) => ({ ...l, ready: offered(l.code) }))
+export const planned = (): { code: string; name: string; soon: string; ready: boolean }[] => PLANNED.map((l) => ({ ...l, ready: offered(l.code) }))
 
 /** For trials only, never offered: every text marked, accented and 40% longer, so one left in the code shows at a glance. */
 export const PSEUDO = 'pseudo'

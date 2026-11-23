@@ -30,7 +30,7 @@ export interface SetupStatus {
   /** The language the app speaks (shared/i18n): a page that speaks another loads again in this one. */
   lang?: string
   /** Every language planned, in its own words, and whether it can be had yet (shared/i18n, planned). */
-  langs?: { code: string; name: string; ready: boolean }[]
+  langs?: { code: string; name: string; soon: string; ready: boolean }[]
   /** The language the game is in (textLocale), or null when it is not known. */
   gameLang?: string | null
   /** The window that asks for the language once after the update is due (askLangOf, main/setup.ts). */

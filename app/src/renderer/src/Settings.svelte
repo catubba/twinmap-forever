@@ -54,7 +54,7 @@
           <section class="group">
             <h2 class="band">{t('language.settingsTitle')}</h2>
             <div class="in">
-              <label class="choice">{t('language.label')} <select class="field" value={langNow()} onchange={(e) => void window.twinmap.setLang(e.currentTarget.value)}>{#each setup.langs ?? [] as lang (lang.code)}<option value={lang.code} disabled={!lang.ready}>{lang.ready ? lang.name : t('language.soon', { name: lang.name })}</option>{/each}</select></label>
+              <label class="choice">{t('language.label')} <select class="field" value={langNow()} onchange={(e) => void window.twinmap.setLang(e.currentTarget.value)}>{#each setup.langs ?? [] as lang (lang.code)}<option value={lang.code} disabled={!lang.ready}>{lang.ready ? lang.name : lang.soon}</option>{/each}</select></label>
               <p class="hint">{t('language.hint')}</p>
             </div>
           </section>

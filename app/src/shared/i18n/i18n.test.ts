@@ -151,8 +151,7 @@ test('every language planned is listed, in its own words; the ones not out yet a
   expect(planned().map((l) => l.code)).toEqual(['enUS', 'frFR', 'deDE', 'esES', 'esMX', 'ruRU', 'koKR', 'zhCN'])
   expect(planned().filter((l) => l.ready).map((l) => l.code)).toEqual(['enUS'])
   expect(planned().find((l) => l.code === 'deDE')!.name).toBe('Deutsch')
-  setLang('frFR')
-  expect(t('language.soon', { name: 'Deutsch' })).toBe('Deutsch (bientôt)')
+  expect(planned().find((l) => l.code === 'deDE')!.soon, 'coming, in its own words').toBe('Deutsch (demnächst)')
   offerAll()
   try {
     expect(offered('frFR')).toBe(true)

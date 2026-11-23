@@ -24,7 +24,6 @@ export default {
     title: 'Choisissez votre langue',
     intro: 'La langue de Twinmap. Les noms qui viennent du jeu (zones, PNJ, objets) restent dans la langue de votre jeu.',
     game: 'la langue de votre jeu',
-    soon: '{name} (bientôt)',
     later: 'Vous pourrez la changer à tout moment dans les Options.',
     newTitle: 'Twinmap parle maintenant votre langue',
     newIntro: 'Choisissez la langue de Twinmap. Sans choix, il reste en anglais.',
