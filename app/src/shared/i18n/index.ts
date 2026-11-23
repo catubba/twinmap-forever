@@ -4,6 +4,8 @@
 // The language is set once as a page or the main process starts (setLang): a new choice reloads the page.
 import en from './en'
 import fr from './fr'
+import esES from './es-ES'
+import esMX from './es-MX'
 
 /** A text that changes with a number, `count` among its values: the forms Intl.PluralRules names for the language. */
 export type Plural = { other: string } & Partial<Record<Intl.LDMLPluralRule, string>>
@@ -22,6 +24,8 @@ export const LANGS: Record<string, { name: string; intl: string; table: Table; s
   // soon: written, not offered yet. Spoken only when chosen by hand in settings.json, never from the game's language,
   // until all the languages come out together (design notes, M17-F15). Trials offer them with TWINMAP_LANGS=all.
   frFR: { name: 'Français', intl: 'fr-FR', table: fr, soon: true },
+  esES: { name: 'Español (España)', intl: 'es-ES', table: esES, soon: true },
+  esMX: { name: 'Español (Latinoamérica)', intl: 'es-MX', table: esMX, soon: true },
 }
 /** Every language planned (design notes, l10n.md), in its own words, in the order they are offered. The ones not in
  *  LANGS, or there but soon, show as coming, said in their own words too: the player who reads it is one who speaks it. */

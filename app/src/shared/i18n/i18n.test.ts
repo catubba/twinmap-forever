@@ -36,6 +36,19 @@ test('French writes numbers, hours and days as France does', () => {
   expect(day(at, { day: 'numeric', month: 'short', timeZone: 'UTC' })).toBe('23 nov.')
 })
 
+test('Spanish writes numbers as each game does: Spain with a decimal comma, Latin America with a decimal point', () => {
+  const at = Date.UTC(2026, 10, 23, 14, 5)
+  setLang('esES')
+  expect(t('common.close')).toBe('Cerrar')
+  expect(num(1234567)).toBe('1.234.567')
+  expect(num(2.5)).toBe('2,5')
+  expect(day(at, { day: 'numeric', month: 'short', timeZone: 'UTC' })).toBe('23 nov')
+  setLang('esMX')
+  expect(num(1234567)).toBe('1,234,567')
+  expect(num(2.5)).toBe('2.5')
+  expect(clock(at + new Date(at).getTimezoneOffset() * 60000)).toBe('14:05')
+})
+
 test('English writes numbers, hours and days as the app always has', () => {
   expect(num(1234567)).toBe('1,234,567')
   const at = Date.UTC(2026, 10, 23, 14, 5)
@@ -155,6 +168,7 @@ test('every language planned is listed, in its own words; the ones not out yet a
   offerAll()
   try {
     expect(offered('frFR')).toBe(true)
+    expect(offered('esES') && offered('esMX'), 'written, both').toBe(true)
     expect(offered('deDE'), 'not written').toBe(false)
     expect(langFor(undefined, 'frFR'), 'the game language, now offered').toBe('frFR')
   } finally {
