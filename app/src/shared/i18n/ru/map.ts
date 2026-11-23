@@ -7,6 +7,12 @@ export default {
     // Group after a colon: "все {group}" would need the case of each group name.
     hideAll: 'Скрыть все: {group}',
     showAll: 'Показать все: {group}',
+    kinds: 'Виды: {layer}',
+    hideGrey: 'Скрыть серые',
+    hideGreyTip: 'Скрыть то, что больше не повышает навык',
+    skill: 'Навык {skill}',
+    notLearned: 'Не изучено',
+    skillUnread: 'Навык ещё не прочитан',
     groups: {
       you: 'Вы',
       quests: 'Задания',

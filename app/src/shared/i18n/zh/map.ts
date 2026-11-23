@@ -6,6 +6,12 @@ export default {
     menu: '图层',
     hideAll: '隐藏全部{group}',
     showAll: '显示全部{group}',
+    kinds: '{layer}种类',
+    hideGrey: '隐藏灰色',
+    hideGreyTip: '隐藏不再提高技能的种类',
+    skill: '技能 {skill}',
+    notLearned: '未学会',
+    skillUnread: '尚未读取技能',
     groups: {
       // The character (glossary), never 你: "隐藏全部你" would not read.
       you: '角色',

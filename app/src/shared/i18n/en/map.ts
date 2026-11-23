@@ -11,6 +11,18 @@ export default {
     // Tooltip on the name of a group, which turns all its layers off or on. {group}: one of map.layers.groups.
     hideAll: 'Hide all {group}',
     showAll: 'Show all {group}',
+    // The arrow beside Ore and beside Herbs that opens the list of their kinds beside the menu. {layer}: map.layers.names.ore or .herbs.
+    kinds: 'Kinds of {layer}',
+    // The first row of that list: hides the kinds that give the character no more skill points, grey in the game. Short.
+    hideGrey: 'Hide grey',
+    // Its tooltip.
+    hideGreyTip: 'Hide what no longer raises your skill',
+    // Right of Hide grey: the character's skill in Mining or in Herbalism. {skill}: a number.
+    skill: 'Skill {skill}',
+    // In its place when the character has not learned the profession.
+    notLearned: 'Not learned',
+    // In its place before the addon has sent the character's skills.
+    skillUnread: 'Skill not read yet',
     // The groups: a heading in the menu, over its layers. Short.
     groups: {
       you: 'You',

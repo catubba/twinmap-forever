@@ -31,8 +31,8 @@ export interface Questie {
   /** QuestieDB's own version, as its .toc says. */
   version: string
   ids: { Quest: number[]; Npc: number[]; Object: number[]; Item: number[] }
-  /** One field of one entity, as QuestieDB holds it; undefined when it has none. */
-  get: (kind: Kind, id: number, field: number) => unknown
+  /** One field of one entity, as QuestieDB holds it; undefined when it has none. english: the English name, not the game's language. */
+  get: (kind: Kind, id: number, field: number, english?: boolean) => unknown
   /** Where an NPC or an object is. A patrol has no spawn: it is where its path starts. */
   places: (kind: 'Npc' | 'Object', id: number) => Places
   /** The NPCs and the objects of each zone. */
@@ -172,8 +172,8 @@ export function openQuestie(gameFolder: string, locale = gameLocale(gameFolder) 
     return typeof said === 'string' && said ? said : undefined
   }
   // Scalars live in the -S row, tables on a line of their own; a name in the game's language before the English one.
-  const get = (kind: Kind, id: number, field: number): unknown => {
-    const own = translated(kind, id, field)
+  const get = (kind: Kind, id: number, field: number, english = false): unknown => {
+    const own = english ? undefined : translated(kind, id, field)
     if (own !== undefined) return own
     const scalar = (value(`${kind}-${id}-S`) as Record<string, unknown> | undefined)?.[field]
     return scalar !== undefined ? scalar : value(`${kind}-${id}-${field}`)
@@ -359,8 +359,11 @@ export function fixedPins(db: Questie): FixedPin[] {
     add('Npc', id, { name, ...(typeof sub === 'string' && sub ? { sub } : {}), layers, side, ...(panel && { npc: id }), ...(sold.has(id) && { sells: sold.get(id) }) })
   }
   for (const id of db.ids.Object) {
-    const name = db.get('Object', id, OBJECT.name), layer = typeof name === 'string' ? resourceOf(name) : null
-    if (layer) add('Object', id, { name: name as string, layers: [layer] })
+    // Told by the English name, shown in the game's language.
+    const english = db.get('Object', id, OBJECT.name, true), found = typeof english === 'string' ? resourceOf(english) : null
+    if (!found) continue
+    const name = db.get('Object', id, OBJECT.name)
+    add('Object', id, { name: typeof name === 'string' ? name : (english as string), layers: [found.layer], ...(found.kind && { kind: found.kind, need: found.need }) })
   }
   return pins
 }

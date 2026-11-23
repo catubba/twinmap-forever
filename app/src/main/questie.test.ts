@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { deflateSync } from 'node:zlib'
 import { expect, test } from 'vitest'
 import { logFrom, shownFrom } from '../shared/quests'
 import { gameItemFacts, shopRows } from '../shared/items'
@@ -125,9 +126,29 @@ test('who offers a service is pinned where they stand, and so are ore and herbs'
     { area: 12, x: 42.5, y: 65.25, name: 'Miller Odo', layers: ['vendors'], side: 'A', npc: 101 },
     { area: 40, x: 10, y: 20, name: 'Miller Odo', layers: ['vendors'], side: 'A', npc: 101 },
     { area: 40, x: 55, y: 45, name: 'Smith Hale', sub: 'Armorer', layers: ['vendors', 'repair'], side: 'AH', npc: 105, sells: [60] },
-    { area: 12, x: 30, y: 30, name: 'Copper Vein', layers: ['ore'] },
-    { area: 12, x: 31, y: 32, name: 'Copper Vein', layers: ['ore'] },
-    { area: 40, x: 70, y: 70, name: 'Peacebloom', layers: ['herbs'] },
+    { area: 12, x: 30, y: 30, name: 'Copper Vein', layers: ['ore'], kind: 'copper', need: 1 },
+    { area: 12, x: 31, y: 32, name: 'Copper Vein', layers: ['ore'], kind: 'copper', need: 1 },
+    { area: 40, x: 70, y: 70, name: 'Peacebloom', layers: ['herbs'], kind: 'Peacebloom', need: 1 },
+  ])
+})
+
+test('with the game in another language, ore and herbs are still told by their English names and shown by the translated ones', () => {
+  const zipped = (v: unknown): string => deflateSync(enc(v)).toString('base64')
+  const db = openQuestie(
+    game([
+      ...LINES,
+      `## X-Object-901-S: ${b64({ [OBJECT.name]: 'Copper Vein' })}`,
+      `## X-Object-901-${OBJECT.spawns}: ${b64({ 12: [[30, 30]] })}`,
+      `## X-Object-902-S: ${b64({ [OBJECT.name]: 'Peacebloom' })}`,
+      `## X-Object-902-${OBJECT.spawns}: ${b64({ 40: [[70, 70]] })}`,
+      `## X-Object-IDS: ${zipped([901, 902])}`,
+      `## X-l10n-frFR-Object: ${zipped([['Filon de cuivre', 'Pacifique']])}`,
+    ]),
+    'frFR',
+  )!
+  expect(fixedPins(db).filter((p) => p.layers[0] === 'ore' || p.layers[0] === 'herbs')).toEqual([
+    { area: 12, x: 30, y: 30, name: 'Filon de cuivre', layers: ['ore'], kind: 'copper', need: 1 },
+    { area: 40, x: 70, y: 70, name: 'Pacifique', layers: ['herbs'], kind: 'Peacebloom', need: 1 },
   ])
 })
 

@@ -6,7 +6,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { decodeBlpCutout, type Cutout } from '../shared/blp'
-import { ORE_ITEMS } from '../shared/services'
+import { ORES } from '../shared/services'
 import { readTable } from '../shared/wdc5'
 import type { ClientFiles } from './client-files'
 import { encodePng } from './png'
@@ -25,7 +25,7 @@ const SHEET_PICTURES_FILE = 897532, PICTURE_NAME = 0, PICTURE_SHEET = 2, PICTURE
  * dungeon, green for a raid), the tombstone the game marks a corpse with, and a ghost for the graveyard. */
 const SHEET_NAMES: Record<string, string> = { dungeon: 'dungeon', raid: 'raid', 'Navigation-Tombstone-Icon': 'corpse', 'poi-soulspiritghost': 'ghost' }
 /** Written last in the folder of the icons: the icons there are the ones this app makes. An older folder is made again. */
-export const ICONS_MADE = 'made-3'
+export const ICONS_MADE = 'made-4'
 
 const SIZE = 32 // of an icon cut from an item's picture: the size of the others
 const FRAME = 5 // pixels of border an item's picture has on each side, of 64
@@ -104,7 +104,7 @@ export function writeIcons(files: ClientFiles, folder: string): void {
     // No table: the veins take the cursor.
   }
   const rows = new Map(items?.rows.map((r) => [r.id, r]))
-  for (const [ore, item] of Object.entries(ORE_ITEMS)) {
+  for (const [ore, [, item]] of Object.entries(ORES)) {
     const picture = rows.get(item)?.int(ITEM_ICON)
     write(`ore-${ore}`, picture, (c) => (c.width === SIZE * 2 && c.height === SIZE * 2 ? withoutGround(c) : c))
   }

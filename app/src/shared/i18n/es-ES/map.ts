@@ -7,6 +7,12 @@ export default {
     // Group after a colon: "todos los {group}" would need the gender of each group name (las Misiones, el Mundo).
     hideAll: 'Ocultar todo: {group}',
     showAll: 'Mostrar todo: {group}',
+    kinds: 'Tipos: {layer}',
+    hideGrey: 'Ocultar grises',
+    hideGreyTip: 'Ocultar lo que ya no aumenta tu habilidad',
+    skill: 'Habilidad {skill}',
+    notLearned: 'No aprendido',
+    skillUnread: 'Habilidad aún no leída',
     groups: {
       you: 'Tú',
       quests: 'Misiones',

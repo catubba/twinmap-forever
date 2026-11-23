@@ -16,11 +16,37 @@ export const servicesOf = (flags: number): ServiceLayer[] => (Object.keys(SERVIC
 // ponytail: QuestieDB does not say what kind of thing an object is, so ore and herbs are told by
 // their English names. A herb the game adds is missing until it is listed here; read the kind from
 // the game (the lock of the object) if a table of it ever turns up in the client.
+// Each herb by its English name, and each ore by the word of its vein (a dash for a space): the skill it asks and the
+// item it gives, whose picture is the ore's on the map (icons.ts) and the kind's in the list of kinds.
+export const HERBS: Record<string, readonly [need: number, item: number]> = {
+  Peacebloom: [1, 2447], Silverleaf: [1, 765], Earthroot: [15, 2449], Mageroyal: [50, 785], Briarthorn: [70, 2450], Stranglekelp: [85, 3820],
+  Bruiseweed: [100, 2453], 'Wild Steelbloom': [115, 3355], 'Grave Moss': [120, 3369], Kingsblood: [125, 3356], Liferoot: [150, 3357],
+  Fadeleaf: [160, 3818], Goldthorn: [170, 3821], "Khadgar's Whisker": [185, 3358], Wintersbite: [195, 3819], Firebloom: [205, 4625],
+  'Purple Lotus': [210, 8831], "Arthas' Tears": [220, 8836], Sungrass: [230, 8838], Blindweed: [235, 8839], 'Ghost Mushroom': [245, 8845],
+  Gromsblood: [250, 8846], 'Golden Sansam': [260, 13464], Dreamfoil: [270, 13463], 'Mountain Silversage': [280, 13465], Plaguebloom: [285, 13466],
+  Icecap: [290, 13467], 'Black Lotus': [300, 13468],
+}
+export const ORES = {
+  copper: [1, 2770], tin: [65, 2771], incendicite: [65, 3340], silver: [75, 2775], bloodstone: [75, 4278], iron: [125, 2772], indurium: [150, 5833],
+  gold: [155, 2776], mithril: [175, 3858], truesilver: [230, 7911], 'dark-iron': [230, 11370], thorium: [245, 10620], 'rich-thorium': [275, 10620],
+} as const satisfies Record<string, readonly [need: number, item: number]>
 const ORE = /\b(Vein|Deposit)$/
-const HERBS = new Set(
-  "Peacebloom,Silverleaf,Earthroot,Mageroyal,Briarthorn,Stranglekelp,Bruiseweed,Wild Steelbloom,Grave Moss,Kingsblood,Liferoot,Fadeleaf,Goldthorn,Khadgar's Whisker,Wintersbite,Firebloom,Purple Lotus,Arthas' Tears,Sungrass,Blindweed,Ghost Mushroom,Gromsblood,Golden Sansam,Dreamfoil,Mountain Silversage,Plaguebloom,Icecap,Black Lotus".split(','),
-)
-export const resourceOf = (name: string): 'ore' | 'herbs' | null => (ORE.test(name) ? 'ore' : HERBS.has(name) ? 'herbs' : null)
+const ORES_LONGEST_FIRST = Object.keys(ORES).sort((a, b) => b.length - a.length) // "Truesilver" is not silver, "Rich Thorium" not thorium
+/** The skill lines of the two professions that gather them. */
+export const GATHER_SKILL = { ore: 186, herbs: 182 } as const
+
+/** What an object of QuestieDB is by its English name: ore or a herb, of which kind, and the skill it asks; null for anything else. */
+export function resourceOf(name: string): { layer: 'ore' | 'herbs'; kind?: string; need?: number } | null {
+  if (HERBS[name]) return { layer: 'herbs', kind: name, need: HERBS[name][0] }
+  if (!ORE.test(name)) return null
+  const word = name.toLowerCase().replaceAll(' ', '-'), kind = ORES_LONGEST_FIRST.find((o) => word.includes(o)) as keyof typeof ORES | undefined
+  return kind ? { layer: 'ore', kind, need: ORES[kind][0] } : { layer: 'ore' }
+}
+
+// ponytail: the steps of classic (25, 50, 100 over the skill asked), not read from Forever.
+/** The colour the game gives a node for a skill: red not yet, then orange, yellow, green, and grey when it gives no more points. */
+export const gatherColour = (need: number, skill: number): 'red' | 'orange' | 'yellow' | 'green' | 'grey' =>
+  skill < need ? 'red' : skill < need + 25 ? 'orange' : skill < need + 50 ? 'yellow' : skill < need + 100 ? 'green' : 'grey'
 
 /** One pin: a place in percent of the map of a zone, the zone by the game's area number. */
 export interface FixedPin {
@@ -38,6 +64,9 @@ export interface FixedPin {
   npc?: number
   /** What a vendor sells: items by number. */
   sells?: number[]
+  /** Of ore and herbs: the kind (a key of HERBS or ORES) and the skill it asks. Missing for a vein of no kind listed. */
+  kind?: string
+  need?: number
 }
 
 /**
@@ -125,15 +154,6 @@ export function travel(maps: Table, taxiNodes: Table, taxiPaths: Table, zones: G
   return { format: TRAVEL_FORMAT, doors: doors.map(({ at: _at, raid, ...door }) => (raid ? { ...door, raid } : door)), nodes, routes: [...routes.values()] }
 }
 
-/**
- * The item each kind of vein gives, by the word of the vein's name that tells it (with a dash for
- * a space): the game's own number of the ore. Found by asking the player's QuestieDB what every
- * vein holds. A vein of none of these takes the picture of mining.
- */
-// ponytail: a list by hand, as the herbs above; read it from QuestieDB at run time if the game adds ores.
-export const ORE_ITEMS = { copper: 2770, tin: 2771, silver: 2775, iron: 2772, gold: 2776, mithril: 3858, truesilver: 7911, 'dark-iron': 11370, thorium: 10620, incendicite: 3340, indurium: 5833, bloodstone: 4278 } as const
-const ORES_LONGEST_FIRST = Object.keys(ORE_ITEMS).sort((a, b) => b.length - a.length) // "Truesilver" is not silver, "Dark Iron" not iron
-
 const ICON_ORDER = ['flight', 'inn', 'bank', 'auction', 'stable', 'repair', 'trainers', 'vendors', 'ore', 'herbs'] as const satisfies readonly FixedLayer[]
 const CLASS_TRAINER = /\b(Warrior|Paladin|Hunter|Rogue|Priest|Shaman|Mage|Warlock|Druid) Trainer\b/
 // What is sold, told by what the game writes under the name of who sells it.
@@ -148,13 +168,10 @@ const SOLD: [RegExp, string][] = [
  * The picture a pin is drawn with (icons.ts writes them): of the first of its layers that is
  * shown, in the order above, so that an innkeeper who also sells is drawn as an inn.
  */
-export function iconOf(pin: Pick<FixedPin, 'name' | 'sub' | 'layers'>, shown: (layer: FixedLayer) => boolean = () => true): string {
+export function iconOf(pin: Pick<FixedPin, 'sub' | 'layers' | 'kind'>, shown: (layer: FixedLayer) => boolean = () => true): string {
   const layer = ICON_ORDER.find((l) => pin.layers.includes(l) && shown(l)) ?? pin.layers[0]
   if (layer === 'trainers') return CLASS_TRAINER.test(pin.sub ?? '') ? 'class' : 'profession'
   if (layer === 'vendors') return SOLD.find(([told]) => told.test(pin.sub ?? ''))?.[1] ?? 'vendors'
-  if (layer === 'ore') {
-    const name = pin.name.toLowerCase().replaceAll(' ', '-'), ore = ORES_LONGEST_FIRST.find((o) => name.includes(o))
-    return ore ? `ore-${ore}` : 'ore'
-  }
+  if (layer === 'ore') return pin.kind ? `ore-${pin.kind}` : 'ore'
   return layer ?? 'vendors'
 }

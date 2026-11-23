@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest'
 import { unitsOfPlace, unitsOfWorld } from './geo'
 import type { GameMap } from './maps'
-import { iconOf, panelFor, resourceOf, serves, servicesOf, travel, TRAVEL_FORMAT, type FixedLayer, type FixedPin } from './services'
+import { gatherColour, iconOf, panelFor, resourceOf, serves, servicesOf, travel, TRAVEL_FORMAT, type FixedLayer, type FixedPin } from './services'
 import type { Row, Table } from './wdc5'
 
 // A table of the game, as far as these readers look at one: rows of columns, a column a value or a list.
@@ -25,14 +25,22 @@ test('the flags of an NPC say which services it offers', () => {
   expect(servicesOf(1 + 2 + 32), 'gossip, quests, a spirit healer: no service').toEqual([])
 })
 
-test('ore and herbs are told by their names, and nothing else is', () => {
-  expect(resourceOf('Copper Vein')).toBe('ore')
-  expect(resourceOf('Ooze Covered Mithril Deposit')).toBe('ore')
-  expect(resourceOf('Peacebloom')).toBe('herbs')
-  expect(resourceOf("Khadgar's Whisker")).toBe('herbs')
+test('ore and herbs are told by their English names, with their kind and the skill they ask, and nothing else is', () => {
+  expect(resourceOf('Copper Vein')).toEqual({ layer: 'ore', kind: 'copper', need: 1 })
+  expect(resourceOf('Ooze Covered Mithril Deposit')).toEqual({ layer: 'ore', kind: 'mithril', need: 175 })
+  expect(resourceOf('Small Thorium Vein')).toEqual({ layer: 'ore', kind: 'thorium', need: 245 })
+  expect(resourceOf('Ooze Covered Rich Thorium Vein')).toEqual({ layer: 'ore', kind: 'rich-thorium', need: 275 })
+  expect(resourceOf('Strange Vein'), 'a vein of no kind listed').toEqual({ layer: 'ore' })
+  expect(resourceOf('Peacebloom')).toEqual({ layer: 'herbs', kind: 'Peacebloom', need: 1 })
+  expect(resourceOf("Khadgar's Whisker")).toEqual({ layer: 'herbs', kind: "Khadgar's Whisker", need: 185 })
   expect(resourceOf('Jangolode Mine')).toBeNull()
   expect(resourceOf('Deepmoss Eggs')).toBeNull()
   expect(resourceOf('Veinous Thing')).toBeNull()
+})
+
+test('a node is red under the skill it asks, then orange, yellow, green, and grey a hundred points over it', () => {
+  expect([0, 1, 26, 51, 101].map((skill) => gatherColour(1, skill))).toEqual(['red', 'orange', 'yellow', 'green', 'grey'])
+  expect([124, 149, 174, 224, 225].map((skill) => gatherColour(125, skill))).toEqual(['red', 'orange', 'yellow', 'green', 'grey'])
 })
 
 test('a pin is for a side when it serves it, and for everyone while the side is not known', () => {
@@ -113,9 +121,9 @@ test('a pin takes the picture of what it is', () => {
   expect(iconOf(pin('Tannysa', ['trainers'], 'Herbalism Trainer'))).toBe('profession')
   expect(iconOf(pin('Jasper Fel', ['vendors'], 'Shady Dealer'))).toBe('vendors')
   expect(iconOf(pin('Lina Stover', ['vendors'], 'Bow & Arrow Merchant'))).toBe('ammunition')
-  expect(iconOf(pin('Copper Vein', ['ore']))).toBe('ore-copper')
-  expect(iconOf(pin('Ooze Covered Truesilver Deposit', ['ore']))).toBe('ore-truesilver')
-  expect(iconOf(pin('Dark Iron Deposit', ['ore']))).toBe('ore-dark-iron')
+  // A vein by its kind, not by its name, which is in the game's language.
+  expect(iconOf({ layers: ['ore'], kind: 'copper' })).toBe('ore-copper')
+  expect(iconOf({ layers: ['ore'], kind: 'dark-iron' })).toBe('ore-dark-iron')
   expect(iconOf(pin('Strange Vein', ['ore']))).toBe('ore')
   expect(iconOf(pin('Peacebloom', ['herbs']))).toBe('herbs')
 })

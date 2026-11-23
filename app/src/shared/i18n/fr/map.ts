@@ -7,6 +7,12 @@ export default {
     // Group after a colon: "tous les {group}" would need the gender of each group name (les Quêtes, le Monde).
     hideAll: 'Tout cacher : {group}',
     showAll: 'Tout afficher : {group}',
+    kinds: 'Types : {layer}',
+    hideGrey: 'Cacher les gris',
+    hideGreyTip: 'Cacher ce qui ne fait plus progresser votre compétence',
+    skill: 'Compétence {skill}',
+    notLearned: 'Non appris',
+    skillUnread: 'Compétence pas encore lue',
     groups: {
       you: 'Vous',
       quests: 'Quêtes',

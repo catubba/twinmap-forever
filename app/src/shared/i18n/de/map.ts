@@ -7,6 +7,12 @@ export default {
     // Group after a colon: "alle {group}" would need the plural and case of each group name (die Quests, die Welt).
     hideAll: 'Alle ausblenden: {group}',
     showAll: 'Alle anzeigen: {group}',
+    kinds: 'Arten: {layer}',
+    hideGrey: 'Graue ausblenden',
+    hideGreyTip: 'Ausblenden, was Eure Fertigkeit nicht mehr erhöht',
+    skill: 'Fertigkeit {skill}',
+    notLearned: 'Nicht erlernt',
+    skillUnread: 'Fertigkeit noch nicht gelesen',
     groups: {
       you: 'Ihr',
       quests: 'Quests',

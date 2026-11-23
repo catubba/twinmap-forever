@@ -7,6 +7,12 @@ export default {
     // Group after a colon: a particle after {group} would change with its last syllable.
     hideAll: '모두 숨기기: {group}',
     showAll: '모두 표시: {group}',
+    kinds: '종류: {layer}',
+    hideGrey: '회색 숨기기',
+    hideGreyTip: '더 이상 숙련도가 오르지 않는 것 숨기기',
+    skill: '숙련도 {skill}',
+    notLearned: '배우지 않음',
+    skillUnread: '숙련도를 아직 읽지 않음',
     groups: {
       // The character, never "당신" or "나".
       you: '캐릭터',
