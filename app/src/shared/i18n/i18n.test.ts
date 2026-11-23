@@ -72,6 +72,17 @@ test('Russian writes numbers, hours and days as the Russian game does, and every
   expect(said).toEqual(['Осталась 1 отправка', 'Осталось 2 отправки', 'Осталось 5 отправок', 'Осталось 11 отправок', 'Осталась 21 отправка', 'Осталось 22 отправки'])
 })
 
+test('Korean writes numbers, hours and days as the Korean game does, with one form for every number', () => {
+  setLang('koKR')
+  expect(t('common.close')).toBe('닫기')
+  expect(num(1234567)).toBe('1,234,567')
+  expect(num(2.5)).toBe('2.5')
+  const at = Date.UTC(2026, 10, 23, 14, 5)
+  expect(clock(at + new Date(at).getTimezoneOffset() * 60000)).toBe('14:05')
+  expect(day(at, { day: 'numeric', month: 'short', timeZone: 'UTC' })).toBe('11월 23일')
+  expect([1, 2, 5, 21].map((count) => t('app.top.sendsLeft', { count }))).toEqual(['전송 1회 남음', '전송 2회 남음', '전송 5회 남음', '전송 21회 남음'])
+})
+
 test('English writes numbers, hours and days as the app always has', () => {
   expect(num(1234567)).toBe('1,234,567')
   const at = Date.UTC(2026, 10, 23, 14, 5)
@@ -211,7 +222,8 @@ test('every language planned is listed, in its own words; the ones not out yet a
     expect(offered('esES') && offered('esMX'), 'written, both').toBe(true)
     expect(offered('deDE'), 'written').toBe(true)
     expect(offered('ruRU'), 'written').toBe(true)
-    expect(offered('koKR'), 'not written').toBe(false)
+    expect(offered('koKR'), 'written').toBe(true)
+    expect(offered('zhCN'), 'not written').toBe(false)
     expect(langFor(undefined, 'frFR'), 'the game language, now offered').toBe('frFR')
   } finally {
     offerAll(false)

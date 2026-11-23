@@ -8,6 +8,7 @@ import esES from './es-ES'
 import esMX from './es-MX'
 import de from './de'
 import ru from './ru'
+import ko from './ko'
 
 /** A text that changes with a number, `count` among its values: the forms Intl.PluralRules names for the language. */
 export type Plural = { other: string } & Partial<Record<Intl.LDMLPluralRule, string>>
@@ -30,6 +31,7 @@ export const LANGS: Record<string, { name: string; intl: string; table: Table; s
   esMX: { name: 'Español (Latinoamérica)', intl: 'es-MX', table: esMX, soon: true },
   deDE: { name: 'Deutsch', intl: 'de-DE', table: de, soon: true },
   ruRU: { name: 'Русский', intl: 'ru-RU', table: ru, soon: true },
+  koKR: { name: '한국어', intl: 'ko-KR', table: ko, soon: true },
 }
 /** Every language planned (design notes, l10n.md), in its own words, in the order they are offered. The ones not in
  *  LANGS, or there but soon, show as coming, said in their own words too: the player who reads it is one who speaks it. */
