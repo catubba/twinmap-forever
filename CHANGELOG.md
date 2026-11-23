@@ -2,6 +2,17 @@
 
 What changed in each version of Twinmap, newest first. The section of a version is also the text of its release on GitHub and of the addon's file on CurseForge.
 
+## 0.15.1 - 2026-11-23
+
+### New
+
+- **Hardware acceleration can be turned off.** Settings, Window, Use hardware acceleration. Turn it off if the map flickers or stays black: Twinmap offers to restart, and without it the 3D view is slower.
+- **The addon from GitHub.** Every release on GitHub carries the addon's zip too, so addon managers that install from GitHub, such as CurseBreaker and WowUp, can install and update Twinmap Forever. Thanks to burk3.
+
+### Changed
+
+- **A smoother 3D view without the GPU.** When the 3D view is drawn by the processor, its edges are not smoothed: about twice as many frames for the same work, with edges a little rougher.
+
 ## 0.15.0 - 2026-11-22
 
 ### New

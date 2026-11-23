@@ -51,6 +51,8 @@ You do not have to take our word for it: the code is all here, every release can
 
 The CurseForge app installs [QuestieDB](https://www.curseforge.com/wow/addons/questiedb) with the addon: the data about NPCs, items and quests that the map reads. If you install the addon by hand, get QuestieDB too.
 
+The addon is also attached to every release on GitHub, for addon managers that install from there, such as CurseBreaker and WowUp.
+
 Every version of the app, with its notes, is on the [releases page](https://github.com/catubba/twinmap-forever/releases).
 </details>
 
