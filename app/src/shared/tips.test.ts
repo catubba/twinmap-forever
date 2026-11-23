@@ -24,6 +24,9 @@ test("an item's key is the one the sheet carries, or its number; the durability 
   expect(tipKey(1155, 'item:99')).toBe('item:1155')
   const lines = tipsFrom({ 'item:1': [['Staff', ''], ['Durability 90 / 100', '']] })['item:1']!
   expect(shownLines(lines, { now: 12, most: 100 })).toEqual([['Staff', ''], ['Durability 12 / 100', '']])
+  // In the game's language, and only the line of the item's most: another "n / m" stays.
+  const russian = tipsFrom({ 'item:1': [['Посох', ''], ['Прочность: 90 / 100', ''], ['Комплект 1 / 5', '']] })['item:1']!
+  expect(shownLines(russian, { now: 12, most: 100 })).toEqual([['Посох', ''], ['Прочность: 12 / 100', ''], ['Комплект 1 / 5', '']])
   expect(shownLines(lines)).toBe(lines)
 })
 

@@ -31,10 +31,16 @@ export function tipsFrom(value: unknown): Tips {
 /** The key of an item held: the one the sheet carries, or "item:ID". */
 export const tipKey = (item: number, key?: unknown): string => (typeof key === 'string' && key.startsWith(`item:${item}`) ? key : `item:${item}`)
 
-/** The lines to show: the durability as it is now, not as it was when the tooltip was read. */
+/**
+ * The lines to show: the durability as it is now, not as it was when the tooltip was read. In every language the line
+ * is its word, then "now / most" ("Durability 50 / 60", "Прочность: 50 / 60"): the one whose most is the item's.
+ */
 export function shownLines(lines: TipLine[], wear?: { now?: number; most?: number }): TipLine[] {
   if (wear?.most === undefined || wear.now === undefined) return lines
-  return lines.map((l) => (/^Durability \d+ \/ \d+$/.test(l[0]) ? [`Durability ${wear.now} / ${wear.most}`, l[1]] : l))
+  return lines.map((l) => {
+    const m = /^(\D+?)\s*\d+ \/ (\d+)$/.exec(l[0])
+    return m && Number(m[2]) === wear.most ? [`${m[1]} ${wear.now} / ${wear.most}`, l[1]] : l
+  })
 }
 
 export interface Holder {

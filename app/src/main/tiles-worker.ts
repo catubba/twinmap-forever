@@ -3,6 +3,10 @@
 import { existsSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parentPort, workerData } from 'node:worker_threads'
+import { GAME_NAMES_FILE, pairNames, wingNames } from '../shared/game-names'
+import { DUNGEON_PINS } from '../shared/dungeon-pins'
+import { NEW_DUNGEON_PINS } from '../shared/new-dungeon-pins'
+import { NPC, openQuestie } from './questie'
 import { FACTS, gameItemFacts, type ItemFacts, ITEMS_FILE } from '../shared/items'
 import { AH_NAMES_FILE, gameAhNames } from '../shared/ah'
 import { trainerFacts, TRAINERS_FILE, TRAINERS_FORMAT } from '../shared/trainers'
@@ -31,6 +35,8 @@ const tell = (status: TilesStatus): void => parentPort?.postMessage(status)
 const KEYS_FILE = 'keys.json'
 /** In the folder of the build: the language of the game the names were read in (its textLocale). */
 const LOCALE_FILE = 'locale.txt'
+// The game's tables of the dungeons as its finder names them, of the skills, and of the spells (their rank, as Journeyman).
+const LFG_DUNGEONS_FILE = 1361033, SKILL_LINE_FILE = 1240935, SPELL_FILE = 1140089
 
 try {
   const started = Date.now()
@@ -61,7 +67,7 @@ try {
   } catch {
     // A map made before the app read the game's language, or none yet.
   }
-  if (madeIn !== locale) for (const made of [MAPS_FILE, PLACES_FILE, TRAVEL_FILE, INTERIORS_FILE, ITEMS_FILE, AH_NAMES_FILE, TRAINERS_FILE]) rmSync(join(folder, made), { force: true })
+  if (madeIn !== locale) for (const made of [MAPS_FILE, PLACES_FILE, TRAVEL_FILE, INTERIORS_FILE, ITEMS_FILE, AH_NAMES_FILE, TRAINERS_FILE, GAME_NAMES_FILE]) rmSync(join(folder, made), { force: true })
   // The game's archive is opened only when there is something to convert: it takes half a second
   // and a few hundred megabytes, and on most starts the tiles are already there.
   let client: ClientFiles | undefined
@@ -191,6 +197,25 @@ try {
     }
   } catch {
     // The trainer panel goes without the game's lists; tried again at the next start.
+  }
+  // What the app keeps in English, in the game's language (shared/game-names.ts): each table read in English too, and the
+  // names of the NPCs from QuestieDB for the bosses the tables have not. Nothing for a game in English.
+  if (locale !== 'enUS' && locale !== 'enGB' && !existsSync(join(folder, GAME_NAMES_FILE))) {
+    try {
+      const english = openClientFiles(gameFolder, keys, 'enUS'), own = open(), names: Record<string, string> = {}
+      const opens = (keyName: string): boolean => own.opens(keyName)
+      // The game's maps, areas, dungeons as the finder names them, bosses, professions, and the ranks of spells (Journeyman).
+      for (const [file, field, texts] of [[MAP_FILE, 1, [1]], [AREA_TABLE_FILE, 1, [1]], [LFG_DUNGEONS_FILE, 0, [0]], [ENCOUNTERS_FILE, 0, [0]], [SKILL_LINE_FILE, 0, [0]], [SPELL_FILE, 0, [0, 1, 2]]] as const) {
+        const e = english.read(file, true), o = own.read(file, true)
+        if (e && o) pairNames(readTable(e, opens, [...texts]), readTable(o, opens, [...texts]), field, names)
+      }
+      const [en, there] = [openQuestie(gameFolder, 'enUS'), openQuestie(gameFolder, locale)]
+      if (en && there) pairNames({ rows: en.ids.Npc.map((id) => ({ id, text: () => String(en.get('Npc', id, NPC.name) ?? '') })) }, { rows: there.ids.Npc.map((id) => ({ id, text: () => String(there.get('Npc', id, NPC.name) ?? '') })) }, 0, names)
+      wingNames([...DUNGEON_PINS, ...NEW_DUNGEON_PINS].map((d) => d.name), locale, names)
+      writeFileSync(join(folder, GAME_NAMES_FILE), JSON.stringify(names))
+    } catch {
+      // The pins keep their English names; tried again at the next start.
+    }
   }
   // The names are made again in this language: said so, for the next start. (The insides, after, are made in it too.)
   writeFileSync(localeFile, locale)
