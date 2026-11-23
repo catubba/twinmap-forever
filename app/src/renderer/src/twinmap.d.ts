@@ -42,6 +42,8 @@ declare global {
       setZoom: (zoom: number) => Promise<void>
       setGpu: (on: boolean) => Promise<void>
       restart: () => Promise<void>
+      lang: () => Promise<string>
+      setLang: (code: string) => Promise<void>
       zoomBy: (by: 1 | -1) => Promise<void>
       setLan: (on: boolean) => Promise<void>
       setParticipate: (on: boolean) => Promise<void>

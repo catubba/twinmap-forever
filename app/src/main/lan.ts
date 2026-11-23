@@ -8,6 +8,7 @@ import { readFile } from 'node:fs/promises'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import { networkInterfaces } from 'node:os'
 import { extname, join, sep } from 'node:path'
+import { t } from '../shared/i18n'
 
 export const LAN_PORT = 8765 // always the same, so an address saved on the phone keeps working
 
@@ -116,7 +117,7 @@ export function startLan(port: number, asks: LanAsks, failed: (message: string) 
     // or from another app, and a browser holds a Strict cookie back on a visit that began elsewhere.
     const shown = url.searchParams.get('k'), fresh = shown !== null && same(shown, asks.code)
     const kept = /(?:^|;\s*)k=([^;]+)/.exec(req.headers.cookie ?? '')?.[1]
-    if (!fresh && !(kept && same(kept, asks.code))) return plain(403, "Open Twinmap's settings on the computer and scan the code again.")
+    if (!fresh && !(kept && same(kept, asks.code))) return plain(403, t('app.main.scanAgain'))
 
     if (url.pathname === '/events') {
       res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store', connection: 'keep-alive' })
@@ -164,7 +165,7 @@ export function startLan(port: number, asks: LanAsks, failed: (message: string) 
       res.end()
     })
   })
-  server.once('error', (e: NodeJS.ErrnoException) => failed(e.code === 'EADDRINUSE' ? `Port ${port} is taken by another program.` : e.message))
+  server.once('error', (e: NodeJS.ErrnoException) => failed(e.code === 'EADDRINUSE' ? t('app.main.portTaken', { port }) : e.message))
   server.listen(port)
 
   return {

@@ -2,6 +2,8 @@
 // Auction House section, design/ui.md section 5). The widths are kept, one list for each table by
 // its name, so the table opens as it was left.
 
+import { t } from '../../shared/i18n'
+
 const LEAST = 44 // px: a column is never narrower
 
 export function columns(table: HTMLTableElement, name: string): { destroy: () => void } {
@@ -23,7 +25,7 @@ export function columns(table: HTMLTableElement, name: string): { destroy: () =>
   const grips = heads().map((th, i) => {
     const grip = document.createElement('span')
     grip.className = 'grip'
-    grip.title = 'Drag to resize'
+    grip.title = t('items.resize')
     th.appendChild(grip)
     grip.onpointerdown = (e) => {
       if (e.button !== 0) return

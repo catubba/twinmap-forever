@@ -11,6 +11,7 @@
   import { inApp } from './web'
   import { ZOOMS } from '../../shared/window'
   import { layout, setMapRight } from './layout.svelte'
+  import { num, t } from '../../shared/i18n'
 
   let { setup, tiles, onback, onfirstrun, onfeedback }: { setup: SetupStatus; tiles: TilesStatus | null; onback: () => void; onfirstrun: () => void; onfeedback: () => void } = $props()
 
@@ -34,7 +35,7 @@
     return { side, path }
   })
   const map = $derived(
-    !tiles || tiles.state === 'looking' ? 'Looking' : tiles.state === 'no-game' ? 'Waiting for the game folder' : tiles.state === 'converting' ? `Being built, ${tiles.percent}%` : tiles.state === 'failed' ? `Not built: ${tiles.message}` : `Ready, game ${tiles.version}`,
+    !tiles || tiles.state === 'looking' ? t('settings.found.mapLooking') : tiles.state === 'no-game' ? t('settings.found.mapNoGame') : tiles.state === 'converting' ? t('settings.found.mapBuilding', { percent: tiles.percent }) : tiles.state === 'failed' ? t('settings.found.mapFailed', { message: tiles.message }) : t('settings.found.mapReady', { version: tiles.version }),
   )
 </script>
 
@@ -43,55 +44,55 @@
 <main class="surface">
   <div class="page">
     <div class="head">
-      <h1>Settings</h1>
-      <button class="btn" onclick={onback}>Back to the map</button>
+      <h1>{t('settings.title')}</h1>
+      <button class="btn" onclick={onback}>{t('settings.back')}</button>
     </div>
     <div class="columns">
       <div class="column">
         <section class="group">
-          <h2 class="band">Game folder</h2>
+          <h2 class="band">{t('settings.gameFolder.title')}</h2>
           <div class="in">
             <div class="line">
-              <span class="path" title={setup.gameFolder ?? undefined}>{setup.gameFolder ?? 'Not found'}</span>
+              <span class="path" title={setup.gameFolder ?? undefined}>{setup.gameFolder ?? t('settings.gameFolder.notFound')}</span>
               <!-- The folder is chosen on the computer it is on. -->
-              {#if inApp}<button class="btn" onclick={choose}>{setup.gameFolder ? 'Change folder' : 'Choose the game folder'}</button>{/if}
+              {#if inApp}<button class="btn" onclick={choose}>{setup.gameFolder ? t('settings.gameFolder.change') : t('settings.gameFolder.choose')}</button>{/if}
             </div>
             {#if wrong}<p class="wrong">{wrong}</p>{/if}
           </div>
         </section>
         <section class="group">
-          <h2 class="band">Layout</h2>
+          <h2 class="band">{t('settings.layout.title')}</h2>
           <div class="in">
-            <label class="choice"><input type="radio" class="check" name="map-side" checked={!layout.mapRight} onchange={() => setMapRight(false)} />Map on the left</label>
-            <label class="choice"><input type="radio" class="check" name="map-side" checked={layout.mapRight} onchange={() => setMapRight(true)} />Map on the right</label>
+            <label class="choice"><input type="radio" class="check" name="map-side" checked={!layout.mapRight} onchange={() => setMapRight(false)} />{t('settings.layout.mapLeft')}</label>
+            <label class="choice"><input type="radio" class="check" name="map-side" checked={layout.mapRight} onchange={() => setMapRight(true)} />{t('settings.layout.mapRight')}</label>
           </div>
         </section>
         <!-- The window is the computer's, and so is what it shows to other devices: a phone on the home network has neither to set. -->
         {#if inApp}
           <section class="group">
-            <h2 class="band">Window</h2>
+            <h2 class="band">{t('settings.window.title')}</h2>
             <div class="in">
-              <label class="choice"><input type="checkbox" class="check" checked={setup.onTop} onchange={(e) => window.twinmap.setOnTop(e.currentTarget.checked)} />Keep Twinmap on top of other windows</label>
-              <label class="choice">Text size <select class="field size" value={setup.zoom ?? 1} onchange={(e) => window.twinmap.setZoom(Number(e.currentTarget.value))}>{#each ZOOMS as z (z)}<option value={z}>{Math.round(z * 100)}%</option>{/each}</select></label>
-              <label class="choice"><input type="checkbox" class="check" checked={setup.gpu?.chosen ?? true} onchange={(e) => window.twinmap.setGpu(e.currentTarget.checked)} />Use hardware acceleration</label>
-              <p class="hint">Turn it off if the map flickers or stays black. Without it the 3D view is slower.</p>
+              <label class="choice"><input type="checkbox" class="check" checked={setup.onTop} onchange={(e) => window.twinmap.setOnTop(e.currentTarget.checked)} />{t('settings.window.onTop')}</label>
+              <label class="choice">{t('settings.window.textSize')} <select class="field size" value={setup.zoom ?? 1} onchange={(e) => window.twinmap.setZoom(Number(e.currentTarget.value))}>{#each ZOOMS as z (z)}<option value={z}>{num(z, { style: 'percent' })}</option>{/each}</select></label>
+              <label class="choice"><input type="checkbox" class="check" checked={setup.gpu?.chosen ?? true} onchange={(e) => window.twinmap.setGpu(e.currentTarget.checked)} />{t('settings.window.gpu')}</label>
+              <p class="hint">{t('settings.window.gpuHint')}</p>
               {#if setup.gpu && setup.gpu.chosen !== setup.gpu.running}
-                <div class="line"><span class="hint">Takes effect when Twinmap restarts.</span><button class="btn" onclick={() => window.twinmap.restart()}>Restart now</button></div>
+                <div class="line"><span class="hint">{t('settings.window.restartNeeded')}</span><button class="btn" onclick={() => window.twinmap.restart()}>{t('settings.window.restartNow')}</button></div>
               {/if}
             </div>
           </section>
           <section class="group">
-            <h2 class="band">Phone and tablet</h2>
+            <h2 class="band">{t('settings.phone.title')}</h2>
             <div class="in">
-              <label class="choice"><input type="checkbox" class="check" checked={!!setup.lan} onchange={(e) => window.twinmap.setLan(e.currentTarget.checked)} />Show the map to my other devices</label>
+              <label class="choice"><input type="checkbox" class="check" checked={!!setup.lan} onchange={(e) => window.twinmap.setLan(e.currentTarget.checked)} />{t('settings.phone.share')}</label>
               {#if setup.lan && 'error' in setup.lan}<p class="wrong">{setup.lan.error}</p>{/if}
               {#if lanUrl && code}
                 <div class="phone">
-                  <svg class="code" viewBox="-4 -4 {code.side + 8} {code.side + 8}" role="img" aria-label="The address beside, as a code for the camera of a phone"><path d={code.path} /></svg>
+                  <svg class="code" viewBox="-4 -4 {code.side + 8} {code.side + 8}" role="img" aria-label={t('settings.phone.codeLabel')}><path d={code.path} /></svg>
                   <div>
-                    <span class="hint">Scan the code, or open</span>
+                    <span class="hint">{t('settings.phone.scan')}</span>
                     <span class="address">{lanUrl}</span>
-                    <p class="hint">For devices on your home network only. Windows may ask once to allow it.</p>
+                    <p class="hint">{t('settings.phone.homeOnly')}</p>
                   </div>
                 </div>
               {/if}
@@ -99,10 +100,10 @@
           </section>
           <!-- The participation programme: the words approved with its notice (site/privacy.html, "participation"). -->
           <section class="group">
-            <h2 class="band">Help improve Twinmap</h2>
+            <h2 class="band">{t('participate.title')}</h2>
             <div class="in">
-              <label class="choice"><input type="checkbox" class="check" checked={setup.participate === true} onchange={(e) => window.twinmap.setParticipate(e.currentTarget.checked)} />Share anonymous data about the world of Forever</label>
-              <p class="hint">Off unless you turn it on. Twinmap sends what helps it find you better inside dungeons and fill in what the map lacks: the minimap inside dungeons, where bosses and rares die, the doors of dungeons, what trainers teach, the creatures, objects and quests that Questie does not know, and Twinmap's own errors. Never a name, a character, an account, the chat, or the rest of your screen. Turn it off and nothing more is sent. <button class="link" onclick={() => void window.twinmap.openFeedback('participation', '')}>What is sent, in full</button></p>
+              <label class="choice"><input type="checkbox" class="check" checked={setup.participate === true} onchange={(e) => window.twinmap.setParticipate(e.currentTarget.checked)} />{t('settings.participate.share')}</label>
+              <p class="hint">{t('settings.participate.what')} <button class="link" onclick={() => void window.twinmap.openFeedback('participation', '')}>{t('participate.full')}</button></p>
             </div>
           </section>
         {/if}
@@ -110,23 +111,23 @@
 
       <div class="column">
         <section class="group">
-          <h2 class="band">What Twinmap found</h2>
+          <h2 class="band">{t('settings.found.title')}</h2>
           <!-- A light, the name, what was found; a button only where something is missing. -->
           <dl class="in found">
             <div>
-              <dt><i class:off={!setup.addon}></i>Twinmap Forever addon</dt>
-              <dd>{#if setup.addon}{setup.addon}{:else}<button class="btn" onclick={() => window.twinmap.openCurseForge()}>Get it on CurseForge</button>{/if}</dd>
+              <dt><i class:off={!setup.addon}></i>{t('settings.found.addon')}</dt>
+              <dd>{#if setup.addon}{setup.addon}{:else}<button class="btn" onclick={() => window.twinmap.openCurseForge()}>{t('settings.found.get')}</button>{/if}</dd>
             </div>
             <div>
-              <dt><i class:off={!setup.questie}></i>QuestieDB <small>NPCs, services and quests</small></dt>
-              <dd>{#if setup.questie}Installed{:else}<button class="btn" onclick={() => window.twinmap.openCurseForge('questie')}>Get it on CurseForge</button>{/if}</dd>
+              <dt><i class:off={!setup.questie}></i>QuestieDB <small>{t('settings.found.questie')}</small></dt>
+              <dd>{#if setup.questie}{t('settings.found.installed')}{:else}<button class="btn" onclick={() => window.twinmap.openCurseForge('questie')}>{t('settings.found.get')}</button>{/if}</dd>
             </div>
             <div>
-              <dt><i class:off={!setup.shortestPath}></i>Shortest Path <small>optional</small></dt>
-              <dd>{#if setup.shortestPath}Installed{:else}<button class="btn" onclick={() => window.twinmap.openCurseForge('shortestPath')}>Get it on CurseForge</button>{/if}</dd>
+              <dt><i class:off={!setup.shortestPath}></i>Shortest Path <small>{t('settings.found.optional')}</small></dt>
+              <dd>{#if setup.shortestPath}{t('settings.found.installed')}{:else}<button class="btn" onclick={() => window.twinmap.openCurseForge('shortestPath')}>{t('settings.found.get')}</button>{/if}</dd>
             </div>
             <div>
-              <dt><i class:off={tiles?.state !== 'ready'} class:bad={tiles?.state === 'failed'}></i>Map</dt>
+              <dt><i class:off={tiles?.state !== 'ready'} class:bad={tiles?.state === 'failed'}></i>{t('settings.found.map')}</dt>
               <dd>{map}</dd>
             </div>
           </dl>
@@ -134,28 +135,28 @@
         <section class="group">
           <h2 class="band">Twinmap {setup.version}</h2>
           <div class="in">
-            <p class="hint">Updates itself when it starts. The addon updates through CurseForge.</p>
+            <p class="hint">{t('settings.version.updates')}</p>
             <div class="buttons">
-              <button class="btn" onclick={onfeedback}>Report a bug or an idea</button>
-              {#if inApp}<button class="btn" onclick={onfirstrun}>Go through the first steps again</button>{/if}
+              <button class="btn" onclick={onfeedback}>{t('settings.version.report')}</button>
+              {#if inApp}<button class="btn" onclick={onfirstrun}>{t('settings.version.firstRun')}</button>{/if}
             </div>
           </div>
         </section>
       </div>
 
       <section class="group wide keys">
-        <h2 class="band">Shortcuts</h2>
+        <h2 class="band">{t('settings.keys.title')}</h2>
         <dl class="in">
-          <div><dt><kbd>L</kbd></dt><dd>Layers</dd></div>
-          <div><dt><kbd>F</kbd></dt><dd>Follow on and off</dd></div>
-          <div><dt><kbd>N</kbd></dt><dd>The map turns with your character, or north up</dd></div>
-          <div><dt><kbd>M</kbd></dt><dd>Map on the other side of the panel</dd></div>
-          {#if inApp}<div><dt><kbd>F11</kbd></dt><dd>Full screen</dd></div>{/if}
-          {#if inApp}<div><dt><kbd>Ctrl</kbd><kbd>+</kbd><kbd>-</kbd><kbd>0</kbd></dt><dd>Text size, also Ctrl and the wheel outside the map</dd></div>{/if}
-          <div><dt><kbd>Esc</kbd></dt><dd>Closes a label, Layers, these settings</dd></div>
-          <div><dt><kbd>Arrows</kbd><kbd>+</kbd><kbd>-</kbd></dt><dd>Move and zoom the map</dd></div>
-          <div><dt><kbd>Right drag</kbd></dt><dd>Turn the map</dd></div>
-          <div><dt><kbd>Space</kbd></dt><dd>Label on the middle of the map</dd></div>
+          <div><dt><kbd>L</kbd></dt><dd>{t('settings.keys.layers')}</dd></div>
+          <div><dt><kbd>F</kbd></dt><dd>{t('settings.keys.follow')}</dd></div>
+          <div><dt><kbd>N</kbd></dt><dd>{t('settings.keys.north')}</dd></div>
+          <div><dt><kbd>M</kbd></dt><dd>{t('settings.keys.side')}</dd></div>
+          {#if inApp}<div><dt><kbd>F11</kbd></dt><dd>{t('settings.keys.fullScreen')}</dd></div>{/if}
+          {#if inApp}<div><dt><kbd>Ctrl</kbd><kbd>+</kbd><kbd>-</kbd><kbd>0</kbd></dt><dd>{t('settings.keys.zoom')}</dd></div>{/if}
+          <div><dt><kbd>Esc</kbd></dt><dd>{t('settings.keys.close')}</dd></div>
+          <div><dt><kbd>{t('settings.keys.arrows')}</kbd><kbd>+</kbd><kbd>-</kbd></dt><dd>{t('settings.keys.move')}</dd></div>
+          <div><dt><kbd>{t('settings.keys.rightDrag')}</kbd></dt><dd>{t('settings.keys.turn')}</dd></div>
+          <div><dt><kbd>{t('settings.keys.space')}</kbd></dt><dd>{t('settings.keys.label')}</dd></div>
         </dl>
       </section>
     </div>
@@ -163,14 +164,14 @@
     <div class="about">
       <span class="mark"><Logo size={36} word={false} /></span>
       <div>
-        <p>A live map of World of Warcraft: Forever for your second screen. Free software under the GNU General Public License, version 3. It comes with no warranty.</p>
-        <p>Not affiliated with or endorsed by Blizzard Entertainment. World of Warcraft is a trademark of Blizzard Entertainment, Inc.</p>
+        <p>{t('settings.about.what')}</p>
+        <p>{t('settings.about.notAffiliated')}</p>
         <details class="built">
-          <summary><Glyph name="menu" />Built with: the licences of the {parties.length} projects inside</summary>
+          <summary><Glyph name="menu" />{t('settings.about.built', { count: parties.length })}</summary>
           {#each parties as party (party.name)}
             {@const [, address = '', rest = ''] = /^(https?:\/\/\S+)?\s*(.*)$/.exec(party.about) ?? []}
             <details>
-              <summary><Glyph name="menu" />{party.name}<span>{KIND.exec(party.licence)?.[0] ?? 'See the text'}</span></summary>
+              <summary><Glyph name="menu" />{party.name}<span>{KIND.exec(party.licence)?.[0] ?? t('settings.about.seeText')}</span></summary>
               {#if address}<p class="dim">{address}</p>{/if}
               {#if rest}<p class="dim">{rest}</p>{/if}
               <pre>{party.licence}</pre>

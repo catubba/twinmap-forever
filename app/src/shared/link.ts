@@ -1,5 +1,6 @@
 // What the main process tells the window about its link with the game, a few times a second.
 import type { GameState } from './game'
+import { t } from './i18n'
 
 export interface LinkSnapshot {
   /** The game's window: not found, minimized (nothing to read), or on screen. */
@@ -28,31 +29,28 @@ export interface LinkStatus {
   line?: string
 }
 
-/** Under the map while paused, beside its Resume button. */
-export const PAUSED = 'Twinmap is paused: the map stays where you were and your character is not followed.'
-
 // The addon sends the position at least every 10 seconds. Two missed and a margin: the strip has stopped.
 export const LOST_AFTER = 25_000
 
 export function linkStatus(link: LinkSnapshot, now: number): LinkStatus {
   const { state } = link
   // The map says so with a button of its own (App.svelte): no line here.
-  if (link.paused) return { kind: 'paused', word: 'Paused', tone: 'dim' }
+  if (link.paused) return { kind: 'paused', word: t('app.link.paused'), tone: 'dim' }
   if (link.game === 'closed')
-    return { kind: 'closed', word: 'Game not running', tone: 'objective', line: 'Game not running. The map still works; your position appears when you log in.' }
+    return { kind: 'closed', word: t('app.link.closed'), tone: 'objective', line: t('app.link.closedLine') }
   if (link.game === 'minimized')
-    return { kind: 'minimized', word: 'Game minimized', tone: 'objective', line: 'Game minimized. Your position appears when its window is back on screen.' }
+    return { kind: 'minimized', word: t('app.link.minimized'), tone: 'objective', line: t('app.link.minimizedLine') }
   if (state.protocol)
-    return { kind: `update-${state.protocol.update}`, word: state.protocol.update === 'app' ? 'Update the app' : 'Update the addon', tone: 'objective', line: state.protocol.message }
+    return { kind: `update-${state.protocol.update}`, word: state.protocol.update === 'app' ? t('app.link.updateApp') : t('app.link.updateAddon'), tone: 'objective', line: state.protocol.message }
   const heard = Math.max(0, ...Object.values(state.updatedAt))
-  if (!heard && link.seconds * 1000 < LOST_AFTER) return { kind: 'waiting', word: 'Connecting', tone: 'dim' }
+  if (!heard && link.seconds * 1000 < LOST_AFTER) return { kind: 'waiting', word: t('app.link.connecting'), tone: 'dim' }
   // Back from a pause, the addon reads the news within seconds and draws again: until then the link is not lost.
-  if (link.resumedAt !== undefined && heard < link.resumedAt && now - link.resumedAt < LOST_AFTER) return { kind: 'waiting', word: 'Connecting', tone: 'dim' }
+  if (link.resumedAt !== undefined && heard < link.resumedAt && now - link.resumedAt < LOST_AFTER) return { kind: 'waiting', word: t('app.link.connecting'), tone: 'dim' }
   if (now - heard > LOST_AFTER)
-    return { kind: 'lost', word: 'Link lost', tone: 'objective', line: 'No signal from the game. Log in, and check that the Twinmap Forever addon is on and its strip is not paused.' }
+    return { kind: 'lost', word: t('app.link.lost'), tone: 'objective', line: t('app.link.lostLine') }
   const line = insideLine(link.inside)
-  if (state.sections.pos?.combat) return { kind: 'combat', word: 'In combat, position only', tone: 'gold', ...(line && { line }) }
-  return { kind: 'connected', word: 'Connected', tone: 'done', ...(line && { line }) }
+  if (state.sections.pos?.combat) return { kind: 'combat', word: t('app.link.combat'), tone: 'gold', ...(line && { line }) }
+  return { kind: 'connected', word: t('app.link.connected'), tone: 'done', ...(line && { line }) }
 }
 
 // A place that is missing for this long inside a dungeon is said: shorter, the map is still looking.
@@ -64,11 +62,11 @@ const LOOKING_FOR = 10_000
  */
 function insideLine(inside: LinkSnapshot['inside']): string | undefined {
   if (!inside?.why) return undefined
-  if (inside.why === 'minimap turns') return 'Your place in a dungeon is read from the minimap, and it cannot be while the minimap turns: turn off Rotate Minimap in the game.'
-  if (inside.why === 'no rooms') return 'Twinmap has no pictures of this dungeon: your place is not shown in here.'
-  if (inside.why === 'no minimap told' || inside.why === 'zoom not known') return 'Your place in a dungeon is read from the minimap, and the game tells none: update the Twinmap Forever addon and keep the minimap on screen.'
+  if (inside.why === 'minimap turns') return t('app.link.minimapTurns')
+  if (inside.why === 'no rooms') return t('app.link.noRooms')
+  if (inside.why === 'no minimap told' || inside.why === 'zoom not known') return t('app.link.noMinimap')
   if ((inside.lostFor ?? 0) < LOOKING_FOR) return undefined
-  return 'Looking for your place. It is read from the minimap of the game: keep it on screen, with nothing over it.'
+  return t('app.link.looking')
 }
 
 /** The experience bar: percent of the level done, and percent of it that rest will double. Null at the level cap. */

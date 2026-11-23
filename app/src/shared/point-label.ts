@@ -1,5 +1,6 @@
 // The label on a point of the map: what it says of the point, and where it opens.
 import { unitsOfRect, UNITS_PER_BLOCK, type Point } from './geo'
+import { num, t } from './i18n'
 import type { Continent, GameMap, Rect } from './maps'
 import { BLOCK_YARDS } from './world'
 
@@ -24,7 +25,7 @@ export function zoneAt(maps: GameMap[], continent: Continent, p: Point): { zone:
   return best
 }
 
-const WAYS = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west']
+const WAYS = ['north', 'northEast', 'east', 'southEast', 'south', 'southWest', 'west', 'northWest'] as const
 // ponytail: a runner's pace all the way. The real speed and mounts come with the travel times (M7-F3).
 const RUN = 7 // yards a second on foot
 
@@ -38,7 +39,13 @@ export function wayTo(from: Point, to: Point, walked?: number): { far: string; t
   const yards = Math.round(walked ?? Math.hypot(dx, dy) * YARDS_PER_UNIT)
   const way = WAYS[((Math.round(Math.atan2(dx, -dy) / (Math.PI / 4)) % 8) + 8) % 8]!
   const seconds = Math.round(yards / RUN)
-  return { far: `${yards.toLocaleString('en-US')} yd ${way}`, time: `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')} on foot` }
+  return { far: t(`map.way.${way}`, { yards: num(yards) }), time: t('map.way.onFoot', { time: `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}` }) }
+}
+
+/** A place on a zone's map as the game gives it, "42.3, 65.1"; after the name of the zone when one is given. */
+export function placeText(place: Point, zone?: string): string {
+  const x = place.x.toFixed(1), y = place.y.toFixed(1)
+  return zone === undefined ? t('map.place.coords', { x, y }) : t('map.place.inZone', { zone, x, y })
 }
 
 export interface Size { width: number; height: number }

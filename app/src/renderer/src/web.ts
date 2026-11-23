@@ -4,6 +4,7 @@
 import type { LinkSnapshot } from '../../shared/link'
 import { feedbackLink } from '../../shared/feedback'
 import { pageOf } from '../../shared/setup'
+import { t } from '../../shared/i18n'
 
 /** The page runs in the app's own window, not in a browser on the home network. */
 export const inApp = 'twinmap' in window
@@ -32,7 +33,12 @@ if (!inApp) {
         return none
       }
     }
-  const unsent = { error: 'Twinmap on the computer did not answer.' }
+  // Read when said, not now: the language is set after this file runs (main.ts).
+  const unsent = {
+    get error(): string {
+      return t('app.web.noAnswer')
+    },
+  }
   // The times in what the game told are the computer's, and the page compares them with its own
   // clock (is the link lost, where is the arrow now): they are moved onto this browser's clock.
   // ponytail: how far ahead this clock is, by the news that took least to come; a clock set anew while the page is open is not followed
@@ -67,7 +73,7 @@ if (!inApp) {
     ahAlert: call('ah-alert', undefined),
     ahUnalert: call('ah-unalert', undefined),
     // What belongs to the computer stays on the computer.
-    chooseGameFolder: () => Promise.resolve('Choose the game folder in Twinmap on the computer.'),
+    chooseGameFolder: () => Promise.resolve(t('app.web.chooseOnComputer')),
     openCurseForge: (addon?: string) => Promise.resolve(void window.open(pageOf(addon), '_blank', 'noopener')),
     openFeedback: (way, details) => {
       const link = feedbackLink(way, details)
@@ -78,6 +84,8 @@ if (!inApp) {
     setZoom: () => Promise.resolve(),
     setGpu: () => Promise.resolve(),
     restart: () => Promise.resolve(),
+    lang: call('lang', 'enUS'),
+    setLang: () => Promise.resolve(), // the language is chosen on the computer
     zoomBy: () => Promise.resolve(),
     setLan: () => Promise.resolve(),
     setParticipate: () => Promise.resolve(),
@@ -85,7 +93,7 @@ if (!inApp) {
     drawn: () => {},
     onUpdate: () => {}, // the app updates itself on its computer, never from here
     retryTiles: call('retry-tiles', undefined),
-    sendFeedback: call<string | null>('send-feedback', 'Twinmap on the computer did not answer.'),
+    sendFeedback: (...args: unknown[]) => call<string | null>('send-feedback', t('app.web.noAnswer'))(...args),
     readLog: call('read-log', ''),
     search: call('search', []),
     walk: call('walk', null),

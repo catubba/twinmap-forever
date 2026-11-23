@@ -10,6 +10,7 @@
 // After the player's own reads, those of the participation programme (trainers-seen.ts): every
 // trainer someone saw, the costs before any discount.
 import { CLASS_QUESTS } from './class-quests'
+import { t } from './i18n'
 import { PROFESSION_TRAINERS } from './profession-trainers'
 import type { Sheets } from './sheet'
 import { readTable, type Table } from './wdc5'
@@ -172,7 +173,7 @@ export function classTrainer(npc: number, cls: string, facts: TrainerFacts, read
   return seen.s
     .map((l) => {
       const s = byId.get(l[0])
-      return s ? row(s) : { spell: l[0], name: facts.spells[l[0]]?.[0] ?? `Spell ${l[0]}`, rank: 0, level: l[2], skill: 0, cost: l[1], talent: false, races: 0, icon: facts.spells[l[0]]?.[1] ?? 0 }
+      return s ? row(s) : { spell: l[0], name: facts.spells[l[0]]?.[0] ?? t('items.unknownSpell', { id: l[0] }), rank: 0, level: l[2], skill: 0, cost: l[1], talent: false, races: 0, icon: facts.spells[l[0]]?.[1] ?? 0 }
     })
     .sort((a, b) => a.level - b.level || a.name.localeCompare(b.name) || a.rank - b.rank)
 }
@@ -203,7 +204,7 @@ export function professionTrainer(npc: number, facts: TrainerFacts, reads: Reads
       const l = reads.lines.get(spell), fee = p.fees[spell]
       return {
         spell,
-        name: facts.spells[spell]?.[0] ?? `Spell ${spell}`,
+        name: facts.spells[spell]?.[0] ?? t('items.unknownSpell', { id: spell }),
         rank: 0,
         level: l?.[2] ?? 0,
         skill: l?.[3] ?? fee?.[1] ?? 0,

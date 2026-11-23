@@ -2,6 +2,7 @@
 // It is fed the readings of the strip, one after the other, and nothing else changes it.
 import type { MinimapPlace } from './minimap'
 import { PROTOCOL, type Reading } from './strip'
+import { t } from './i18n'
 
 /** Where the character is. Every field is missing when the game does not tell. */
 export interface Position {
@@ -83,10 +84,7 @@ const MISMATCH_AFTER = 3
 
 export function protocolMismatch(addon: number): ProtocolMismatch {
   const update = addon > PROTOCOL ? 'app' : 'addon'
-  const message =
-    update === 'app'
-      ? `The Twinmap Forever addon is newer than this app (protocol ${addon}, this app speaks ${PROTOCOL}). Close Twinmap and open it again: it updates itself when it starts.`
-      : `The Twinmap Forever addon is older than this app (protocol ${addon}, this app speaks ${PROTOCOL}). Update the addon from CurseForge, then restart the game.`
+  const message = t(update === 'app' ? 'app.link.newerAddon' : 'app.link.olderAddon', { addon, app: PROTOCOL })
   return { addon, app: PROTOCOL, update, message }
 }
 

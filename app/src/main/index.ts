@@ -30,6 +30,7 @@ import { startLog } from './log'
 import type { Answer, Asked, Placed, Sources } from './questie-worker'
 import startQuestieWorker from './questie-worker?nodeWorker'
 import { gameLocale, sendSamples, startSamples } from './samples'
+import { langFor, langNow, setLang, t } from '../shared/i18n'
 import { addonHearsFonts, addonsFolder, readSettings, setupStatus, writeSettings } from './setup'
 import { hear, installChannel, removeSlots, send as sendSignal, sendOld, sentParts } from './signal'
 import { MAPS_FILE, servedFile } from './tiles'
@@ -108,7 +109,7 @@ function startQuests(
   const NONE: ItemSources = { sold: [], drops: [], found: [] }
   const ALL = (asks: Ask[]): Promise<boolean[]> => Promise.resolve(asks.map(() => true))
   if (!gameFolder) return { show: () => {}, search: () => Promise.resolve([]), sources: () => Promise.resolve(NONE), placed: ALL, stop: () => {} }
-  const worker = startQuestieWorker({ workerData: { gameFolder } })
+  const worker = startQuestieWorker({ workerData: { gameFolder, lang: langNow() } })
   // A search waits for the answer that carries its number.
   const asked = new Map<number, (found: Found[]) => void>(), askedSources = new Map<number, (sources: ItemSources) => void>(), askedPlaced = new Map<number, { answer: (placed: boolean[]) => void; fail: (why: Error) => void }>()
   let dead = false
@@ -287,6 +288,8 @@ function createWindow(): void {
   const settingsFile = join(app.getPath('userData'), 'settings.json')
   const settings = readSettings(settingsFile)
   let gameFolder = findGameFolder(settings.gameFolder)
+  // The language: the one chosen in the settings, else the game's, else English. The pages ask for it as they load.
+  setLang(langFor(settings.lang, gameFolder && gameLocale(gameFolder)))
   // The participation programme: with the choice on, the samples of a run in a dungeon are sent when the
   // character leaves it. With it off nothing is kept and nothing is sent. TWINMAP_SAMPLES, for trials, names another address.
   const participates = (): boolean => settings.participate === true
@@ -452,11 +455,11 @@ function createWindow(): void {
   // What the window may ask for, and only this: to let the player pick the game folder, to open the
   // addon's page on CurseForge in the browser, and (further down) to keep the window over the others.
   ipcMain.handle('choose-game-folder', async (): Promise<string | null> => {
-    const picked = await dialog.showOpenDialog(win, { title: 'Where World of Warcraft: Forever is installed', properties: ['openDirectory'] })
+    const picked = await dialog.showOpenDialog(win, { title: t('app.main.pickFolder'), properties: ['openDirectory'] })
     const chosen = picked.filePaths[0]
     if (picked.canceled || !chosen) return null
     const found = gameFolderFrom([chosen])
-    if (!found) return 'World of Warcraft: Forever is not in that folder. Choose the one that holds _forever_.'
+    if (!found) return t('app.main.notGame')
     settings.gameFolder = found
     writeSettings(settingsFile, settings)
     if (found !== gameFolder) {
@@ -498,6 +501,7 @@ function createWindow(): void {
   })
   // The latest lines of the app's record, for the player to copy.
   asks('read-log', (): string => record.read())
+  asks('lang', (): string => langNow())
   // What the player wrote in the Feedback window, sent when they press Send. TWINMAP_API, for trials, names another address.
   asks('send-feedback', (sent: unknown): Promise<string | null> => sendFeedback(sent, record.read, process.env.TWINMAP_API))
   // A conversion that failed is started again, from where it stopped: the cause may be gone (a full disk, a folder in use).
@@ -511,10 +515,10 @@ function createWindow(): void {
   // turns it on in the settings. The same page, the same map files, and what a page may ask for above.
   let lan: Lan | null = null
   let lanWord: SetupStatus['lan'] = null
-  const lookSetup = (): SetupStatus => ({ ...setupStatus(gameFolder, settings, app.getVersion()), lan: lanWord, zoom: settings.zoom ?? 1, gpu: { chosen: settings.noGpu !== true, running: GPU } })
+  const lookSetup = (): SetupStatus => ({ ...setupStatus(gameFolder, settings, app.getVersion()), lan: lanWord, zoom: settings.zoom ?? 1, gpu: { chosen: settings.noGpu !== true, running: GPU }, lang: langNow() })
   const lanUrl = async (): Promise<void> => {
     const address = await homeAddress()
-    if (lan) lanWord = address ? { url: `http://${address}:${LAN_PORT}/?k=${settings.lanCode}` } : { error: 'This computer is on no home network.' }
+    if (lan) lanWord = address ? { url: `http://${address}:${LAN_PORT}/?k=${settings.lanCode}` } : { error: t('app.main.noNetwork') }
   }
   const turnLan = (on: boolean): void => {
     lan?.stop()
@@ -707,7 +711,7 @@ function createWindow(): void {
   // Save: a copy of the picture where the player says. The window's own: a browser on the home network downloads it.
   ipcMain.handle('save-portrait', async (_event, key: unknown): Promise<void> => {
     if (typeof key !== 'string' || !Object.hasOwn(portraits, key)) return
-    const picked = await dialog.showSaveDialog(win, { title: `Save the picture of ${key}`, defaultPath: `${key}.png`, filters: [{ name: 'PNG', extensions: ['png'] }] })
+    const picked = await dialog.showSaveDialog(win, { title: t('app.main.savePicture', { name: key }), defaultPath: `${key}.png`, filters: [{ name: 'PNG', extensions: ['png'] }] })
     if (!picked.canceled && picked.filePath) await copyFile(portraitFile(key), picked.filePath).catch(() => {})
   })
   // A character the player no longer wants listed. The one in game comes back whole at its next send.
@@ -769,11 +773,11 @@ function createWindow(): void {
   // send, which the addon tells back on the strip once it has it, or what went wrong.
   type Sent = { seq: number } | { error: string }
   const sendParts = (parts: Record<string, unknown> | null): Sent => {
-    if (!parts || !gameFolder) return { error: 'There is nothing to send.' }
+    if (!parts || !gameFolder) return { error: t('app.main.nothingToSend') }
     try {
       return { seq: send(addonsFolder(gameFolder), parts, addonHearsFonts(gameFolder)).seq }
     } catch {
-      return { error: 'Twinmap could not write next to the addon in the game folder.' }
+      return { error: t('app.main.cannotWrite') }
     }
   }
   // The Pause button (tellPause, above).
@@ -815,6 +819,12 @@ function createWindow(): void {
   // Hardware acceleration on or off: kept, and taken at the next start. Restart starts the app again at once.
   ipcMain.handle('set-gpu', (_event, on: unknown) => {
     settings.noGpu = on !== true
+    writeSettings(settingsFile, settings)
+    setup = lookSetup()
+  })
+  // A language chosen in the settings: kept, spoken here at once, and the pages load again in it (App.svelte).
+  ipcMain.handle('set-lang', (_event, code: unknown) => {
+    settings.lang = setLang(code)
     writeSettings(settingsFile, settings)
     setup = lookSetup()
   })

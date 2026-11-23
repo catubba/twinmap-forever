@@ -36,7 +36,7 @@ test('a route and a step are checked before they leave', () => {
   }
   expect(stepFrom({ t: 5, at: 3 })).toEqual({ t: 5, at: 3 })
   expect(stepFrom({ t: 5, at: 2.5 })).toBeNull()
-  expect(sendState(true, { seq: 1, left: 30 }, false, 'A stop is').why).toBe('A stop is in no zone the game can mark.')
+  expect(sendState(true, { seq: 1, left: 30 }, false, 'stop').why).toBe('A stop is in no zone the game can mark.')
 })
 
 test('the marks sent are only what changed: a new or renamed point, and false for one no longer saved', () => {

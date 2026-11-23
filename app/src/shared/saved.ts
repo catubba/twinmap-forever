@@ -1,6 +1,7 @@
 // My pins: points the player saved, each with a name. They are kept from one run of the app to the
 // next, and shown on the map as a layer of their own. A pin set in the game with Alt and a click is
 // temporary until it is saved: it goes once the character gets there.
+import { t } from './i18n'
 import { unitsOfPlace, UNITS_PER_BLOCK, type Point } from './geo'
 import type { Continent, GameMap } from './maps'
 import { zoneAt } from './point-label'
@@ -42,7 +43,7 @@ export function savePin(pins: SavedPin[], pin: SavedPin): SavedPin[] {
   const at = savedAt(pins, pin.continent, pin.at)
   if (at >= 0) return pins[at]!.temp && !pin.temp ? pins.map((p, i) => (i === at ? { name: p.name, continent: p.continent, at: p.at, pin: p.pin } : p)) : pins
   if (pins.length >= MAX_PINS) return pins
-  return [...pins, { ...pin, name: named(pin.name) || 'Pin' }]
+  return [...pins, { ...pin, name: named(pin.name) || t('app.send.pin') }]
 }
 
 /** A pin under another name. An empty name is no name: the old one stays. */

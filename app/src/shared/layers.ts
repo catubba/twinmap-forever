@@ -1,51 +1,58 @@
 // The layers of the map, in the groups the Layers button shows. A layer that is not built yet is
 // listed, greyed out: its turn comes with the data that fills it.
+import { t } from './i18n'
+
 export const LAYER_GROUPS = [
-  { name: 'You', layers: [{ id: 'arrow', name: 'Arrow', built: true }, { id: 'route', name: 'Route', built: true }, { id: 'mypins', name: 'My pins', built: true }, { id: 'death', name: 'Corpse and graveyard', built: true }] },
+  { id: 'you', layers: [{ id: 'arrow', built: true }, { id: 'route', built: true }, { id: 'mypins', built: true }, { id: 'death', built: true }] },
   {
-    name: 'Quests',
+    id: 'quests',
     layers: [
-      { id: 'available', name: 'Available', built: true },
-      { id: 'turnin', name: 'Turn in', built: true },
-      { id: 'objectives', name: 'Objectives', built: true },
+      { id: 'available', built: true },
+      { id: 'turnin', built: true },
+      { id: 'objectives', built: true },
     ],
   },
   {
-    name: 'Services',
+    id: 'services',
     layers: [
-      { id: 'flight', name: 'Flight', built: true },
-      { id: 'inn', name: 'Inn', built: true },
-      { id: 'vendors', name: 'Vendors', built: true },
-      { id: 'repair', name: 'Repair', built: true },
-      { id: 'trainers', name: 'Trainers', built: true },
-      { id: 'bank', name: 'Bank', built: true },
-      { id: 'auction', name: 'Auction', built: true },
-      { id: 'stable', name: 'Stable', built: true },
+      { id: 'flight', built: true },
+      { id: 'inn', built: true },
+      { id: 'vendors', built: true },
+      { id: 'repair', built: true },
+      { id: 'trainers', built: true },
+      { id: 'bank', built: true },
+      { id: 'auction', built: true },
+      { id: 'stable', built: true },
     ],
   },
   {
-    name: 'Resources',
+    id: 'resources',
     layers: [
-      { id: 'ore', name: 'Ore', built: true },
-      { id: 'herbs', name: 'Herbs', built: true },
+      { id: 'ore', built: true },
+      { id: 'herbs', built: true },
     ],
   },
   {
-    name: 'World',
+    id: 'world',
     layers: [
-      { id: 'zones', name: 'Place names', built: true },
-      { id: 'relief', name: 'Relief', built: true },
-      { id: 'caves', name: 'Caves', built: true },
-      { id: 'dungeons', name: 'Dungeons', built: true },
-      { id: 'routes', name: 'Flight routes', built: true },
-      { id: 'bosses', name: 'Bosses in a dungeon', built: true },
+      { id: 'zones', built: true },
+      { id: 'relief', built: true },
+      { id: 'caves', built: true },
+      { id: 'dungeons', built: true },
+      { id: 'routes', built: true },
+      { id: 'bosses', built: true },
     ],
   },
-  { name: 'Group', layers: [{ id: 'companions', name: 'Companions', built: true }] },
+  { id: 'group', layers: [{ id: 'companions', built: true }] },
 ] as const
 
 export type LayerId = (typeof LAYER_GROUPS)[number]['layers'][number]['id']
 export type LayerChoices = Record<LayerId, boolean>
+export type GroupId = (typeof LAYER_GROUPS)[number]['id']
+
+// The ids are kept in the player's choices: the names shown come from the English file and its languages.
+export const layerName = (id: LayerId): string => t(`map.layers.names.${id}`)
+export const groupName = (id: GroupId): string => t(`map.layers.groups.${id}`)
 
 /** The player's choices as they were saved, every layer on where nothing readable says otherwise. */
 export function layersFrom(saved: string | null): LayerChoices {

@@ -4,6 +4,7 @@
   // says so first: for a few seconds after it there is no Twinmap on screen.
   import Logo from './Logo.svelte'
   import type { Updating } from '../../main/update'
+  import { t } from '../../shared/i18n'
 
   let updating = $state<Updating | null>(null)
   window.twinmap.onUpdate((told) => (updating = told))
@@ -13,12 +14,12 @@
   <Logo size={96} stacked />
   <p aria-live="polite">
     {#if updating?.installing}
-      Installing version {updating.version}<br />Twinmap will open again in a few seconds
+      {t('app.update.installing', { version: updating.version })}<br />{t('app.update.reopen')}
     {:else}
-      {updating ? `Updating to version ${updating.version}` : 'Updating'}
+      {updating ? t('app.update.updatingTo', { version: updating.version }) : t('app.update.updating')}
     {/if}
   </p>
-  <progress class="bar" value={updating?.percent ?? 0} max="100" aria-label="Downloading the new version"></progress>
+  <progress class="bar" value={updating?.percent ?? 0} max="100" aria-label={t('app.update.downloading')}></progress>
 </main>
 
 <style>

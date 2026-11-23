@@ -1,6 +1,6 @@
 <script lang="ts">
   // The main screen: the top row with the state of the link, the map in its frame, and the Now panel.
-  import { experience, linkStatus, PAUSED, type LinkSnapshot } from '../../shared/link'
+  import { experience, linkStatus, type LinkSnapshot } from '../../shared/link'
   import { groupFrom } from '../../shared/group'
   import { deathFrom, type Place as DeathPlace } from '../../shared/death'
   import { feedbackDetails } from '../../shared/feedback'
@@ -16,7 +16,7 @@
   import { journeyFrom } from '../../shared/journey'
   import Now from './Now.svelte'
   import Search from './Search.svelte'
-  import { ADDON_MISSING, type SetupStatus } from '../../shared/setup'
+  import type { SetupStatus } from '../../shared/setup'
   import Feedback from './Feedback.svelte'
   import Participate from './Participate.svelte'
   import FirstRun from './FirstRun.svelte'
@@ -35,6 +35,7 @@
   import { firstName, knownOf, shownOf } from '../../shared/characters'
   import type { PortraitsTold } from '../../shared/portrait'
   import type { Sheets } from '../../shared/sheet'
+  import { around, langNow, num, t } from '../../shared/i18n'
 
   let link = $state<LinkSnapshot | null>(null)
   let now = $state(Date.now())
@@ -81,6 +82,8 @@
   let onFeedback = $state(false)
   let answered = $state(false) // Help improve Twinmap was answered in this run: the setup may tell it a moment later
   window.twinmap.onSetup((told) => {
+    // Another language chosen (here or on the computer): the page loads again, every text in it.
+    if (told.lang && told.lang !== langNow()) location.reload()
     setup = told
     // On a phone there are no steps to go through, only the wait for them to be done on the computer: it ends by itself.
     if (inApp) onSetup ??= !told.done
@@ -217,7 +220,6 @@
   const shown = $derived(shownOf(characters, picked))
   const mapReady = $derived(tiles?.state === 'ready')
   const insideReady = $derived(tiles?.state === 'ready' && !!tiles.interiors && !tiles.interiors.problem)
-  const count = (n: number): string => n.toLocaleString('en-US')
   let wrong = $state('') // what was wrong with the folder the player picked
   // The panel closes at any size: closed, it lies over a corner of the map and shows the next stop
   // and nothing else, and what stands at the foot of the map is lifted by its closed height. On a
@@ -286,11 +288,11 @@
     <Picker known={characters} {shown} {now} onpick={(key) => (picked = key)} onforget={(key) => void window.twinmap.forgetSheet(key)} />
   {/if}
   {#if !onSetup}
-    <nav aria-label="Sections">
-      <button class="tab" title="Now" aria-label="Now" aria-current={onSettings || onItems || onAh ? undefined : 'page'} onclick={() => ((onSettings = false), (onItems = false), (onAh = false))}><Glyph name="pin" size={18} /><span class="word">Now</span></button>
-      <button class="tab" title="Items" aria-label="Items" aria-current={onItems && !onSettings ? 'page' : undefined} onclick={() => ((onSettings = false), (onItems = true), (onAh = false))}><Glyph name="bag" size={18} /><span class="word">Items</span></button>
+    <nav aria-label={t('app.top.sections')}>
+      <button class="tab" title={t('app.top.now')} aria-label={t('app.top.now')} aria-current={onSettings || onItems || onAh ? undefined : 'page'} onclick={() => ((onSettings = false), (onItems = false), (onAh = false))}><Glyph name="pin" size={18} /><span class="word">{t('app.top.now')}</span></button>
+      <button class="tab" title={t('app.top.items')} aria-label={t('app.top.items')} aria-current={onItems && !onSettings ? 'page' : undefined} onclick={() => ((onSettings = false), (onItems = true), (onAh = false))}><Glyph name="bag" size={18} /><span class="word">{t('app.top.items')}</span></button>
       <!-- Its name gives first: Auction House, then AH, then the glyph alone with the others. -->
-      <button class="tab" title="Auction House" aria-label="Auction House" aria-current={onAh && !onSettings ? 'page' : undefined} onclick={() => ((onSettings = false), (onItems = false), (onAh = true))}><Glyph name="coins" size={18} /><span class="word long">Auction House</span><span class="word short">AH</span></button>
+      <button class="tab" title={t('app.top.auctionHouse')} aria-label={t('app.top.auctionHouse')} aria-current={onAh && !onSettings ? 'page' : undefined} onclick={() => ((onSettings = false), (onItems = false), (onAh = true))}><Glyph name="coins" size={18} /><span class="word long">{t('app.top.auctionHouse')}</span><span class="word short">{t('app.top.auctionHouseShort')}</span></button>
     </nav>
   {/if}
   {#if onSetup === false && !onSettings && mapReady}
@@ -298,14 +300,14 @@
   {/if}
   {#if status}
     <!-- The state of the link is the Pause button too: two bars to pause, the arrow of play to resume. -->
-    <button class="status" class:alone={onSetup !== false || onSettings || !mapReady} class:paused title={paused ? 'Resume Twinmap' : 'Pause Twinmap'} aria-label={paused ? 'Resume Twinmap' : 'Pause Twinmap'} aria-pressed={paused} onclick={() => setPause(!paused)}><i class={status.tone}></i><span class="word">{status.word}</span>{#if inbox && !inbox.off && inbox.id === undefined}<span class="left" class:low={inbox.left < 5}>{inbox.left} sends left</span>{/if}<span class="toggle"><Glyph name={paused ? 'play' : 'pause'} size={16} /></span></button>
+    <button class="status" class:alone={onSetup !== false || onSettings || !mapReady} class:paused title={paused ? t('app.top.resume') : t('app.top.pause')} aria-label={paused ? t('app.top.resume') : t('app.top.pause')} aria-pressed={paused} onclick={() => setPause(!paused)}><i class={status.tone}></i><span class="word">{status.word}</span>{#if inbox && !inbox.off && inbox.id === undefined}<span class="left" class:low={inbox.left < 5}>{t('app.top.sendsLeft', { count: inbox.left })}</span>{/if}<span class="toggle"><Glyph name={paused ? 'play' : 'pause'} size={16} /></span></button>
   {/if}
   {#if setup}
     <!-- The bug and the cog say what the words may not, to those who do not know them; in a narrow window they stand alone. The sections have theirs too: the pin of where you are, the bag. -->
-    <button class="entry feedback" title="Report a bug or an idea" aria-label="Feedback" onclick={() => (onFeedback = true)}><Glyph name="bug" size={18} /><span class="word">Feedback</span></button>
+    <button class="entry feedback" title={t('app.top.feedbackHint')} aria-label={t('app.top.feedback')} onclick={() => (onFeedback = true)}><Glyph name="bug" size={18} /><span class="word">{t('app.top.feedback')}</span></button>
   {/if}
   {#if onSetup === false}
-    <button class="entry" title="Settings" aria-label="Settings" aria-current={onSettings ? 'page' : undefined} onclick={() => (onSettings = !onSettings)}><Glyph name="gear" size={18} /><span class="word">Settings</span></button>
+    <button class="entry" title={t('app.top.settings')} aria-label={t('app.top.settings')} aria-current={onSettings ? 'page' : undefined} onclick={() => (onSettings = !onSettings)}><Glyph name="gear" size={18} /><span class="word">{t('app.top.settings')}</span></button>
   {/if}
 </header>
 
@@ -324,8 +326,8 @@
       <!-- The game folder, the map and the addon are the computer's to set up: here there is only the wait. -->
       <main class="elsewhere surface">
         <span class="mark"><Logo size={72} /></span>
-        <h1>Finish the setup on your computer</h1>
-        <p>Twinmap on the computer is still being set up: it shows what is left to do. The map opens here by itself when it is done.</p>
+        <h1>{t('app.elsewhere.title')}</h1>
+        <p>{t('app.elsewhere.text')}</p>
       </main>
     {/if}
   </div>
@@ -356,10 +358,10 @@
         {#if tilesHelp(tiles)}<p class="help">{tilesHelp(tiles)}</p>{/if}
         {#if tiles.state === 'no-game' && inApp}
           {#if wrong}<p>{wrong}</p>{/if}
-          <button class="btn" onclick={choose}>Choose the game folder</button>
+          <button class="btn" onclick={choose}>{t('app.tiles.chooseFolder')}</button>
         {/if}
         {#if tiles.state === 'failed'}
-          <button class="btn" onclick={() => window.twinmap.retryTiles()}>Try again</button>
+          <button class="btn" onclick={() => window.twinmap.retryTiles()}>{t('app.tiles.retry')}</button>
         {/if}
       </div>
     {/if}
@@ -371,34 +373,35 @@
       </div>
     {:else if pos}
       <div class="readout">
-        <b>{pos.zone ?? 'Unknown zone'}</b>
+        <b>{pos.zone ?? t('app.map.unknownZone')}</b>
         {pos.sub ?? ''}
         {pos.x !== undefined && pos.y !== undefined ? `${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}` : ''}
       </div>
     {/if}
     {#if setup?.gameFolder && !setup.addon}
-      <p class="map-note with-button" role="status">{ADDON_MISSING} <button class="btn" onclick={() => window.twinmap.openCurseForge()}>Get it on CurseForge</button></p>
+      <p class="map-note with-button" role="status">{t('app.map.addonMissing')} <button class="btn" onclick={() => window.twinmap.openCurseForge()}>{t('app.map.getAddon')}</button></p>
     {:else if paused && mapReady}
-      <p class="map-note with-button" role="status" in:fly={drop(8)} out:fade={gone}>{PAUSED} <button class="btn" onclick={() => setPause(false)}>Resume</button></p>
+      <p class="map-note with-button" role="status" in:fly={drop(8)} out:fade={gone}>{t('app.map.paused')} <button class="btn" onclick={() => setPause(false)}>{t('app.map.resume')}</button></p>
     {:else if status?.line && mapReady}
       {#key status.line}<p class="map-note" role="status" in:fly={drop(8)} out:fade={gone}>{status.line}</p>{/key}
     {/if}
   </div>
 
-  <aside class="panel surface" class:closed={!panelOpen} aria-label="Now" bind:clientHeight={panelHeight}>
+  <aside class="panel surface" class:closed={!panelOpen} aria-label={t('app.top.now')} bind:clientHeight={panelHeight}>
     <div class="head">
-      <button class="grip" aria-expanded={panelOpen} onclick={togglePanel}><Glyph name="menu" turn={panelOpen ? 0 : 180} />{panelOpen ? 'Close' : 'Quests and nearby'}</button>
+      <button class="grip" aria-expanded={panelOpen} onclick={togglePanel}><Glyph name="menu" turn={panelOpen ? 0 : 180} />{panelOpen ? t('app.panel.close') : t('app.panel.open')}</button>
       <!-- On the end of the bar next to the map: the map goes to the other side. -->
       {#if panelOpen}
-        {@const to = layout.mapRight ? 'Map on the left (M)' : 'Map on the right (M)'}
+        {@const to = layout.mapRight ? t('app.panel.mapLeft') : t('app.panel.mapRight')}
         <button class="swap" title={to} aria-label={to} onclick={() => setMapRight(!layout.mapRight)}><Glyph name="swap" /></button>
       {/if}
     </div>
     {#if inGame && shown && !shown.live}
+      {@const showing = around('app.panel.showing', 'name')}
       <!-- Another character than the one in game: said where its bags and spells will show, with the way back. -->
       <p class="viewing" role="status">
-        <span>Showing <b style:color={shown.color}>{shown.key}</b></span>
-        <button class="btn back" onclick={() => (picked = null)}>Back to {firstName(inGame)}</button>
+        <span>{showing[0]}<b style:color={shown.color}>{shown.key}</b>{showing[1]}</span>
+        <button class="btn back" onclick={() => (picked = null)}>{t('app.panel.backTo', { name: firstName(inGame) })}</button>
       </p>
     {/if}
     {#if npc}
@@ -431,18 +434,18 @@
     {#if char}
       <footer>
         <p>
-          <span>Level {char.level}{xp ? `, ${Math.floor(xp.percent)}%` : ''}</span>
-          {#if xp}<span class="dim">{count(char.xp!)} of {count(char.max!)} xp</span>{/if}
+          <span>{xp ? t('app.panel.levelPercent', { level: char.level, percent: Math.floor(xp.percent) }) : t('app.panel.level', { level: char.level })}</span>
+          {#if xp}<span class="dim">{t('app.panel.xp', { xp: num(char.xp!), max: num(char.max!) })}</span>{/if}
         </p>
         {#if xp}
-          <div class="xp" role="progressbar" aria-label="Experience" aria-valuenow={Math.floor(xp.percent)} style:--v="{xp.percent}%" style:--rest="{xp.rested}%"></div>
+          <div class="xp" role="progressbar" aria-label={t('app.panel.experience')} aria-valuenow={Math.floor(xp.percent)} style:--v="{xp.percent}%" style:--rest="{xp.rested}%"></div>
         {/if}
       </footer>
     {/if}
   </aside>
   {#if panelOpen}
     <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
-    <div class="edge" class:dragging role="separator" tabindex="0" aria-orientation="vertical" aria-label="Panel width" aria-valuemin={PANEL.least} aria-valuemax={Math.round(wide / 2)} aria-valuenow={layout.width} title="Drag to resize. Double-click to reset." onpointerdown={drag} onkeydown={nudge} ondblclick={() => setWidth(PANEL.start)}><i></i></div>
+    <div class="edge" class:dragging role="separator" tabindex="0" aria-orientation="vertical" aria-label={t('app.panel.width')} aria-valuemin={PANEL.least} aria-valuemax={Math.round(wide / 2)} aria-valuenow={layout.width} title={t('app.panel.widthHint')} onpointerdown={drag} onkeydown={nudge} ondblclick={() => setWidth(PANEL.start)}><i></i></div>
   {/if}
 </div>
 {/if}

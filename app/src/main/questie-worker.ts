@@ -8,6 +8,7 @@ import type { ItemSources } from '../shared/tips'
 import { readFileSync } from 'node:fs'
 import type { GameMap } from '../shared/maps'
 import { ABOUT_NPC, type Ask } from './gamelog'
+import { setLang } from '../shared/i18n'
 import { doerIndex, fixedPins, itemSources, metWhereQuestieSays, openQuestie, placed, questLog, questPins, search, searchIndex, shownFromLog } from './questie'
 
 /** What the main process asks. */
@@ -19,6 +20,8 @@ export interface Sources { id: number; sources: ItemSources }
 /** For each thing asked, whether QuestieDB has it with a place; all of them without QuestieDB, which cannot tell what is missing. */
 export interface Placed { id: number; placed: boolean[] }
 
+// A thread of its own speaks no language until told: the one of the app as it started the thread.
+setLang((workerData as { lang?: string }).lang)
 const db = openQuestie((workerData as { gameFolder: string }).gameFolder)
 // The game's maps, to measure where an NPC was met against QuestieDB (M15-F24): read once for each build's file.
 let maps: { file: string; read: GameMap[] | null } | null = null

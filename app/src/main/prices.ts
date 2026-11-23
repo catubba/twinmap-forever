@@ -6,6 +6,7 @@
 import { mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { chartDays, dayFrom, historyOf, hoursFrom, KEEP_DAYS, listingFrom, nextPrices, PRICES_URL, withListing, type DayFile, type History, type HoursFile, type PricesTold } from '../shared/ah'
+import { t } from '../shared/i18n'
 
 const AGAIN_SOON = 15 * 60_000 // the next snapshot is late: asked again this much later
 const AFTER_FAILURE = 5 * 60_000
@@ -41,11 +42,11 @@ export function startPrices(folder: string, tell: (told: PricesTold) => void, ba
       const answer = await fetch(`${base}/${region.toLowerCase()}/${house}.json`, { headers: tag && told.listing ? { 'if-none-match': tag } : {}, signal: AbortSignal.timeout(WAIT) })
       if (mine !== asking) return
       if (answer.status === 304) say({ checked: now(), error: null })
-      else if (!answer.ok) throw new Error(answer.status === 404 ? 'This house has no prices.' : `prices.twinmap.app answered ${answer.status}.`)
+      else if (!answer.ok) throw new Error(answer.status === 404 ? t('auction.errors.noHouse') : t('auction.errors.answered', { status: answer.status }))
       else {
         const text = await answer.text(), listing = listingFrom(JSON.parse(text))
         if (mine !== asking) return
-        if (!listing || listing.house !== house) throw new Error('prices.twinmap.app sent something else than prices.')
+        if (!listing || listing.house !== house) throw new Error(t('auction.errors.notPrices'))
         try {
           writeFileSync(`${file}.new`, text)
           renameSync(`${file}.new`, file)
@@ -60,7 +61,7 @@ export function startPrices(folder: string, tell: (told: PricesTold) => void, ba
       wait = next > 0 ? next : AGAIN_SOON
     } catch (e) {
       if (mine !== asking) return
-      say({ error: e instanceof Error && !(e instanceof SyntaxError) && e.name !== 'TimeoutError' && !/fetch failed/i.test(e.message) ? e.message : 'Twinmap could not reach prices.twinmap.app.' })
+      say({ error: e instanceof Error && !(e instanceof SyntaxError) && e.name !== 'TimeoutError' && !/fetch failed/i.test(e.message) ? e.message : t('auction.errors.unreachable') })
     }
     timer = setTimeout(() => void ask(region, house), wait)
   }

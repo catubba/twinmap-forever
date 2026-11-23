@@ -31,6 +31,7 @@
   // The chart of the page of an item (M18-F9), as approved on design/ah/mock.html: typical and lowest
   // price, how many on sale as bars, over 24 hours or 7 days. Slots with nothing collected stay empty.
   import { coins } from '../../shared/items'
+  import { clock, day, num, t } from '../../shared/i18n'
 
   let { history, snapshot, now }: { history: History | null; snapshot: string; now: number } = $props()
   let range = $state<'24h' | '7d'>('24h')
@@ -42,28 +43,32 @@
   const most = $derived(Math.max(...pts.map((x) => x.n), 1))
   const X = (i: number): number => L + (i / (slots - 1)) * (W - L - 10)
   const Y = (y: number): number => TOP + (1 - y / hi) * (H - TOP - B - 40)
-  const short = (c: number): string => (c >= 10000 ? `${(c / 10000).toFixed(1)}g` : c >= 100 ? `${(c / 100).toFixed(1)}s` : `${Math.round(c)}c`)
-  const money = (c: number): string => coins(Math.round(c)).map(([n, coin]) => `${n}${coin[0]}`).join(' ')
-  const clock = (ms: number): string => new Date(ms).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
-  const dayName = (ms: number): string => (new Date(ms).toISOString().slice(0, 10) === new Date(now).toISOString().slice(0, 10) ? 'today' : new Date(ms).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }))
+  const ONE = { minimumFractionDigits: 1, maximumFractionDigits: 1 } // one decimal, written as the language writes it
+  const COIN = { g: 'auction.chart.coin.gold', s: 'auction.chart.coin.silver', c: 'auction.chart.coin.copper' } as const
+  const short = (c: number): string => (c >= 10000 ? t(COIN.g, { amount: num(c / 10000, ONE) }) : c >= 100 ? t(COIN.s, { amount: num(c / 100, ONE) }) : t(COIN.c, { amount: Math.round(c) }))
+  const money = (c: number): string => coins(Math.round(c)).map(([n, coin]) => t(COIN[coin], { amount: n })).join(' ')
+  const dayName = (ms: number): string => (new Date(ms).toISOString().slice(0, 10) === new Date(now).toISOString().slice(0, 10) ? t('auction.chart.today') : day(ms, { day: 'numeric', month: 'short', timeZone: 'UTC' }))
   const ticks = $derived(
     range === '24h'
       ? [0, 6, 12, 18, 23].map((i) => [i, clock(Date.parse(snapshot) - (23 - i) * HOUR)] as const)
       : [0, 2, 4, 6].map((i) => [i, dayName(Date.parse(snapshot.slice(0, 10)) - (6 - i) * DAY)] as const),
   )
-  const said = (x: Placed): string => `${range === '24h' ? clock(Date.parse(x.at)) : dayName(Date.parse(x.at))}: typical ${money(x.typ)}, lowest ${money(x.low)}, ${x.n.toLocaleString('en')} on sale${range === '7d' ? ' (mean of its hours)' : ''}`
+  const said = (x: Placed): string =>
+    range === '24h'
+      ? t('auction.chart.pointHour', { time: clock(Date.parse(x.at)), typical: money(x.typ), lowest: money(x.low), count: num(x.n) })
+      : t('auction.chart.pointDay', { time: dayName(Date.parse(x.at)), typical: money(x.typ), lowest: money(x.low), count: num(x.n) })
   // The slots before the first point: nothing collected yet.
   const emptyTo = $derived(pts.length ? X(pts[0]!.i) - 14 : W - 10)
 </script>
 
-<svg class="chart" viewBox="0 0 {W} {H}" role="img" aria-label="Prices over the last {range === '24h' ? '24 hours' : '7 days'}">
-  {#each [0, 1, 2, 3, 4] as t (t)}
-    <line x1={L} x2={W - 10} y1={Y((hi / 4) * t)} y2={Y((hi / 4) * t)} stroke="#ffffff12" />
-    <text x={L - 6} y={Y((hi / 4) * t) + 4} fill="#b9a88c" font-size="11" text-anchor="end">{short((hi / 4) * t)}</text>
+<svg class="chart" viewBox="0 0 {W} {H}" role="img" aria-label={range === '24h' ? t('auction.chart.label24h') : t('auction.chart.label7d')}>
+  {#each [0, 1, 2, 3, 4] as g (g)}
+    <line x1={L} x2={W - 10} y1={Y((hi / 4) * g)} y2={Y((hi / 4) * g)} stroke="#ffffff12" />
+    <text x={L - 6} y={Y((hi / 4) * g) + 4} fill="#b9a88c" font-size="11" text-anchor="end">{short((hi / 4) * g)}</text>
   {/each}
   {#if emptyTo > L + 20}
     <rect x={L} y={TOP} width={emptyTo - L} height={H - TOP - B - 40} fill="#ffffff05" />
-    {#if emptyTo - L > 250}<text x={(L + emptyTo) / 2} y={(H - B - 40) / 2 + TOP} fill="#7d705c" font-size="12" text-anchor="middle">no prices collected yet for these {range === '24h' ? 'hours' : 'days'}</text>{/if}
+    {#if emptyTo - L > 250}<text x={(L + emptyTo) / 2} y={(H - B - 40) / 2 + TOP} fill="#7d705c" font-size="12" text-anchor="middle">{range === '24h' ? t('auction.chart.emptyHours') : t('auction.chart.emptyDays')}</text>{/if}
   {/if}
   {#each pts as x (x.i)}
     <rect x={X(x.i) - 6} y={H - B - (x.n / most) * 34} width="12" height={(x.n / most) * 34} fill="#4e4033" />
@@ -79,12 +84,12 @@
   {/each}
 </svg>
 <div class="legend">
-  <span><i style="background:#7fc8ff"></i>Typical price (median)</span>
-  <span><i style="background:#eacba4"></i>Lowest</span>
-  <span><i style="background:#4e4033;height:8px"></i>Available</span>
-  <span class="seg" role="group" aria-label="Chart range"><button aria-pressed={range === '24h'} onclick={() => (range = '24h')}>24 hours</button><button aria-pressed={range === '7d'} onclick={() => (range = '7d')}>7 days</button></span>
+  <span><i style="background:#7fc8ff"></i>{t('auction.chart.typical')}</span>
+  <span><i style="background:#eacba4"></i>{t('auction.chart.lowest')}</span>
+  <span><i style="background:#4e4033;height:8px"></i>{t('auction.chart.available')}</span>
+  <span class="seg" role="group" aria-label={t('auction.chart.range')}><button aria-pressed={range === '24h'} onclick={() => (range = '24h')}>{t('auction.chart.hours')}</button><button aria-pressed={range === '7d'} onclick={() => (range = '7d')}>{t('auction.chart.days')}</button></span>
 </div>
-<p class="note">Only prices really collected are drawn: {range === '24h' ? 'one point an hour' : 'one point a day, the lowest of the day and the mean of its hours'}. The lines grow from there.</p>
+<p class="note">{range === '24h' ? t('auction.chart.noteHours') : t('auction.chart.noteDays')}</p>
 
 <style>
   .chart {

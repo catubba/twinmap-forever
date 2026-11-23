@@ -1,6 +1,7 @@
 // The characters the app knows, for the picker at the start of the top row: one for each sheet it
 // keeps (shared/sheet.ts). The one shown is the one in game, unless the player picked another; a
 // login, of the same character or another, brings the one in game back.
+import { t, type Key } from './i18n'
 import type { Sheets } from './sheet'
 
 export interface Known {
@@ -22,11 +23,26 @@ export const CLASS_COLORS: Record<string, string> = {
   WARRIOR: '#c79c6e', PALADIN: '#f58cba', HUNTER: '#abd473', ROGUE: '#fff569', PRIEST: '#ffffff',
   SHAMAN: '#0070de', MAGE: '#69ccf0', WARLOCK: '#9482c9', DRUID: '#ff7d0a',
 }
-// The race tokens whose name is not the token with spaces.
-const RACES: Record<string, string> = { Scourge: 'Undead', NightElf: 'Night Elf' }
+// The races and classes by the game's tokens: the keys of their names. A token not listed (Forever's own) shows as written.
+const RACES: Record<string, Key> = {
+  Human: 'items.races.human', Orc: 'items.races.orc', Dwarf: 'items.races.dwarf', NightElf: 'items.races.nightElf',
+  Scourge: 'items.races.undead', Tauren: 'items.races.tauren', Gnome: 'items.races.gnome', Troll: 'items.races.troll',
+}
+const CLASSES: Record<string, Key> = {
+  WARRIOR: 'items.classes.warrior', PALADIN: 'items.classes.paladin', HUNTER: 'items.classes.hunter', ROGUE: 'items.classes.rogue', PRIEST: 'items.classes.priest',
+  SHAMAN: 'items.classes.shaman', MAGE: 'items.classes.mage', WARLOCK: 'items.classes.warlock', DRUID: 'items.classes.druid',
+}
+const CLASSES_ALL: Record<string, Key> = {
+  WARRIOR: 'items.classesAll.warrior', PALADIN: 'items.classesAll.paladin', HUNTER: 'items.classesAll.hunter', ROGUE: 'items.classesAll.rogue', PRIEST: 'items.classesAll.priest',
+  SHAMAN: 'items.classesAll.shaman', MAGE: 'items.classesAll.mage', WARLOCK: 'items.classesAll.warlock', DRUID: 'items.classesAll.druid',
+}
 
 const word = (token: string): string => token.charAt(0) + token.slice(1).toLowerCase()
-const spaced = (token: string): string => RACES[token] ?? token.replace(/([a-z])([A-Z])/g, '$1 $2')
+const raceName = (token: string): string => (RACES[token] ? t(RACES[token]) : token.replace(/([a-z])([A-Z])/g, '$1 $2'))
+/** A class by its token, one of them ("Warlock"). */
+export const className = (token: string): string => (CLASSES[token] ? t(CLASSES[token]) : word(token))
+/** A class by its token, all of them ("Warlocks"). */
+export const classNameAll = (token: string): string => (CLASSES_ALL[token] ? t(CLASSES_ALL[token]) : `${word(token)}s`)
 
 /** The characters to pick from: the one in game first, then the others by when they were last seen. */
 export function knownOf(sheets: Sheets, live: string | null): Known[] {
@@ -34,7 +50,9 @@ export function knownOf(sheets: Sheets, live: string | null): Known[] {
     const who = (sheet.pieces.who ?? {}) as { race?: unknown; class?: unknown; level?: unknown }
     const cls = typeof who.class === 'string' ? who.class : undefined
     const level = typeof who.level === 'number' ? who.level : undefined
-    const line = [level !== undefined && `Level ${level}`, typeof who.race === 'string' && spaced(who.race), cls && word(cls)].filter(Boolean).join(' ')
+    const race = typeof who.race === 'string' ? raceName(who.race) : '', named = cls ? className(cls) : ''
+    // Without a level, race and class alone; with one, the whole line, room left by a part not told taken away.
+    const line = level === undefined ? [race, named].filter(Boolean).join(' ') : t('items.character.line', { level, race, class: named }).replace(/\s+/g, ' ').trim()
     return { key, ...(cls && { class: cls }), color: (cls && CLASS_COLORS[cls]) ?? 'var(--text)', ...(level !== undefined && { level }), line, live: key === live, seen: Math.max(0, ...Object.values(sheet.at)) }
   })
   return out.sort((a, b) => Number(b.live) - Number(a.live) || b.seen - a.seen)
@@ -48,12 +66,11 @@ export function shownOf(known: Known[], picked: string | null): Known | null {
 /** How long ago, in words: "just now", "5 minutes ago", "3 hours ago", "2 days ago", "3 weeks ago". */
 export function ago(then: number, now: number): string {
   const minutes = Math.floor((now - then) / 60_000)
-  const say = (n: number, unit: string): string => `${n} ${unit}${n === 1 ? '' : 's'} ago`
-  if (minutes < 1) return 'just now'
-  if (minutes < 60) return say(minutes, 'minute')
-  if (minutes < 60 * 24) return say(Math.floor(minutes / 60), 'hour')
-  if (minutes < 60 * 24 * 14) return say(Math.floor(minutes / (60 * 24)), 'day')
-  return say(Math.floor(minutes / (60 * 24 * 7)), 'week')
+  if (minutes < 1) return t('items.ago.justNow')
+  if (minutes < 60) return t('items.ago.minutes', { count: minutes })
+  if (minutes < 60 * 24) return t('items.ago.hours', { count: Math.floor(minutes / 60) })
+  if (minutes < 60 * 24 * 14) return t('items.ago.days', { count: Math.floor(minutes / (60 * 24)) })
+  return t('items.ago.weeks', { count: Math.floor(minutes / (60 * 24 * 7)) })
 }
 
 /** The first name: what the way back to the character in game says. */

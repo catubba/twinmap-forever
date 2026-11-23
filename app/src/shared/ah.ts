@@ -4,17 +4,18 @@
 import type { ItemFacts } from './items'
 import { fold } from './search'
 import { readTable, type Table } from './wdc5'
+import { t } from './i18n'
 
 export const PRICES_URL = 'https://prices.twinmap.app/prices'
 export const REGIONS = ['EU', 'US', 'KR', 'TW'] as const
 export type Region = (typeof REGIONS)[number]
 
-/** The rulesets a player can choose, by the API's number, with the names the game gives each in every language (design/bnet/rulesets.json). */
-export const RULESETS: { id: number; name: string; names: string[] }[] = [
-  { id: 2, name: 'Normal', names: ['Normal', 'Обычный', '일반', '普通'] },
-  { id: 1, name: 'PvP', names: ['PvP', 'JcJ', 'JxJ'] },
-  { id: 3, name: 'Roleplay', names: ['Roleplay', 'Juego de rol', 'Interpretação', 'Rollenspiel', 'Jeu de rôle', 'Ролевая игра', '롤플레이', '角色扮演'] },
-  { id: 15, name: 'Roleplay PvP', names: ['Roleplay PvP', 'Juego de rol JcJ', 'Interpretação e JxJ', 'Rollenspiel (PvP)', 'Jeu de rôle JcJ', 'Ролевая игра с PvP', '롤플레이 PvP', '角色扮演PvP'] },
+/** The rulesets a player can choose, by the API's number, with the names the game gives each in every language (design/bnet/rulesets.json). The name shown is auction.ruleset.<key>. */
+export const RULESETS: { id: number; key: 'normal' | 'pvp' | 'roleplay' | 'roleplayPvp'; names: string[] }[] = [
+  { id: 2, key: 'normal', names: ['Normal', 'Обычный', '일반', '普通'] },
+  { id: 1, key: 'pvp', names: ['PvP', 'JcJ', 'JxJ'] },
+  { id: 3, key: 'roleplay', names: ['Roleplay', 'Juego de rol', 'Interpretação', 'Rollenspiel', 'Jeu de rôle', 'Ролевая игра', '롤플레이', '角色扮演'] },
+  { id: 15, key: 'roleplayPvp', names: ['Roleplay PvP', 'Juego de rol JcJ', 'Interpretação e JxJ', 'Rollenspiel (PvP)', 'Jeu de rôle JcJ', 'Ролевая игра с PvP', '롤플레이 PvP', '角色扮演PvP'] },
 ]
 
 /**
@@ -26,7 +27,8 @@ export const HOUSES: Record<number, [number, number, number]> = { 1: [110, 113, 
 
 /** A for the Alliance, H for the Horde, N for the neutral house. */
 export type Side = 'A' | 'H' | 'N'
-export const SIDES: Record<Side, string> = { A: 'Alliance', H: 'Horde', N: 'Neutral' }
+export const SIDES = { A: 'alliance', H: 'horde', N: 'neutral' } as const
+export const sideName = (s: Side): string => t(`auction.side.${SIDES[s]}`)
 
 export interface House {
   region: Region
@@ -35,9 +37,12 @@ export interface House {
 }
 
 export const houseNumber = (h: House): number => HOUSES[h.ruleset]?.[h.side === 'A' ? 0 : h.side === 'H' ? 1 : 2] ?? 0
-export const rulesetName = (id: number): string => RULESETS.find((r) => r.id === id)?.name ?? `Ruleset ${id}`
+export function rulesetName(id: number): string {
+  const r = RULESETS.find((r) => r.id === id)
+  return r ? t(`auction.ruleset.${r.key}`) : t('auction.house.unknownRuleset', { id })
+}
 /** "House 111 · Alliance · Normal". */
-export const houseLine = (h: House): string => `House ${houseNumber(h)} · ${SIDES[h.side]} · ${rulesetName(h.ruleset)}`
+export const houseLine = (h: House): string => t('auction.house.line', { number: houseNumber(h), side: sideName(h.side), ruleset: rulesetName(h.ruleset) })
 
 /** The ruleset the game names so, in any of its languages; null for a name not known. */
 export function rulesetOf(name: unknown): number | null {
@@ -291,7 +296,7 @@ export function ahItems(listing: Listing, facts: ItemFacts, names: AhNames): AhI
   }
   return [...byId].map(([id, kinds]) => {
     const f = facts[id]
-    const name = f?.[0] ?? `Item ${id}`
+    const name = f?.[0] ?? t('auction.unknownItem', { id })
     kinds.sort((a, b) => (a.suffix ? 1 : 0) - (b.suffix ? 1 : 0) || a.suffix.localeCompare(b.suffix) || a.key.localeCompare(b.key))
     return {
       id,
@@ -315,7 +320,8 @@ export function ahItems(listing: Listing, facts: ItemFacts, names: AhNames): AhI
 // The categories as the game's auction house lists them: the classes in its order, their
 // subclasses, and for armour where it is worn.
 const CLASS_ORDER = [2, 4, 1, 0, 7, 6, 11, 9, 5, 13, 15, 12]
-const SLOTS: Record<number, string> = { 1: 'Head', 2: 'Neck', 3: 'Shoulder', 4: 'Shirt', 5: 'Chest', 6: 'Waist', 7: 'Legs', 8: 'Feet', 9: 'Wrist', 10: 'Hands', 11: 'Finger', 12: 'Trinket', 14: 'Off Hand', 16: 'Back', 19: 'Tabard', 20: 'Chest', 23: 'Held In Off-hand', 28: 'Relic' }
+// The name shown of a slot is auction.slot.<its word>.
+const SLOTS: Record<number, 'head' | 'neck' | 'shoulder' | 'shirt' | 'chest' | 'waist' | 'legs' | 'feet' | 'wrist' | 'hands' | 'finger' | 'trinket' | 'offHand' | 'back' | 'tabard' | 'heldInOffHand' | 'relic'> = { 1: 'head', 2: 'neck', 3: 'shoulder', 4: 'shirt', 5: 'chest', 6: 'waist', 7: 'legs', 8: 'feet', 9: 'wrist', 10: 'hands', 11: 'finger', 12: 'trinket', 14: 'offHand', 16: 'back', 19: 'tabard', 20: 'chest', 23: 'heldInOffHand', 28: 'relic' }
 const SLOT_ORDER = [1, 2, 3, 16, 5, 4, 19, 9, 10, 6, 7, 8, 11, 12, 14, 23, 28]
 
 export interface Category {
@@ -344,14 +350,14 @@ export function categoriesOf(items: AhItem[], names: AhNames): Category[] {
       .sort(order)
       .map((last) => {
         const key = `${parent}.${last}`
-        return { key, name: name(last), n: n.get(key)!, kids: key.split('.').length === 2 && key.startsWith('4.') ? kids(key, (s) => SLOTS[s]!, (a, b) => SLOT_ORDER.indexOf(a) - SLOT_ORDER.indexOf(b)) : [] }
+        return { key, name: name(last), n: n.get(key)!, kids: key.split('.').length === 2 && key.startsWith('4.') ? kids(key, (s) => t(`auction.slot.${SLOTS[s]!}`), (a, b) => SLOT_ORDER.indexOf(a) - SLOT_ORDER.indexOf(b)) : [] }
       })
   const classes = [...new Set(items.map((it) => it.cls))].sort((a, b) => (CLASS_ORDER.indexOf(a) + 1 || 99) - (CLASS_ORDER.indexOf(b) + 1 || 99) || a - b)
   return classes.map((cls) => ({
     key: `${cls}`,
-    name: names.classes[cls] || (cls < 0 ? 'Other' : `Class ${cls}`),
+    name: names.classes[cls] || (cls < 0 ? t('auction.category.noClass') : t('auction.category.unknownClass', { id: cls })),
     n: n.get(`${cls}`)!,
-    kids: kids(`${cls}`, (sub) => names.subs[`${cls}.${sub}`] || `Subclass ${sub}`, (a, b) => a - b),
+    kids: kids(`${cls}`, (sub) => names.subs[`${cls}.${sub}`] || t('auction.category.unknownSub', { id: sub }), (a, b) => a - b),
   }))
 }
 
@@ -613,7 +619,7 @@ export function alertFrom(v: unknown): Alert | null {
   if (key !== null && (typeof key !== 'string' || (key !== `${a.item}` && !key.startsWith(`${a.item}:`)) || !/^\d+(:\d+(\.\d+)*)?$/.test(key))) return null
   if (!Number.isInteger(a.price) || (a.price as number) < 0 || (a.when !== 'appears' && !a.price)) return null
   const met = typeof a.met === 'string' && !Number.isNaN(Date.parse(a.met)) ? a.met : null
-  return { t: a.t as number, who: a.who, region: a.region.toUpperCase(), house: a.house as number, item: a.item as number, key, name: typeof a.name === 'string' ? a.name.slice(0, 120) : `Item ${a.item}`, when: a.when as AlertWhen, price: a.when === 'appears' ? 0 : (a.price as number), game: a.game === true, met, at: met && Number.isInteger(a.at) ? (a.at as number) : null, away: a.away === true }
+  return { t: a.t as number, who: a.who, region: a.region.toUpperCase(), house: a.house as number, item: a.item as number, key, name: typeof a.name === 'string' ? a.name.slice(0, 120) : t('auction.unknownItem', { id: a.item as number }), when: a.when as AlertWhen, price: a.when === 'appears' ? 0 : (a.price as number), game: a.game === true, met, at: met && Number.isInteger(a.at) ? (a.at as number) : null, away: a.away === true }
 }
 
 /** The lowest price an alert looks at in a listing: of its kind, or of any kind of its item. */

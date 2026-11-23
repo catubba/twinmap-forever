@@ -3,6 +3,7 @@
 // program, already filled with what the app knows about itself. They see every word before it leaves.
 import { tilesLine, type TilesStatus } from './tiles-status'
 import type { SetupStatus } from './setup'
+import { t } from './i18n'
 
 export const FEEDBACK = { github: 'https://github.com/catubba/twinmap-forever/issues/new', email: 'dev@twinmap.app', privacy: 'https://twinmap.app/privacy.html', participation: 'https://twinmap.app/privacy.html#participation' } as const
 export type FeedbackWay = keyof typeof FEEDBACK
@@ -12,15 +13,16 @@ export const nameless = (text: string): string => text.replace(/([\\/]Users[\\/]
 
 const LONGEST = 1500 // characters of details an address may carry: a browser or a mail program cuts longer ones as it likes
 
-/** What the app knows about itself, for whoever reads the report. Nothing of the player: no folder, no name, no character. */
+/** What the app knows about itself, for whoever reads the report. Nothing of the player: no folder, no name, no character.
+ * In English whatever the language: the developer reads it. */
 export function feedbackDetails(setup: SetupStatus, tiles: TilesStatus | null, link: string | null): string {
-  const has = (there: boolean): string => (there ? 'installed' : 'not installed')
+  const has = (there: boolean): string => (there ? 'installed' : 'not installed') // for the developer
   // A fault's message may name a folder of the player.
   return nameless(
     [
       `Twinmap ${setup.version}`,
       `Twinmap Forever addon: ${setup.addon ?? 'not installed'}`,
-      `Game folder: ${setup.gameFolder ? 'found' : 'not found'}`,
+      `Game folder: ${setup.gameFolder ? 'found' : 'not found'}`, // for the developer
       `Map: ${tiles ? tilesLine(tiles) : 'unknown'}`,
       `Link: ${link ?? 'unknown'}`,
       `QuestieDB: ${has(setup.questie)}`,
@@ -33,7 +35,7 @@ export function feedbackDetails(setup: SetupStatus, tiles: TilesStatus | null, l
 export function feedbackLink(way: unknown, details: unknown): string | null {
   if (way === 'privacy' || way === 'participation') return FEEDBACK[way]
   if (way !== 'github' && way !== 'email') return null
-  const body = encodeURIComponent(`What happened, or what you would like:\n\n\n\n---\n${typeof details === 'string' ? details.slice(0, LONGEST) : ''}`)
+  const body = encodeURIComponent(`${t('settings.feedback.letterTop')}\n\n\n\n---\n${typeof details === 'string' ? details.slice(0, LONGEST) : ''}`)
   return way === 'github' ? `${FEEDBACK.github}?body=${body}` : `mailto:${FEEDBACK.email}?subject=${encodeURIComponent('Twinmap feedback')}&body=${body}`
 }
 
@@ -55,8 +57,8 @@ export const LONGEST_MESSAGE = 5000 // characters, as the server allows
  */
 export async function sendFeedback(sent: unknown, log: () => string, to: string = SEND_TO): Promise<string | null> {
   const { message, email, details, withLog } = (typeof sent === 'object' && sent !== null ? sent : {}) as Record<string, unknown>
-  if (typeof message !== 'string' || !message.trim()) return 'Write your message first.'
-  if (message.length > LONGEST_MESSAGE) return `Your message is too long: ${LONGEST_MESSAGE} characters at most.`
+  if (typeof message !== 'string' || !message.trim()) return t('settings.feedback.fails.empty')
+  if (message.length > LONGEST_MESSAGE) return t('settings.feedback.fails.tooLong', { most: LONGEST_MESSAGE })
   const body = {
     message,
     email: typeof email === 'string' ? email.trim() : '',
@@ -66,10 +68,10 @@ export async function sendFeedback(sent: unknown, log: () => string, to: string 
   try {
     const answer = await fetch(to, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(15_000) })
     if (answer.ok) return null
-    if (answer.status === 429) return 'Too many messages in a short time. Wait a minute and send again.'
+    if (answer.status === 429) return t('settings.feedback.fails.tooMany')
     const said = ((await answer.json().catch(() => null)) as { error?: unknown } | null)?.error
-    return said === 'not an email address' ? 'The email address does not look right.' : 'The message could not be delivered. Try again later, or use GitHub or email.'
+    return said === 'not an email address' ? t('settings.feedback.fails.badEmail') : t('settings.feedback.fails.notDelivered')
   } catch {
-    return 'No answer from the server. Check your connection and send again.'
+    return t('settings.feedback.fails.noAnswer')
   }
 }

@@ -3,6 +3,7 @@
 import { unitsOfPlace, type Point } from './geo'
 import type { Continent, GameMap } from './maps'
 import { pinFrom, type Pin } from './send'
+import { t } from './i18n'
 
 export interface Leg {
   /** As Shortest Path names it: "walk", "passage", "tram", "flight", "boat"... */
@@ -44,7 +45,7 @@ export function journeyFrom(section: unknown): Journey | null {
     if (a && b && (height(fz) !== null || height(tz) !== null)) told.heights = [height(fz), height(tz)]
     return [told]
   })
-  const title = plain(name, 80) || 'Journey'
+  const title = plain(name, 80) || t('app.journey.name')
   return { name: title, owner: plain(owner, 40), legs: read, left: seconds(left), goal: pinFrom({ m, x, y, name: title }) }
 }
 
@@ -56,9 +57,9 @@ export function startedBy(owner: string): string {
 
 /** "45 s", "4 min", "1 h 12 min". */
 export function span(s: number): string {
-  if (s < 60) return `${s} s`
+  if (s < 60) return t('app.journey.seconds', { seconds: s })
   const minutes = Math.round(s / 60)
-  return minutes < 60 ? `${minutes} min` : `${Math.floor(minutes / 60)} h ${minutes % 60} min`
+  return minutes < 60 ? t('app.journey.minutes', { minutes }) : t('app.journey.hours', { hours: Math.floor(minutes / 60), minutes: minutes % 60 })
 }
 
 /** A leg of the journey as it lies on the map: its mode, and where it starts and ends in map units. */

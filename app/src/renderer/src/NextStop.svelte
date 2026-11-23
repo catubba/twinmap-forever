@@ -5,6 +5,7 @@
   import { slide } from 'svelte/transition'
   import Glyph from './Glyph.svelte'
   import { still } from './motion'
+  import { t } from '../../shared/i18n'
 
   let {
     route,
@@ -34,7 +35,7 @@
     onpick: (stop: Stop) => void
   } = $props()
 
-  const DWELL = 3000 // ms at a stop, or on "Route complete", before moving on
+  const DWELL = 3000 // ms at a stop, or on the route complete, before moving on
   let editing = $state(false)
   // The band is told afresh with every reading of the position: only the stop reached starts the wait.
   const dwelling = $derived(band.state === 'arrived' ? `at ${band.n}` : band.state === 'complete' ? 'complete' : '')
@@ -54,16 +55,16 @@
 </script>
 
 {#if band.state === 'none'}
-  <p class="none">No route. Click the map to add a stop.</p>
+  <p class="none">{t('map.nextStop.none')}</p>
 {:else}
-  <section class="plate" aria-label="Next stop">
-    <h2>Next stop {#if band.state !== 'complete'}<span>{band.n} of {band.of}</span>{/if}</h2>
+  <section class="plate" aria-label={t('map.nextStop.title')}>
+    <h2>{t('map.nextStop.title')} {#if band.state !== 'complete'}<span>{t('map.nextStop.count', { n: band.n, of: band.of })}</span>{/if}</h2>
     <!-- A new stop ahead: a light crosses the band once. -->
     {#key band.state === 'complete' ? 'complete' : band.n + band.name}<i class="sheen"></i>{/key}
     <div class="sign" role="status">
       {#if band.state === 'complete'}
         <div class="square"><Glyph name="check" size={30} /></div>
-        <div class="what"><b>Route complete</b></div>
+        <div class="what"><b>{t('map.nextStop.complete')}</b></div>
       {:else}
         {#if band.state === 'going' || band.state === 'arrived'}
           <div class="square">
@@ -73,26 +74,26 @@
         <div class="what">
           <b>{band.name}</b>
           {#if band.state === 'going' || band.state === 'arrived'}<span>{band.far}</span>{/if}
-          {#if band.state === 'elsewhere'}<span>Not on the ground you are on</span>{/if}
+          {#if band.state === 'elsewhere'}<span>{t('map.nextStop.elsewhere')}</span>{/if}
         </div>
         {#if band.state === 'arrived'}
-          <div class="time"><b>Here</b></div>
+          <div class="time"><b>{t('map.nextStop.here')}</b></div>
         {:else if band.state === 'going'}
-          <div class="time"><b>{band.minutes}</b><span>min on foot</span></div>
+          <div class="time"><b>{band.minutes}</b><span>{t('map.nextStop.minutes')}</span></div>
         {/if}
       {/if}
     </div>
     {#if band.state !== 'complete'}
       <div class="go">
-        <button class="btn" onclick={onskip}>Skip</button>
-        <button class="btn" aria-expanded={editing} onclick={() => (editing = !editing)}>Edit route</button>
-        <button class="btn" onclick={onclear}>Clear</button>
+        <button class="btn" onclick={onskip}>{t('map.nextStop.skip')}</button>
+        <button class="btn" aria-expanded={editing} onclick={() => (editing = !editing)}>{t('map.nextStop.edit')}</button>
+        <button class="btn" onclick={onclear}>{t('map.nextStop.clear')}</button>
       </div>
       {#if !route.sent}
-        <p class="unsent">Not in game yet <button class="btn" disabled={!sending.can} onclick={send}>Send route to game</button></p>
+        <p class="unsent">{t('map.nextStop.unsent')} <button class="btn" disabled={!sending.can} onclick={send}>{t('map.nextStop.send')}</button></p>
         {#if note || !sending.can}<p class="why" role="status">{note || sending.why}</p>{/if}
       {:else if !inGame && sending.can}
-        <p class="why" role="status">On its way to the game.</p>
+        <p class="why" role="status">{t('map.nextStop.onItsWay')}</p>
       {/if}
     {/if}
   </section>
@@ -104,10 +105,10 @@
           <span class="n">{#if done}<Glyph name="check" size={12} />{:else}{i + 1}{/if}</span>
           <button class="name" onclick={() => onpick(stop)}>{stop.name}</button>
           {#if !done}
-            <button class="tool up" aria-label="Move {stop.name} up" disabled={i <= route.next} onclick={() => onmove(i, i - 1)}><Glyph name="menu" size={14} /></button>
-            <button class="tool" aria-label="Move {stop.name} down" disabled={i >= route.stops.length - 1} onclick={() => onmove(i, i + 1)}><Glyph name="menu" size={14} /></button>
+            <button class="tool up" aria-label={t('map.nextStop.moveUp', { name: stop.name })} disabled={i <= route.next} onclick={() => onmove(i, i - 1)}><Glyph name="menu" size={14} /></button>
+            <button class="tool" aria-label={t('map.nextStop.moveDown', { name: stop.name })} disabled={i >= route.stops.length - 1} onclick={() => onmove(i, i + 1)}><Glyph name="menu" size={14} /></button>
           {/if}
-          <button class="tool last" aria-label="Remove {stop.name}" onclick={() => onremove(i)}><Glyph name="close" size={14} /></button>
+          <button class="tool last" aria-label={t('map.nextStop.remove', { name: stop.name })} onclick={() => onremove(i)}><Glyph name="close" size={14} /></button>
         </li>
       {/each}
     </ol>

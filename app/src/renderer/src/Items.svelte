@@ -5,7 +5,8 @@
   // Two views (M10-F14, mockup design/vendors/mockup/items2.html): Slots, what is worn as the game's
   // character window lays it and the bags and the bank as grids; Table, a row for each item.
   import { ago, type Known } from '../../shared/characters'
-  import { coins, filterRows, gridsOf, itemMatches, itemRows, othersHolding, PLACES, QUALITY_COLORS, QUALITY_TEXT, sortRows, wornOf, WORN_LEFT, WORN_RIGHT, WORN_WEAPONS, type Cell, type Column, type Grid, type ItemFacts, type ItemRow, type Place } from '../../shared/items'
+  import { coins, filterRows, ITEMS_FILE, gridsOf, itemMatches, itemRows, othersHolding, placeName, PLACES, QUALITY_COLORS, QUALITY_TEXT, sortRows, wornOf, WORN_LEFT, WORN_RIGHT, WORN_WEAPONS, type Cell, type Column, type Grid, type ItemFacts, type ItemRow, type Place } from '../../shared/items'
+  import { around, t, type Key } from '../../shared/i18n'
   import type { PortraitsTold } from '../../shared/portrait'
   import type { Sheets } from '../../shared/sheet'
   import { statsOf } from '../../shared/stats'
@@ -20,7 +21,7 @@
   // What the game says of each item, made beside the map (tiles-worker.ts). Without it the items have their numbers and no prices.
   let facts = $state.raw<ItemFacts>({})
   $effect(() => {
-    void fetch(`${TILES}/items.json`)
+    void fetch(`${TILES}/${ITEMS_FILE}`)
       .then((r) => (r.ok ? r.json() : {}))
       .then((read: ItemFacts) => (facts = read))
       .catch(() => {})
@@ -45,7 +46,19 @@
   const money = $derived(typeof sheet?.pieces.money === 'number' ? sheet.pieces.money : null)
   const places = $derived(PLACES.map((p) => ({ p, n: all.filter((r) => r.place === p).length })).filter(({ p, n }) => n > 0 || p !== 'Keyring'))
 
-  const COLUMNS = $derived<[Column, string][]>([['name', 'Item'], ['type', 'Type'], ['place', 'Where'], ['n', 'Qty'], ['value', 'Value'], ...(listing ? [['auction', 'At the AH'] as [Column, string]] : [])])
+  const COLUMNS = $derived<[Column, string][]>([
+    ['name', t('items.table.columns.item')],
+    ['type', t('items.table.columns.type')],
+    ['place', t('items.table.columns.where')],
+    ['n', t('items.table.columns.qty')],
+    ['value', t('items.table.columns.value')],
+    ...(listing ? [['auction', t('items.table.columns.auction')] as [Column, string]] : []),
+  ])
+  // The other characters' table: the same, with whose each row is after the item.
+  const OTHER_COLUMNS = $derived<[Column | null, string][]>([COLUMNS[0]!, [null, t('items.table.columns.character')], ...COLUMNS.slice(1)])
+  // Texts with coins or a key in the middle: what comes before and after them.
+  const WORTH = around('items.page.worth', 'money'), AUCTION = around('items.page.auction', 'money'), MONEY = around('items.page.money', 'money')
+  const KEY_HINT = around('items.doll.keyHint', 'key')
   // A click sorts by the column; another click turns it round. Names and types start from A, numbers from the most.
   function sortBy(c: Column): void {
     if (c === column) up = !up
@@ -58,9 +71,9 @@
   const stats = $derived(statsOf(sheet?.pieces.stats))
   const when = $derived.by(() => {
     if (!sheet || !shown) return ''
-    const bags = shown.live ? 'Bags as they are now' : `Bags as of ${ago(shown.seen, now)}`
-    const bank = sheet.at.bank ? `bank ${ago(sheet.at.bank, now)}, when it was last open` : 'bank not seen yet: open it in game once'
-    return `${bags} · ${bank[0]!.toUpperCase()}${bank.slice(1)}`
+    const bags = shown.live ? t('items.table.bagsNow') : t('items.table.bagsAsOf', { ago: ago(shown.seen, now) })
+    const bank = sheet.at.bank ? t('items.table.bankSeen', { ago: ago(sheet.at.bank, now) }) : t('items.table.bankUnseen')
+    return `${bags} · ${bank}`
   })
 </script>
 
@@ -79,7 +92,7 @@
 {#snippet cell(c: Cell, label = '', wear?: { now?: number; most?: number })}
   {#if c}
     {@const q = facts[c.item]?.[1] ?? 1}
-    {@const name = facts[c.item]?.[0] ?? `Item ${c.item}`}
+    {@const name = facts[c.item]?.[0] ?? t('items.unknownItem', { id: c.item })}
     {@const left = wear?.most ? (wear.now ?? 0) / wear.most : 1}
     <span class="cell" use:itemTip={{ item: c.item, key: c.key, n: c.n, wear }} class:off={!itemMatches(c.item, facts, typed)} style:--q={q > 1 ? (QUALITY_COLORS[q] ?? null) : null}>
       <img src="{TILES}/items/{c.item}.png" alt={name} onerror={(e) => e.currentTarget.remove()} />
@@ -91,14 +104,14 @@
   {/if}
 {/snippet}
 
-{#snippet wornSlot([slot, label]: [number, string])}
+{#snippet wornSlot([slot, label]: [number, Key])}
   {@const w = worn.get(slot)}
-  {@render cell(w ? { item: w.item, n: 1, key: w.key } : null, label, w)}
+  {@render cell(w ? { item: w.item, n: 1, key: w.key } : null, t(label), w)}
 {/snippet}
 
 {#snippet grid(name: string, g: Grid)}
   <div class="box">
-    <h3>{name}<small>{g.used ? `${g.used} of ${g.slots} used` : `empty · ${g.slots} slots`}</small></h3>
+    <h3>{name}<small>{g.used ? t('items.held.used', { used: g.used, count: g.slots }) : t('items.held.empty', { count: g.slots })}</small></h3>
     {#if g.used}<div class="grid">{#each g.cells as c, i (i)}{@render cell(c)}{/each}</div>{/if}
   </div>
 {/snippet}
@@ -119,27 +132,27 @@
 
 <main class="surface">
   {#if !shown || !sheet}
-    <p class="empty">No character yet. Play one with the Twinmap Forever addon on and its bags show here, also when the game is closed.</p>
+    <p class="empty">{t('items.page.noCharacter')}</p>
   {:else}
     <div class="tools">
-      <input type="search" placeholder="Filter by name or type" aria-label="Filter items" bind:value={typed} />
-      <div class="views" role="group" aria-label="View">
-        <button aria-pressed={view === 'slots'} onclick={() => (view = 'slots')}>Slots</button>
-        <button aria-pressed={view === 'table'} onclick={() => (view = 'table')}>Table</button>
+      <input type="search" placeholder={t('items.page.filter')} aria-label={t('items.page.filterLabel')} bind:value={typed} />
+      <div class="views" role="group" aria-label={t('items.page.viewLabel')}>
+        <button aria-pressed={view === 'slots'} onclick={() => (view = 'slots')}>{t('items.page.slots')}</button>
+        <button aria-pressed={view === 'table'} onclick={() => (view = 'table')}>{t('items.page.table')}</button>
       </div>
       {#if view === 'table'}
-        <div class="chips" role="group" aria-label="Where">
-          <button class="chip" aria-pressed={!place} onclick={() => (place = null)}>All <b>{all.length}</b></button>
+        <div class="chips" role="group" aria-label={t('items.page.whereLabel')}>
+          <button class="chip" aria-pressed={!place} onclick={() => (place = null)}>{t('items.page.all')} <b>{all.length}</b></button>
           {#each places as { p, n } (p)}
-            <button class="chip" aria-pressed={place === p} onclick={() => (place = place === p ? null : p)}>{p} <b>{n}</b></button>
+            <button class="chip" aria-pressed={place === p} onclick={() => (place = place === p ? null : p)}>{placeName(p)} <b>{n}</b></button>
           {/each}
         </div>
       {/if}
-      <p class="sum">Worth {@render money_(worth)} at a vendor{#if listing}{' · '}{@render money_(auction)} at the auction house{/if}{#if money !== null}{' · '}Money {@render money_(money)}{/if}</p>
+      <p class="sum">{WORTH[0]}{@render money_(worth)}{WORTH[1]}{#if listing}{' · '}{AUCTION[0]}{@render money_(auction)}{AUCTION[1]}{/if}{#if money !== null}{' · '}{MONEY[0]}{@render money_(money)}{MONEY[1]}{/if}</p>
     </div>
     {#if view === 'slots' && grids}
       <div class="page">
-        <section class="doll" aria-label="Worn">
+        <section class="doll" aria-label={t('items.doll.label')}>
           <header><span class="who" style:color={shown.color}>{shown.key}</span><span class="line">{shown.line}</span></header>
           <div class="body">
             <div class="col">{#each WORN_LEFT as s (s[0])}{@render wornSlot(s)}{/each}</div>
@@ -147,23 +160,23 @@
               <div class="picture" style:background-image={portraitUrl ? `url("${portraitUrl}")` : null}>
                 {#if portraits.retake === shown.key}
                   <div class="wait">
-                    <p>Open the character window in game<br /><kbd>C</kbd> unless you changed the key</p>
-                    <small>The picture is taken as soon as it is open and nothing covers the character.</small>
-                    <span><button class="pbtn" onclick={() => void window.twinmap.retakePortrait(null)}>Cancel</button></span>
+                    <p>{t('items.doll.open')}<br />{KEY_HINT[0]}<kbd>C</kbd>{KEY_HINT[1]}</p>
+                    <small>{t('items.doll.waitNote')}</small>
+                    <span><button class="pbtn" onclick={() => void window.twinmap.retakePortrait(null)}>{t('items.doll.cancel')}</button></span>
                   </div>
                 {:else if portrait && portraitUrl}
                   <div class="under">
-                    <span class="when">Taken {ago(portrait.at, now)}</span>
+                    <span class="when">{t('items.doll.taken', { ago: ago(portrait.at, now) })}</span>
                     {#if inApp}
-                      <button class="pbtn" onclick={() => void window.twinmap.savePortrait(shown.key)}>Save…</button>
+                      <button class="pbtn" onclick={() => void window.twinmap.savePortrait(shown.key)}>{t('items.doll.save')}</button>
                     {:else}
-                      <a class="pbtn" href={portraitUrl} download="{shown.key}.png">Save…</a>
+                      <a class="pbtn" href={portraitUrl} download="{shown.key}.png">{t('items.doll.save')}</a>
                     {/if}
-                    {#if shown.live}<button class="pbtn" onclick={() => void window.twinmap.retakePortrait(shown.key)}>Retake</button>{/if}
+                    {#if shown.live}<button class="pbtn" onclick={() => void window.twinmap.retakePortrait(shown.key)}>{t('items.doll.retake')}</button>{/if}
                   </div>
                 {:else}
-                  <span>No picture of {shown.key.split(' ')[0]} yet</span>
-                  <small>Open the character window in game and it is taken by itself.</small>
+                  <span>{t('items.doll.none', { name: shown.key.split(' ')[0] ?? '' })}</span>
+                  <small>{t('items.doll.noneNote')}</small>
                 {/if}
               </div>
               <div class="weapons">{#each WORN_WEAPONS as s (s[0])}{@render wornSlot(s)}{/each}</div>
@@ -182,13 +195,13 @@
             </div>
           {/if}
         </section>
-        <section class="held" aria-label="Bags and bank">
-          <h2>Bags<span>{shown.live ? 'as they are now' : `as of ${ago(shown.seen, now)}`}</span></h2>
-          {@render grid('Backpack and bags', grids.bags)}
-          {#if grids.reagents.slots}{@render grid('Reagent bag', grids.reagents)}{/if}
-          {#if grids.keyring.slots}{@render grid('Keyring', grids.keyring)}{/if}
-          <h2>Bank<span>{sheet.at.bank ? `seen ${ago(sheet.at.bank, now)}` : 'not seen yet: open it in game once'}</span></h2>
-          {#if grids.bank.slots}{@render grid('Bank and its bags', grids.bank)}{/if}
+        <section class="held" aria-label={t('items.held.label')}>
+          <h2>{t('items.held.bags')}<span>{shown.live ? t('items.held.bagsNow') : t('items.held.bagsAsOf', { ago: ago(shown.seen, now) })}</span></h2>
+          {@render grid(t('items.held.backpack'), grids.bags)}
+          {#if grids.reagents.slots}{@render grid(t('items.held.reagents'), grids.reagents)}{/if}
+          {#if grids.keyring.slots}{@render grid(t('items.held.keyring'), grids.keyring)}{/if}
+          <h2>{t('items.held.bank')}<span>{sheet.at.bank ? t('items.held.bankSeen', { ago: ago(sheet.at.bank, now) }) : t('items.held.bankUnseen')}</span></h2>
+          {#if grids.bank.slots}{@render grid(t('items.held.bankBags'), grids.bank)}{/if}
         </section>
       </div>
     {:else}
@@ -196,9 +209,9 @@
       {@render heads(COLUMNS)}
       <tbody>
         {#each rows as r (r.place + r.id)}
-          <tr use:itemTip={{ item: r.id, n: r.n }}><td>{@render item(r)}</td><td class="dim">{r.type}</td><td>{r.place}</td><td class="num">{r.n}</td><td class="num">{@render money_(r.value)}</td>{#if listing}<td class="num">{@render money_(r.auction)}</td>{/if}</tr>
+          <tr use:itemTip={{ item: r.id, n: r.n }}><td>{@render item(r)}</td><td class="dim">{r.type}</td><td>{placeName(r.place)}</td><td class="num">{r.n}</td><td class="num">{@render money_(r.value)}</td>{#if listing}<td class="num">{@render money_(r.auction)}</td>{/if}</tr>
         {:else}
-          <tr><td colspan={COLUMNS.length} class="none">{typed ? `${shown.key} has nothing like "${typed}".` : 'Nothing here.'}</td></tr>
+          <tr><td colspan={COLUMNS.length} class="none">{typed ? t('items.table.nothingLike', { name: shown.key, typed }) : t('items.table.nothing')}</td></tr>
         {/each}
       </tbody>
     </table>
@@ -206,18 +219,18 @@
     {/if}
 
     {#if othersSorted.length}
-      <h2>Other characters<span>kept on this PC</span></h2>
+      <h2>{t('items.others.title')}<span>{t('items.others.where')}</span></h2>
       <table use:columns={'items-others'}>
-        {@render heads([['name', 'Item'], [null, 'Character'], ['type', 'Type'], ['place', 'Where'], ['n', 'Qty'], ['value', 'Value'], ...(listing ? [['auction', 'At the AH'] as [Column, string]] : [])])}
+        {@render heads(OTHER_COLUMNS)}
         <tbody>
           {#each othersSorted as r (r.who?.key + r.place + r.id)}
-            <tr class="other" onclick={() => r.who && onpick(r.who.key)} title="Show {r.who?.key}">
-              <td>{@render item(r)}</td><td style:color={r.who?.color}>{r.who?.key}</td><td class="dim">{r.type}</td><td>{r.place}</td><td class="num">{r.n}</td><td class="num">{@render money_(r.value)}</td>{#if listing}<td class="num">{@render money_(r.auction)}</td>{/if}
+            <tr class="other" onclick={() => r.who && onpick(r.who.key)} title={t('items.others.show', { name: r.who?.key ?? '' })}>
+              <td>{@render item(r)}</td><td style:color={r.who?.color}>{r.who?.key}</td><td class="dim">{r.type}</td><td>{placeName(r.place)}</td><td class="num">{r.n}</td><td class="num">{@render money_(r.value)}</td>{#if listing}<td class="num">{@render money_(r.auction)}</td>{/if}
             </tr>
           {/each}
         </tbody>
       </table>
-      <p class="foot">{[...new Set(othersSorted.map((r) => r.who))].map((k) => k && `${k.key}: seen ${ago(k.seen, now)}`).filter(Boolean).join(' · ')}</p>
+      <p class="foot">{[...new Set(othersSorted.map((r) => r.who))].map((k) => k && t('items.others.seen', { name: k.key, ago: ago(k.seen, now) })).filter(Boolean).join(' · ')}</p>
     {/if}
   {/if}
 </main>

@@ -3,6 +3,7 @@
 import { unitsOfPlace, type Point } from './geo'
 import type { Continent, GameMap } from './maps'
 import type { Travel } from './services'
+import { t } from './i18n'
 
 /** A place as the game tells it: a map and percent of it. */
 interface Spot { map: number; x: number; y: number }
@@ -47,6 +48,6 @@ const placeOf = (maps: GameMap[], spot: Spot | undefined): Place | null => {
 export function deathPlaces(death: Death, maps: GameMap[], doors: Travel['doors']): { back: (Place & { name: string; door: boolean }) | null; yard: Place | null } {
   const door = death.inst === undefined ? undefined : doors.find((d) => d.maps?.includes(death.inst!))
   const corpse = placeOf(maps, death.corpse)
-  const back = door ? { continent: door.continent, at: { x: door.x, y: door.y }, name: door.names[door.maps!.indexOf(death.inst!)] ?? door.names[0]!, door: true } : corpse && { ...corpse, name: 'Your corpse', door: false }
+  const back = door ? { continent: door.continent, at: { x: door.x, y: door.y }, name: door.names[door.maps!.indexOf(death.inst!)] ?? door.names[0]!, door: true } : corpse && { ...corpse, name: t('app.death.corpse'), door: false }
   return { back, yard: placeOf(maps, death.yard) }
 }

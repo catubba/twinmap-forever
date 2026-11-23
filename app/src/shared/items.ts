@@ -3,6 +3,7 @@
 // gives for it, its type. Those come from the player's game (items.json, made beside the map by
 // tiles-worker.ts): ItemSparse with the rows the server has sent over it, and Item for the type.
 import { keyOfLink } from './ah'
+import { t, type Key } from './i18n'
 import type { Sheet, Sheets } from './sheet'
 import { readHotfixes, readTable, type Table } from './wdc5'
 
@@ -62,7 +63,7 @@ export function shopRows(items: number[], facts: ItemFacts): ShopRow[] {
   return items
     .flatMap((id): ShopRow[] => {
       const f = facts[id]
-      if (!f) return [{ id, name: `Item ${id}`, quality: 1, buy: null, perBuy: 1 }]
+      if (!f) return [{ id, name: t('items.unknownItem', { id }), quality: 1, buy: null, perBuy: 1 }]
       return f[7] ? [] : [{ id, name: f[0], quality: f[1], buy: f[5], perBuy: f[6] }]
     })
     .sort((a, b) => a.name.localeCompare(b.name))
@@ -78,20 +79,24 @@ export function gameItemFacts(files: { read(id: number, skipHidden?: boolean): B
   return itemFacts(readTable(item, opens), readTable(sparse, opens, ITEM_SPARSE_TEXTS), hotfixes)
 }
 
-// The names the game gives the classes of items, and the subclasses of weapons and armour.
-const CLASSES = ['Consumable', 'Container', 'Weapon', 'Gem', 'Armor', 'Reagent', 'Projectile', 'Trade Goods', 'Item Enhancement', 'Recipe', 'Money', 'Quiver', 'Quest', 'Key', 'Permanent', 'Miscellaneous']
-const WEAPONS = ['Axe', 'Axe', 'Bow', 'Gun', 'Mace', 'Mace', 'Polearm', 'Sword', 'Sword', 'Warglaive', 'Staff', 'Exotic', 'Exotic', 'Fist Weapon', 'Miscellaneous', 'Dagger', 'Thrown', 'Spear', 'Crossbow', 'Wand', 'Fishing Pole']
-const ARMOR = ['Miscellaneous', 'Cloth', 'Leather', 'Mail', 'Plate', 'Cosmetic', 'Shield', 'Libram', 'Idol', 'Totem', 'Sigil', 'Relic']
+// The names the game gives the classes of items, and the subclasses of weapons and armour: their keys, by the game's numbers.
+const CLASSES = ['consumable', 'container', 'weapon', 'gem', 'armor', 'reagent', 'projectile', 'tradeGoods', 'itemEnhancement', 'recipe', 'money', 'quiver', 'quest', 'key', 'permanent', 'miscellaneous'] as const
+const WEAPONS = ['axe', 'axe', 'bow', 'gun', 'mace', 'mace', 'polearm', 'sword', 'sword', 'warglaive', 'staff', 'exotic', 'exotic', 'fistWeapon', 'miscellaneous', 'dagger', 'thrown', 'spear', 'crossbow', 'wand', 'fishingPole'] as const
+const ARMOR = ['miscellaneous', 'cloth', 'leather', 'mail', 'plate', 'cosmetic', 'shield', 'libram', 'idol', 'totem', 'sigil', 'relic'] as const
 
 /** "Armor · Cloth", "Weapon · Staff", "Trade Goods"; "Other" for what the game does not say. */
 export function typeOf(cls: number, sub: number): string {
-  if (cls === 2 && WEAPONS[sub]) return `Weapon · ${WEAPONS[sub]}`
-  if (cls === 4 && ARMOR[sub]) return `Armor · ${ARMOR[sub]}`
-  return CLASSES[cls] ?? 'Other'
+  const weapon = cls === 2 ? WEAPONS[sub] : undefined, armor = cls === 4 ? ARMOR[sub] : undefined, kind = CLASSES[cls]
+  if (weapon) return t('items.types.weaponOf', { kind: t(`items.types.weapons.${weapon}`) })
+  if (armor) return t('items.types.armorOf', { kind: t(`items.types.armors.${armor}`) })
+  return kind ? t(`items.types.classes.${kind}`) : t('items.types.unknown')
 }
 
 export type Place = 'Bags' | 'Bank' | 'Worn' | 'Keyring'
 export const PLACES: Place[] = ['Bags', 'Bank', 'Worn', 'Keyring']
+const PLACE_KEYS: Record<Place, Key> = { Bags: 'items.places.bags', Bank: 'items.places.bank', Worn: 'items.places.worn', Keyring: 'items.places.keyring' }
+/** A place as the player reads it: the Place itself is an id, compared in code. */
+export const placeName = (place: Place): string => t(PLACE_KEYS[place])
 const KEYRING = -1 // the keyring's container on Forever (Sheet.lua)
 
 export interface ItemRow {
@@ -126,7 +131,7 @@ export function itemRows(sheet: Sheet, facts: ItemFacts, lowest: (key: string) =
     const auction = (lowest(keyOfLink(id, link)) ?? 0) * n
     const had = rows.get(`${place} ${id}`)
     if (had) return void ((had.n += n), (had.auction += auction))
-    const [name, quality, sell, cls, sub] = facts[id] ?? [`Item ${id}`, 1, 0, -1, 0]
+    const [name, quality, sell, cls, sub] = facts[id] ?? [t('items.unknownItem', { id }), 1, 0, -1, 0]
     rows.set(`${place} ${id}`, { id, place, n, name, quality, type: typeOf(cls, sub), value: sell, auction })
   }
   for (const s of slotsOf(sheet.pieces.bags)) add(s.bag === KEYRING ? 'Keyring' : 'Bags', s.item, s.n, s.link)
@@ -176,10 +181,10 @@ export const QUALITY_TEXT = ['#9d9d9d', '#ffffff', '#1eff00', '#3d9bff', '#b866f
 // The page of slots (M10-F14): what is worn in the places the game's character window gives it,
 // and the bags and the bank as grids, their items packed and the free slots at the end.
 
-/** The game's equipment slots as its character window lays them: left column, right column, weapons; with a word for an empty one. */
-export const WORN_LEFT: [number, string][] = [[1, 'Head'], [2, 'Neck'], [3, 'Shoulder'], [15, 'Back'], [5, 'Chest'], [4, 'Shirt'], [19, 'Tabard'], [9, 'Wrist']]
-export const WORN_RIGHT: [number, string][] = [[10, 'Hands'], [6, 'Waist'], [7, 'Legs'], [8, 'Feet'], [11, 'Ring'], [12, 'Ring'], [13, 'Trinket'], [14, 'Trinket']]
-export const WORN_WEAPONS: [number, string][] = [[16, 'Main'], [17, 'Off'], [18, 'Ranged']]
+/** The game's equipment slots as its character window lays them: left column, right column, weapons; with the key of the word for an empty one. */
+export const WORN_LEFT: [number, Key][] = [[1, 'items.slots.head'], [2, 'items.slots.neck'], [3, 'items.slots.shoulder'], [15, 'items.slots.back'], [5, 'items.slots.chest'], [4, 'items.slots.shirt'], [19, 'items.slots.tabard'], [9, 'items.slots.wrist']]
+export const WORN_RIGHT: [number, Key][] = [[10, 'items.slots.hands'], [6, 'items.slots.waist'], [7, 'items.slots.legs'], [8, 'items.slots.feet'], [11, 'items.slots.ring'], [12, 'items.slots.ring'], [13, 'items.slots.trinket'], [14, 'items.slots.trinket']]
+export const WORN_WEAPONS: [number, Key][] = [[16, 'items.slots.mainHand'], [17, 'items.slots.offHand'], [18, 'items.slots.ranged']]
 
 export interface Worn {
   item: number
@@ -239,7 +244,7 @@ export function gridsOf(sheet: Sheet): { bags: Grid; reagents: Grid; keyring: Gr
 export function itemMatches(id: number, facts: ItemFacts, typed: string): boolean {
   const words = typed.toLowerCase().split(/\s+/).filter(Boolean)
   if (!words.length) return true
-  const [name, , , cls, sub] = facts[id] ?? [`Item ${id}`, 1, 0, -1, 0]
+  const [name, , , cls, sub] = facts[id] ?? [t('items.unknownItem', { id }), 1, 0, -1, 0]
   const type = typeOf(cls, sub).toLowerCase(), n = name.toLowerCase()
   return words.every((w) => n.includes(w) || type.includes(w))
 }

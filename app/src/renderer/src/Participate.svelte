@@ -5,6 +5,7 @@
   // is not asked again: Settings keeps the switch.
   import { onMount } from 'svelte'
   import Glyph from './Glyph.svelte'
+  import { t } from '../../shared/i18n'
 
   let { onclose }: { onclose: () => void } = $props()
 
@@ -15,14 +16,14 @@
 </script>
 
 <dialog bind:this={dialog} class="surface" aria-labelledby="participate-title" onclose={() => void window.twinmap.setParticipate(answer).then(onclose)}>
-  <button class="x" aria-label="Close" onclick={() => say(false)}><Glyph name="close" size={14} /></button>
-  <h1 id="participate-title">Help improve Twinmap</h1>
-  <p>Twinmap can learn from what you see in the game. If you share, it sends what helps it find you better inside dungeons and fill in what the map lacks: the minimap inside dungeons, where bosses and rares die, the doors of dungeons, what trainers teach, the creatures, objects and quests that Questie does not know, and Twinmap's own errors.</p>
-  <p>None of it says who you are: no name, no character, no account.</p>
-  <p class="dim">You can change your mind at any time in Settings. <button class="link" onclick={() => void window.twinmap.openFeedback('participation', '')}>What is sent, in full</button></p>
+  <button class="x" aria-label={t('common.close')} onclick={() => say(false)}><Glyph name="close" size={14} /></button>
+  <h1 id="participate-title">{t('participate.title')}</h1>
+  <p>{t('participate.what')}</p>
+  <p>{t('participate.anonymous')}</p>
+  <p class="dim">{t('participate.later')} <button class="link" onclick={() => void window.twinmap.openFeedback('participation', '')}>{t('participate.full')}</button></p>
   <div class="foot">
-    <button class="btn" onclick={() => say(true)}>Yes, share</button>
-    <button class="btn" onclick={() => say(false)}>No thanks</button>
+    <button class="btn" onclick={() => say(true)}>{t('participate.yes')}</button>
+    <button class="btn" onclick={() => say(false)}>{t('participate.no')}</button>
   </div>
 </dialog>
 

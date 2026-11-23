@@ -4,13 +4,14 @@
   // and under a line what the app adds: who holds it, who sells it and where (the nearest first), who drops it.
   import { keyOfLink, lowestOf, type Listing } from '../../shared/ah'
   import { firstName, type Known } from '../../shared/characters'
-  import { coins, QUALITY_COLORS, typeOf, type ItemFacts } from '../../shared/items'
+  import { coins, ITEMS_FILE, QUALITY_COLORS, typeOf, type ItemFacts } from '../../shared/items'
   import type { Position } from '../../shared/game'
   import { unitsOfPlace } from '../../shared/geo'
   import type { GameMap } from '../../shared/maps'
   import { whereIs } from '../../shared/now'
   import { serves } from '../../shared/services'
   import type { Sheets } from '../../shared/sheet'
+  import { around, t } from '../../shared/i18n'
   import { holdersOf, piecesOf, shownLines, tipKey, type ItemSources } from '../../shared/tips'
   import { hover, kept } from './item-tip.svelte'
   import { TILES } from './web'
@@ -23,11 +24,12 @@
   let zones = $state.raw<Map<number, GameMap>>(new Map())
   let maps = $state.raw<GameMap[]>([])
   let read = false
+  const MAPS_FILE = 'maps.json' // as main/tiles.ts serves it
   $effect(() => {
     if (!hover.now || read) return
     read = true
-    void fetch(`${TILES}/items.json`).then((r) => (r.ok ? r.json() : {})).then((f: ItemFacts) => (facts = f)).catch(() => {})
-    void fetch(`${TILES}/maps.json`)
+    void fetch(`${TILES}/${ITEMS_FILE}`).then((r) => (r.ok ? r.json() : {})).then((f: ItemFacts) => (facts = f)).catch(() => {})
+    void fetch(`${TILES}/${MAPS_FILE}`)
       .then((r) => (r.ok ? r.json() : []))
       .then((list: GameMap[]) => ((maps = list), (zones = new Map(list.filter((m) => m.level === 'zone' && m.area).map((m) => [m.area, m])))))
       .catch(() => {})
@@ -62,7 +64,7 @@
   const where = (area: number): string => zones.get(area)?.name ?? ''
   const colorOf = (key: string): string | undefined => known.find((k) => k.key === key)?.color
   const held = (h: { bags: number; bank: number; worn: number }): string =>
-    [h.worn && 'wears it', h.bags && `${h.bags} in the bags`, h.bank && `${h.bank} in the bank`].filter(Boolean).join(', ')
+    [h.worn && t('items.popup.wears'), h.bags && t('items.popup.inBags', { count: h.bags }), h.bank && t('items.popup.inBank', { count: h.bank })].filter(Boolean).join(', ')
 
   // Beside what is pointed at, on the side with room, inside the window.
   let width = $state(0), height = $state(0)
@@ -97,28 +99,34 @@
       <div class="tl name"><span style:color={QUALITY_COLORS[fact[1]] ?? undefined}>{fact[0]}</span></div>
       <div class="tl"><span>{typeOf(fact[3], fact[4])}</span></div>
     {/if}
-    {#if fact && fact[2] > 0}<div class="tl"><span>Sell Price: {@render money(fact[2] * (shown.n ?? 1))}</span></div>{/if}
+    {#if fact && fact[2] > 0}
+      {@const sell = around('items.popup.sellPrice', 'price')}
+      <div class="tl"><span>{sell[0]}{@render money(fact[2] * (shown.n ?? 1))}{sell[1]}</span></div>
+    {/if}
     {#if listing}
       {@const ah = lowestOf(listing, keyOfLink(shown.item, shown.key))}
       {@const n = shown.n ?? 1}
-      <div class="tl ah"><span>Auction House: {#if ah}{@render money(ah * n)}{#if n > 1}&nbsp;({@render money(ah)} each){/if}{:else}not on sale{/if}</span></div>
+      {@const house = around('items.popup.auction', 'price')}
+      {@const each = around('items.popup.each', 'price')}
+      <div class="tl ah"><span>{#if ah}{house[0]}{@render money(ah * n)}{#if n > 1}&nbsp;{each[0]}{@render money(ah)}{each[1]}{/if}{house[1]}{:else}{t('items.popup.notOnSale')}{/if}</span></div>
     {/if}
     {#if holders.length || sold.length || sources?.drops.length || sources?.found.length}
       <div class="ours">
         {#each holders as h (h.key)}
           <div><span class="who" style:color={colorOf(h.key)}>{firstName(h.key)}</span> {held(h)}</div>
         {/each}
-        {#if !holders.length && fact}<div>None of your characters has it</div>{/if}
+        {#if !holders.length && fact}<div>{t('items.popup.noneHeld')}</div>{/if}
         {#each sold as s (s.npc)}
-          <div>Sold by <span class="npc">{s.name}</span>{where(s.area) && `, ${where(s.area)}`}{#if fact && fact[5] > 0}{' · '}{@render money(fact[5])}{#if fact[6] > 1}&nbsp;for {fact[6]}{/if}{/if}</div>
+          {@const by = where(s.area) ? around('items.popup.soldByIn', 'npc', { zone: where(s.area) }) : around('items.popup.soldBy', 'npc')}
+          <div>{by[0]}<span class="npc">{s.name}</span>{by[1]}{#if fact && fact[5] > 0}{' · '}{#if fact[6] > 1}{@const pack = around('items.popup.perPack', 'price', { count: fact[6] })}{pack[0]}{@render money(fact[5])}{pack[1]}{:else}{@render money(fact[5])}{/if}{/if}</div>
         {/each}
-        {#if sellers.length > sold.length}<div class="more">and {sellers.length - sold.length} more vendors</div>{/if}
+        {#if sellers.length > sold.length}<div class="more">{t('items.popup.moreVendors', { count: sellers.length - sold.length })}</div>{/if}
         {#each (sources?.drops ?? []).slice(0, 2) as d, i (i)}
-          <div>Drops from {d.name}{where(d.area) && `, ${where(d.area)}`}</div>
+          <div>{where(d.area) ? t('items.popup.dropsFromIn', { npc: d.name, zone: where(d.area) }) : t('items.popup.dropsFrom', { npc: d.name })}</div>
         {/each}
-        {#if (sources?.drops.length ?? 0) > 2}<div class="more">and {(sources?.drops.length ?? 0) - 2} more</div>{/if}
+        {#if (sources?.drops.length ?? 0) > 2}<div class="more">{t('items.popup.moreDrops', { count: (sources?.drops.length ?? 0) - 2 })}</div>{/if}
         {#if !sold.length && !sources?.drops.length}
-          {#each (sources?.found ?? []).slice(0, 2) as f, i (i)}<div>Found in {f.name}{where(f.area) && `, ${where(f.area)}`}</div>{/each}
+          {#each (sources?.found ?? []).slice(0, 2) as f, i (i)}<div>{where(f.area) ? t('items.popup.foundInIn', { object: f.name, zone: where(f.area) }) : t('items.popup.foundIn', { object: f.name })}</div>{/each}
         {/if}
       </div>
     {/if}

@@ -1,6 +1,7 @@
 // The first run: its pages, one thing each, and what each says.
 import type { LinkStatus } from './link'
-import { BUILT_ONCE, tilesHelp, type TilesStatus } from './tiles-status'
+import { tilesHelp, type TilesStatus } from './tiles-status'
+import { num, t } from './i18n'
 
 /** What the main process tells the window about the game folder and the addons in it. */
 export interface SetupStatus {
@@ -26,13 +27,12 @@ export interface SetupStatus {
   gpu?: { chosen: boolean; running: boolean }
   /** The map on the home network: the address a phone opens, or why it cannot be had. Absent or null while it is off. */
   lan?: { url: string } | { error: string } | null
+  /** The language the app speaks (shared/i18n): a page that speaks another loads again in this one. */
+  lang?: string
 }
 
 /** Where the addon is published. The app never installs it itself: every install is one CurseForge counts. */
 export const CURSEFORGE = 'https://www.curseforge.com/wow/addons/twinmap-forever'
-
-/** Said on the map when the game is found and the addon is not in it: without it no position ever comes. */
-export const ADDON_MISSING = 'The Twinmap Forever addon is not in your game, so no position can come. Get it on CurseForge, then restart the game.'
 
 /** The optional addons the app points to, each with its name and its page on CurseForge. */
 export const OPTIONAL = {
@@ -62,69 +62,55 @@ export interface Page {
   warning?: string
 }
 
-/** The addon's strip flickers. Said where the addon is taken and where the game is started. */
-export const PHOTOSENSITIVITY =
-  'Photosensitivity warning: the addon sends data by changing the colors of a one pixel line at the edge of the game window, many times per second. Its settings in the game can slow it down or pause it.'
-
-const count = (n: number): string => n.toLocaleString('en-US')
-
-/** The five pages of the first run, in order. */
+/** The five pages of the first run, in order. The addon's strip flickers: its warning is said where the addon is taken and where the game is started. */
 export function setupPages(setup: SetupStatus, tiles: TilesStatus | null, link: LinkStatus | null): Page[] {
   const game: Page = {
     id: 'game',
-    title: 'Find the game',
-    intro: 'Twinmap needs to know where World of Warcraft: Forever is installed. It only reads from that folder; it never changes anything in it.',
+    title: t('app.firstRun.game.title'),
+    intro: t('app.firstRun.game.intro'),
     action: 'choose-folder',
     ...(setup.gameFolder
-      ? { state: 'done', lines: ['Found.', setup.gameFolder] }
-      : { state: 'todo', lines: ['The game was not found on this PC.', 'Choose the folder it is installed in: the one that holds _forever_.'] }),
+      ? { state: 'done', lines: [t('app.firstRun.game.found'), setup.gameFolder] }
+      : { state: 'todo', lines: [t('app.firstRun.game.notFound'), t('app.firstRun.game.choose')] }),
   }
 
   const map: Page = {
     id: 'map',
-    title: 'Build the map',
-    intro: "Twinmap draws its map from your own game's files, so it always matches your version of the game. This is done once, and again only after the game updates. Nothing is downloaded.",
+    title: t('app.firstRun.map.title'),
+    intro: t('app.firstRun.map.intro'),
     ...(!setup.gameFolder || !tiles || tiles.state === 'no-game'
-      ? { state: 'todo', lines: ['Waiting for the game folder.'] }
+      ? { state: 'todo', lines: [t('app.firstRun.map.waiting')] }
       : tiles.state === 'looking'
-        ? { state: 'working', lines: ["Opening the game's files."], progress: 0 }
+        ? { state: 'working', lines: [t('app.firstRun.map.opening')], progress: 0 }
         : tiles.state === 'converting'
-          ? { state: 'working', lines: ["Reading the game's own pictures of the world.", BUILT_ONCE], progress: tiles.percent }
+          ? { state: 'working', lines: [t('app.firstRun.map.reading'), t('app.tiles.builtOnce')], progress: tiles.percent }
           : tiles.state === 'failed'
-            ? { state: 'problem', lines: ['The map could not be built.', tiles.message, tilesHelp(tiles)!], action: 'retry' }
-            : { state: 'done', lines: ['The map is ready.', `${count(tiles.tiles)} tiles from game version ${tiles.version}.`] }),
+            ? { state: 'problem', lines: [t('app.firstRun.map.failed'), tiles.message, tilesHelp(tiles)!], action: 'retry' }
+            : { state: 'done', lines: [t('app.firstRun.map.ready'), t('app.firstRun.map.tiles', { count: num(tiles.tiles), version: tiles.version })] }),
   }
 
   const addon: Page = {
     id: 'addon',
-    title: 'Get the addon',
-    intro: 'The Twinmap Forever addon tells this app where your character is. It installs like any other addon, from CurseForge.',
-    warning: PHOTOSENSITIVITY,
+    title: t('app.firstRun.addon.title'),
+    intro: t('app.firstRun.addon.intro'),
+    warning: t('app.firstRun.photosensitivity'),
     ...(setup.addon
-      ? { state: 'done', lines: ['Installed.', `Twinmap Forever ${setup.addon} is in the game's AddOns folder.`] }
+      ? { state: 'done', lines: [t('app.firstRun.addon.installed'), t('app.firstRun.addon.inFolder', { version: setup.addon })] }
       : {
           state: 'todo',
-          lines: [
-            'Not installed yet.',
-            'Install it with the CurseForge app. Without that app, download the file from the same page and unpack it into _forever_\\Interface\\AddOns.',
-            'This page notices by itself when the addon is there.',
-          ],
+          lines: [t('app.firstRun.addon.notYet'), t('app.firstRun.addon.howTo'), t('app.firstRun.addon.notices')],
           action: 'curseforge',
         }),
   }
 
   const extras: Page = {
     id: 'extras',
-    title: 'Optional addons',
-    intro: 'None of these is needed. When one is installed, Twinmap shows more.',
+    title: t('app.firstRun.extras.title'),
+    intro: t('app.firstRun.extras.intro'),
     state: 'done',
     lines: [
-      setup.questie
-        ? 'QuestieDB: installed. The map shows who offers a service, ore, herbs and the quests of your log. With Questie running too, it shows the same quests Questie shows, the ones to take as well.'
-        : 'QuestieDB: not installed. It comes with Twinmap Forever from the CurseForge app. Without it the map has no NPCs, no services and no quests.',
-      setup.shortestPath
-        ? 'Shortest Path: installed. The map will show its journey, and what you send to the game is reached along the roads.'
-        : 'Shortest Path: not installed. With it, the map shows the journey it plans, and what you send to the game is reached along the roads.',
+      setup.questie ? t('app.firstRun.extras.questie') : t('app.firstRun.extras.noQuestie'),
+      setup.shortestPath ? t('app.firstRun.extras.shortestPath') : t('app.firstRun.extras.noShortestPath'),
     ],
     get: (['questie', 'shortestPath'] as const).filter((addon) => !setup[addon]),
   }
@@ -132,22 +118,22 @@ export function setupPages(setup: SetupStatus, tiles: TilesStatus | null, link: 
   const live = link?.kind === 'connected' || link?.kind === 'combat'
   const play: Page = {
     id: 'play',
-    title: 'Start the game',
-    intro: 'Start World of Warcraft: Forever and log in with a character. Your position appears here on its own.',
-    warning: PHOTOSENSITIVITY,
+    title: t('app.firstRun.play.title'),
+    intro: t('app.firstRun.play.intro'),
+    warning: t('app.firstRun.photosensitivity'),
     ...(live
-      ? { state: 'done', lines: ['Connected. Your position is coming through.'] }
+      ? { state: 'done', lines: [t('app.firstRun.play.connected')] }
       : link?.kind === 'update-app' || link?.kind === 'update-addon'
         ? { state: 'problem', lines: [link.line ?? link.word] }
         : {
             state: 'todo',
             lines: [
               link?.kind === 'lost' || link?.kind === 'waiting'
-                ? 'The game is open, but nothing comes from the addon yet.'
+                ? t('app.firstRun.play.silent')
                 : link?.kind === 'minimized'
-                  ? 'The game is minimized. Bring its window back on screen.'
-                  : 'Waiting for the game.',
-              'At the character list, open AddOns and make sure Twinmap Forever is ticked.',
+                  ? t('app.firstRun.play.minimized')
+                  : t('app.firstRun.play.waiting'),
+              t('app.firstRun.play.tick'),
             ],
           }),
   }
@@ -165,5 +151,5 @@ export function timeLeft(startedAt: number, startedPercent: number, now: number,
   const elapsed = (now - startedAt) / 1000, gained = percent - startedPercent
   if (elapsed < 3 || gained <= 0 || percent >= 100) return ''
   const seconds = Math.max(1, Math.round(((100 - percent) / gained) * elapsed))
-  return seconds < 60 ? `about ${Math.ceil(seconds / 5) * 5} seconds left` : `about ${Math.round(seconds / 60)} min left`
+  return seconds < 60 ? t('app.firstRun.secondsLeft', { count: Math.ceil(seconds / 5) * 5 }) : t('app.firstRun.minutesLeft', { count: Math.round(seconds / 60) })
 }

@@ -4,6 +4,7 @@
   // letter in their mail program. What the app adds about itself is shown here first.
   import { onMount } from 'svelte'
   import { FEEDBACK, LONGEST_MESSAGE, type FeedbackWay } from '../../shared/feedback'
+  import { t } from '../../shared/i18n'
 
   let { details, onclose }: { details: string; onclose: () => void } = $props()
 
@@ -32,30 +33,30 @@
 </script>
 
 <dialog bind:this={dialog} class="surface" aria-labelledby="feedback-title" {onclose} onclick={(e) => e.target === dialog && dialog.close()}>
-  <h1 id="feedback-title">Feedback</h1>
-  <p>Found a bug, or have an idea? Tell us. Write here and press Send, or open an issue on GitHub, or write an email. You see every word before it leaves.</p>
+  <h1 id="feedback-title">{t('settings.feedback.title')}</h1>
+  <p>{t('settings.feedback.intro')}</p>
   <form onsubmit={send}>
-    <textarea class="field" bind:value={message} oninput={() => ((sent = false), (wrong = null))} maxlength={LONGEST_MESSAGE} rows="5" placeholder="What happened, or what you would like" aria-label="Your message" aria-describedby="feedback-said"></textarea>
-    <input class="field" type="email" bind:value={email} maxlength="200" placeholder="Your email, if you want an answer" aria-label="Your email, if you want an answer" />
-    <label class="choice"><input type="checkbox" class="check" bind:checked={withLog} />Add the log</label>
+    <textarea class="field" bind:value={message} oninput={() => ((sent = false), (wrong = null))} maxlength={LONGEST_MESSAGE} rows="5" placeholder={t('settings.feedback.placeholder')} aria-label={t('settings.feedback.message')} aria-describedby="feedback-said"></textarea>
+    <input class="field" type="email" bind:value={email} maxlength="200" placeholder={t('settings.feedback.email')} aria-label={t('settings.feedback.email')} />
+    <label class="choice"><input type="checkbox" class="check" bind:checked={withLog} />{t('settings.feedback.withLog')}</label>
     <div class="ways">
-      <button class="btn" type="submit" disabled={sending || !message.trim()}>{sending ? 'Sending' : 'Send'}</button>
-      <button class="btn" type="button" onclick={() => open('github')}>Open an issue on GitHub</button>
-      <button class="btn" type="button" onclick={() => open('email')}>Write an email</button>
+      <button class="btn" type="submit" disabled={sending || !message.trim()}>{sending ? t('settings.feedback.sending') : t('settings.feedback.send')}</button>
+      <button class="btn" type="button" onclick={() => open('github')}>{t('settings.feedback.github')}</button>
+      <button class="btn" type="button" onclick={() => open('email')}>{t('settings.feedback.letter')}</button>
     </div>
-    <p id="feedback-said" class={wrong ? 'field-note' : 'said'} role="status">{wrong ?? (sent ? 'Sent. Thank you.' : '')}</p>
+    <p id="feedback-said" class={wrong ? 'field-note' : 'said'} role="status">{wrong ?? (sent ? t('settings.feedback.sent') : '')}</p>
   </form>
-  <p class="dim">Send delivers your message to the Twinmap developer: the text you wrote, the details shown here, and your email and the log only if you add them. Nothing is sent until you press Send. <button class="link" onclick={() => open('privacy')}>Privacy</button></p>
-  <p class="dim">No GitHub account? Write to {FEEDBACK.email}, in English or in Italian.</p>
-  <h2>What Twinmap adds to your message</h2>
+  <p class="dim">{t('settings.feedback.carries')} <button class="link" onclick={() => open('privacy')}>{t('settings.feedback.privacy')}</button></p>
+  <p class="dim">{t('settings.feedback.noGithub', { email: FEEDBACK.email })}</p>
+  <h2>{t('settings.feedback.details')}</h2>
   <pre>{details}</pre>
-  <p class="dim log">For a bug, the log helps: it is Twinmap's own record of what happened to it (started, game found, map, link). Add it to what you send{#if canCopy}, or copy it and paste it into an issue or an email{/if}.</p>
+  <p class="dim log">{canCopy ? t('settings.feedback.logCopy') : t('settings.feedback.log')}</p>
   <div class="foot">
     {#if canCopy}
-      <button class="btn" onclick={() => copy('details')}>{copied === 'details' ? 'Copied' : 'Copy details'}</button>
-      <button class="btn" onclick={() => copy('log')}>{copied === 'log' ? 'Copied' : 'Copy log'}</button>
+      <button class="btn" onclick={() => copy('details')}>{copied === 'details' ? t('settings.feedback.copied') : t('settings.feedback.copyDetails')}</button>
+      <button class="btn" onclick={() => copy('log')}>{copied === 'log' ? t('settings.feedback.copied') : t('settings.feedback.copyLog')}</button>
     {/if}
-    <button class="btn" onclick={() => dialog.close()}>Close</button>
+    <button class="btn" onclick={() => dialog.close()}>{t('settings.feedback.close')}</button>
   </div>
 </dialog>
 

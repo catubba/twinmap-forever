@@ -1,4 +1,6 @@
 // What the main process tells the window about the map tiles made from the player's game files.
+import { t } from './i18n'
+
 export type TilesStatus =
   /** Looking for the game folder. */
   | { state: 'looking' }
@@ -27,30 +29,31 @@ export interface InteriorsStatus {
   problem?: string
 }
 
-/** One line for the window. */
-/** Said while the map is built: that it is not so at every start, or one might think the app too slow to keep. */
-export const BUILT_ONCE = 'This happens only the first time, and again after a game update.'
-
 /** What the player can do about a map that is not there, or should know while it is made; nothing when there is nothing to say. */
 export function tilesHelp(status: TilesStatus): string | null {
-  if (status.state === 'converting') return BUILT_ONCE
-  if (status.state === 'no-game') return 'Choose the folder where World of Warcraft: Forever is installed, the one that holds _forever_.'
-  if (status.state === 'failed')
-    return "Twinmap could not read the game's files. Close the game's launcher if it is updating or repairing the game, then try again. If it fails again, repair the game from the launcher and tell us with Feedback."
+  // While it is built: that it is not so at every start, or one might think the app too slow to keep.
+  if (status.state === 'converting') return t('app.tiles.builtOnce')
+  if (status.state === 'no-game') return t('app.tiles.noGameHelp')
+  if (status.state === 'failed') return t('app.tiles.failedHelp')
   return null
 }
 
+/** One line for the window. */
 export function tilesLine(status: TilesStatus): string {
   switch (status.state) {
     case 'looking':
-      return 'Looking for the game.'
+      return t('app.tiles.looking')
     case 'no-game':
-      return 'The game folder was not found.'
+      return t('app.tiles.noGame')
     case 'converting':
-      return `Building the map from your game's files, ${status.percent}%.`
-    case 'ready':
-      return `Map: ${status.tiles} tiles ready, game ${status.version}` + (!status.interiors ? ', reading the rooms' : status.interiors.problem ? `, rooms not read (${status.interiors.problem})` : `, ${status.interiors.pieces} rooms`)
+      return t('app.tiles.converting', { percent: status.percent })
+    case 'ready': {
+      const said = { tiles: status.tiles, version: status.version }
+      if (!status.interiors) return t('app.tiles.readyReading', said)
+      if (status.interiors.problem) return t('app.tiles.readyNoRooms', { ...said, problem: status.interiors.problem })
+      return t('app.tiles.ready', { ...said, rooms: status.interiors.pieces })
+    }
     case 'failed':
-      return `The map could not be built: ${status.message}`
+      return t('app.tiles.failed', { message: status.message })
   }
 }

@@ -20,6 +20,7 @@
   import { kept as keptByApp } from './kept.svelte'
   import type { Alert } from '../../shared/ah'
   import { coins } from '../../shared/items'
+  import { num, t } from '../../shared/i18n'
 
   // onpick: a row was chosen, the map should go there. onpoint: the pointer or the keyboard is on
   // a row (or on none: null), the map should show which pin it is.
@@ -148,9 +149,9 @@
   // The route as the game takes it: none while a stop lies in no zone, or nothing is left to walk.
   const news = $derived(routeNews(route, maps, 1))
   async function sendRoute(): Promise<string> {
-    const t = Date.now(), answer = await window.twinmap.sendRoute(routeNews(route, maps, t) ?? false)
+    const sentAt = Date.now(), answer = await window.twinmap.sendRoute(routeNews(route, maps, sentAt) ?? false)
     if ('error' in answer) return answer.error
-    onsent(t)
+    onsent(sentAt)
     return ''
   }
   // The row chosen last keeps its mark, here and on the map, until another is chosen, it is chosen
@@ -173,9 +174,9 @@
     if (on.closest('.leaflet-container') || (on.closest('.now') && !on.closest('button'))) chosen = null
   }
   // Attention: what wants doing first. Its one row for now: dead, the way back to life.
-  const attention = $derived<NowRow[]>(back ? [{ key: 'death', name: back.name, kind: back.door ? 'Entrance' : 'Corpse', tone: 'service', continent: back.continent, at: back.at }] : [])
+  const attention = $derived<NowRow[]>(back ? [{ key: 'death', name: back.name, kind: back.door ? t('app.now.entrance') : t('app.now.corpse'), tone: 'service', continent: back.continent, at: back.at }] : [])
   const toBack = feet(() => (me && back && back.continent === me.continent ? { continent: me.continent, from: me.at, to: [back.at], reach: FAR } : null), 20)
-  const yards = (n: number): string => `${Math.round(n).toLocaleString('en-US')} yd`
+  const yards = (n: number): string => t('app.now.yards', { yards: num(Math.round(n)) })
 </script>
 
 <svelte:window
@@ -201,7 +202,7 @@
       <!-- A place on the other continent has no distance to walk: the row still takes the map there. -->
       <!-- The yards are those on foot where a way is known; the arrow points at the place itself. -->
       {@const way = row.continent === me!.continent ? { ...wayOf(me!.at, row.at), ...(walked.yards(row.at) === undefined ? {} : { yards: walked.yards(row.at)! }) } : null}
-      <button class="row" title={way ? undefined : 'On the other continent'} aria-current={row.key === chosen} onclick={() => pick(row)} onpointerenter={() => (over = row)} onpointerleave={() => (over = null)} onfocus={() => (over = row)} onblur={() => (over = null)}>
+      <button class="row" title={way ? undefined : t('app.now.otherContinent')} aria-current={row.key === chosen} onclick={() => pick(row)} onpointerenter={() => (over = row)} onpointerleave={() => (over = null)} onfocus={() => (over = row)} onblur={() => (over = null)}>
         <span>{row.name}</span>
         <span class="t-{row.tone}">{row.kind}</span>
         <span class="num">{way ? yards(way.yards) : ''}</span>
@@ -213,12 +214,12 @@
 
 <div class="now" data-took={walked.took.toFixed(1)}>
   {#if (attention.length && me) || met.length}
-    {@render title('attention', 'Attention')}
+    {@render title('attention', t('app.now.attention'))}
     {#if !folded.attention}<div class="rows attention">
       {#each met as a (a.t)}
         <button class="row alert" onclick={onalerts}>
           <span><Glyph name="coins" size={14} />{a.name}</span>
-          <span>{a.when === 'appears' ? 'On sale' : a.when === 'below' ? 'Cheaper' : 'Dearer'}</span>
+          <span>{a.when === 'appears' ? t('app.now.onSale') : a.when === 'below' ? t('app.now.cheaper') : t('app.now.dearer')}</span>
           <span class="num">{a.at === null ? '' : coins(a.at).map(([n, c]) => `${n}${c}`).join(' ')}</span>
         </button>
       {/each}
@@ -233,13 +234,13 @@
       {/each}
     </div>{/if}
   {/if}
-  <NextStop {route} band={bandOf(route, me, live, stop && toStop.yards(stop.at))} sending={sendState(live, inbox, news !== null, 'A stop is')} {inGame} onsend={sendRoute} {onskip} {onarrive} {onclear} {onend} {onremove} {onmove} onpick={onstop} />
+  <NextStop {route} band={bandOf(route, me, live, stop && toStop.yards(stop.at))} sending={sendState(live, inbox, news !== null, 'stop')} {inGame} onsend={sendRoute} {onskip} {onarrive} {onclear} {onend} {onremove} {onmove} onpick={onstop} />
   {#if journey}
     <!-- What Shortest Path guides in the game now: its goal and the legs still ahead, as its tracker words them. -->
-    {@render title('game', 'In game', journey.loading ? undefined : span(journey.left))}
+    {@render title('game', t('app.now.inGame'), journey.loading ? undefined : span(journey.left))}
     {#if !folded.game}<div class="rows placeless legs" role="status">
       {#if journey.loading}
-        <div class="row"><span>Finding the way</span></div>
+        <div class="row"><span>{t('app.now.finding')}</span></div>
       {:else}
         <div class="row"><span><b>{journey.name}</b></span>{#if startedBy(journey.owner)}<span>{startedBy(journey.owner)}</span>{/if}</div>
         {#each journey.legs as leg, i (i)}
@@ -247,17 +248,17 @@
         {/each}
         <!-- Where the legs start and end comes from Shortest Path 1.39 and later, through an addon that tells it: without them a flight or a boat has no line. -->
         {#if journey.legs.some((leg) => leg.mode !== 'walk') && !journey.legs.some((leg) => leg.ends)}
-          <div class="row hint"><span>Update Shortest Path and the Twinmap Forever addon to see the whole way here</span></div>
+          <div class="row hint"><span>{t('app.now.updateHint')}</span></div>
         {/if}
       {/if}
     </div>{/if}
   {/if}
   {#if myPins.length}
-    {@render title('pins', 'My pins', myPins.length)}
+    {@render title('pins', t('app.now.pins'), myPins.length)}
     {#if !folded.pins}{@render rows(myPins)}{/if}
   {/if}
   {#if lists.here.length + lists.placeless.length}
-    {@render title('quests', 'Quests', lists.here.length + lists.placeless.length)}
+    {@render title('quests', t('app.now.quests'), lists.here.length + lists.placeless.length)}
     {#if !folded.quests}
       {@render rows(lists.here)}
       <!-- In the log, with no place on the map: in a dungeon, or one Questie cannot place. -->
@@ -269,7 +270,7 @@
     {/if}
   {/if}
   {#if lists.near.length}
-    {@render title('near', 'Nearby')}
+    {@render title('near', t('app.now.nearby'))}
     {#if !folded.near}{@render rows(lists.near)}{/if}
   {/if}
 </div>

@@ -4,6 +4,7 @@
   // characters the app has kept; one picked shows its bags, bank and spells, never its place on the
   // map. A right click on one that is not in game offers to forget it.
   import { ago, type Known } from '../../shared/characters'
+  import { t } from '../../shared/i18n'
 
   let { known, shown, now, onpick, onforget }: { known: Known[]; shown: Known | null; now: number; onpick: (key: string | null) => void; onforget: (key: string) => void } = $props()
 
@@ -33,14 +34,14 @@
 {#if shown}
   <div class="picker" bind:this={box}>
     <button class="who" class:open aria-haspopup="listbox" aria-expanded={open} style:--class={shown.color} onclick={() => ((open = !open), (forgetting = null))}>
-      {#if shown.live}<i class="light" title="In game"></i>{/if}
+      {#if shown.live}<i class="light" title={t('items.picker.inGame')}></i>{/if}
       <span class="name">{shown.key}</span>
       {#if shown.level !== undefined}<span class="level">{shown.level}</span>{/if}
-      {#if !shown.live}<span class="seen">seen {ago(shown.seen, now)}</span>{/if}
+      {#if !shown.live}<span class="seen">{t('items.picker.seen', { ago: ago(shown.seen, now) })}</span>{/if}
       <svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 3h8L5 8z" /></svg>
     </button>
     {#if open}
-      <div class="list" role="listbox" aria-label="Characters">
+      <div class="list" role="listbox" aria-label={t('items.picker.list')}>
         {#each known as k (k.key)}
           <div class="char" role="option" tabindex="-1" aria-selected={k.key === shown.key} class:current={k.key === shown.key}
             oncontextmenu={(e) => {
@@ -52,13 +53,13 @@
               {#if k.line}<span class="d">{k.line}</span>{/if}
             </button>
             {#if forgetting === k.key}
-              <button class="btn forget" onclick={() => (onforget(k.key), (forgetting = null))}>Forget</button>
+              <button class="btn forget" onclick={() => (onforget(k.key), (forgetting = null))}>{t('items.picker.forget')}</button>
             {:else}
-              <span class="when" class:live={k.live}>{k.live ? 'In game' : ago(k.seen, now)}</span>
+              <span class="when" class:live={k.live}>{k.live ? t('items.picker.inGame') : ago(k.seen, now)}</span>
             {/if}
           </div>
         {/each}
-        <p class="note">Kept on this computer, from what the addon told while you played. Right click a character to forget it.</p>
+        <p class="note">{t('items.picker.note')}</p>
       </div>
     {/if}
   </div>

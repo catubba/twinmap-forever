@@ -1,5 +1,6 @@
 // Sending to the game, as the window sees it: what a pin is, what the addon tells of its inbox, and
 // whether a send can go now.
+import { t } from './i18n'
 
 /** A point to mark in the game: the game's number of a zone map, and the place on it in percent. */
 export interface Pin {
@@ -18,7 +19,7 @@ export function pinFrom(asked: unknown): Pin | null {
   const { m, x, y, name } = asked as Record<string, unknown>
   if (!Number.isInteger(m) || (m as number) <= 0 || !percent(x) || !percent(y) || typeof name !== 'string') return null
   const plain = Array.from(name, (c) => (c < ' ' || c === '\x7f' ? ' ' : c === '|' ? '/' : c)).join('').trim().slice(0, NAME_MAX)
-  return { m: m as number, x: Math.round(x * 100) / 100, y: Math.round(y * 100) / 100, name: plain || 'Pin' }
+  return { m: m as number, x: Math.round(x * 100) / 100, y: Math.round(y * 100) / 100, name: plain || t('app.send.pin') }
 }
 
 const plainText = (text: string, most: number): string => Array.from(text, (c) => (c < ' ' || c === '\x7f' ? ' ' : c === '|' ? '/' : c)).join('').trim().slice(0, most)
@@ -28,16 +29,16 @@ const whole = (v: unknown, least: number): v is number => Number.isInteger(v) &&
 export function routeNewsFrom(asked: unknown): { t: number; at: number; stops: { m: number; x: number; y: number; rx: number; ry: number; name: string }[] } | false | null {
   if (asked === false) return false
   if (typeof asked !== 'object' || !asked) return null
-  const { t, at, stops } = asked as Record<string, unknown>
-  if (!whole(t, 1) || !whole(at, 1) || !Array.isArray(stops) || stops.length < 1 || stops.length > 30) return null
+  const { t: sent, at, stops } = asked as Record<string, unknown>
+  if (!whole(sent, 1) || !whole(at, 1) || !Array.isArray(stops) || stops.length < 1 || stops.length > 30) return null
   const out = []
   for (const stop of stops as Record<string, unknown>[]) {
     if (typeof stop !== 'object' || !stop) return null
     const { m, x, y, rx, ry, name } = stop
     if (!whole(m, 1) || !percent(x) || !percent(y) || typeof rx !== 'number' || typeof ry !== 'number' || !(rx > 0) || !(ry > 0) || typeof name !== 'string') return null
-    out.push({ m, x, y, rx, ry, name: plainText(name, 40) || 'Stop' })
+    out.push({ m, x, y, rx, ry, name: plainText(name, 40) || t('app.send.stop') })
   }
-  return { t, at, stops: out }
+  return { t: sent, at, stops: out }
 }
 
 /** A step ahead on the route the game has, as the window asked for it, checked. */
@@ -76,14 +77,14 @@ export const arrived = (inbox: Inbox | null, seq: number): boolean => inbox !== 
 /**
  * Whether a point can be sent now, and if not, why, in words for the player.
  * live: the strip is being read. inbox: what the addon last told. pin: what is sent lies on zone maps.
- * what: the words for what is sent, when it does not.
+ * what: what is sent, a point or the stops of the route, for when it does not.
  */
-export function sendState(live: boolean, inbox: Inbox | null, pin: boolean, what = 'This point is'): { can: boolean; why: string } {
-  if (!pin) return { can: false, why: `${what} in no zone the game can mark.` }
-  if (!live) return { can: false, why: 'The game is not connected.' }
-  if (!inbox) return { can: false, why: 'The game is not listening yet. If this stays, update the addon and restart the game.' }
-  if (inbox.off === 'slots used up') return { can: false, why: 'Type /reload in the game to send again.' }
-  if (inbox.off) return { can: false, why: 'Restart the game once: its way back from Twinmap opens at the next start.' }
+export function sendState(live: boolean, inbox: Inbox | null, pin: boolean, what: 'point' | 'stop' = 'point'): { can: boolean; why: string } {
+  if (!pin) return { can: false, why: what === 'stop' ? t('app.send.stopNoZone') : t('app.send.pointNoZone') }
+  if (!live) return { can: false, why: t('app.send.notConnected') }
+  if (!inbox) return { can: false, why: t('app.send.notListening') }
+  if (inbox.off === 'slots used up') return { can: false, why: t('app.send.reload') }
+  if (inbox.off) return { can: false, why: t('app.send.restart') }
   return { can: true, why: '' }
 }
 

@@ -7,7 +7,8 @@
   import type { Continent, GameMap } from '../../shared/maps'
   import { wayOf, whereIs } from '../../shared/now'
   import { best, dungeonsOf, fold, type Dungeon } from '../../shared/search'
-  import { zoneAt } from '../../shared/point-label'
+  import { placeText, zoneAt } from '../../shared/point-label'
+  import { num, t } from '../../shared/i18n'
   import type { Travel } from '../../shared/services'
   import { serves } from '../../shared/services'
   import { nearestOnFoot } from '../../shared/walk'
@@ -61,7 +62,7 @@
     const mine = ++asked, started = performance.now()
     const wanted = typed.trim()
     if (!wanted) return void ((results = []), (open = false))
-    const places: Result[] = best(zones, wanted, ZONES).map((zone) => ({ continent: zone.continent!, at: unitsOfPlace(zone.rect!, 50, 50), title: zone.name, where: '', whole: zone, note: 'Zone' }))
+    const places: Result[] = best(zones, wanted, ZONES).map((zone) => ({ continent: zone.continent!, at: unitsOfPlace(zone.rect!, 50, 50), title: zone.name, where: '', whole: zone, note: t('map.search.zone') }))
     const byArea = new Map(zones.filter((z) => z.area).map((z) => [z.area, z]))
     const found = await window.twinmap.search(wanted)
     if (mine !== asked) return // something else was typed while this was being looked for
@@ -71,12 +72,12 @@
       ...best(myPins, wanted, PINS).map((p): Result => {
         const zone = zoneAt(zones, p.continent, p.at)?.zone.name
         const yards = me && me.continent === p.continent ? wayOf(me.at, p.at).yards : undefined
-        return { continent: p.continent, at: p.at, title: p.name, note: `My pin${zone ? `, ${zone}` : ''}`, yards }
+        return { continent: p.continent, at: p.at, title: p.name, note: zone ? t('map.search.myPinIn', { zone }) : t('map.search.myPin'), yards }
       }),
       ...best(dungeons, wanted, DUNGEONS).map((d): Result => {
         const zone = zoneAt(zones, d.continent, d.at)?.zone.name
         const yards = me && me.continent === d.continent ? wayOf(me.at, d.at).yards : undefined
-        return { continent: d.continent, at: d.at, title: d.name, where: zone ?? '', note: `${d.raid ? 'Raid' : 'Dungeon'}${zone ? `, ${zone}` : ''}`, yards, dungeon: { id: d.id, ...(d.wing ? { wing: d.wing } : {}) } }
+        return { continent: d.continent, at: d.at, title: d.name, where: zone ?? '', note: d.raid ? (zone ? t('map.search.raidIn', { zone }) : t('map.search.raid')) : zone ? t('map.search.dungeonIn', { zone }) : t('map.search.dungeon'), yards, dungeon: { id: d.id, ...(d.wing ? { wing: d.wing } : {}) } }
       }),
     )
     const named: Result[] = [], doers: Result[] = []
@@ -86,7 +87,7 @@
       const at = unitsOfPlace(zone.rect!, f.x, f.y)
       // How far, when the character is on the same continent: there is no walking to the other.
       const yards = me && me.continent === zone.continent ? wayOf(me.at, at).yards : undefined
-      ;(f.does ? doers : named).push({ continent: zone.continent!, at, title: f.name, where: `${zone.name} ${f.x.toFixed(1)}, ${f.y.toFixed(1)}`, note: `${f.note}, ${zone.name}`, yards, ...(f.item && { item: f.item }) })
+      ;(f.does ? doers : named).push({ continent: zone.continent!, at, title: f.name, where: placeText(f, zone.name), note: t('map.search.foundIn', { what: f.note, zone: zone.name }), yards, ...(f.item && { item: f.item }) })
     }
     // Who does what was typed comes first, the nearest first; then what is called so, unless it is one of them.
     // A result with a way on foot known tells its yards, the others those of the crow.
@@ -132,8 +133,8 @@
   <input
     class="field"
     type="search"
-    placeholder="Search NPCs, items, quests, zones"
-    aria-label="Search"
+    placeholder={t('map.search.placeholder')}
+    aria-label={t('map.search.field')}
     role="combobox"
     aria-expanded={open}
     aria-controls="search-results"
@@ -148,7 +149,7 @@
   />
   {#if open}
     <!-- A press on a result must not take the keyboard from the field first: the list would close under the pointer. -->
-    <ul class="menu" id="search-results" role="listbox" aria-label="Results" onpointerdown={(e) => e.preventDefault()}>
+    <ul class="menu" id="search-results" role="listbox" aria-label={t('map.search.results')} onpointerdown={(e) => e.preventDefault()}>
       {#each results as result, i (i)}
         <li role="presentation">
           <button class="item" class:is-hover={i === chosen} id="search-result-{i}" role="option" aria-selected={i === chosen} tabindex="-1" onclick={() => pick(result)}>
@@ -156,11 +157,11 @@
             {#if result.item}<img class="pic" src="{TILES}/items/{result.item}.png" alt="" onerror={(e) => e.currentTarget.remove()} />{/if}
             <span class="name">{result.title}</span>
             <span class="num">{result.note}</span>
-            {#if result.yards !== undefined}<span class="far">{Math.round(result.yards).toLocaleString('en-US')} yd</span>{/if}
+            {#if result.yards !== undefined}<span class="far">{t('map.search.yards', { yards: num(Math.round(result.yards)) })}</span>{/if}
           </button>
         </li>
       {:else}
-        <li class="none">Nothing by that name.</li>
+        <li class="none">{t('map.search.none')}</li>
       {/each}
     </ul>
   {/if}

@@ -8,6 +8,7 @@
   import Glyph from './Glyph.svelte'
   import Logo from './Logo.svelte'
   import { pageIn, pageOut } from './motion'
+  import { t } from '../../shared/i18n'
 
   let { setup, tiles, link, onclose }: { setup: SetupStatus; tiles: TilesStatus | null; link: LinkStatus | null; onclose: () => void } = $props()
 
@@ -44,7 +45,7 @@
 <main class="surface">
   <header>
     <Logo size={40} />
-    <ol aria-label="Steps">
+    <ol aria-label={t('app.firstRun.steps')}>
       {#each pages as p, i (p.id)}
         <li class:here={i === at} class:done={p.state === 'done' && i !== at} aria-current={i === at ? 'step' : undefined}>{#if p.state === 'done' && i !== at}<Glyph name="check" size={12} />{/if}{p.title}</li>
       {/each}
@@ -64,7 +65,7 @@
             {page.lines[0]}
           </p>
           {#if page.progress !== undefined}
-            <progress class="bar" value={page.progress} max="100" aria-label="Building the map"></progress>
+            <progress class="bar" value={page.progress} max="100" aria-label={t('app.firstRun.building')}></progress>
             <p class="count"><span>{Math.floor(page.progress)}%</span><span>{left}</span></p>
           {/if}
           {#each page.lines.slice(1) as line (line)}
@@ -72,14 +73,14 @@
           {/each}
           {#if page.action === 'choose-folder'}
             {#if wrong}<p class="wrong">{wrong}</p>{/if}
-            <button class="btn" onclick={choose}>{page.state === 'done' ? 'Choose another folder' : 'Choose the game folder'}</button>
+            <button class="btn" onclick={choose}>{page.state === 'done' ? t('app.firstRun.chooseAnother') : t('app.firstRun.chooseFolder')}</button>
           {:else if page.action === 'curseforge'}
-            <button class="btn" onclick={() => window.twinmap.openCurseForge()}>Get Twinmap Forever on CurseForge</button>
+            <button class="btn" onclick={() => window.twinmap.openCurseForge()}>{t('app.firstRun.getAddon')}</button>
           {:else if page.action === 'retry'}
-            <button class="btn" onclick={() => window.twinmap.retryTiles()}>Try again</button>
+            <button class="btn" onclick={() => window.twinmap.retryTiles()}>{t('app.firstRun.retry')}</button>
           {/if}
           {#each page.get ?? [] as addon (addon)}
-            <button class="btn" onclick={() => window.twinmap.openCurseForge(addon)}>Get {OPTIONAL[addon].name} on CurseForge</button>
+            <button class="btn" onclick={() => window.twinmap.openCurseForge(addon)}>{t('app.firstRun.getOptional', { name: OPTIONAL[addon].name })}</button>
           {/each}
         </div>
       </section>
@@ -87,13 +88,13 @@
   </div>
 
   <footer>
-    <button class="plain" onclick={onclose}>Skip, look at the map</button>
+    <button class="plain" onclick={onclose}>{t('app.firstRun.skip')}</button>
     <span class="nav">
-      {#if at > 0}<button class="btn" onclick={() => go(-1)}>Back</button>{/if}
+      {#if at > 0}<button class="btn" onclick={() => go(-1)}>{t('app.firstRun.back')}</button>{/if}
       {#if last}
-        <button class="btn" disabled={page.state !== 'done'} onclick={onclose}>Go to the map</button>
+        <button class="btn" disabled={page.state !== 'done'} onclick={onclose}>{t('app.firstRun.toMap')}</button>
       {:else}
-        <button class="btn" disabled={page.state !== 'done'} onclick={() => go(1)}>Next</button>
+        <button class="btn" disabled={page.state !== 'done'} onclick={() => go(1)}>{t('app.firstRun.next')}</button>
       {/if}
     </span>
   </footer>

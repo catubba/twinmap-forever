@@ -11,6 +11,7 @@
   import Glyph from './Glyph.svelte'
   import { gone, pop } from './motion'
   import { TILES } from './web'
+  import { t } from '../../shared/i18n'
 
   let {
     title,
@@ -84,7 +85,7 @@
     const timer = setTimeout(() => {
       phase = 'rest'
       awaited = null
-      if (!sent) note = 'No answer from the game yet. It takes the pin once you are out of combat.'
+      if (!sent) note = t('map.label.noAnswer')
     }, sent ? SENT_FOR : GIVE_UP)
     return () => clearTimeout(timer)
   })
@@ -115,25 +116,25 @@
   {/if}
 </svg>
 <div class="label" data-side={at.side} role="dialog" in:scale={pop()} out:fade={gone} aria-label={title} style:left="{at.left}px" style:top="{at.top}px" style:visibility={width ? 'visible' : 'hidden'} bind:offsetWidth={width} bind:offsetHeight={height}>
-  <button class="close" aria-label="Close" onclick={onclose}><Glyph name="close" size={14} /></button>
+  <button class="close" aria-label={t('common.close')} onclick={onclose}><Glyph name="close" size={14} /></button>
   {#if saved}
-    <input class="name" aria-label="Name of the pin" value={title} maxlength="60" spellcheck="false" onchange={(e) => onrename(e.currentTarget.value)} onkeydown={(e) => e.key === 'Enter' && e.currentTarget.blur()} />
+    <input class="name" aria-label={t('map.label.pinName')} value={title} maxlength="60" spellcheck="false" onchange={(e) => onrename(e.currentTarget.value)} onkeydown={(e) => e.key === 'Enter' && e.currentTarget.blur()} />
   {:else}
     <h3>{#if item}<img class="pic" src="{TILES}/items/{item}.png" alt="" onerror={(e) => e.currentTarget.remove()} />{/if}{title}</h3>
   {/if}
   {#each notes as note}<p>{note}</p>{/each}
   {#if where}<p class="dim">{where}</p>{/if}
-  {#if way}<p>{way.far}, {way.time}</p>{/if}
+  {#if way}<p>{t('map.label.far', { far: way.far, time: way.time })}</p>{/if}
   <!-- The maps behind a door, on a row of their own above the others: one is Dungeon Map, or Raid Map; several, a button each by its name. -->
   {#if dungeons.length}
     <div class="go maps">
-      {#each dungeons as d (d.id)}<button class="btn" onclick={() => ondungeon?.(d.id)}>{dungeons.length > 1 ? d.name : d.raid ? 'Raid Map' : 'Dungeon Map'}</button>{/each}
+      {#each dungeons as d (d.id)}<button class="btn" onclick={() => ondungeon?.(d.id)}>{dungeons.length > 1 ? d.name : d.raid ? t('map.label.raidMap') : t('map.label.dungeonMap')}</button>{/each}
     </div>
   {/if}
   <div class="go">
-    <button class="btn send" disabled={!sending.can} aria-busy={phase === 'sending'} onclick={go}>{phase === 'sending' ? 'Sending' : phase === 'sent' ? 'Sent' : following ? 'Stop following' : 'Send to game'}</button>
-    <button class="btn" disabled={routed} onclick={onroute}>{routed ? 'In route' : 'Add to route'}</button>
-    {#if saved}<button class="btn" onclick={onremove}>Remove</button>{:else}<button class="btn" onclick={onsave}>Save</button>{/if}
+    <button class="btn send" disabled={!sending.can} aria-busy={phase === 'sending'} onclick={go}>{phase === 'sending' ? t('map.label.sending') : phase === 'sent' ? t('map.label.sent') : following ? t('map.label.stopFollowing') : t('map.label.send')}</button>
+    <button class="btn" disabled={routed} onclick={onroute}>{routed ? t('map.label.inRoute') : t('map.label.addToRoute')}</button>
+    {#if saved}<button class="btn" onclick={onremove}>{t('map.label.remove')}</button>{:else}<button class="btn" onclick={onsave}>{t('map.label.save')}</button>{/if}
   </div>
   {#if note || !sending.can}<p class="dim why" role="status">{note || sending.why}</p>{/if}
 </div>

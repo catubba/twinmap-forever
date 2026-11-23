@@ -3,7 +3,8 @@
   // (M10-F11, mockups in design/vendors/mockup): for the character picked, a vendor's items with price and how
   // many are in bags and bank; a trainer's spells or recipes, what can be learned now with its total, then each
   // level or skill still to reach, the known folded at the foot. Read only. The logic is in shared/npc-panel.ts.
-  import { ago, firstName, type Known } from '../../shared/characters'
+  import { ago, classNameAll, firstName, type Known } from '../../shared/characters'
+  import { around, t } from '../../shared/i18n'
   import { coins, QUALITY_COLORS, type ItemFacts } from '../../shared/items'
   import { craftOf, forRace, grouped, knownSpells, trainerClass, vendorRows, whoOf, type Group } from '../../shared/npc-panel'
   import type { FixedPin } from '../../shared/services'
@@ -61,12 +62,15 @@
     return item ? QUALITY_COLORS[items?.[item]?.[1] ?? 1] : craft ? undefined : 'var(--done)'
   }
   const foot = $derived.by(() => {
-    if (!shown || !sheet) return 'No character yet: play one with the Twinmap Forever addon on.'
+    if (!shown || !sheet) return t('items.npc.noCharacter')
     const name = firstName(shown.key)
-    if (craft) return stand?.read ? `${name} · recipes as of when the ${craft.profession} window was last open` : `${name} · open the ${craft.profession} window once in game for the recipes known`
-    if (cls) return `${name}, level ${who.level ?? '?'} · spells ${shown.live ? 'as they are now' : `as of ${ago(sheet.at.spells ?? shown.seen, now)}`}`
-    return sheet.at.bank ? `Bank seen ${ago(sheet.at.bank, now)} · ${name}` : `Bank not seen yet: open it in game once · ${name}`
+    if (craft) return t(stand?.read ? 'items.npc.recipesRead' : 'items.npc.recipesUnread', { name, profession: craft.profession })
+    if (cls) return shown.live ? t('items.npc.spellsNow', { name, level: who.level ?? '?' }) : t('items.npc.spellsAsOf', { name, level: who.level ?? '?', ago: ago(sheet.at.spells ?? shown.seen, now) })
+    return sheet.at.bank ? t('items.npc.bankSeen', { ago: ago(sheet.at.bank, now), name }) : t('items.npc.bankUnseen', { name })
   })
+  // The headings of the groups still to reach: a profession's by skill, a class's by level.
+  const atSkill = (n: number): string => t('items.npc.atSkill', { skill: n })
+  const atLevel = (n: number): string => t('items.npc.atLevel', { level: n })
 </script>
 
 {#snippet price(copper: number | null)}
@@ -83,8 +87,8 @@
 {#snippet line(r: TrainerRow, open: boolean)}
   <div class="t" use:itemTip={{ item: made(r) ?? 0 }}>
     {@render pic(picture(r))}
-    <span class="name" style:color={color(r, open)}>{r.name}{#if r.rank}<span class="rank">Rank {r.rank}</span>{/if}</span>
-    {#if r.talent}<span class="tag">Talent</span>{:else if r.quest !== undefined}<span class="tag" title={r.quest ? `Taught by the quest ${r.quest}` : 'Taught by a class quest'}>Quest</span>{:else}{@render price(r.cost)}{/if}
+    <span class="name" style:color={color(r, open)}>{r.name}{#if r.rank}<span class="rank">{t('items.npc.rank', { rank: r.rank })}</span>{/if}</span>
+    {#if r.talent}<span class="tag">{t('items.npc.talent')}</span>{:else if r.quest !== undefined}<span class="tag" title={r.quest ? t('items.npc.questTaught', { quest: r.quest }) : t('items.npc.classQuest')}>{t('items.npc.quest')}</span>{:else}{@render price(r.cost)}{/if}
   </div>
 {/snippet}
 
@@ -92,23 +96,23 @@
   <h3 class="grp"><span>{text}</span>{@render price(cost)}</h3>
 {/snippet}
 
-{#snippet groups(g: { now: Group; later: Group[] }, word: string)}
+{#snippet groups(g: { now: Group; later: Group[] }, at: (n: number) => string)}
   {#if g.now.rows.length}
-    {@render heading(`Learn now · ${g.now.rows.length}`, g.now.cost)}
+    {@render heading(t('items.npc.learnNow', { count: g.now.rows.length }), g.now.cost)}
     {#each g.now.rows as r (r.spell)}{@render line(r, true)}{/each}
   {/if}
   {#each g.later as l (l.at)}
     <div class="later">
-      {@render heading(`${word} ${l.at}`, l.cost)}
+      {@render heading(at(l.at), l.cost)}
       {#each l.rows as r (r.spell)}{@render line(r, false)}{/each}
     </div>
   {/each}
 {/snippet}
 
 <section class="npc" aria-label={pin.name}>
-  <h2 class="band">{pin.name}<button class="x" aria-label="Close" onclick={onclose}><Glyph name="close" size={14} /></button></h2>
+  <h2 class="band">{pin.name}<button class="x" aria-label={t('common.close')} onclick={onclose}><Glyph name="close" size={14} /></button></h2>
   <p class="who">
-    <span class="sub">{pin.sub ?? ''}{#if goods.length && !list}{pin.sub ? ' · ' : ''}Sells {goods.length}{/if}</span>
+    <span class="sub">{#if goods.length && !list}{pin.sub ? t('items.npc.subSells', { sub: pin.sub, count: goods.length }) : t('items.npc.sells', { count: goods.length })}{:else}{pin.sub ?? ''}{/if}</span>
     {#if money !== null}{@render price(money)}{/if}
   </p>
   {#if craft && stand}
@@ -117,26 +121,26 @@
         {craft.profession} {stand.skill} / {stand.most}{stand.rank ? ` · ${stand.rank}` : ''}
         <div class="bar"><i style:width="{(100 * stand.skill) / stand.most}%"></i></div>
       {:else}
-        {craft.profession} not learned yet
+        {t('items.npc.notLearned', { profession: craft.profession })}
       {/if}
     </div>
   {/if}
   <div class="list">
     {#if cls && !mine}
-      <p class="note">Teaches {cls.charAt(0) + cls.slice(1).toLowerCase()}s only{who.class ? '' : ': pick a character to see what it can learn'}.</p>
+      <p class="note">{t(who.class ? 'items.npc.teaches' : 'items.npc.teachesPick', { classes: classNameAll(cls) })}</p>
     {/if}
     {#if list}
       {#if craft && stand?.next}
         <div class="later">
-          <h3 class="grp"><span>Next rank</span></h3>
+          <h3 class="grp"><span>{t('items.npc.nextRank')}</span></h3>
           <div class="t">
             {@render pic(`${TILES}/pictures/${trainers.spells[stand.next.spell]?.[1] ?? 0}.png`)}
-            <span class="name">{stand.next.name} {craft.profession}<span class="rank">skill {stand.next.skill}, level {stand.next.level}</span></span>
+            <span class="name">{stand.next.name} {craft.profession}<span class="rank">{t('items.npc.nextNeeds', { skill: stand.next.skill, level: stand.next.level })}</span></span>
             {@render price(stand.next.cost)}
           </div>
         </div>
       {/if}
-      {@render groups(list, craft ? 'Skill' : 'Level')}
+      {@render groups(list, craft ? atSkill : atLevel)}
       {#if showKnown}
         <div class="later">
           {#each list.known as r (r.spell)}{@render line(r, false)}{/each}
@@ -144,15 +148,16 @@
       {/if}
     {/if}
     {#if goods.length}
-      {#if list}<h3 class="grp"><span>Sells · {goods.length}</span></h3>{/if}
-      <div class="head"><span></span><span>Item</span><span>Price{#if listing}<small title="The lowest price at the auction house, for as many">&nbsp;· AH</small>{/if}</span><span>Bags</span><span>Bank</span></div>
+      {#if list}<h3 class="grp"><span>{t('items.npc.sellsHeading', { count: goods.length })}</span></h3>{/if}
+      <div class="head"><span></span><span>{t('items.npc.columns.item')}</span><span>{t('items.npc.columns.price')}{#if listing}<small title={t('items.npc.ahNote')}>&nbsp;· {t('items.npc.columns.ah')}</small>{/if}</span><span>{t('items.npc.columns.bags')}</span><span>{t('items.npc.columns.bank')}</span></div>
       {#each goods as g (g.id)}
         <div class="r" class:two={!!listing} use:itemTip={{ item: g.id }}>
           {@render pic(`${TILES}/items/${g.id}.png`, g.perBuy)}
           <span class="name" style:color={QUALITY_COLORS[g.quality]}>{g.name}</span>
           {#if listing}
             {@const ah = lowestOf(listing, `${g.id}`)}
-            <span class="both">{@render price(g.buy)}<span class="price ah" title="The lowest price at the auction house, for as many">AH {#if ah}{#each coins(ah * g.perBuy) as [n, coin]}{n}<i class="coin {coin}"></i>{/each}{:else}-{/if}</span></span>
+            {@const ahAt = around('items.npc.ahPrice', 'price')}
+            <span class="both">{@render price(g.buy)}<span class="price ah" title={t('items.npc.ahNote')}>{ahAt[0]}{#if ah}{#each coins(ah * g.perBuy) as [n, coin]}{n}<i class="coin {coin}"></i>{/each}{:else}-{/if}{ahAt[1]}</span></span>
           {:else}
             {@render price(g.buy)}
           {/if}
@@ -163,7 +168,7 @@
     {/if}
   </div>
   {#if list?.known.length}
-    <button class="fold" aria-expanded={showKnown} onclick={() => (showKnown = !showKnown)}><span>Known · {list.known.length}</span><b>{showKnown ? 'Hide' : 'Show'}</b></button>
+    <button class="fold" aria-expanded={showKnown} onclick={() => (showKnown = !showKnown)}><span>{t('items.npc.known', { count: list.known.length })}</span><b>{showKnown ? t('items.npc.hide') : t('items.npc.show')}</b></button>
   {/if}
   <p class="foot">{foot}</p>
 </section>

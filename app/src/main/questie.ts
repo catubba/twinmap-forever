@@ -8,6 +8,7 @@ import type { GameQuest, LogQuest, ObjectiveKind, QuestIcon, QuestieShown, Quest
 import { best, fold, wordsMatch, type Found } from '../shared/search'
 import type { ItemSources } from '../shared/tips'
 import { resourceOf, servicesOf, type FixedPin, type ServiceLayer } from '../shared/services'
+import { t, type Key } from '../shared/i18n'
 
 /** The file of QuestieDB this app reads, in a game folder. Questie without it gives the app nothing. */
 export const questieFile = (gameFolder: string): string => join(gameFolder, '_forever_', 'Interface', 'AddOns', 'QuestieDB', 'QuestieDB_Forever.toc')
@@ -202,6 +203,9 @@ export function searchIndex(db: Questie): SearchIndex[] {
 /** What each service is called by who looks for it, beside what the game writes under the name. */
 const SERVICE_WORDS: Record<ServiceLayer, string> = { flight: 'flight master taxi', inn: 'inn innkeeper', vendors: 'vendor', repair: 'repair', trainers: 'trainer', bank: 'bank banker', auction: 'auction house auctioneer', stable: 'stable master' }
 
+// What is written under an NPC with no title of its own, for each service it offers. The words above are only searched.
+const SERVICE_NOTES: Record<ServiceLayer, Key> = { flight: 'app.found.services.flight', inn: 'app.found.services.inn', vendors: 'app.found.services.vendor', repair: 'app.found.services.repair', trainers: 'app.found.services.trainer', bank: 'app.found.services.bank', auction: 'app.found.services.auction', stable: 'app.found.services.stable' }
+
 /** Every NPC that does something for a player, with the words that tell what: for the search by what one does. */
 export interface Doer { id: number; name: string; note: string; lower: string; side: string }
 
@@ -213,7 +217,7 @@ export function doerIndex(db: Questie): Doer[] {
     const told = typeof sub === 'string' ? sub : ''
     // Someone friendly to no side serves no player; someone with no title and no service does nothing to look for.
     if (typeof name !== 'string' || !name || typeof side !== 'string' || !side || (!told && !layers.length)) continue
-    doers.push({ id, name, note: told || layers.map((layer) => SERVICE_WORDS[layer].split(' ')[0]).join(', '), lower: fold(`${told} ${layers.map((layer) => SERVICE_WORDS[layer]).join(' ')}`), side })
+    doers.push({ id, name, note: told || layers.map((layer) => t(SERVICE_NOTES[layer])).join(', '), lower: fold(`${told} ${layers.map((layer) => SERVICE_WORDS[layer]).join(' ')}`), side })
   }
   return doers
 }
@@ -254,15 +258,15 @@ export function search(db: Questie, index: SearchIndex[], typed: string, most = 
       let hit: Found | null = null
       if (entry.kind === 'npc') {
         const where = spot('Npc', id)
-        if (where) hit = { kind: 'npc', name: entry.name, note: text(db.get('Npc', id, NPC.sub)) || 'NPC', ...where }
+        if (where) hit = { kind: 'npc', name: entry.name, note: text(db.get('Npc', id, NPC.sub)) || t('app.found.npc'), ...where }
       } else if (entry.kind === 'quest') {
         const from = db.get('Quest', id, QUEST.startedBy), giver = firstOf('Npc', numbers(at(from, 1))) ?? firstOf('Object', numbers(at(from, 2)))
         const level = db.get('Quest', id, QUEST.level)
-        if (giver) hit = { kind: 'quest', name: entry.name, note: `Quest${typeof level === 'number' && level > 0 ? `, level ${level}` : ''}, from ${giver.name}`, ...giver.where }
+        if (giver) hit = { kind: 'quest', name: entry.name, note: typeof level === 'number' && level > 0 ? t('app.found.questLevel', { level, giver: giver.name }) : t('app.found.quest', { giver: giver.name }), ...giver.where }
       } else {
         const sellers = numbers(db.get('Item', id, ITEM.vendors)).flatMap((npc): Found[] => {
           const where = spot('Npc', npc), side = db.get('Npc', npc, NPC.friendly)
-          return where ? [{ kind: 'item', name: entry.name, note: `Sold by ${text(db.get('Npc', npc, NPC.name))}`, ...where, does: true, item: id, ...(typeof side === 'string' ? { side } : {}) }] : []
+          return where ? [{ kind: 'item', name: entry.name, note: t('app.found.soldBy', { name: text(db.get('Npc', npc, NPC.name)) }), ...where, does: true, item: id, ...(typeof side === 'string' ? { side } : {}) }] : []
         })
         if (sellers.length > 1) {
           shops.push(...sellers.slice(0, DOERS_MOST - shops.length))
@@ -272,7 +276,7 @@ export function search(db: Questie, index: SearchIndex[], typed: string, most = 
         const seller = firstOf('Npc', numbers(db.get('Item', id, ITEM.vendors))), dropper = seller ? null : firstOf('Npc', numbers(db.get('Item', id, ITEM.npcDrops)))
         const holder = seller || dropper ? null : firstOf('Object', numbers(db.get('Item', id, ITEM.objectDrops)))
         const who = seller ?? dropper ?? holder
-        if (who) hit = { kind: 'item', name: entry.name, note: `${seller ? 'Sold by' : dropper ? 'Dropped by' : 'Found in'} ${who.name}`, ...who.where, item: id }
+        if (who) hit = { kind: 'item', name: entry.name, note: t(seller ? 'app.found.soldBy' : dropper ? 'app.found.droppedBy' : 'app.found.foundIn', { name: who.name }), ...who.where, item: id }
       }
       if (hit) {
         found.push(hit)
@@ -438,7 +442,7 @@ export function metWhereQuestieSays(db: Questie, id: number, place: number[], ma
 export function questLog(db: Questie, shown: QuestieShown): LogQuest[] {
   return shown.active.map((q) => {
     const name = db.get('Quest', q.id, QUEST.name)
-    return { name: typeof name === 'string' && name ? name : `Quest ${q.id}`, done: q.done }
+    return { name: typeof name === 'string' && name ? name : t('app.found.questNumber', { id: q.id }), done: q.done }
   })
 }
 
@@ -484,7 +488,7 @@ export function questPins(db: Questie, shown: QuestieShown): QuestPin[] {
   const pins = new Map<string, QuestPin>()
   for (const type of ['available', 'turnin', 'objective'] as const) {
     for (const icon of shown.icons[type]) {
-      const title = text(db.get('Quest', icon.quest, QUEST.name), `Quest ${icon.quest}`)
+      const title = text(db.get('Quest', icon.quest, QUEST.name), t('app.found.questNumber', { id: icon.quest }))
       const level = db.get('Quest', icon.quest, QUEST.level)
       const quest = type === 'available' && typeof level === 'number' && level > 0 ? `[${level}] ${title}` : title
       const who = type === 'available' ? starters(icon.quest) : type === 'turnin' ? both(db.get('Quest', icon.quest, QUEST.finishedBy)) : (targets.get(icon.quest) ?? [])

@@ -5,6 +5,7 @@ import type { Continent, GameMap } from './maps'
 import type { LogQuest, QuestPin } from './quests'
 import { serves, type FixedPin, type ServiceLayer } from './services'
 import { BLOCK_YARDS } from './world'
+import { t, type Key } from './i18n'
 
 const YARDS_PER_UNIT = BLOCK_YARDS / UNITS_PER_BLOCK
 
@@ -53,7 +54,7 @@ export function questRows(log: LogQuest[], pins: QuestPin[], maps: GameMap[], co
     if (pin.type === 'available' || !zone) continue
     const at = unitsOfPlace(zone.rect!, pin.x, pin.y)
     for (const quest of pin.quests) {
-      const row: NowRow = { key: `q:${quest}`, name: quest, kind: pin.type === 'turnin' ? 'Hand in' : 'Objective', tone: pin.type === 'turnin' ? 'quest' : 'objective', continent: zone.continent!, at }
+      const row: NowRow = { key: `q:${quest}`, name: quest, kind: pin.type === 'turnin' ? t('app.now.handIn') : t('app.now.objective'), tone: pin.type === 'turnin' ? 'quest' : 'objective', continent: zone.continent!, at }
       const before = best.get(row.key), here = row.continent === continent
       if (!before || (here !== (before.continent === continent) ? here : here && far(from, row) < far(from, before))) best.set(row.key, row)
     }
@@ -63,19 +64,19 @@ export function questRows(log: LogQuest[], pins: QuestPin[], maps: GameMap[], co
     const key = `q:${quest.name}`, row = best.get(key)
     if (seen.has(key)) continue // two quests of one name are one row
     seen.add(key)
-    if (!row) placeless.push({ key, name: quest.name, kind: quest.done ? 'Hand in' : 'Objective', tone: quest.done ? 'quest' : 'objective' })
+    if (!row) placeless.push({ key, name: quest.name, kind: quest.done ? t('app.now.handIn') : t('app.now.objective'), tone: quest.done ? 'quest' : 'objective' })
     else (row.continent === continent ? near : away).push(row)
   }
   return { placed: [...near.sort((a, b) => far(from, a) - far(from, b)), ...away], placeless }
 }
 
 // The word for each service, in the order they are told when someone offers several.
-const WORDS: Record<ServiceLayer, string> = { flight: 'Flight', inn: 'Inn', bank: 'Bank', auction: 'Auction', stable: 'Stable', trainers: 'Trainer', repair: 'Repair', vendors: 'Vendor' }
+const WORDS: Record<ServiceLayer, Key> = { flight: 'app.now.flight', inn: 'app.now.inn', bank: 'app.now.bank', auction: 'app.now.auction', stable: 'app.now.stable', trainers: 'app.now.trainer', repair: 'app.now.repair', vendors: 'app.now.vendor' }
 const ORDER = Object.keys(WORDS) as ServiceLayer[]
 // Ore and herbs have no word here: they are not someone to go to.
 function serviceWord(pin: FixedPin): string | undefined {
   const layer = ORDER.find((l) => pin.layers.includes(l))
-  return layer && WORDS[layer]
+  return layer && t(WORDS[layer])
 }
 
 /**
@@ -86,7 +87,7 @@ export function nearbyRows(maps: GameMap[], quests: QuestPin[], fixed: FixedPin[
   const zones = zonesByArea(maps), rows: NowRow[] = []
   for (const pin of quests) {
     const zone = zones.get(pin.area)
-    if (pin.type === 'available' && zone) rows.push({ key: `a:${pin.name}`, name: pin.name, kind: 'Quest', tone: 'quest', continent: zone.continent!, at: unitsOfPlace(zone.rect!, pin.x, pin.y) })
+    if (pin.type === 'available' && zone) rows.push({ key: `a:${pin.name}`, name: pin.name, kind: t('app.now.quest'), tone: 'quest', continent: zone.continent!, at: unitsOfPlace(zone.rect!, pin.x, pin.y) })
   }
   for (const pin of fixed) {
     const zone = zones.get(pin.area), kind = serviceWord(pin)

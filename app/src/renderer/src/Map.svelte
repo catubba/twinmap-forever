@@ -27,9 +27,10 @@
   import { iconOf, panelFor, serves, type FixedLayer, type FixedPin, type Travel } from '../../shared/services'
   import { pictureOfBlock, tileOfPicture } from '../../shared/pixels'
   import { WORLDS } from '../../shared/world'
-  import { LAYER_GROUPS, layersFrom, type LayerId } from '../../shared/layers'
+  import { groupName, LAYER_GROUPS, layerName, layersFrom, type LayerId } from '../../shared/layers'
   import { fitNames, tierRank, tierShows, type Avoid, type NameBox, type NameTier, type Place } from '../../shared/places'
-  import { wayTo, zoneAt, type Size } from '../../shared/point-label'
+  import { placeText, wayTo, zoneAt, type Size } from '../../shared/point-label'
+  import { t } from '../../shared/i18n'
   import { fade, fly } from 'svelte/transition'
   import Glyph from './Glyph.svelte'
   import { drop, gone, still } from './motion'
@@ -48,9 +49,9 @@
   // insideReady: the rooms of the buildings are converted, and their list can be asked for.
   let { pos, group = [], at: readAt, insideReady, quests = [], fixed = [], side, live = false, inbox = null, removed = [], set = [], gameFollows = null, journey = null, route = noRoute(), onroute, onnpc, kills, death = null, back = $bindable(null), looking = $bindable(null) }: { kills?: unknown; death?: Death | null; back?: (DeathPlace & { name: string; door: boolean }) | null; looking?: { zone: string; where: string } | null; journey?: Journey | null; pos: Position | undefined; at: number | undefined; insideReady: boolean; quests?: QuestPin[]; fixed?: FixedPin[]; side?: string; live?: boolean; inbox?: Inbox | null; removed?: string[]; set?: GameMark[]; gameFollows?: Pin | null; route?: Route; onroute?: (stop: Stop) => void; onnpc?: (pin: FixedPin | null) => void; group?: Companion[] } = $props()
 
-  const TOP_ZOOM = 7 // the game's own detail: a block's picture is four tiles
+  const TOP_ZOOM = 7 // the detail of the game itself: the picture of a block is four tiles
   const BLANK = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=='
-  const NAMES: Record<Continent, string> = { 0: 'Eastern Kingdoms', 1: 'Kalimdor' }
+  const NAMES: Record<Continent, string> = { 0: t('map.continents.easternKingdoms'), 1: t('map.continents.kalimdor') }
   // Two cities lie wholly under a roof, though the game calls them outdoors (one can ride there).
   // Ironforge is always on the map from the inside: what is above it is bare mountain, and the
   // player looks for the city there. Undercity shows only from within, as a cave does: above it
@@ -440,7 +441,7 @@
     if (!map || following || inside) return void (looking = null)
     // From far, where the pins of a zone are not shown, it is the continent that is looked at, not the zone in its middle.
     const middle = map.getCenter(), found = map.getZoom() < PIN_ZOOM ? null : zoneAt(maps, continent, { x: middle.lng, y: -middle.lat })
-    looking = { zone: found?.zone.name ?? NAMES[continent], where: found ? `${found.place.x.toFixed(1)}, ${found.place.y.toFixed(1)}` : '' }
+    looking = { zone: found?.zone.name ?? NAMES[continent], where: found ? placeText(found.place) : '' }
   }
   $effect(look) // following, the continent on show, a dungeon entered or left, or opened from outside
 
@@ -590,12 +591,12 @@
     for (const [name, u, v] of all) {
       // A rare boss is not there in every run: a silver ring, and said in its name.
       const rare = RARE_BOSSES.has(nameOfBoss(name))
-      bossMarks.push({ name, rare, gone: false, marker: L.marker(atYards({ u, v }), { keyboard: false, icon: bossIcon(false, rare) }).bindTooltip(rare ? `${name} (rare)` : name, { permanent: true, direction: 'bottom', offset: [0, rare ? 11 : 9], className: 'boss-name' }).addTo(pins) })
+      bossMarks.push({ name, rare, gone: false, marker: L.marker(atYards({ u, v }), { keyboard: false, icon: bossIcon(false, rare) }).bindTooltip(rare ? t('map.pins.rareBoss', { name }) : name, { permanent: true, direction: 'bottom', offset: [0, rare ? 11 : 9], className: 'boss-name' }).addTo(pins) })
     }
     for (const d of dungeons) {
       if (d.entrance)
         L.marker(atYards({ u: d.entrance[0], v: d.entrance[1] }), { keyboard: false, icon: doorIcon(m.kind === 'raid') })
-          .bindTooltip(dungeons.length > 1 ? `Entrance: ${d.name}` : 'Entrance', { direction: 'top', offset: [0, -13], className: 'tip' })
+          .bindTooltip(dungeons.length > 1 ? t('map.pins.entranceOf', { name: d.name }) : t('map.pins.entrance'), { direction: 'top', offset: [0, -13], className: 'tip' })
           .addTo(pins)
     }
     bosses = bossMarks
@@ -685,7 +686,7 @@
     // A dungeon: its door, labelled as a click on it labels it; Dungeon Map opens the wing that was found.
     const door = to.dungeon && travel.doors.find((d) => d.continent === to.continent && d.x === to.at.x && d.y === to.at.y)
     if (door) {
-      labelPin(to.at, door.names.join(', '), ['Entrance'], found, behindDoor(door), to.dungeon!.wing)
+      labelPin(to.at, door.names.join(', '), [t('map.pins.entrance')], found, behindDoor(door), to.dungeon!.wing)
       return
     }
     labelled = {
@@ -693,7 +694,7 @@
       continent: to.continent,
       title: to.title,
       // The caller may know the zone better: where two maps overlap, the point alone does not tell.
-      where: to.where ?? (found ? `${found.zone.name} ${found.place.x.toFixed(1)}, ${found.place.y.toFixed(1)}` : ''),
+      where: to.where ?? (found ? placeText(found.place, found.zone.name) : ''),
       spot: spotOf(at(to.at)),
       box: frameSize(),
       pin: found ? { m: found.zone.id, ...found.place } : null,
@@ -716,7 +717,7 @@
       continent,
       title,
       notes,
-      where: on ? `${on.zone.name} ${on.place.x.toFixed(1)}, ${on.place.y.toFixed(1)}` : '',
+      where: on ? placeText(on.place, on.zone.name) : '',
       spot: spotOf(at(units)),
       box: frameSize(),
       pin: on ? { m: on.zone.id, ...on.place } : null,
@@ -1104,7 +1105,7 @@
         units,
         continent,
         title: found?.zone.name ?? NAMES[continent],
-        where: found ? `${found.place.x.toFixed(1)}, ${found.place.y.toFixed(1)}` : '',
+        where: found ? placeText(found.place) : '',
         spot: e.containerPoint,
         plain: true, // a bare point of the map: as a stop it is told from the others by its coordinates
         box: frameSize(),
@@ -1151,8 +1152,6 @@
   // The quests Questie shows, on the zones of the continent in view: where to take one, where to hand
   // one in, where what is still to find is. Each kind is a layer of its own.
   const questLayers = { available: L.layerGroup(), turnin: L.layerGroup(), objectives: L.layerGroup() }
-  const QUEST_SAYS = { available: 'Quest to take', turnin: 'Quest to hand in', objective: 'Quest objective' } as const
-  const KIND_SAYS = { slay: 'Objective: slay', loot: 'Objective: loot', object: 'Objective: use', talk: 'Objective: talk', event: 'Objective: go there' } as const
   const QUEST_PINS = { available: ['quest', 'available', 500], turnin: ['turnin', 'turnin', 1000], objective: ['objective', 'objectives', 0] } as const
   $effect(() => {
     for (const group of Object.values(questLayers)) group.clearLayers()
@@ -1197,7 +1196,7 @@
       const units = unitsOfPlace(zone.rect, p.x, p.y)
       L.marker(at(units), { keyboard: false, zIndexOffset: above, icon: L.divIcon({ className: p.type === 'objective' ? 'door task' : 'door', iconSize: [size, size], html: pin(drawing) }) })
         .bindTooltip(tip, { direction: 'top', offset: [0, -size / 2], className: 'tip' })
-        .on('click', () => labelPin(units, p.name, [(p.kind && KIND_SAYS[p.kind]) ?? QUEST_SAYS[p.type], ...p.quests.filter((quest) => quest !== p.name)], { zone, place: { x: p.x, y: p.y } }))
+        .on('click', () => labelPin(units, p.name, [p.kind ? t(`map.pins.objective.${p.kind}`) : t(`map.pins.quest.${p.type}`), ...p.quests.filter((quest) => quest !== p.name)], { zone, place: { x: p.x, y: p.y } }))
         .addTo(questLayers[layer])
     }
   })
@@ -1217,7 +1216,6 @@
   function showAll(ids: readonly LayerId[], on: boolean): void {
     for (const id of ids) layers[id] = on
   }
-  const LAYER_NAMES = Object.fromEntries(LAYER_GROUPS.flatMap((group) => group.layers.map((layer) => [layer.id, layer.name]))) as Record<LayerId, string>
   // They are painted on one canvas, not made one element each: three thousand elements over the map
   // brought dragging down to eight frames a second. Each is the picture the game itself has for it
   // (main/icons.ts takes them from the player's game); where the game gave none, the shapes and
@@ -1283,13 +1281,13 @@
               const tip = document.createElement('span')
               tip.append(Object.assign(document.createElement('b'), { textContent: p.name }))
               if (p.sub) tip.append(document.createElement('br'), p.sub)
-              tip.append(document.createElement('br'), p.layers.map((layer) => LAYER_NAMES[layer]).join(', '))
+              tip.append(document.createElement('br'), p.layers.map(layerName).join(', '))
               return tip
             },
             { direction: 'top', offset: [0, -9], className: 'tip' },
           )
           .on('click', () => {
-            labelPin({ x: where.lng, y: -where.lat }, p.name, [...(p.sub ? [p.sub] : []), p.layers.map((layer) => LAYER_NAMES[layer]).join(', ')], { zone, place: { x: p.x, y: p.y } })
+            labelPin({ x: where.lng, y: -where.lat }, p.name, [...(p.sub ? [p.sub] : []), p.layers.map(layerName).join(', ')], { zone, place: { x: p.x, y: p.y } })
             if (labelled && p.npc) labelled.npc = { ...p }
           })
           .addTo(fixedGroup)
@@ -1322,7 +1320,7 @@
       L.marker(at(door), { keyboard: false, zIndexOffset: 200, icon: doorIcon(door.raid === true) })
         .bindTooltip(door.names.join(', '), { direction: 'top', offset: [0, -13], className: 'tip' })
         .on('click', () => {
-          labelPin({ x: door.x, y: door.y }, door.names.join(', '), ['Entrance'], undefined, behindDoor(door))
+          labelPin({ x: door.x, y: door.y }, door.names.join(', '), [t('map.pins.entrance')], undefined, behindDoor(door))
         })
         .addTo(travelLayers.dungeons)
     }
@@ -1348,7 +1346,7 @@
     const flag = (saved: SavedPin, gold: boolean): void => {
       if (saved.continent !== continent) return
       L.marker(at(saved.at), { keyboard: false, zIndexOffset: gold ? 450 : 400, icon: L.divIcon({ className: 'door mine', iconSize: [16, 16], html: gold ? pin('flag').replaceAll('#f3ead9', '#ffd100') : pin('flag') }) })
-        .bindTooltip(Object.assign(document.createElement('span'), { textContent: gold ? `${saved.name}, followed in the game` : saved.name }), { direction: 'top', offset: [0, -8], className: 'tip' })
+        .bindTooltip(Object.assign(document.createElement('span'), { textContent: gold ? t('map.pins.followed', { name: saved.name }) : saved.name }), { direction: 'top', offset: [0, -8], className: 'tip' })
         .on('click', () => {
           if (!map) return
           const found = zoneAt(maps, saved.continent, saved.at)
@@ -1356,7 +1354,7 @@
             units: { ...saved.at },
             continent: saved.continent,
             title: saved.name,
-            where: found ? `${found.zone.name} ${found.place.x.toFixed(1)}, ${found.place.y.toFixed(1)}` : '',
+            where: found ? placeText(found.place, found.zone.name) : '',
             spot: spotOf(at(saved.at)),
             box: frameSize(),
             pin: saved.pin && { ...saved.pin },
@@ -1504,7 +1502,7 @@
     if (goal.continent !== continent) return
     L.circleMarker(at(goal.at), { radius: 7, color: '#000', weight: 4, fill: false, interactive: false }).addTo(journeyLayer)
     L.circleMarker(at(goal.at), { radius: 7, color: '#ffd100', weight: 2, fillColor: '#ffd100', fillOpacity: 0.35 })
-      .bindTooltip(Object.assign(document.createElement('span'), { textContent: `${goal.name}, the journey in the game` }), { direction: 'top', offset: [0, -8], className: 'tip' })
+      .bindTooltip(Object.assign(document.createElement('span'), { textContent: t('map.pins.journey', { name: goal.name }) }), { direction: 'top', offset: [0, -8], className: 'tip' })
       .addTo(journeyLayer)
   })
   $effect(() => {
@@ -1553,14 +1551,14 @@
       for (const [color, weight] of [['#000', 7.5], [WAY_BACK, 4.5]] as const) L.polyline(rest, { color, weight, dashArray: '9 13', lineCap: 'round', lineJoin: 'round', interactive: false }).addTo(deathLayer)
     }
     if (death?.ghost && yard?.continent === continent)
-      L.marker(at(yard.at), { keyboard: false, zIndexOffset: 700, icon: deathIcon('ghost', 26) }).bindTooltip('Graveyard', { direction: 'top', offset: [0, -13], className: 'tip' }).addTo(deathLayer)
+      L.marker(at(yard.at), { keyboard: false, zIndexOffset: 700, icon: deathIcon('ghost', 26) }).bindTooltip(t('map.pins.graveyard'), { direction: 'top', offset: [0, -13], className: 'tip' }).addTo(deathLayer)
     if (to?.continent !== continent) return
     if (to.door) {
       // The door has its swirl already: a ring in the colour of the way says it is the one to walk to.
       for (const [color, weight] of [['#000', 5], [WAY_BACK, 3]] as const) L.circleMarker(at(to.at), { radius: 24, color, weight, fill: false, interactive: false }).addTo(deathLayer)
       return
     }
-    L.marker(at(to.at), { keyboard: false, zIndexOffset: 800, icon: deathIcon('corpse', 28) }).bindTooltip('Your corpse', { direction: 'top', offset: [0, -14], className: 'tip' }).addTo(deathLayer)
+    L.marker(at(to.at), { keyboard: false, zIndexOffset: 800, icon: deathIcon('corpse', 28) }).bindTooltip(t('map.pins.corpse'), { direction: 'top', offset: [0, -14], className: 'tip' }).addTo(deathLayer)
   })
   $effect(() => {
     if (map && layers.death && !inside) deathLayer.addTo(map)
@@ -1657,8 +1655,8 @@
 
 <div class="map" class:under={threeD} bind:this={holder}></div>
 <div class="terrain" class:on={threeD} bind:this={terrainHost}><div class="map pins3d" bind:this={pinsHost}></div></div>
-{#if counting && threeD}<p class="fps">{fps} fps</p>{/if}
-<button class="compass" class:on={!!compass} class:turning bind:this={compassHost} tabindex={compass ? 0 : -1} aria-hidden={!compass} title={turning ? 'North up (N)' : 'Turn with your character (N)'} aria-label="Turn with your character" aria-pressed={turning} onclick={() => setHeadingUp(!turning)}></button>
+{#if counting && threeD}<p class="fps">{t('map.fps', { fps })}</p>{/if}
+<button class="compass" class:on={!!compass} class:turning bind:this={compassHost} tabindex={compass ? 0 : -1} aria-hidden={!compass} title={turning ? t('map.corner.northUpTip') : t('map.corner.turnTip')} aria-label={t('map.corner.turn')} aria-pressed={turning} onclick={() => setHeadingUp(!turning)}></button>
 {#if labelled}
   {#key labelled.units}
     <PointLabel
@@ -1673,7 +1671,7 @@
       sending={sendState(live, inbox, !!labelled.pin)}
       acked={inbox}
       onsend={() => {
-        if (!labelled?.pin) return Promise.resolve({ error: 'There is nothing to send.' })
+        if (!labelled?.pin) return Promise.resolve({ error: t('map.nothingToSend') })
         sentTo = keyOf(labelled.continent, labelled.units)
         return window.twinmap.sendPin({ ...labelled.pin, name: pointName })
       }}
@@ -1700,7 +1698,7 @@
 <div class="corner top">
   <div class="line">
     {#if browsing}
-      <button class="btn" onclick={goBack}>Back to {browsing.from}</button>
+      <button class="btn" onclick={goBack}>{t('map.corner.back', { place: browsing.from })}</button>
     {/if}
     {#if inside}
       <span class="tag">{inside.name}</span>
@@ -1708,23 +1706,23 @@
     {#each [1, 0] as const as which (which)}
       <button class="btn" aria-pressed={!inside && continent === which} onclick={() => choose(which)}>{NAMES[which]}</button>
     {/each}
-    <button class="btn" aria-expanded={layersOpen} aria-controls="layers" title="Layers (L)" onclick={() => (layersOpen = !layersOpen)}>Layers</button>
+    <button class="btn" aria-expanded={layersOpen} aria-controls="layers" title={t('map.layers.buttonTip')} onclick={() => (layersOpen = !layersOpen)}>{t('map.layers.button')}</button>
     {#if !inside}
-      <button class="view" role="switch" aria-checked={threeD} aria-label="3D view" title="2D or 3D view (3)" onclick={() => view3d(!threeD)}><i class="knob"></i><span class="two">2D</span><span class="three">3D</span></button>
+      <button class="view" role="switch" aria-checked={threeD} aria-label={t('map.corner.view3d')} title={t('map.corner.view3dTip')} onclick={() => view3d(!threeD)}><i class="knob"></i><span class="two">2D</span><span class="three">3D</span></button>
     {/if}
   </div>
   {#if layersOpen}
-    <div class="menu layers" id="layers" role="group" aria-label="Layers" in:fly={drop()} out:fade={gone}>
+    <div class="menu layers" id="layers" role="group" aria-label={t('map.layers.menu')} in:fly={drop()} out:fade={gone}>
       <!-- Only the layers that draw something: a ticked box for one that is not built yet would not be true. -->
-      {#each LAYER_GROUPS as group (group.name)}
+      {#each LAYER_GROUPS as group (group.id)}
         {#if group.layers.some((layer) => layer.built)}
           <!-- The name of a group turns all of it off, or on when any of it is off. -->
           {@const all = group.layers.filter((layer) => layer.built).map((layer) => layer.id)}
           {@const on = all.every((id) => layers[id])}
-          <button class="group" aria-pressed={on} title={on ? `Hide all ${group.name}` : `Show all ${group.name}`} onclick={() => showAll(all, !on)}>{group.name}</button>
+          <button class="group" aria-pressed={on} title={on ? t('map.layers.hideAll', { group: groupName(group.id) }) : t('map.layers.showAll', { group: groupName(group.id) })} onclick={() => showAll(all, !on)}>{groupName(group.id)}</button>
           {#each group.layers as layer (layer.id)}
             {#if layer.built}
-              <label class="item"><input type="checkbox" class="check" bind:checked={layers[layer.id]} />{layer.name}</label>
+              <label class="item"><input type="checkbox" class="check" bind:checked={layers[layer.id]} />{layerName(layer.id)}</label>
             {/if}
           {/each}
         {/if}
@@ -1732,10 +1730,10 @@
     </div>
   {/if}
   {#if inside && levels > 0}
-    <div class="line" role="group" aria-label="Levels shown">
-      <span class="tag">Levels</span>
+    <div class="line" role="group" aria-label={t('map.corner.levelsShown')}>
+      <span class="tag">{t('map.corner.levels')}</span>
       {#each Array.from({ length: levels + 1 }, (_, i) => i) as level (level)}
-        <button class="btn" aria-pressed={upTo === level} title={level === levels ? 'Every room' : `Rooms up to level ${level + 1}`} onclick={() => showUpTo(level)}>{level + 1}</button>
+        <button class="btn" aria-pressed={upTo === level} title={level === levels ? t('map.corner.everyRoom') : t('map.corner.roomsUpTo', { level: level + 1 })} onclick={() => showUpTo(level)}>{level + 1}</button>
       {/each}
     </div>
   {/if}
@@ -1748,12 +1746,12 @@
   {/if}
 </div>
 <div class="corner bottom">
-  <button class="btn" aria-label="Zoom in" title="Zoom in (+)" aria-disabled={zoom >= 9} onclick={() => map?.zoomIn()}><Glyph name="plus" /></button>
-  <button class="btn" aria-label="Zoom out" title="Zoom out (-)" aria-disabled={zoom <= 1} onclick={() => map?.zoomOut()}><Glyph name="minus" /></button>
-  <button class="btn" aria-pressed={following} title="Follow your character (F)" onclick={follow}>Follow</button>
+  <button class="btn" aria-label={t('map.corner.zoomIn')} title={t('map.corner.zoomInTip')} aria-disabled={zoom >= 9} onclick={() => map?.zoomIn()}><Glyph name="plus" /></button>
+  <button class="btn" aria-label={t('map.corner.zoomOut')} title={t('map.corner.zoomOutTip')} aria-disabled={zoom <= 1} onclick={() => map?.zoomOut()}><Glyph name="minus" /></button>
+  <button class="btn" aria-pressed={following} title={t('map.corner.followTip')} onclick={follow}>{t('map.corner.follow')}</button>
 </div>
 {#if offMap}
-  <p class="map-note" in:fly={drop(8)} out:fade={gone}>This place is not on the map.</p>
+  <p class="map-note" in:fly={drop(8)} out:fade={gone}>{t('map.offMap')}</p>
 {/if}
 
 <style>
