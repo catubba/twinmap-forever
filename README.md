@@ -86,8 +86,8 @@ Bags, bank, gear and statistics of every character you play, with a picture of e
 
 - **In your language.** English, Français, Deutsch, Español (España), Español (Latinoamérica), Русский, 한국어 and 简体中文, the app and the addon, with the names of your game in its own language.
 - **Auction House.** The prices of your character's auction house, every hour: what your bags, bank and gear are worth, how a price moved over a day or a week, and an alert when it crosses your line.
-- **Your quests.** Where to hand in what is done and where to find what is left, for every quest of your log. With Questie installed, the ones to take as well.
-- **Services and resources.** Flight masters, inns, vendors, repair, trainers, banks, ore and herbs, each one a layer you turn on or off.
+- **Your quests.** Where to hand in what is done and where to find what is left, for every quest of your log, with the XP and money each one gives. With Questie installed, the ones to take as well.
+- **Services and resources.** Flight masters, inns, vendors, repair, trainers, banks, ore and herbs, each one a layer you turn on or off. Ore and herbs go by kind too, and can hide what no longer raises your skill.
 - **Caves and mines.** Zoom in on a zone and their galleries show through the ground, before you go in.
 - **When you die.** The map marks your corpse, the graveyard and the way back on foot, or the door of the dungeon you died in.
 - **From the map to the game.** Mark a point or build a route on Twinmap, and it appears in the game.
@@ -145,7 +145,7 @@ Here is what is planned, in no particular order. These are plans, not promises: 
 - **Group**: quests you share, pins everyone sees
 - **Travel**: time to arrive, flight paths, boats and zeppelins, your hearthstone
 - **More on the map**: zones colored by level, the places you have explored, rares and treasures
-- **Quests**: your whole quest log, chains, rewards, and a plan for the session
+- **Quests**: your whole quest log, chains, item rewards, and a plan for the session
 - **Character**: experience per hour, professions, reputations, a reminder when your trainer has something new
 - **Alerts**: full bags, broken gear, a disconnected game, and why you died
 - **Items**: a shopping list
