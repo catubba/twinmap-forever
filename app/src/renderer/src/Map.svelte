@@ -1933,7 +1933,9 @@
     justify-content: flex-end;
     align-items: center;
     gap: 4px;
-    max-width: calc(100cqw - 44px); /* the map's width less the two margins */
+    /* The map's width less the two margins and the name of the zone in the other corner (App.svelte, --readout), with a
+       hair of a gap: in a longer language the buttons go on two lines rather than over the name. */
+    max-width: calc(100cqw - 48px - var(--readout, 0px));
   }
   .tag {
     margin-right: 4px;

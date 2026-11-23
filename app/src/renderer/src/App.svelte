@@ -51,6 +51,8 @@
   // The map on show: the panel sends it to the place of a row.
   let mapView = $state<Map>()
   let looking = $state<{ zone: string; where: string } | null>(null) // what the map shows while moved away from the character
+  // How wide the name of the zone is over the map: the buttons in the other corner make room for it (Map.svelte, .line).
+  let readoutWidth = $state(0)
   // The quests of the log, with a pin or without.
   let log = $state.raw<LogQuest[]>([])
   window.twinmap.onQuests((status) => {
@@ -349,7 +351,7 @@
 {/if}
 {#if onSetup === false}
 <div class="work" class:shut={!panelOpen} class:map-right={layout.mapRight} in:fade={screen} inert={onSettings || onItems || onAh} style:--peek="{peek}px" style:--panel-w="{layout.width}px" bind:this={work}>
-  <div class="mapbox">
+  <div class="mapbox" style:--readout="{readoutWidth}px">
     {#if mapReady}
       <Map {pos} {group} {death} bind:back kills={live ? link?.state.sections.kills : undefined} bind:looking at={link?.state.updatedAt.pos} bind:this={mapView} {insideReady} {quests} {fixed} side={char?.side} {live} {inbox} removed={live ? goneFrom(link?.state.sections.marks) : []} set={live ? setFrom(link?.state.sections.marks) : []} gameFollows={live ? followFrom(link?.state.sections.follow) : null} {journey} {route} onroute={(stop) => setRoute(addStop(route, stop))} onnpc={(pin) => (npc = pin)} />
     {:else if tiles}
@@ -367,12 +369,12 @@
     {/if}
     {#if looking}
       <!-- The map was moved by hand: the zone and the coordinates of its middle. -->
-      <div class="readout">
+      <div class="readout" bind:clientWidth={readoutWidth}>
         <b>{looking.zone}</b>
         {looking.where}
       </div>
     {:else if pos}
-      <div class="readout">
+      <div class="readout" bind:clientWidth={readoutWidth}>
         <b>{pos.zone ?? t('app.map.unknownZone')}</b>
         {pos.sub ?? ''}
         {pos.x !== undefined && pos.y !== undefined ? `${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}` : ''}

@@ -931,6 +931,11 @@
   .alert .field.price {
     width: 110px;
   }
+  /* In a longer language the words and the fields of a line go on to the next one, whole, rather than squeezed. */
+  .alert .line {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
   .opt {
     display: flex;
     gap: 8px;

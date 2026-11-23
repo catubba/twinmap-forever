@@ -149,6 +149,7 @@
     {/if}
     {#if goods.length}
       {#if list}<h3 class="grp"><span>{t('items.npc.sellsHeading', { count: goods.length })}</span></h3>{/if}
+      <div class="table">
       <div class="head"><span></span><span>{t('items.npc.columns.item')}</span><span>{t('items.npc.columns.price')}{#if listing}<small title={t('items.npc.ahNote')}>&nbsp;· {t('items.npc.columns.ah')}</small>{/if}</span><span>{t('items.npc.columns.bags')}</span><span>{t('items.npc.columns.bank')}</span></div>
       {#each goods as g (g.id)}
         <div class="r" class:two={!!listing} use:itemTip={{ item: g.id }}>
@@ -165,6 +166,7 @@
           <span class="own" class:zero={!g.bank}>{g.bank || '-'}</span>
         </div>
       {/each}
+      </div>
     {/if}
   </div>
   {#if list?.known.length}
@@ -263,9 +265,24 @@
     height: 31px;
     padding: 0 16px;
   }
-  .head,
-  .r {
-    grid-template-columns: 26px minmax(0, 1fr) 66px 30px 30px;
+  /* The price and the two counts are as wide as their longest text, never less than in English: in a longer language
+     the headers push the names, which end with dots, rather than run into each other. The narrow tracks at the two ends,
+     with the gaps, are the rows' own margins. */
+  .table {
+    display: grid;
+    grid-template-columns: 8px 26px minmax(0, 1fr) minmax(66px, max-content) minmax(30px, max-content) minmax(30px, max-content) 8px;
+    column-gap: 8px;
+  }
+  .table > .head,
+  .table > .r {
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
+    padding-left: 0;
+    padding-right: 0;
+  }
+  .table > .head > :first-child,
+  .table > .r > :first-child {
+    grid-column: 2;
   }
   .head {
     display: grid;

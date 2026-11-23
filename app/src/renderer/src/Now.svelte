@@ -197,7 +197,7 @@
 {/snippet}
 
 {#snippet rows(list: NowRow[])}
-  <div class="rows">
+  <div class="rows places">
     {#each list as row (row.key)}
       <!-- A place on the other continent has no distance to walk: the row still takes the map there. -->
       <!-- The yards are those on foot where a way is known; the arrow points at the place itself. -->
@@ -284,6 +284,22 @@
   /* More room above a title than under it: the band belongs to its own rows. */
   .rows {
     padding: 6px 0 16px;
+  }
+  /* The kind and the distance are as wide as their longest text in the list, never less than in English: in a longer
+     language they push the names, which end with dots, and stay in line from row to row. The narrow tracks at the two
+     ends, with the gaps, are the rows' own margins. */
+  .places {
+    display: grid;
+    grid-template-columns: 8px minmax(0, 1fr) minmax(56px, max-content) minmax(60px, max-content) 12px 8px;
+    column-gap: 8px;
+  }
+  .places > .row {
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
+    padding: 0;
+  }
+  .places > .row > :first-child {
+    grid-column: 2;
   }
   /* The rows with no place follow the others as one list, and are not for clicking. */
   .rows:has(+ .placeless) {
