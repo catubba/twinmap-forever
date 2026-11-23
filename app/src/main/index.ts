@@ -1092,9 +1092,9 @@ void Promise.all([captureReady, app.whenReady()]).then(([captureError]) => {
   record.say(`started: Twinmap ${app.getVersion()}${GPU ? '' : ', hardware acceleration off'}`)
   if (captureError) record.say(captureError)
   if (!captureAllowed()) {
-    // Preflight alone never adds Twinmap to System Settings on a fresh install.
+    // Asking makes macOS register Twinmap for the permission and may show its prompt; preflight alone never does.
     requestCapture()
-    record.say('Allow Twinmap under System Settings > Privacy & Security > Screen & System Audio Recording, then reopen Twinmap.')
+    record.say('Twinmap cannot read the game window yet. Under System Settings > Privacy & Security > Screen & System Audio Recording, turn on Twinmap (add it with + if it is not listed), then reopen Twinmap.')
   }
   updateFirst(createWindow, (line) => record.say(`update: ${line}`))
 })

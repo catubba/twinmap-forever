@@ -43,8 +43,8 @@ export default {
     lost: 'Link lost',
     lostLine: 'No signal from the game. Log in, and check that the Twinmap Forever addon is on and its strip is not paused.',
     // macOS only: shown on the map and in setup while Screen Recording permission is missing; Windows needs no such permission.
-    // Use the names of System Settings and its panes as macOS shows them in this language.
-    screenRecording: 'Twinmap cannot read the game window yet. Allow Twinmap under System Settings > Privacy & Security > Screen & System Audio Recording, then reopen Twinmap.',
+    // Use the names of System Settings and its panes as macOS shows them in this language; + is the button under the list.
+    screenRecording: 'Twinmap cannot read the game window yet. Under System Settings > Privacy & Security > Screen & System Audio Recording, turn on Twinmap (add it with + if it is not listed), then reopen Twinmap.',
     combat: 'In combat, position only',
     connected: 'Connected',
     // Inside a dungeon, when the arrow is not there. "Rotate Minimap" is the name of the game's own setting.

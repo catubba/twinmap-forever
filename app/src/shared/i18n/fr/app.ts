@@ -30,7 +30,7 @@ export default {
     connecting: 'Connexion',
     lost: 'Connexion perdue',
     lostLine: 'Aucun signal du jeu. Connectez-vous et vérifiez que l’addon Twinmap Forever est activé et que sa bande n’est pas en pause.',
-    screenRecording: 'Twinmap ne peut pas encore lire la fenêtre du jeu. Autorisez Twinmap dans « Réglages Système > Confidentialité et sécurité > Enregistrement de l’écran et des sons du système », puis rouvrez Twinmap.',
+    screenRecording: 'Twinmap ne peut pas encore lire la fenêtre du jeu. Activez Twinmap dans « Réglages Système > Confidentialité et sécurité > Enregistrement de l’écran et des sons du système » (ajoutez-le avec + s’il ne figure pas dans la liste), puis rouvrez Twinmap.',
     combat: 'En combat, position seule',
     connected: 'Connecté',
     minimapTurns: 'Dans un donjon, votre position est lue sur la minicarte, ce qui est impossible quand elle tourne : désactivez « Rotation de la minicarte » dans le jeu.',

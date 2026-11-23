@@ -32,7 +32,7 @@ export default {
     // "Disconnected": short, the line under it says why.
     lost: 'Getrennt',
     lostLine: 'Kein Signal vom Spiel. Loggt Euch ein und prüft, ob das Twinmap-Forever-Addon aktiv ist und sein Streifen nicht pausiert ist.',
-    screenRecording: 'Twinmap kann das Spielfenster noch nicht lesen. Erlaubt Twinmap unter "Systemeinstellungen > Datenschutz & Sicherheit > Aufnahme von Bildschirm & Systemaudio" und öffnet Twinmap dann erneut.',
+    screenRecording: 'Twinmap kann das Spielfenster noch nicht lesen. Schaltet Twinmap unter "Systemeinstellungen > Datenschutz & Sicherheit > Aufnahme von Bildschirm & Systemaudio" ein (fügt es mit + hinzu, falls es nicht aufgelistet ist) und öffnet Twinmap dann erneut.',
     combat: 'Im Kampf, nur Position',
     connected: 'Verbunden',
     minimapTurns: 'In einem Dungeon wird Eure Position von der Minikarte gelesen, und das geht nicht, solange sie sich dreht: Schaltet "Minikarte drehen" im Spiel aus.',

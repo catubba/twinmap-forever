@@ -31,7 +31,7 @@ export default {
     connecting: 'Conectando',
     lost: 'Conexión perdida',
     lostLine: 'No llega ninguna señal del juego. Inicia sesión y comprueba que el addon Twinmap Forever está activado y que su franja no está en pausa.',
-    screenRecording: 'Twinmap aún no puede leer la ventana del juego. Permite Twinmap en "Ajustes del Sistema > Privacidad y seguridad > Grabación de pantalla y del audio del sistema", y luego vuelve a abrir Twinmap.',
+    screenRecording: 'Twinmap aún no puede leer la ventana del juego. Activa Twinmap en "Ajustes del Sistema > Privacidad y seguridad > Grabación de pantalla y del audio del sistema" (añádelo con + si no aparece en la lista), y luego vuelve a abrir Twinmap.',
     combat: 'En combate, solo posición',
     connected: 'Conectado',
     minimapTurns: 'Dentro de una mazmorra, tu posición se lee del minimapa, y no se puede mientras el minimapa gira: desactiva "Rotar minimapa" en el juego.',
