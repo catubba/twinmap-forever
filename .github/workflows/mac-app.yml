@@ -1,0 +1,111 @@
+name: Mac app
+
+# The Mac app of a release, signed and notarized with the Developer ID of markus-barta until this project has an Apple
+# account of its own (M19-F4). His fork builds Twinmap.app from the public source of our tag and publishes it as its
+# release mac-<tag>. This workflow fetches it, checks it as a player's Mac will, checks that it holds our code and
+# nothing else (its app.asar the same as the one built here from the same tag), and attaches it to our release as
+# Twinmap-mac-arm64.zip: the one name the download buttons point to, as Twinmap-Setup.exe is for Windows.
+on:
+  release:
+    types: [published]
+  schedule:
+    # His fork looks at our releases at 7 and 37: the build is ready from about half an hour later.
+    - cron: '22,52 * * * *'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag of a release here (v1.2.3). Empty means the latest release.
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mac-app
+  cancel-in-progress: false
+
+env:
+  FORK: markus-barta/twinmap-forever
+  ZIP: Twinmap-mac-arm64.zip
+
+jobs:
+  # A quick look on Linux: is there something to do? The Mac runner starts only when there is.
+  find:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.find.outputs.tag }}
+      version: ${{ steps.find.outputs.version }}
+      todo: ${{ steps.find.outputs.todo }}
+    steps:
+      - id: find
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          tag="${INPUT_TAG:-$(gh release view -R "$GITHUB_REPOSITORY" --json tagName --jq .tagName)}"
+          [[ "$tag" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)$ ]] || { echo "::error::Not a version tag: $tag"; exit 1; }
+          version="${BASH_REMATCH[1]}" todo=true
+          if gh release view "$tag" -R "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | grep -qx "$ZIP"; then
+            echo "$tag has its Mac app already."; todo=false
+          elif ! gh release view "mac-$tag" -R "$FORK" --json assets --jq '.assets[].name' 2>/dev/null | grep -qx "Twinmap-$version-arm64.zip"; then
+            echo "mac-$tag is not on $FORK yet: next time."; todo=false
+          fi
+          echo "$tag, version $version, to do $todo"
+          { echo "tag=$tag"; echo "version=$version"; echo "todo=$todo"; } >> "$GITHUB_OUTPUT"
+
+  attach:
+    needs: find
+    if: needs.find.outputs.todo == 'true'
+    runs-on: macos-15
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ needs.find.outputs.tag }}
+      VERSION: ${{ needs.find.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.find.outputs.tag }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Build Twinmap.app from the tag, as the fork does
+        working-directory: app
+        run: |
+          npm ci
+          npm run dist:mac -- -c.extraMetadata.version="$VERSION"
+      - name: Fetch the signed app from the fork
+        run: |
+          set -euo pipefail
+          mkdir "$RUNNER_TEMP/fork" && cd "$RUNNER_TEMP/fork"
+          gh release download "mac-$TAG" -R "$FORK" -p "Twinmap-$VERSION-arm64.zip" -p "Twinmap-$VERSION-arm64.zip.sha256"
+          shasum -a 256 -c "Twinmap-$VERSION-arm64.zip.sha256"
+          ditto -x -k "Twinmap-$VERSION-arm64.zip" app
+          [ -d app/Twinmap.app ] || { echo "::error::No Twinmap.app in the zip"; exit 1; }
+      - name: Check it as a player's Mac will
+        run: |
+          set -euo pipefail
+          app="$RUNNER_TEMP/fork/app/Twinmap.app"
+          codesign --verify --deep --strict --verbose=2 "$app"
+          spctl --assess --type execute --verbose=2 "$app"
+          xcrun stapler validate "$app"
+          codesign -dv "$app" 2>&1 | grep -E '^(Authority|TeamIdentifier)='
+      - name: Check that it holds our code and nothing else
+        run: |
+          set -euo pipefail
+          ours=app/dist/mac-arm64/Twinmap.app/Contents/Resources/app.asar
+          theirs="$RUNNER_TEMP/fork/app/Twinmap.app/Contents/Resources/app.asar"
+          shasum -a 256 "$ours" "$theirs"
+          cmp "$ours" "$theirs" || { echo "::error::app.asar of the fork differs from the one built here from $TAG"; exit 1; }
+          # The rest of the app is Electron and the capture helper; their files may differ only by their signatures.
+          diff <(cd app/dist/mac-arm64/Twinmap.app && find . -type f ! -path '*/_CodeSignature/*' | sort) \
+               <(cd "$RUNNER_TEMP/fork/app/Twinmap.app" && find . -type f ! -path '*/_CodeSignature/*' ! -name CodeResources | sort)
+      - name: Attach it to the release
+        run: |
+          set -euo pipefail
+          cp "$RUNNER_TEMP/fork/Twinmap-$VERSION-arm64.zip" "$ZIP"
+          shasum -a 256 "$ZIP" > "$ZIP.sha256"
+          gh release upload "$TAG" "$ZIP" "$ZIP.sha256" -R "$GITHUB_REPOSITORY"
