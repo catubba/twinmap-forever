@@ -121,6 +121,11 @@ jobs:
               esac
             done < <(find "$RUNNER_TEMP/asar-$side" -type f -print0)
           done
+          # The bundler writes the folder a build was made in into a comment above each worker it starts
+          # ("// ./walk-worker?nodeWorker&importer=/path/app/src/main/index.ts"): only those comment lines are left out.
+          for side in ours theirs; do
+            find "$RUNNER_TEMP/asar-$side/out" -name '*.js' -exec perl -i -ne 'print unless m{^// \./[\w-]+\?nodeWorker&importer=\S+$}' {} +
+          done
           if ! diff -r --brief "$RUNNER_TEMP/asar-ours" "$RUNNER_TEMP/asar-theirs" > "$RUNNER_TEMP/asar.diff"; then
             cat "$RUNNER_TEMP/asar.diff"
             # What differs in a text file, to see why.
