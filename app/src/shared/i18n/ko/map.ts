@@ -117,16 +117,15 @@ export default {
     inZone: '{zone} {x}, {y}',
   },
 
-  // "미터" attached to the number, as the game's SPELL_RANGE.
   way: {
-    north: '{yards}미터 북쪽',
-    northEast: '{yards}미터 북동쪽',
-    east: '{yards}미터 동쪽',
-    southEast: '{yards}미터 남동쪽',
-    south: '{yards}미터 남쪽',
-    southWest: '{yards}미터 남서쪽',
-    west: '{yards}미터 서쪽',
-    northWest: '{yards}미터 북서쪽',
+    north: '{far} 북쪽',
+    northEast: '{far} 북동쪽',
+    east: '{far} 동쪽',
+    southEast: '{far} 남동쪽',
+    south: '{far} 남쪽',
+    southWest: '{far} 남서쪽',
+    west: '{far} 서쪽',
+    northWest: '{far} 북서쪽',
     onFoot: '도보 {time}',
   },
 
@@ -174,7 +173,6 @@ export default {
     field: '검색',
     results: '검색 결과',
     none: '해당 이름의 결과가 없습니다.',
-    yards: '{yards}미터',
     zone: '지역',
     myPin: '내 핀',
     myPinIn: '내 핀, {zone}',

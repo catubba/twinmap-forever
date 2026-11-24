@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Settings: a window over the map, its categories in a column on the left, the groups of the one chosen on the right. On a
+  // Settings: a window over the map, its categories in a column on the left, the rows of the one chosen on the right. On a
   // narrow window the column keeps its icons only. Closed with the cross or Escape; the category chosen is kept for the session.
   import licences from '../../../../THIRD-PARTY-LICENSES?raw'
   import { onMount } from 'svelte'
@@ -13,7 +13,7 @@
   import { inApp } from './web'
   import { ZOOMS } from '../../shared/window'
   import { layout, setMapRight } from './layout.svelte'
-  import { langNow, num, t, type Key } from '../../shared/i18n'
+  import { langNow, metresOn, metricOffered, num, t, type Key } from '../../shared/i18n'
 
   let { setup, tiles, onback, onfirstrun, onfeedback, onnews }: { setup: SetupStatus; tiles: TilesStatus | null; onback: () => void; onfirstrun: () => void; onfeedback: () => void; onnews: () => void } = $props()
 
@@ -63,6 +63,12 @@
     for (let row = 0; row < side; row++) for (let column = 0; column < side; column++) if (made.isDark(row, column)) path += `M${column} ${row}h1v1h-1z`
     return { side, path }
   })
+  // Metres or yards: kept by this window, as the side of the map; the page loads again in it (main.ts reads it).
+  function setDistances(to: string): void {
+    localStorage.setItem('distances', to)
+    sessionStorage.setItem('view', 'settings') // it opens again where it was (App.svelte)
+    location.reload()
+  }
   const map = $derived(
     !tiles || tiles.state === 'looking' ? t('settings.found.mapLooking') : tiles.state === 'no-game' ? t('settings.found.mapNoGame') : tiles.state === 'converting' ? t('settings.found.mapBuilding', { percent: tiles.percent }) : tiles.state === 'failed' ? t('settings.found.mapFailed', { message: tiles.message }) : t('settings.found.mapReady', { version: tiles.version }),
   )
@@ -78,56 +84,51 @@
   <button class="x" aria-label={t('common.close')} onclick={() => dialog.close()}><Glyph name="close" size={14} /></button>
   <div class="body">
     <h2 class="title">{t(CATS.find((c) => c.key === cat)!.name)}</h2>
+    <!-- No cards: one column of rows, a label and its control, the notes small under their row. -->
     {#if cat === 'general'}
       <!-- The language is the computer's: a phone's page follows it. A pick is spoken at once, the page loads again in it. -->
       {#if inApp}
-        <section class="group">
-          <h3 class="band">{t('language.settingsTitle')}</h3>
-          <div class="in">
-            <label class="choice">{t('language.label')} <select class="field" value={langNow()} onchange={(e) => void window.twinmap.setLang(e.currentTarget.value)}>{#each setup.langs ?? [] as lang (lang.code)}<option value={lang.code} disabled={!lang.ready}>{lang.ready ? lang.name : lang.soon}</option>{/each}</select></label>
-            <p class="hint">{t('language.hint')}</p>
-          </div>
-        </section>
+        <div class="setting">
+          <label class="choice">{t('language.label')} <select class="field" value={langNow()} onchange={(e) => void window.twinmap.setLang(e.currentTarget.value)}>{#each setup.langs ?? [] as lang (lang.code)}<option value={lang.code} disabled={!lang.ready}>{lang.ready ? lang.name : lang.soon}</option>{/each}</select></label>
+          <p class="hint">{t('language.hint')}</p>
+        </div>
+      {/if}
+      <!-- Only where the game counts in yards (English, Chinese): its other languages already write m. The page loads
+           again in the choice, as for the language, so that every distance on it changes at once. -->
+      {#if metricOffered()}
+        <label class="choice">{t('settings.distances.label')} <select class="field size" value={metresOn() ? 'metres' : 'yards'} onchange={(e) => setDistances(e.currentTarget.value)}><option value="yards">{t('settings.distances.yards')}</option><option value="metres">{t('settings.distances.metres')}</option></select></label>
       {/if}
       <!-- The window is the computer's: a phone on the home network has none to set. -->
       {#if inApp}
-        <section class="group">
-          <h3 class="band">{t('settings.window.title')}</h3>
-          <div class="in">
-            <label class="choice"><input type="checkbox" class="check" checked={setup.onTop} onchange={(e) => window.twinmap.setOnTop(e.currentTarget.checked)} />{t('settings.window.onTop')}</label>
-            <label class="choice">{t('settings.window.textSize')} <select class="field size" value={setup.zoom ?? 1} onchange={(e) => window.twinmap.setZoom(Number(e.currentTarget.value))}>{#each ZOOMS as z (z)}<option value={z}>{num(z, { style: 'percent' })}</option>{/each}</select></label>
-            <label class="choice"><input type="checkbox" class="check" checked={setup.gpu?.chosen ?? true} onchange={(e) => window.twinmap.setGpu(e.currentTarget.checked)} />{t('settings.window.gpu')}</label>
-            <p class="hint">{t('settings.window.gpuHint')}</p>
-            {#if setup.gpu && setup.gpu.chosen !== setup.gpu.running}
-              <div class="line"><span class="hint">{t('settings.window.restartNeeded')}</span><button class="btn" onclick={() => window.twinmap.restart()}>{t('settings.window.restartNow')}</button></div>
-            {/if}
-          </div>
-        </section>
+        <label class="choice">{t('settings.window.textSize')} <select class="field size" value={setup.zoom ?? 1} onchange={(e) => window.twinmap.setZoom(Number(e.currentTarget.value))}>{#each ZOOMS as z (z)}<option value={z}>{num(z, { style: 'percent' })}</option>{/each}</select></label>
+        <label class="choice"><input type="checkbox" class="check" checked={setup.onTop} onchange={(e) => window.twinmap.setOnTop(e.currentTarget.checked)} />{t('settings.window.onTop')}</label>
+        <div class="setting">
+          <label class="choice"><input type="checkbox" class="check" checked={setup.gpu?.chosen ?? true} onchange={(e) => window.twinmap.setGpu(e.currentTarget.checked)} />{t('settings.window.gpu')}</label>
+          <p class="hint">{t('settings.window.gpuHint')}</p>
+          {#if setup.gpu && setup.gpu.chosen !== setup.gpu.running}
+            <div class="line"><span class="hint">{t('settings.window.restartNeeded')}</span><button class="btn" onclick={() => window.twinmap.restart()}>{t('settings.window.restartNow')}</button></div>
+          {/if}
+        </div>
       {/if}
     {:else if cat === 'appearance'}
-      <section class="group">
-        <h3 class="band">{t('settings.layout.title')}</h3>
-        <div class="in">
-          <label class="choice"><input type="radio" class="check" name="map-side" checked={!layout.mapRight} onchange={() => setMapRight(false)} />{t('settings.layout.mapLeft')}</label>
-          <label class="choice"><input type="radio" class="check" name="map-side" checked={layout.mapRight} onchange={() => setMapRight(true)} />{t('settings.layout.mapRight')}</label>
-        </div>
-      </section>
+      <div class="setting">
+        <label class="choice">{t('settings.layout.label')} <select class="field size" value={layout.mapRight ? 'right' : 'left'} onchange={(e) => setMapRight(e.currentTarget.value === 'right')}><option value="left">{t('settings.layout.left')}</option><option value="right">{t('settings.layout.right')}</option></select></label>
+        {#if !touch}<p class="hint">{t('settings.layout.hint')}</p>{/if}
+      </div>
     {:else if cat === 'game'}
-      <section class="group">
-        <h3 class="band">{t('settings.gameFolder.title')}</h3>
-        <div class="in">
-          <div class="line">
-            <span class="path" title={setup.gameFolder ?? undefined}>{setup.gameFolder ?? t('settings.gameFolder.notFound')}</span>
-            <!-- The folder is chosen on the computer it is on. -->
-            {#if inApp}<button class="btn" onclick={choose}>{setup.gameFolder ? t('settings.gameFolder.change') : t('settings.gameFolder.choose')}</button>{/if}
-          </div>
-          {#if wrong}<p class="wrong">{wrong}</p>{/if}
+      <div class="setting">
+        <h3 class="sub">{t('settings.gameFolder.title')}</h3>
+        <div class="line">
+          <span class="path" title={setup.gameFolder ?? undefined}>{setup.gameFolder ?? t('settings.gameFolder.notFound')}</span>
+          <!-- The folder is chosen on the computer it is on. -->
+          {#if inApp}<button class="btn" onclick={choose}>{setup.gameFolder ? t('settings.gameFolder.change') : t('settings.gameFolder.choose')}</button>{/if}
         </div>
-      </section>
-      <section class="group">
-        <h3 class="band">{t('settings.found.title')}</h3>
+        {#if wrong}<p class="wrong">{wrong}</p>{/if}
+      </div>
+      <div class="setting">
+        <h3 class="sub">{t('settings.found.inFolder')}</h3>
         <!-- A light, the name, what was found; a button only where something is missing. -->
-        <dl class="in found">
+        <dl class="found">
           <div>
             <dt><i class:off={!setup.addon}></i>{t('settings.found.addon')}</dt>
             <dd>{#if setup.addon}{setup.addon}{:else}<button class="btn" onclick={() => window.twinmap.openCurseForge()}>{t('settings.found.get')}</button>{/if}</dd>
@@ -145,62 +146,52 @@
             <dd>{map}</dd>
           </div>
         </dl>
-      </section>
+      </div>
     {:else if cat === 'phone'}
-      <section class="group">
-        <h3 class="band">{t('settings.phone.title')}</h3>
-        <div class="in">
-          <label class="choice"><input type="checkbox" class="check" checked={!!setup.lan} onchange={(e) => window.twinmap.setLan(e.currentTarget.checked)} />{t('settings.phone.share')}</label>
-          {#if setup.lan && 'error' in setup.lan}<p class="wrong">{setup.lan.error}</p>{/if}
-          {#if lanUrl && code}
-            <div class="phone">
-              <svg class="code" viewBox="-4 -4 {code.side + 8} {code.side + 8}" role="img" aria-label={t('settings.phone.codeLabel')}><path d={code.path} /></svg>
-              <div>
-                <span class="hint">{t('settings.phone.scan')}</span>
-                <span class="address">{lanUrl}</span>
-                <p class="hint">{t('settings.phone.homeOnly')}</p>
-              </div>
+      <div class="setting">
+        <label class="choice"><input type="checkbox" class="check" checked={!!setup.lan} onchange={(e) => window.twinmap.setLan(e.currentTarget.checked)} />{t('settings.phone.share')}</label>
+        {#if setup.lan && 'error' in setup.lan}<p class="wrong">{setup.lan.error}</p>{/if}
+        {#if lanUrl && code}
+          <div class="phone">
+            <svg class="code" viewBox="-4 -4 {code.side + 8} {code.side + 8}" role="img" aria-label={t('settings.phone.codeLabel')}><path d={code.path} /></svg>
+            <div>
+              <span class="hint">{t('settings.phone.scan')}</span>
+              <span class="address">{lanUrl}</span>
+              <p class="hint">{t('settings.phone.homeOnly')}</p>
             </div>
-          {/if}
-        </div>
-      </section>
+          </div>
+        {/if}
+      </div>
     {:else if cat === 'privacy'}
       <!-- The participation programme: the words approved with its notice (site/privacy.html, "participation"). -->
-      <section class="group">
-        <h3 class="band">{t('participate.title')}</h3>
-        <div class="in">
-          <label class="choice"><input type="checkbox" class="check" checked={setup.participate === true} onchange={(e) => window.twinmap.setParticipate(e.currentTarget.checked)} />{t('settings.participate.share')}</label>
-          <p class="hint">{t('settings.participate.what')} <button class="link" onclick={() => void window.twinmap.openFeedback('participation', '')}>{t('participate.full')}</button></p>
-        </div>
-      </section>
+      <div class="setting">
+        <h3 class="sub">{t('participate.title')}</h3>
+        <label class="choice"><input type="checkbox" class="check" checked={setup.participate === true} onchange={(e) => window.twinmap.setParticipate(e.currentTarget.checked)} />{t('settings.participate.share')}</label>
+        <p class="hint">{t('settings.participate.what')} <button class="link" onclick={() => void window.twinmap.openFeedback('participation', '')}>{t('participate.full')}</button></p>
+      </div>
     {:else if cat === 'keys'}
-      <section class="group keys">
-        <h3 class="band">{t('settings.keys.title')}</h3>
-        <dl class="in">
-          <div><dt><kbd>L</kbd></dt><dd>{t('settings.keys.layers')}</dd></div>
-          <div><dt><kbd>F</kbd></dt><dd>{t('settings.keys.follow')}</dd></div>
-          <div><dt><kbd>N</kbd></dt><dd>{t('settings.keys.north')}</dd></div>
-          <div><dt><kbd>M</kbd></dt><dd>{t('settings.keys.side')}</dd></div>
-          {#if inApp}<div><dt><kbd>F11</kbd></dt><dd>{t('settings.keys.fullScreen')}</dd></div>{/if}
-          {#if inApp}<div><dt><kbd>{t('settings.keys.ctrl')}</kbd><kbd>+</kbd><kbd>-</kbd><kbd>0</kbd></dt><dd>{t('settings.keys.zoom')}</dd></div>{/if}
-          <div><dt><kbd>Esc</kbd></dt><dd>{t('settings.keys.close')}</dd></div>
-          <div><dt><kbd>{t('settings.keys.arrows')}</kbd><kbd>+</kbd><kbd>-</kbd></dt><dd>{t('settings.keys.move')}</dd></div>
-          <div><dt><kbd>{t('settings.keys.rightDrag')}</kbd></dt><dd>{t('settings.keys.turn')}</dd></div>
-          <div><dt><kbd>{t('settings.keys.space')}</kbd></dt><dd>{t('settings.keys.label')}</dd></div>
-        </dl>
-      </section>
+      <dl class="keys">
+        <div><dt><kbd>L</kbd></dt><dd>{t('settings.keys.layers')}</dd></div>
+        <div><dt><kbd>F</kbd></dt><dd>{t('settings.keys.follow')}</dd></div>
+        <div><dt><kbd>N</kbd></dt><dd>{t('settings.keys.north')}</dd></div>
+        <div><dt><kbd>M</kbd></dt><dd>{t('settings.keys.side')}</dd></div>
+        {#if inApp}<div><dt><kbd>F11</kbd></dt><dd>{t('settings.keys.fullScreen')}</dd></div>{/if}
+        {#if inApp}<div><dt><kbd>{t('settings.keys.ctrl')}</kbd><kbd>+</kbd><kbd>-</kbd><kbd>0</kbd></dt><dd>{t('settings.keys.zoom')}</dd></div>{/if}
+        <div><dt><kbd>Esc</kbd></dt><dd>{t('settings.keys.close')}</dd></div>
+        <div><dt><kbd>{t('settings.keys.arrows')}</kbd><kbd>+</kbd><kbd>-</kbd></dt><dd>{t('settings.keys.move')}</dd></div>
+        <div><dt><kbd>{t('settings.keys.rightDrag')}</kbd></dt><dd>{t('settings.keys.turn')}</dd></div>
+        <div><dt><kbd>{t('settings.keys.space')}</kbd></dt><dd>{t('settings.keys.label')}</dd></div>
+      </dl>
     {:else}
-      <section class="group">
-        <h3 class="band">Twinmap {setup.version}</h3>
-        <div class="in">
-          <p class="hint">{t('settings.version.updates')}</p>
-          <div class="buttons">
-            <button class="btn" onclick={onnews}>{t('news.button')}</button>
-            <button class="btn" onclick={onfeedback}>{t('settings.version.report')}</button>
-            {#if inApp}<button class="btn" onclick={onfirstrun}>{t('settings.version.firstRun')}</button>{/if}
-          </div>
+      <div class="setting">
+        <h3 class="sub">Twinmap {setup.version}</h3>
+        <p class="hint">{t('settings.version.updates')}</p>
+        <div class="buttons">
+          <button class="btn" onclick={onnews}>{t('news.button')}</button>
+          <button class="btn" onclick={onfeedback}>{t('settings.version.report')}</button>
+          {#if inApp}<button class="btn" onclick={onfirstrun}>{t('settings.version.firstRun')}</button>{/if}
         </div>
-      </section>
+      </div>
       <div class="about">
         <span class="mark"><Logo size={36} word={false} /></span>
         <div>
@@ -225,7 +216,7 @@
 </dialog>
 
 <style>
-  /* The window: the column of the categories, then the groups of the one chosen, which scroll on their own. */
+  /* The window: the column of the categories, then the rows of the one chosen, which scroll on their own. */
   dialog {
     width: min(920px, calc(100vw - 32px));
     height: min(640px, calc(100vh - 32px));
@@ -307,29 +298,28 @@
     font: var(--t-title);
     color: var(--gold);
   }
-  /* A group: its band, and what it holds on a darker ground with a thin edge. */
-  .group {
-    background: #0000002e;
-    box-shadow:
-      0 0 0 1px var(--bronze-700),
-      0 0 0 2px #000;
-  }
-  .in {
+  /* A row: its label and control, or its subtitle, then the notes small under it. */
+  .setting {
     display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: 12px;
+    justify-items: start;
+    gap: 4px;
+    min-width: 0;
+  }
+  .sub {
     margin: 0;
-    padding: 14px 16px 16px;
+    font: inherit;
+    line-height: 26px;
+    color: var(--text);
   }
   .line {
     display: flex;
     align-items: center;
     gap: 12px;
+    max-width: 100%;
     min-height: 28px;
   }
   .line .btn {
     flex: none;
-    margin-left: auto;
   }
   .path {
     min-width: 0;
@@ -339,6 +329,7 @@
   }
   .hint {
     display: block;
+    max-width: 64ch;
     margin: 0;
     font: var(--t-small);
     color: var(--text-dim);
@@ -358,6 +349,7 @@
   }
   .buttons {
     display: flex;
+    margin-top: 8px;
     flex-wrap: wrap;
     gap: 10px;
   }
@@ -392,9 +384,8 @@
     margin: 0;
   }
   .found {
-    gap: 0;
-    padding-top: 8px;
-    padding-bottom: 8px;
+    width: min(520px, 100%);
+    margin: 0;
   }
   .found div {
     display: flex;
@@ -437,9 +428,11 @@
     background: var(--objective);
   }
 
-  .keys dl {
+  dl.keys {
+    display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px 24px;
+    margin: 0;
   }
   .keys div {
     display: flex;
@@ -570,7 +563,7 @@
       align-items: flex-start;
       padding-left: 0;
     }
-    .keys dl {
+    dl.keys {
       grid-template-columns: minmax(0, 1fr);
     }
   }

@@ -18,14 +18,20 @@ export default {
     choose: 'Elegir la carpeta del juego',
   },
 
+  distances: {
+    label: 'Distancias',
+    yards: 'Yardas',
+    metres: 'Metros',
+  },
+
   layout: {
-    title: 'Disposición',
-    mapLeft: 'Mapa a la izquierda',
-    mapRight: 'Mapa a la derecha',
+    label: 'Mapa',
+    left: 'A la izquierda',
+    right: 'A la derecha',
+    hint: 'M lo cambia de lado en cualquier momento.',
   },
 
   window: {
-    title: 'Ventana',
     onTop: 'Mantener Twinmap sobre las demás ventanas',
     textSize: 'Tamaño del texto',
     gpu: 'Usar aceleración por hardware',
@@ -50,7 +56,7 @@ export default {
   },
 
   found: {
-    title: 'Lo que ha encontrado Twinmap',
+    inFolder: 'Encontrado en la carpeta',
     // The game says "addon" in its texts (GS DISABLE_ADDONS "Desactivar addons").
     addon: 'Addon Twinmap Forever',
     questie: 'PNJ, servicios y misiones',
@@ -84,7 +90,7 @@ export default {
     ctrl: 'Ctrl',
     zoom: 'Tamaño del texto, también Ctrl y la rueda fuera del mapa',
     // "estas opciones": the page is called Opciones.
-    close: 'Cierra una etiqueta, Capas, estas opciones',
+    close: 'Cierra una etiqueta, Filtros, estas opciones',
     arrows: 'Flechas',
     move: 'Mover el mapa y hacer zoom',
     // The game's short name of the button (GS KEY_BUTTON2 "Botón dcho. ratón"): the drag goes in turn.

@@ -18,14 +18,20 @@ export default {
     choose: '게임 폴더 선택',
   },
 
+  distances: {
+    label: '거리',
+    yards: '야드',
+    metres: '미터',
+  },
+
   layout: {
-    title: '화면 배치',
-    mapLeft: '왼쪽에 지도',
-    mapRight: '오른쪽에 지도',
+    label: '지도',
+    left: '왼쪽',
+    right: '오른쪽',
+    hint: 'M 키로 언제든지 반대쪽으로 옮길 수 있습니다.',
   },
 
   window: {
-    title: '창',
     // Twinmap is read 트윈맵: the particles after it follow the final ㅂ.
     onTop: 'Twinmap을 항상 다른 창 위에 표시',
     // GS FONT_SIZE.
@@ -51,7 +57,7 @@ export default {
   },
 
   found: {
-    title: 'Twinmap이 찾은 항목',
+    inFolder: '폴더에서 찾은 항목',
     addon: 'Twinmap Forever 애드온',
     questie: 'NPC, 편의 시설, 퀘스트',
     // GS OPTIONAL.
@@ -87,7 +93,7 @@ export default {
     // "+" between the keys: no particle after Ctrl.
     zoom: '글자 크기, 지도 밖에서는 Ctrl + 마우스 휠로도 조절',
     // "정보 카드": our word for the label that opens on a point.
-    close: '정보 카드, 레이어, 설정 창 닫기',
+    close: '정보 카드, 필터, 설정 창 닫기',
     // "키" after it: the Arrow of the route is "화살표".
     arrows: '화살표 키',
     move: '지도 이동 및 확대/축소',

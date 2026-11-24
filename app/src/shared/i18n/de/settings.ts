@@ -18,14 +18,20 @@ export default {
     choose: 'Spielordner wählen',
   },
 
+  distances: {
+    label: 'Entfernungen',
+    yards: 'Yards',
+    metres: 'Meter',
+  },
+
   layout: {
-    title: 'Anordnung',
-    mapLeft: 'Karte links',
-    mapRight: 'Karte rechts',
+    label: 'Karte',
+    left: 'Links',
+    right: 'Rechts',
+    hint: 'Mit M wechselt sie jederzeit die Seite.',
   },
 
   window: {
-    title: 'Fenster',
     // "Immer im Vordergrund" is how Windows and German apps name it.
     onTop: 'Twinmap immer im Vordergrund',
     // The game's "Schriftgröße" (GS FONT_SIZE).
@@ -54,7 +60,7 @@ export default {
   },
 
   found: {
-    title: 'Was Twinmap gefunden hat',
+    inFolder: 'Darin gefunden',
     addon: 'Twinmap-Forever-Addon',
     // "Dienste" as the services layer (de/map.ts).
     questie: 'NSC, Dienste und Quests',
@@ -90,7 +96,7 @@ export default {
     ctrl: 'Strg',
     zoom: 'Schriftgröße, auch Strg und Mausrad außerhalb der Karte',
     // Our word for the label of a point: "Infofeld". "diese Optionen": the page is called Optionen.
-    close: 'Schließt ein Infofeld, die Ebenen, diese Optionen',
+    close: 'Schließt ein Infofeld, die Filter, diese Optionen',
     // Not "Pfeile": the Arrow of the route is "Pfeil".
     arrows: 'Pfeiltasten',
     move: 'Karte verschieben und zoomen',

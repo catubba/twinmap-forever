@@ -9,6 +9,11 @@ export default {
   common: {
     close: '닫기',
   },
+  // The game writes yards as 미터, attached to the number (GS SPELL_RANGE).
+  units: {
+    yards: '{n}미터',
+    metres: '{n}미터',
+  },
   news: {
     title: 'Twinmap의 새로운 기능',
     updatedFrom: '{version}에서 업데이트되었습니다.',
@@ -41,7 +46,6 @@ export default {
     newTitle: '이제 Twinmap을 한국어로 사용할 수 있습니다',
     newIntro: 'Twinmap의 언어를 선택하십시오. 선택하지 않으면 영어로 유지됩니다.',
     done: '완료',
-    settingsTitle: '언어',
     label: 'Twinmap 언어',
     hint: '바로 적용됩니다. 게임에서 가져온 이름은 게임 언어 그대로 표시됩니다.',
   },

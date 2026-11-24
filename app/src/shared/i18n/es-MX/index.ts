@@ -9,6 +9,10 @@ export default {
   common: {
     close: 'Cerrar',
   },
+  units: {
+    yards: '{n} m',
+    metres: '{n} m',
+  },
   news: {
     title: 'Novedades de Twinmap',
     updatedFrom: 'Actualizado desde la {version}.',
@@ -38,7 +42,6 @@ export default {
     newTitle: 'Twinmap ahora habla tu idioma',
     newIntro: 'Elige el idioma de Twinmap. Si no eliges uno, se queda en inglés.',
     done: 'Aceptar',
-    settingsTitle: 'Idioma',
     label: 'Idioma de Twinmap',
     hint: 'Cambia de inmediato. Los nombres que vienen del juego se quedan en el idioma del juego.',
   },

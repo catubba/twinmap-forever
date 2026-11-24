@@ -19,14 +19,20 @@ export default {
     choose: 'Выбрать папку игры',
   },
 
+  distances: {
+    label: 'Расстояния',
+    yards: 'Ярды',
+    metres: 'Метры',
+  },
+
   layout: {
-    title: 'Расположение',
-    mapLeft: 'Карта слева',
-    mapRight: 'Карта справа',
+    label: 'Карта',
+    left: 'Слева',
+    right: 'Справа',
+    hint: 'M переносит ее на другую сторону в любой момент.',
   },
 
   window: {
-    title: 'Окно',
     onTop: 'Показывать Twinmap поверх других окон',
     textSize: 'Размер текста',
     gpu: 'Использовать аппаратное ускорение',
@@ -51,7 +57,7 @@ export default {
   },
 
   found: {
-    title: 'Что нашел Twinmap',
+    inFolder: 'Найдено в папке',
     addon: 'Аддон Twinmap Forever',
     // "Услуги" as the services layer (ru/map.ts).
     questie: 'NPC, услуги и задания',
@@ -86,8 +92,8 @@ export default {
     // Russian keyboards print Ctrl (GS CTRL_KEY "CTRL").
     ctrl: 'Ctrl',
     zoom: 'Размер текста, а также Ctrl и колесо мыши вне карты',
-    // "карточка": the label that opens on a point. "Слои" capitalized: the name of the menu.
-    close: 'Закрывает карточку, Слои, эти параметры',
+    // "карточка": the label that opens on a point. "Фильтры" capitalized: the name of the menu.
+    close: 'Закрывает карточку, Фильтры, эти параметры',
     // Not "Стрелки": the Arrow of the route is "Стрелка".
     arrows: 'Клавиши-стрелки',
     move: 'Перемещение и масштаб карты',

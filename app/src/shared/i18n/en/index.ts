@@ -16,6 +16,12 @@ export default {
     // On a cross that closes a window or panel, read aloud only.
     close: 'Close',
   },
+  // A distance with its unit, after a number as the language writes it ({n}: 1,335). Metres only when the player
+  // chose them, in a language whose game counts in yards (English, Chinese): the game's other languages write m.
+  units: {
+    yards: '{n} yd',
+    metres: '{n} m',
+  },
   // What's new (WhatsNew.svelte): the news of the versions the player updated past, once as the app starts after an
   // update, and again from Settings. The news themselves are the release's text (shared/news.ts), not keys.
   news: {
@@ -66,8 +72,7 @@ export default {
     newIntro: 'Choose the language of Twinmap. Without a choice it stays in English.',
     // Its button: short.
     done: 'Done',
-    // The group in Settings: its title, the label before the list, and the line under it.
-    settingsTitle: 'Language',
+    // In Settings > General: the label before the list, and the line under it.
     label: 'Language of Twinmap',
     hint: 'Changes at once. Names that come from the game stay in the language of the game.',
   },

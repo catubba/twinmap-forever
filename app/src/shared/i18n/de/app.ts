@@ -105,7 +105,6 @@ export default {
     cheaper: 'Günstiger',
     dearer: 'Teurer',
     otherContinent: 'Auf dem anderen Kontinent',
-    yards: '{yards} m',
     finding: 'Weg wird gesucht',
     updateHint: 'Aktualisiert Shortest Path und das Twinmap-Forever-Addon, um hier den ganzen Weg zu sehen',
   },

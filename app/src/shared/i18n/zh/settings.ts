@@ -19,14 +19,20 @@ export default {
     choose: '选择游戏文件夹',
   },
 
+  distances: {
+    label: '距离',
+    yards: '码',
+    metres: '米',
+  },
+
   layout: {
-    title: '布局',
-    mapLeft: '地图在左侧',
-    mapRight: '地图在右侧',
+    label: '地图',
+    left: '左侧',
+    right: '右侧',
+    hint: '随时按 M 切换到另一侧。',
   },
 
   window: {
-    title: '窗口',
     onTop: '让Twinmap始终显示在其他窗口上方',
     // GS FONT_SIZE.
     textSize: '字体大小',
@@ -52,7 +58,7 @@ export default {
   },
 
   found: {
-    title: 'Twinmap找到的内容',
+    inFolder: '文件夹中找到的内容',
     // Addon is 插件, as the game's AddOns button (GS ADDONS).
     addon: 'Twinmap Forever插件',
     // Services is 服务, as the group of the map.
@@ -90,7 +96,7 @@ export default {
     ctrl: 'Ctrl',
     zoom: '字体大小，在地图外也可用Ctrl+鼠标滚轮',
     // 信息卡: our word for the label that opens on a point.
-    close: '关闭信息卡、图层或设置',
+    close: '关闭信息卡、筛选或设置',
     // 键 after it: the Arrow of the route is 箭头.
     arrows: '方向键',
     move: '移动和缩放地图',

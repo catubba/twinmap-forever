@@ -9,6 +9,11 @@ export default {
   common: {
     close: '关闭',
   },
+  // 码 attached to the number, as the game (GS SPELL_RANGE "%s码距离"); 米 the same way.
+  units: {
+    yards: '{n}码',
+    metres: '{n}米',
+  },
   news: {
     title: 'Twinmap 新内容',
     updatedFrom: '已从 {version} 更新。',
@@ -40,7 +45,6 @@ export default {
     newTitle: 'Twinmap现已支持简体中文',
     newIntro: '请选择Twinmap的语言。如不选择，将保持英语。',
     done: '完成',
-    settingsTitle: '语言',
     label: 'Twinmap的语言',
     hint: '立即生效。来自游戏的名称会保留游戏所用的语言。',
   },

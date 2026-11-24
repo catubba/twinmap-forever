@@ -142,8 +142,6 @@ export default {
     dearer: 'Dearer',
     // On hover over a row of a place on the other continent, which has no distance.
     otherContinent: 'On the other continent',
-    // How far, at the right of a row: short. {yards}: a number.
-    yards: '{yards} yd',
     // The journey Shortest Path guides, while its first plan is still searched.
     finding: 'Finding the way',
     updateHint: 'Update Shortest Path and the Twinmap Forever addon to see the whole way here',

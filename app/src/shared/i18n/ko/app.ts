@@ -112,8 +112,6 @@ export default {
     cheaper: '더 저렴함',
     dearer: '더 비쌈',
     otherContinent: '다른 대륙',
-    // The game writes yards as 미터 (GS SPELL_RANGE).
-    yards: '{yards}미터',
     finding: '이동 경로 찾는 중',
     // Rewritten so no particle follows Shortest Path.
     updateHint: 'Shortest Path, Twinmap Forever 애드온을 업데이트하면 전체 이동 경로가 여기에 표시됩니다',

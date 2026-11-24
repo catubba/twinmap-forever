@@ -157,16 +157,16 @@ export default {
   },
 
   // How far a point is from the character and which way, on its label and on the band of the next stop.
-  // {yards}: a number, as 1,335.
+  // {far}: a distance with its unit (units), as 1,335 yd.
   way: {
-    north: '{yards} yd north',
-    northEast: '{yards} yd north-east',
-    east: '{yards} yd east',
-    southEast: '{yards} yd south-east',
-    south: '{yards} yd south',
-    southWest: '{yards} yd south-west',
-    west: '{yards} yd west',
-    northWest: '{yards} yd north-west',
+    north: '{far} north',
+    northEast: '{far} north-east',
+    east: '{far} east',
+    southEast: '{far} south-east',
+    south: '{far} south',
+    southWest: '{far} south-west',
+    west: '{far} west',
+    northWest: '{far} north-west',
     // How long a run it is. {time}: minutes and seconds, as 3:11.
     onFoot: '{time} on foot',
   },
@@ -233,8 +233,6 @@ export default {
     // The list of results, read aloud only.
     results: 'Results',
     none: 'Nothing by that name.',
-    // At the right of a result: how far it is. {yards}: a number, as 1,335.
-    yards: '{yards} yd',
     // Beside the name of a result, small: what it is. {zone}: where it is.
     zone: 'Zone',
     myPin: 'My pin',

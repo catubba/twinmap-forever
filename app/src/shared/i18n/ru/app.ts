@@ -118,7 +118,6 @@ export default {
     cheaper: 'Дешевле',
     dearer: 'Дороже',
     otherContinent: 'На другом континенте',
-    yards: '{yards} м',
     finding: 'Поиск пути',
     updateHint: 'Обновите Shortest Path и аддон Twinmap Forever, чтобы видеть здесь весь путь',
   },

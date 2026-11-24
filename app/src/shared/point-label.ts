@@ -1,6 +1,6 @@
 // The label on a point of the map: what it says of the point, and where it opens.
 import { unitsOfRect, UNITS_PER_BLOCK, type Point } from './geo'
-import { num, t } from './i18n'
+import { distance, t } from './i18n'
 import type { Continent, GameMap, Rect } from './maps'
 import { BLOCK_YARDS } from './world'
 
@@ -39,7 +39,7 @@ export function wayTo(from: Point, to: Point, walked?: number): { far: string; t
   const yards = Math.round(walked ?? Math.hypot(dx, dy) * YARDS_PER_UNIT)
   const way = WAYS[((Math.round(Math.atan2(dx, -dy) / (Math.PI / 4)) % 8) + 8) % 8]!
   const seconds = Math.round(yards / RUN)
-  return { far: t(`map.way.${way}`, { yards: num(yards) }), time: t('map.way.onFoot', { time: `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}` }) }
+  return { far: t(`map.way.${way}`, { far: distance(yards) }), time: t('map.way.onFoot', { time: `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}` }) }
 }
 
 /** A place on a zone's map as the game gives it, "42.3, 65.1"; after the name of the zone when one is given. */
