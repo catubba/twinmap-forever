@@ -58,9 +58,13 @@ Every version of the app, with its notes, is on the [releases page](https://gith
 
 ## macOS
 
-On an Apple Silicon Mac with Node.js 24 and Xcode, run `cd app && npm ci && npm run dist:mac`. Open the ad-hoc signed `app/dist/mac-arm64/Twinmap.app`. Allow Twinmap under **System Settings > Privacy & Security > Screen Recording**, then reopen Twinmap.
+Twinmap also runs on Apple Silicon Macs (macOS 14 or later), with the macOS client of WoW: Forever. There is no download for Mac yet: build it from the source.
 
-Twinmap checks `/Applications/World of Warcraft` and `~/Applications/World of Warcraft` for Forever. It reads the game and addon files. Pins and routes stay in Twinmap on macOS. To verify capture with a synthetic window, run `npm run probe:mac` from `app/` with Screen Recording access for the Electron app used by the probe.
+1. On a Mac with Node.js 24 and Xcode, run `cd app && npm ci && npm run dist:mac`.
+2. Open `app/dist/mac-arm64/Twinmap.app`.
+3. Allow Twinmap under **System Settings > Privacy & Security > Screen Recording**, then open Twinmap again.
+
+Twinmap looks for the game in `/Applications/World of Warcraft` and `~/Applications/World of Warcraft`. Everything works as on Windows, pins and routes sent to the game included. Not on Mac yet: automatic updates (download each new version by hand) and HDR.
 
 ## What it does
 
