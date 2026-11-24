@@ -24,13 +24,13 @@ export default {
     updateApp: '更新应用',
     updateAddon: '更新插件',
     newerAddon: 'Twinmap Forever插件比本应用新（协议版本：插件{addon}，本应用{app}）。请关闭Twinmap后重新打开：它会在启动时自动更新。',
-    newerAddonMac: 'Twinmap Forever插件比本应用新（协议版本：插件{addon}，本应用{app}）。请下载最新的macOS版Twinmap。如果macOS无法打开它，请在“系统设置 > 隐私与安全性”中选择“仍要打开”。',
+    newerAddonMac: 'Twinmap Forever插件比本应用新（协议版本：插件{addon}，本应用{app}）。请下载最新的macOS版Twinmap。如果macOS无法打开它，请在“系统设置 > 隐私与安全”中选择“仍要打开”。',
     olderAddon: 'Twinmap Forever插件比本应用旧（协议版本：插件{addon}，本应用{app}）。请在CurseForge更新插件，然后重启游戏。',
     connecting: '正在连接',
     lost: '连接中断',
     // "its strip is not paused" said as "sending is not paused": the strip has no name the player knows.
     lostLine: '没有收到游戏的信号。请登录游戏，并确认Twinmap Forever插件已启用、发送没有暂停。',
-    screenRecording: 'Twinmap暂时无法读取游戏窗口。请在“系统设置 > 隐私与安全性 > 录屏与系统录音”中打开Twinmap（如果列表中没有，请用+按钮添加），然后重新打开Twinmap。',
+    screenRecording: 'Twinmap暂时无法读取游戏窗口。请在“系统设置 > 隐私与安全 > 录屏与系统录音”中打开Twinmap（如果列表中没有，请用+按钮添加），然后重新打开Twinmap。',
     combat: '战斗中，仅显示位置',
     connected: '已连接',
     // "旋转微缩地图", as the game's setting (GS ROTATE_MINIMAP).

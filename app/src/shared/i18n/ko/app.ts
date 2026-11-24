@@ -26,7 +26,7 @@ export default {
     updateAddon: '애드온 업데이트',
     // The protocol numbers after a colon, so no particle follows them.
     newerAddon: 'Twinmap Forever 애드온이 이 앱보다 새 버전입니다(프로토콜: 애드온 {addon}, 앱 {app}). Twinmap을 닫았다가 다시 여십시오. 시작할 때 스스로 업데이트됩니다.',
-    newerAddonMac: 'Twinmap Forever 애드온이 이 앱보다 새 버전입니다(프로토콜: 애드온 {addon}, 앱 {app}). macOS용 최신 Twinmap을 내려받으십시오. macOS가 열지 않으면 "시스템 설정 > 개인정보 보호 및 보안"에서 "확인 없이 열기"를 선택하십시오.',
+    newerAddonMac: 'Twinmap Forever 애드온이 이 앱보다 새 버전입니다(프로토콜: 애드온 {addon}, 앱 {app}). macOS용 최신 Twinmap을 내려받으십시오. macOS가 열지 않으면 "시스템 설정 > 개인정보 보호 및 보안"에서 "그래도 열기"를 선택하십시오.',
     olderAddon: 'Twinmap Forever 애드온이 이 앱보다 이전 버전입니다(프로토콜: 애드온 {addon}, 앱 {app}). CurseForge에서 애드온을 업데이트한 다음 게임을 다시 시작하십시오.',
     connecting: '연결 중',
     lost: '연결 끊김',
