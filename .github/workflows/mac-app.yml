@@ -107,6 +107,12 @@ jobs:
           extract() { (cd app && node -e "require('@electron/asar').extractAll(process.argv[1], process.argv[2])" "$1" "$2"); }
           extract "$PWD/$ours" "$RUNNER_TEMP/asar-ours"
           extract "$theirs" "$RUNNER_TEMP/asar-theirs"
+          # A program inside (koffi.node) carries the fork's signature: compared without it, on both sides.
+          for side in ours theirs; do
+            find "$RUNNER_TEMP/asar-$side" -type f -print0 | while IFS= read -r -d '' file; do
+              case "$(file -b "$file")" in Mach-O*) codesign --remove-signature "$file" ;; esac
+            done
+          done
           if ! diff -r --brief "$RUNNER_TEMP/asar-ours" "$RUNNER_TEMP/asar-theirs" > "$RUNNER_TEMP/asar.diff"; then
             cat "$RUNNER_TEMP/asar.diff"
             # What differs in a text file, to see why.
