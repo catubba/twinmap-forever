@@ -107,7 +107,14 @@ jobs:
           extract() { (cd app && node -e "require('@electron/asar').extractAll(process.argv[1], process.argv[2])" "$1" "$2"); }
           extract "$PWD/$ours" "$RUNNER_TEMP/asar-ours"
           extract "$theirs" "$RUNNER_TEMP/asar-theirs"
-          diff -r --brief "$RUNNER_TEMP/asar-ours" "$RUNNER_TEMP/asar-theirs" || { echo "::error::app.asar of the fork holds other files than the one built here from $TAG"; exit 1; }
+          if ! diff -r --brief "$RUNNER_TEMP/asar-ours" "$RUNNER_TEMP/asar-theirs" > "$RUNNER_TEMP/asar.diff"; then
+            cat "$RUNNER_TEMP/asar.diff"
+            # What differs in a text file, to see why.
+            grep -o '^Files [^ ]* and' "$RUNNER_TEMP/asar.diff" | sed 's/^Files //; s/ and$//' | grep -E '\.(js|json|mjs|cjs)$' | while read -r file; do
+              diff -u "$file" "${file/asar-ours/asar-theirs}" | cut -c1-300 | head -60 || true
+            done
+            echo "::error::app.asar of the fork holds other files than the one built here from $TAG"; exit 1
+          fi
           echo "app.asar: the same files, byte for byte ($(find "$RUNNER_TEMP/asar-ours" -type f | wc -l | tr -d ' ') files)"
           # The rest of the app is Electron and the capture helper; their files may differ only by their signatures.
           diff <(cd app/dist/mac-arm64/Twinmap.app && find . -type f ! -path '*/_CodeSignature/*' | sort) \
