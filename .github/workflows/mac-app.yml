@@ -107,10 +107,11 @@ jobs:
           extract() { (cd app && node -e "require('@electron/asar').extractAll(process.argv[1], process.argv[2])" "$1" "$2"); }
           extract "$PWD/$ours" "$RUNNER_TEMP/asar-ours"
           extract "$theirs" "$RUNNER_TEMP/asar-theirs"
-          # A program inside (koffi.node) carries the fork's signature: compared without it, on both sides.
+          # A program inside (koffi.node) carries the fork's signature, which changes the file around the code:
+          # compared by what its sections hold, on both sides (.github/scripts/macho-content.py).
           for side in ours theirs; do
             find "$RUNNER_TEMP/asar-$side" -type f -print0 | while IFS= read -r -d '' file; do
-              case "$(file -b "$file")" in Mach-O*) codesign --remove-signature "$file" ;; esac
+              case "$(file -b "$file")" in Mach-O*) python3 .github/scripts/macho-content.py "$file" > "$file.content" && rm "$file" ;; esac
             done
           done
           if ! diff -r --brief "$RUNNER_TEMP/asar-ours" "$RUNNER_TEMP/asar-theirs" > "$RUNNER_TEMP/asar.diff"; then
