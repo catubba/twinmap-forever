@@ -1,9 +1,21 @@
 // The English of settings: see en/index.ts for how a key is written and noted.
 export default {
-  // The Settings page (Settings.svelte): its title and the button back, side by side at the top.
+  // Settings (Settings.svelte), a window over the map: its title, at the top of the column of its categories.
   title: 'Settings',
-  // A button: short.
-  back: 'Back to the map',
+  // The categories of Settings, in a column on the left of its window, each with its icon: short, they stand beside it.
+  // Phone and tablet and Shortcuts take the titles of their groups (phone.title, keys.title).
+  categories: {
+    // The column of the categories, read aloud only.
+    label: 'Categories',
+    // The language, the layout of the map and the window.
+    general: 'General',
+    // The game folder and what Twinmap found of the game and its addons.
+    game: 'Game and addons',
+    // Help improve Twinmap.
+    privacy: 'Privacy',
+    // The version, What's new, Feedback, the first steps and the licences.
+    about: 'About Twinmap',
+  },
 
   // The group that shows the game folder and lets the player pick it.
   gameFolder: {

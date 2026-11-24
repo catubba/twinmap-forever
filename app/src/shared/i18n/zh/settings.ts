@@ -2,8 +2,14 @@
 export default {
   // GS SETTINGS.
   title: '设置',
+  categories: {
+    label: '类别',
+    general: '常规',
+    game: '游戏和插件',
+    privacy: '隐私',
+    about: '关于 Twinmap',
+  },
   // Back is 返回; GS BACK 后退 is a step back in a list of pages.
-  back: '返回地图',
 
   gameFolder: {
     title: '游戏文件夹',

@@ -1,19 +1,47 @@
 <script lang="ts">
-  // Settings: on the left what the player chooses, on the right what the app found, shown as it
-  // is; the keys and the licences under both. One column on a narrow screen.
+  // Settings: a window over the map, its categories in a column on the left, the groups of the one chosen on the right. On a
+  // narrow window the column keeps its icons only. Closed with the cross or Escape; the category chosen is kept for the session.
   import licences from '../../../../THIRD-PARTY-LICENSES?raw'
+  import { onMount } from 'svelte'
   import { thirdParties } from '../../shared/licences'
   import type { SetupStatus } from '../../shared/setup'
   import type { TilesStatus } from '../../shared/tiles-status'
   import Glyph from './Glyph.svelte'
   import Logo from './Logo.svelte'
+  import type { GlyphName } from './marks'
   import qrcode from 'qrcode-generator'
   import { inApp } from './web'
   import { ZOOMS } from '../../shared/window'
   import { layout, setMapRight } from './layout.svelte'
-  import { langNow, num, t } from '../../shared/i18n'
+  import { langNow, num, t, type Key } from '../../shared/i18n'
 
   let { setup, tiles, onback, onfirstrun, onfeedback, onnews }: { setup: SetupStatus; tiles: TilesStatus | null; onback: () => void; onfirstrun: () => void; onfeedback: () => void; onnews: () => void } = $props()
+
+  let dialog: HTMLDialogElement
+  onMount(() => dialog.showModal())
+
+  // The categories. What only the computer sets (the window, a phone, the programme) is not on a phone's page, and the keys
+  // are not on a screen that is touched.
+  const touch = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches
+  type Cat = 'general' | 'game' | 'phone' | 'privacy' | 'keys' | 'about'
+  const CATS: { key: Cat; name: Key; glyph: GlyphName }[] = [
+    { key: 'general', name: 'settings.categories.general', glyph: 'sliders' },
+    { key: 'game', name: 'settings.categories.game', glyph: 'folder' },
+    ...(inApp
+      ? [
+          { key: 'phone' as const, name: 'settings.phone.title' as const, glyph: 'phone' as const },
+          { key: 'privacy' as const, name: 'settings.categories.privacy' as const, glyph: 'shield' as const },
+        ]
+      : []),
+    ...(touch ? [] : [{ key: 'keys' as const, name: 'settings.keys.title' as const, glyph: 'keyboard' as const }]),
+    { key: 'about', name: 'settings.categories.about', glyph: 'info' },
+  ]
+  const kept = sessionStorage.getItem('settings')
+  let cat = $state<Cat>(CATS.find((c) => c.key === kept)?.key ?? 'general')
+  const pick = (key: Cat): void => {
+    cat = key
+    sessionStorage.setItem('settings', key)
+  }
 
   const parties = thirdParties(licences)
   // The licence of each, by its name where the text says it.
@@ -39,124 +67,113 @@
   )
 </script>
 
-<svelte:window onkeydown={(e) => e.key === 'Escape' && onback()} />
-
-<main class="surface">
-  <div class="page">
-    <div class="head">
-      <h1>{t('settings.title')}</h1>
-      <button class="btn" onclick={onback}>{t('settings.back')}</button>
-    </div>
-    <div class="columns">
-      <div class="column">
-        <!-- The language is the computer's: a phone's page follows it. A pick is spoken at once, the page loads again in it. -->
-        {#if inApp}
-          <section class="group">
-            <h2 class="band">{t('language.settingsTitle')}</h2>
-            <div class="in">
-              <label class="choice">{t('language.label')} <select class="field" value={langNow()} onchange={(e) => void window.twinmap.setLang(e.currentTarget.value)}>{#each setup.langs ?? [] as lang (lang.code)}<option value={lang.code} disabled={!lang.ready}>{lang.ready ? lang.name : lang.soon}</option>{/each}</select></label>
-              <p class="hint">{t('language.hint')}</p>
-            </div>
-          </section>
-        {/if}
+<dialog bind:this={dialog} class="surface" aria-labelledby="settings-title" onclose={onback}>
+  <nav aria-label={t('settings.categories.label')}>
+    <h1 id="settings-title">{t('settings.title')}</h1>
+    {#each CATS as c (c.key)}
+      <button class:on={cat === c.key} aria-current={cat === c.key ? 'page' : undefined} title={t(c.name)} onclick={() => pick(c.key)}><Glyph name={c.glyph} size={16} /><span class="word">{t(c.name)}</span></button>
+    {/each}
+  </nav>
+  <button class="x" aria-label={t('common.close')} onclick={() => dialog.close()}><Glyph name="close" size={14} /></button>
+  <div class="body">
+    <h2 class="title">{t(CATS.find((c) => c.key === cat)!.name)}</h2>
+    {#if cat === 'general'}
+      <!-- The language is the computer's: a phone's page follows it. A pick is spoken at once, the page loads again in it. -->
+      {#if inApp}
         <section class="group">
-          <h2 class="band">{t('settings.gameFolder.title')}</h2>
+          <h3 class="band">{t('language.settingsTitle')}</h3>
           <div class="in">
-            <div class="line">
-              <span class="path" title={setup.gameFolder ?? undefined}>{setup.gameFolder ?? t('settings.gameFolder.notFound')}</span>
-              <!-- The folder is chosen on the computer it is on. -->
-              {#if inApp}<button class="btn" onclick={choose}>{setup.gameFolder ? t('settings.gameFolder.change') : t('settings.gameFolder.choose')}</button>{/if}
-            </div>
-            {#if wrong}<p class="wrong">{wrong}</p>{/if}
+            <label class="choice">{t('language.label')} <select class="field" value={langNow()} onchange={(e) => void window.twinmap.setLang(e.currentTarget.value)}>{#each setup.langs ?? [] as lang (lang.code)}<option value={lang.code} disabled={!lang.ready}>{lang.ready ? lang.name : lang.soon}</option>{/each}</select></label>
+            <p class="hint">{t('language.hint')}</p>
           </div>
         </section>
+      {/if}
+      <section class="group">
+        <h3 class="band">{t('settings.layout.title')}</h3>
+        <div class="in">
+          <label class="choice"><input type="radio" class="check" name="map-side" checked={!layout.mapRight} onchange={() => setMapRight(false)} />{t('settings.layout.mapLeft')}</label>
+          <label class="choice"><input type="radio" class="check" name="map-side" checked={layout.mapRight} onchange={() => setMapRight(true)} />{t('settings.layout.mapRight')}</label>
+        </div>
+      </section>
+      <!-- The window is the computer's: a phone on the home network has none to set. -->
+      {#if inApp}
         <section class="group">
-          <h2 class="band">{t('settings.layout.title')}</h2>
+          <h3 class="band">{t('settings.window.title')}</h3>
           <div class="in">
-            <label class="choice"><input type="radio" class="check" name="map-side" checked={!layout.mapRight} onchange={() => setMapRight(false)} />{t('settings.layout.mapLeft')}</label>
-            <label class="choice"><input type="radio" class="check" name="map-side" checked={layout.mapRight} onchange={() => setMapRight(true)} />{t('settings.layout.mapRight')}</label>
+            <label class="choice"><input type="checkbox" class="check" checked={setup.onTop} onchange={(e) => window.twinmap.setOnTop(e.currentTarget.checked)} />{t('settings.window.onTop')}</label>
+            <label class="choice">{t('settings.window.textSize')} <select class="field size" value={setup.zoom ?? 1} onchange={(e) => window.twinmap.setZoom(Number(e.currentTarget.value))}>{#each ZOOMS as z (z)}<option value={z}>{num(z, { style: 'percent' })}</option>{/each}</select></label>
+            <label class="choice"><input type="checkbox" class="check" checked={setup.gpu?.chosen ?? true} onchange={(e) => window.twinmap.setGpu(e.currentTarget.checked)} />{t('settings.window.gpu')}</label>
+            <p class="hint">{t('settings.window.gpuHint')}</p>
+            {#if setup.gpu && setup.gpu.chosen !== setup.gpu.running}
+              <div class="line"><span class="hint">{t('settings.window.restartNeeded')}</span><button class="btn" onclick={() => window.twinmap.restart()}>{t('settings.window.restartNow')}</button></div>
+            {/if}
           </div>
         </section>
-        <!-- The window is the computer's, and so is what it shows to other devices: a phone on the home network has neither to set. -->
-        {#if inApp}
-          <section class="group">
-            <h2 class="band">{t('settings.window.title')}</h2>
-            <div class="in">
-              <label class="choice"><input type="checkbox" class="check" checked={setup.onTop} onchange={(e) => window.twinmap.setOnTop(e.currentTarget.checked)} />{t('settings.window.onTop')}</label>
-              <label class="choice">{t('settings.window.textSize')} <select class="field size" value={setup.zoom ?? 1} onchange={(e) => window.twinmap.setZoom(Number(e.currentTarget.value))}>{#each ZOOMS as z (z)}<option value={z}>{num(z, { style: 'percent' })}</option>{/each}</select></label>
-              <label class="choice"><input type="checkbox" class="check" checked={setup.gpu?.chosen ?? true} onchange={(e) => window.twinmap.setGpu(e.currentTarget.checked)} />{t('settings.window.gpu')}</label>
-              <p class="hint">{t('settings.window.gpuHint')}</p>
-              {#if setup.gpu && setup.gpu.chosen !== setup.gpu.running}
-                <div class="line"><span class="hint">{t('settings.window.restartNeeded')}</span><button class="btn" onclick={() => window.twinmap.restart()}>{t('settings.window.restartNow')}</button></div>
-              {/if}
-            </div>
-          </section>
-          <section class="group">
-            <h2 class="band">{t('settings.phone.title')}</h2>
-            <div class="in">
-              <label class="choice"><input type="checkbox" class="check" checked={!!setup.lan} onchange={(e) => window.twinmap.setLan(e.currentTarget.checked)} />{t('settings.phone.share')}</label>
-              {#if setup.lan && 'error' in setup.lan}<p class="wrong">{setup.lan.error}</p>{/if}
-              {#if lanUrl && code}
-                <div class="phone">
-                  <svg class="code" viewBox="-4 -4 {code.side + 8} {code.side + 8}" role="img" aria-label={t('settings.phone.codeLabel')}><path d={code.path} /></svg>
-                  <div>
-                    <span class="hint">{t('settings.phone.scan')}</span>
-                    <span class="address">{lanUrl}</span>
-                    <p class="hint">{t('settings.phone.homeOnly')}</p>
-                  </div>
-                </div>
-              {/if}
-            </div>
-          </section>
-          <!-- The participation programme: the words approved with its notice (site/privacy.html, "participation"). -->
-          <section class="group">
-            <h2 class="band">{t('participate.title')}</h2>
-            <div class="in">
-              <label class="choice"><input type="checkbox" class="check" checked={setup.participate === true} onchange={(e) => window.twinmap.setParticipate(e.currentTarget.checked)} />{t('settings.participate.share')}</label>
-              <p class="hint">{t('settings.participate.what')} <button class="link" onclick={() => void window.twinmap.openFeedback('participation', '')}>{t('participate.full')}</button></p>
-            </div>
-          </section>
-        {/if}
-      </div>
-
-      <div class="column">
-        <section class="group">
-          <h2 class="band">{t('settings.found.title')}</h2>
-          <!-- A light, the name, what was found; a button only where something is missing. -->
-          <dl class="in found">
-            <div>
-              <dt><i class:off={!setup.addon}></i>{t('settings.found.addon')}</dt>
-              <dd>{#if setup.addon}{setup.addon}{:else}<button class="btn" onclick={() => window.twinmap.openCurseForge()}>{t('settings.found.get')}</button>{/if}</dd>
-            </div>
-            <div>
-              <dt><i class:off={!setup.questie}></i>QuestieDB <small>{t('settings.found.questie')}</small></dt>
-              <dd>{#if setup.questie}{t('settings.found.installed')}{:else}<button class="btn" onclick={() => window.twinmap.openCurseForge('questie')}>{t('settings.found.get')}</button>{/if}</dd>
-            </div>
-            <div>
-              <dt><i class:off={!setup.shortestPath}></i>Shortest Path <small>{t('settings.found.optional')}</small></dt>
-              <dd>{#if setup.shortestPath}{t('settings.found.installed')}{:else}<button class="btn" onclick={() => window.twinmap.openCurseForge('shortestPath')}>{t('settings.found.get')}</button>{/if}</dd>
-            </div>
-            <div>
-              <dt><i class:off={tiles?.state !== 'ready'} class:bad={tiles?.state === 'failed'}></i>{t('settings.found.map')}</dt>
-              <dd>{map}</dd>
-            </div>
-          </dl>
-        </section>
-        <section class="group">
-          <h2 class="band">Twinmap {setup.version}</h2>
-          <div class="in">
-            <p class="hint">{t('settings.version.updates')}</p>
-            <div class="buttons">
-              <button class="btn" onclick={onnews}>{t('news.button')}</button>
-              <button class="btn" onclick={onfeedback}>{t('settings.version.report')}</button>
-              {#if inApp}<button class="btn" onclick={onfirstrun}>{t('settings.version.firstRun')}</button>{/if}
-            </div>
+      {/if}
+    {:else if cat === 'game'}
+      <section class="group">
+        <h3 class="band">{t('settings.gameFolder.title')}</h3>
+        <div class="in">
+          <div class="line">
+            <span class="path" title={setup.gameFolder ?? undefined}>{setup.gameFolder ?? t('settings.gameFolder.notFound')}</span>
+            <!-- The folder is chosen on the computer it is on. -->
+            {#if inApp}<button class="btn" onclick={choose}>{setup.gameFolder ? t('settings.gameFolder.change') : t('settings.gameFolder.choose')}</button>{/if}
           </div>
-        </section>
-      </div>
-
-      <section class="group wide keys">
-        <h2 class="band">{t('settings.keys.title')}</h2>
+          {#if wrong}<p class="wrong">{wrong}</p>{/if}
+        </div>
+      </section>
+      <section class="group">
+        <h3 class="band">{t('settings.found.title')}</h3>
+        <!-- A light, the name, what was found; a button only where something is missing. -->
+        <dl class="in found">
+          <div>
+            <dt><i class:off={!setup.addon}></i>{t('settings.found.addon')}</dt>
+            <dd>{#if setup.addon}{setup.addon}{:else}<button class="btn" onclick={() => window.twinmap.openCurseForge()}>{t('settings.found.get')}</button>{/if}</dd>
+          </div>
+          <div>
+            <dt><i class:off={!setup.questie}></i>QuestieDB <small>{t('settings.found.questie')}</small></dt>
+            <dd>{#if setup.questie}{t('settings.found.installed')}{:else}<button class="btn" onclick={() => window.twinmap.openCurseForge('questie')}>{t('settings.found.get')}</button>{/if}</dd>
+          </div>
+          <div>
+            <dt><i class:off={!setup.shortestPath}></i>Shortest Path <small>{t('settings.found.optional')}</small></dt>
+            <dd>{#if setup.shortestPath}{t('settings.found.installed')}{:else}<button class="btn" onclick={() => window.twinmap.openCurseForge('shortestPath')}>{t('settings.found.get')}</button>{/if}</dd>
+          </div>
+          <div>
+            <dt><i class:off={tiles?.state !== 'ready'} class:bad={tiles?.state === 'failed'}></i>{t('settings.found.map')}</dt>
+            <dd>{map}</dd>
+          </div>
+        </dl>
+      </section>
+    {:else if cat === 'phone'}
+      <section class="group">
+        <h3 class="band">{t('settings.phone.title')}</h3>
+        <div class="in">
+          <label class="choice"><input type="checkbox" class="check" checked={!!setup.lan} onchange={(e) => window.twinmap.setLan(e.currentTarget.checked)} />{t('settings.phone.share')}</label>
+          {#if setup.lan && 'error' in setup.lan}<p class="wrong">{setup.lan.error}</p>{/if}
+          {#if lanUrl && code}
+            <div class="phone">
+              <svg class="code" viewBox="-4 -4 {code.side + 8} {code.side + 8}" role="img" aria-label={t('settings.phone.codeLabel')}><path d={code.path} /></svg>
+              <div>
+                <span class="hint">{t('settings.phone.scan')}</span>
+                <span class="address">{lanUrl}</span>
+                <p class="hint">{t('settings.phone.homeOnly')}</p>
+              </div>
+            </div>
+          {/if}
+        </div>
+      </section>
+    {:else if cat === 'privacy'}
+      <!-- The participation programme: the words approved with its notice (site/privacy.html, "participation"). -->
+      <section class="group">
+        <h3 class="band">{t('participate.title')}</h3>
+        <div class="in">
+          <label class="choice"><input type="checkbox" class="check" checked={setup.participate === true} onchange={(e) => window.twinmap.setParticipate(e.currentTarget.checked)} />{t('settings.participate.share')}</label>
+          <p class="hint">{t('settings.participate.what')} <button class="link" onclick={() => void window.twinmap.openFeedback('participation', '')}>{t('participate.full')}</button></p>
+        </div>
+      </section>
+    {:else if cat === 'keys'}
+      <section class="group keys">
+        <h3 class="band">{t('settings.keys.title')}</h3>
         <dl class="in">
           <div><dt><kbd>L</kbd></dt><dd>{t('settings.keys.layers')}</dd></div>
           <div><dt><kbd>F</kbd></dt><dd>{t('settings.keys.follow')}</dd></div>
@@ -170,68 +187,123 @@
           <div><dt><kbd>{t('settings.keys.space')}</kbd></dt><dd>{t('settings.keys.label')}</dd></div>
         </dl>
       </section>
-    </div>
-
-    <div class="about">
-      <span class="mark"><Logo size={36} word={false} /></span>
-      <div>
-        <p>{t('settings.about.what')}</p>
-        <p>{t('settings.about.notAffiliated')}</p>
-        <details class="built">
-          <summary><Glyph name="menu" />{t('settings.about.built', { count: parties.length })}</summary>
-          {#each parties as party (party.name)}
-            {@const [, address = '', rest = ''] = /^(https?:\/\/\S+)?\s*(.*)$/.exec(party.about) ?? []}
-            <details>
-              <summary><Glyph name="menu" />{party.name}<span>{KIND.exec(party.licence)?.[0] ?? t('settings.about.seeText')}</span></summary>
-              {#if address}<p class="dim">{address}</p>{/if}
-              {#if rest}<p class="dim">{rest}</p>{/if}
-              <pre>{party.licence}</pre>
-            </details>
-          {/each}
-        </details>
+    {:else}
+      <section class="group">
+        <h3 class="band">Twinmap {setup.version}</h3>
+        <div class="in">
+          <p class="hint">{t('settings.version.updates')}</p>
+          <div class="buttons">
+            <button class="btn" onclick={onnews}>{t('news.button')}</button>
+            <button class="btn" onclick={onfeedback}>{t('settings.version.report')}</button>
+            {#if inApp}<button class="btn" onclick={onfirstrun}>{t('settings.version.firstRun')}</button>{/if}
+          </div>
+        </div>
+      </section>
+      <div class="about">
+        <span class="mark"><Logo size={36} word={false} /></span>
+        <div>
+          <p>{t('settings.about.what')}</p>
+          <p>{t('settings.about.notAffiliated')}</p>
+          <details class="built">
+            <summary><Glyph name="menu" />{t('settings.about.built', { count: parties.length })}</summary>
+            {#each parties as party (party.name)}
+              {@const [, address = '', rest = ''] = /^(https?:\/\/\S+)?\s*(.*)$/.exec(party.about) ?? []}
+              <details>
+                <summary><Glyph name="menu" />{party.name}<span>{KIND.exec(party.licence)?.[0] ?? t('settings.about.seeText')}</span></summary>
+                {#if address}<p class="dim">{address}</p>{/if}
+                {#if rest}<p class="dim">{rest}</p>{/if}
+                <pre>{party.licence}</pre>
+              </details>
+            {/each}
+          </details>
+        </div>
       </div>
-    </div>
+    {/if}
   </div>
-</main>
+</dialog>
 
 <style>
-  main {
-    position: absolute;
-    inset: 46px 0 0;
+  /* The window: the column of the categories, then the groups of the one chosen, which scroll on their own. */
+  dialog {
+    width: min(920px, calc(100vw - 32px));
+    height: min(640px, calc(100vh - 32px));
+    padding: 0;
+    border: 1px solid var(--bronze-600);
+    box-shadow: 0 0 0 1px #000, 0 12px 40px #000c;
+    overflow: hidden;
+    color: var(--text);
+  }
+  dialog[open] {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  dialog::backdrop {
+    background: #000a;
+  }
+  nav {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    padding: 16px 8px;
+    border-right: 1px solid #0008;
+    background: #0003;
     overflow-y: auto;
   }
-  .page {
-    max-width: 1040px;
-    margin: 0 auto;
-    padding: 20px 24px 48px;
-  }
-  .head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    margin-bottom: 16px;
-  }
   h1 {
-    margin: 0;
-    font: var(--t-zone);
+    margin: 0 12px 14px;
+    font: var(--t-title);
     color: var(--gold);
     text-shadow: 0 1px 0 #000;
   }
-  /* Two columns, each as tall as what it holds; the keys under both. */
-  .columns {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: 20px;
-    align-items: start;
+  nav button {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border: 0;
+    border-left: 2px solid transparent;
+    background: none;
+    font: inherit;
+    color: var(--text-dim);
+    text-align: left;
+    white-space: nowrap;
+    cursor: pointer;
   }
-  .column {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr); /* a long folder is cut, it does not widen its column */
-    gap: 20px;
+  nav button:hover {
+    color: var(--text);
+    background: #ffffff08;
   }
-  .wide {
-    grid-column: 1 / -1;
+  nav button.on {
+    border-left-color: var(--gold);
+    background: #ffffff0d;
+    color: var(--gold);
+  }
+  .x {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    padding: 4px;
+    border: 0;
+    background: none;
+    color: var(--text-dim);
+    cursor: pointer;
+  }
+  .x:hover {
+    color: var(--text);
+  }
+  .body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr); /* a long folder is cut, it does not widen the window */
+    align-content: start;
+    gap: 16px;
+    padding: 16px 24px 24px;
+    overflow-y: auto;
+  }
+  .title {
+    margin: 0 32px 0 0;
+    font: var(--t-title);
+    color: var(--gold);
   }
   /* A group: its band, and what it holds on a darker ground with a thin edge. */
   .group {
@@ -364,7 +436,7 @@
   }
 
   .keys dl {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px 24px;
   }
   .keys div {
@@ -402,7 +474,6 @@
     display: flex;
     align-items: flex-start;
     gap: 14px;
-    margin-top: 24px;
     padding: 0 2px;
     font: var(--t-small);
     color: var(--text-dim);
@@ -470,16 +541,25 @@
     white-space: pre-wrap;
   }
 
-  /* On a narrow screen the columns stand one under the other, in the same order. */
-  @media (max-width: 760px) {
-    .page {
-      padding: 12px 12px 40px;
+  /* On a narrow window the column keeps the icons, each named on hover and read aloud; the window takes the whole screen. */
+  @media (max-width: 900px) {
+    nav h1,
+    nav .word {
+      display: none;
     }
-    .columns {
-      grid-template-columns: minmax(0, 1fr);
+    nav button {
+      padding: 10px 12px;
     }
-    .keys dl {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  @media (max-width: 560px) {
+    dialog {
+      width: 100vw;
+      max-width: none;
+      height: 100vh;
+      max-height: none;
+    }
+    .body {
+      padding: 12px 12px 20px;
     }
   }
   @media (max-width: 480px) {

@@ -314,25 +314,25 @@
   {/if}
   {#if !onSetup}
     <nav aria-label={t('app.top.sections')}>
-      <button class="tab" title={t('app.top.now')} aria-label={t('app.top.now')} aria-current={onSettings || onItems || onAh ? undefined : 'page'} onclick={() => ((onSettings = false), (onItems = false), (onAh = false))}><Glyph name="pin" size={18} /><span class="word">{t('app.top.now')}</span></button>
-      <button class="tab" title={t('app.top.items')} aria-label={t('app.top.items')} aria-current={onItems && !onSettings ? 'page' : undefined} onclick={() => ((onSettings = false), (onItems = true), (onAh = false))}><Glyph name="bag" size={18} /><span class="word">{t('app.top.items')}</span></button>
+      <button class="tab" title={t('app.top.now')} aria-label={t('app.top.now')} aria-current={onItems || onAh ? undefined : 'page'} onclick={() => ((onSettings = false), (onItems = false), (onAh = false))}><Glyph name="pin" size={18} /><span class="word">{t('app.top.now')}</span></button>
+      <button class="tab" title={t('app.top.items')} aria-label={t('app.top.items')} aria-current={onItems ? 'page' : undefined} onclick={() => ((onSettings = false), (onItems = true), (onAh = false))}><Glyph name="bag" size={18} /><span class="word">{t('app.top.items')}</span></button>
       <!-- Its name gives first: Auction House, then AH, then the glyph alone with the others. -->
-      <button class="tab" title={t('app.top.auctionHouse')} aria-label={t('app.top.auctionHouse')} aria-current={onAh && !onSettings ? 'page' : undefined} onclick={() => ((onSettings = false), (onItems = false), (onAh = true))}><Glyph name="coins" size={18} /><span class="word long">{t('app.top.auctionHouse')}</span><span class="word short">{t('app.top.auctionHouseShort')}</span></button>
+      <button class="tab" title={t('app.top.auctionHouse')} aria-label={t('app.top.auctionHouse')} aria-current={onAh ? 'page' : undefined} onclick={() => ((onSettings = false), (onItems = false), (onAh = true))}><Glyph name="coins" size={18} /><span class="word long">{t('app.top.auctionHouse')}</span><span class="word short">{t('app.top.auctionHouseShort')}</span></button>
     </nav>
   {/if}
-  {#if onSetup === false && !onSettings && mapReady}
+  {#if onSetup === false && mapReady}
     <Search ready={mapReady} {pos} side={char?.side} onpick={(place) => ((onItems = false), (onAh = false), mapView?.goTo(place))} />
   {/if}
   {#if status}
     <!-- The state of the link is the Pause button too: two bars to pause, the arrow of play to resume. -->
-    <button class="status" class:alone={onSetup !== false || onSettings || !mapReady} class:paused title={paused ? t('app.top.resume') : t('app.top.pause')} aria-label={paused ? t('app.top.resume') : t('app.top.pause')} aria-pressed={paused} onclick={() => setPause(!paused)}><i class={status.tone}></i><span class="word">{status.word}</span>{#if inbox && !inbox.off && inbox.id === undefined}<span class="left" class:low={inbox.left < 5}>{t('app.top.sendsLeft', { count: inbox.left })}</span>{/if}<span class="toggle"><Glyph name={paused ? 'play' : 'pause'} size={16} /></span></button>
+    <button class="status" class:alone={onSetup !== false || !mapReady} class:paused title={paused ? t('app.top.resume') : t('app.top.pause')} aria-label={paused ? t('app.top.resume') : t('app.top.pause')} aria-pressed={paused} onclick={() => setPause(!paused)}><i class={status.tone}></i><span class="word">{status.word}</span>{#if inbox && !inbox.off && inbox.id === undefined}<span class="left" class:low={inbox.left < 5}>{t('app.top.sendsLeft', { count: inbox.left })}</span>{/if}<span class="toggle"><Glyph name={paused ? 'play' : 'pause'} size={16} /></span></button>
   {/if}
   {#if setup}
     <!-- The bug and the cog say what the words may not, to those who do not know them; in a narrow window they stand alone. The sections have theirs too: the pin of where you are, the bag. -->
     <button class="entry feedback" title={t('app.top.feedbackHint')} aria-label={t('app.top.feedback')} onclick={() => (onFeedback = true)}><Glyph name="bug" size={18} /><span class="word">{t('app.top.feedback')}</span></button>
   {/if}
   {#if onSetup === false}
-    <button class="entry" title={t('app.top.settings')} aria-label={t('app.top.settings')} aria-current={onSettings ? 'page' : undefined} onclick={() => (onSettings = !onSettings)}><Glyph name="gear" size={18} /><span class="word">{t('app.top.settings')}</span></button>
+    <button class="entry" title={t('app.top.settings')} aria-label={t('app.top.settings')} aria-haspopup="dialog" aria-expanded={onSettings} onclick={() => (onSettings = true)}><Glyph name="gear" size={18} /><span class="word">{t('app.top.settings')}</span></button>
   {/if}
 </header>
 
@@ -364,23 +364,22 @@
     {/if}
   </div>
 {/if}
+<!-- Settings is a window over what is on screen: the map, Items or the Auction House stay under it. -->
 {#if onSettings && setup && onSetup === false}
-  <div class="over" in:fade={screen} out:fade={gone}>
-    <Settings {setup} {tiles} onback={() => (onSettings = false)} onfeedback={() => (onFeedback = true)} onfirstrun={() => ((onSettings = false), (onSetup = true))} onnews={() => (newsAll = true)} />
-  </div>
+  <Settings {setup} {tiles} onback={() => (onSettings = false)} onfeedback={() => (onFeedback = true)} onfirstrun={() => ((onSettings = false), (onSetup = true))} onnews={() => (newsAll = true)} />
 {/if}
-{#if onItems && onSetup === false && !onSettings}
+{#if onItems && onSetup === false}
   <div class="over" in:fade={screen} out:fade={gone}>
     <Items {sheets} {portraits} {shown} known={characters} {now} {listing} onpick={(key) => (picked = key)} />
   </div>
 {/if}
-{#if onAh && onSetup === false && !onSettings}
+{#if onAh && onSetup === false}
   <div class="over" in:fade={screen} out:fade={gone}>
     <Auction {house} chosen={!!chosenHouse} hints={char ?? null} who={char?.name ?? null} {prices} {listing} {sheets} known={characters} {homes} {now} {alerts} {showAlerts} onchoose={chooseHouse} />
   </div>
 {/if}
 {#if onSetup === false}
-<div class="work" class:shut={!panelOpen} class:map-right={layout.mapRight} in:fade={screen} inert={onSettings || onItems || onAh} style:--peek="{peek}px" style:--panel-w="{layout.width}px" bind:this={work}>
+<div class="work" class:shut={!panelOpen} class:map-right={layout.mapRight} in:fade={screen} inert={onItems || onAh} style:--peek="{peek}px" style:--panel-w="{layout.width}px" bind:this={work}>
   <div class="mapbox" style:--readout="{readoutWidth}px">
     {#if mapReady}
       <Map {pos} {group} {death} skills={char?.name ? sheets[char.name]?.pieces.skills : undefined} xpLevel={char ? (xp ? char.level : null) : undefined} bind:back kills={live ? link?.state.sections.kills : undefined} bind:looking at={link?.state.updatedAt.pos} bind:this={mapView} {insideReady} {quests} {fixed} side={char?.side} {live} {inbox} removed={live ? goneFrom(link?.state.sections.marks) : []} set={live ? setFrom(link?.state.sections.marks) : []} gameFollows={live ? followFrom(link?.state.sections.follow) : null} {journey} {route} onroute={(stop) => setRoute(addStop(route, stop))} onnpc={(pin) => (npc = pin)} />
@@ -532,8 +531,7 @@
   .entry:hover {
     color: var(--text);
   }
-  .tab[aria-current],
-  .entry[aria-current] {
+  .tab[aria-current] {
     border-color: var(--bronze-500);
     background: linear-gradient(var(--stone-500), var(--stone-700));
     box-shadow:

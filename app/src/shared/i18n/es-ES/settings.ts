@@ -2,7 +2,13 @@
 export default {
   // The game's menu entry is "Opciones" (GS GAMEMENU_OPTIONS), not "Configuración".
   title: 'Opciones',
-  back: 'Volver al mapa',
+  categories: {
+    label: 'Categorías',
+    general: 'General',
+    game: 'Juego y addons',
+    privacy: 'Privacidad',
+    about: 'Acerca de Twinmap',
+  },
 
   gameFolder: {
     title: 'Carpeta del juego',

@@ -2,7 +2,13 @@
 export default {
   // The game's menu entry is "Параметры" (GS GAMEMENU_OPTIONS), not "Настройки".
   title: 'Параметры',
-  back: 'Назад к карте',
+  categories: {
+    label: 'Разделы',
+    general: 'Общие',
+    game: 'Игра и аддоны',
+    privacy: 'Конфиденциальность',
+    about: 'О Twinmap',
+  },
 
   gameFolder: {
     title: 'Папка игры',
