@@ -124,6 +124,7 @@ export default {
     west: '{far} к западу',
     northWest: '{far} к северо-западу',
     onFoot: '{time} пешком',
+    mounted: '{time} верхом',
   },
 
   label: {
@@ -151,6 +152,7 @@ export default {
     elsewhere: 'Не на вашей текущей карте',
     here: 'Здесь',
     minutes: 'мин. пешком',
+    minutesMounted: 'мин. верхом',
     skip: 'Пропустить',
     // Three buttons side by side: the band is about the route already, so the verb alone.
     edit: 'Изменить',

@@ -126,6 +126,7 @@ export default {
     west: '西{far}',
     northWest: '西北{far}',
     onFoot: '步行{time}',
+    mounted: '坐骑{time}',
   },
 
   label: {
@@ -153,6 +154,7 @@ export default {
     elsewhere: '不在当前地图上',
     here: '已到达',
     minutes: '分钟（步行）',
+    minutesMounted: '分钟（坐骑）',
     skip: '跳过',
     edit: '编辑路线',
     clear: '清除',

@@ -113,7 +113,7 @@
   let me = $state<{ units: Point; continent: Continent } | null>(null)
   // The yards and the time are those of the way on foot, where one is found: asked for the one point, again every few dozen yards.
   const toLabel = feet(() => (labelled && me && me.continent === labelled.continent ? { continent: me.continent, from: me.units, to: [labelled.units], reach: 20_000 } : null), 40)
-  const way = $derived(labelled && me && me.continent === labelled.continent ? wayTo(me.units, labelled.units, toLabel.yards(labelled.units)) : null)
+  const way = $derived(labelled && me && me.continent === labelled.continent ? wayTo(me.units, labelled.units, toLabel.yards(labelled.units), pos) : null)
   // My pins: the points the player saved, kept by the app from one run to the next and for every screen that shows it.
   const keptPins = keptByApp('pins', savedFrom)
   const myPins = $derived(keptPins.value)

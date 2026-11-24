@@ -127,6 +127,7 @@ export default {
     west: '{far} 서쪽',
     northWest: '{far} 북서쪽',
     onFoot: '도보 {time}',
+    mounted: '탈것 {time}',
   },
 
   label: {
@@ -155,6 +156,7 @@ export default {
     // The character has arrived at the stop.
     here: '도착',
     minutes: '분 (도보)',
+    minutesMounted: '분 (탈것)',
     skip: '건너뛰기',
     // Three buttons side by side: the band is about the route already, so the verb alone.
     edit: '편집',

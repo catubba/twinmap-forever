@@ -121,6 +121,7 @@ export default {
     west: '{far} al oeste',
     northWest: '{far} al noroeste',
     onFoot: '{time} a pie',
+    mounted: '{time} en montura',
   },
 
   label: {
@@ -149,6 +150,7 @@ export default {
     elsewhere: 'No está en el mismo mapa que tú',
     here: 'Aquí',
     minutes: 'min a pie',
+    minutesMounted: 'min en montura',
     skip: 'Saltar',
     // Three buttons side by side: the band is about the route already, so the verb alone.
     edit: 'Editar',

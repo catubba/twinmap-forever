@@ -169,6 +169,8 @@ export default {
     northWest: '{far} north-west',
     // How long a run it is. {time}: minutes and seconds, as 3:11.
     onFoot: '{time} on foot',
+    // The same on a mount: the time is at the mount's speed.
+    mounted: '{time} mounted',
   },
 
   // The label that opens on a point of the map (PointLabel.svelte).
@@ -210,6 +212,8 @@ export default {
     here: 'Here',
     // Under a number of minutes, which shows above it in large type. Short.
     minutes: 'min on foot',
+    // The same on a mount. Short.
+    minutesMounted: 'min mounted',
     // Three buttons side by side. Short.
     skip: 'Skip',
     edit: 'Edit route',

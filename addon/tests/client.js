@@ -27,6 +27,9 @@ const STUB = `
   function GetSubZoneText() return GAME.sub end
   function GetPlayerFacing() return GAME.facing end
   function IsIndoors() return GAME.indoors == true end
+  -- GAME.run: how fast the character runs, as the game tells it; GAME.mount on a mount.
+  function GetUnitSpeed() return 0, GAME.run, 0, 0 end
+  function IsMounted() return GAME.mount == true end
   -- GAME.instance = { name, kind, id } inside a dungeon; GAME.north, GAME.west where the game tells the place in yards.
   function GetInstanceInfo()
     local i = GAME.instance

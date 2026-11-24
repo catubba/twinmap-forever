@@ -3,7 +3,7 @@
 import { UNITS_PER_BLOCK, unitsOfRect, type Point } from './geo'
 import type { Continent, GameMap } from './maps'
 import { wayOf } from './now'
-import { wayTo } from './point-label'
+import { secondsFor, wayTo, type Pace } from './point-label'
 import { BLOCK_YARDS } from './world'
 
 export interface Stop {
@@ -27,7 +27,6 @@ export interface Route {
 
 export const MAX_STOPS = 30
 const ARRIVE = 15 // yards from a stop at which the character is there
-const RUN = 7 // yards a second on foot, as on the label of a point
 
 export const noRoute = (): Route => ({ stops: [], next: 0, sent: false })
 
@@ -126,15 +125,15 @@ export type Band =
   | { state: 'complete' }
   // The name and number of the stop alone: the game is closed, or the character is where no way can be told (another continent, a dungeon).
   | { state: 'closed' | 'elsewhere'; name: string; n: number; of: number }
-  // far: "410 yd south-west". turn: degrees clockwise from north, which is up on the map. minutes: on foot.
-  | { state: 'going' | 'arrived'; name: string; n: number; of: number; far: string; turn: number; minutes: number }
+  // far: "410 yd south-west". turn: degrees clockwise from north, which is up on the map. minutes: at the character's pace, mounted or not.
+  | { state: 'going' | 'arrived'; name: string; n: number; of: number; far: string; turn: number; minutes: number; mount: boolean }
 
 /**
  * me: where the character is on the continents, or null (in a dungeon, or not known). live: the
  * strip is being read. walked: the yards of the way on foot to the next stop, where one is known:
  * the band tells those, and the minutes they take. Being there is still told as the crow flies.
  */
-export function bandOf(route: Route, me: { continent: Continent; at: Point } | null, live: boolean, walked?: number): Band {
+export function bandOf(route: Route, me: { continent: Continent; at: Point } | null, live: boolean, walked?: number, pace?: Pace): Band {
   if (!route.stops.length) return { state: 'none' }
   const stop = route.stops[route.next]
   if (!stop) return { state: 'complete' }
@@ -142,5 +141,5 @@ export function bandOf(route: Route, me: { continent: Continent; at: Point } | n
   if (!live) return { state: 'closed', ...said }
   if (!me || me.continent !== stop.continent) return { state: 'elsewhere', ...said }
   const { yards, turn } = wayOf(me.at, stop.at)
-  return { state: yards <= ARRIVE ? 'arrived' : 'going', ...said, far: wayTo(me.at, stop.at, walked).far, turn, minutes: Math.max(1, Math.round((walked ?? yards) / RUN / 60)) }
+  return { state: yards <= ARRIVE ? 'arrived' : 'going', ...said, far: wayTo(me.at, stop.at, walked).far, turn, minutes: Math.max(1, Math.round(secondsFor(walked ?? yards, pace) / 60)), mount: pace?.mount === true }
 }

@@ -121,6 +121,7 @@ export default {
     west: '{far} westlich',
     northWest: '{far} nordwestlich',
     onFoot: '{time} zu Fuß',
+    mounted: '{time} beritten',
   },
 
   label: {
@@ -149,6 +150,7 @@ export default {
     elsewhere: 'Nicht auf Eurer aktuellen Karte',
     here: 'Hier',
     minutes: 'Min. zu Fuß',
+    minutesMounted: 'Min. beritten',
     // Three buttons side by side: "Auslassen" is shorter than "Überspringen"; the band is about the route already, so the verb alone.
     skip: 'Auslassen',
     edit: 'Bearbeiten',

@@ -152,6 +152,13 @@ local function BuildPos()
   if facing then out.facing = Round(math.deg(facing), 10) % 360 end
   -- Under a roof (a cave, a mine, a house): the app then shows the rooms of the place.
   if Try(IsIndoors) == true then out.indoors = true end
+  -- How fast the character runs, in yards a second, standing still too: on a mount the mount's
+  -- speed. The app tells from it how long a way takes. It changes only on and off a mount, a form,
+  -- a spell, so it sends nothing new while running.
+  local _, run = Try(GetUnitSpeed, "player")
+  run = Num(run)
+  if run and run > 0 then out.speed = Round(run, 0.1) end
+  if Try(IsMounted) == true then out.mount = true end
   -- Inside a dungeon, a raid or a battleground: which one. It travels with the position, so the
   -- app never holds the place of one moment with the instance of another.
   local name, kind, _, _, _, _, _, id = Try(GetInstanceInfo)

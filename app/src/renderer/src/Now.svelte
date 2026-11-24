@@ -233,7 +233,7 @@
       {/each}
     </div>{/if}
   {/if}
-  <NextStop {route} band={bandOf(route, me, live, stop && toStop.yards(stop.at))} sending={sendState(live, inbox, news !== null, 'stop')} {inGame} onsend={sendRoute} {onskip} {onarrive} {onclear} {onend} {onremove} {onmove} onpick={onstop} />
+  <NextStop {route} band={bandOf(route, me, live, stop && toStop.yards(stop.at), pos)} sending={sendState(live, inbox, news !== null, 'stop')} {inGame} onsend={sendRoute} {onskip} {onarrive} {onclear} {onend} {onremove} {onmove} onpick={onstop} />
   {#if journey}
     <!-- What Shortest Path guides in the game now: its goal and the legs still ahead, as its tracker words them. -->
     {@render title('game', t('app.now.inGame'), journey.loading ? undefined : span(journey.left))}

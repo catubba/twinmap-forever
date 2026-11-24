@@ -17,6 +17,10 @@ export interface Position {
   facing?: number
   /** True under a roof: in a cave, a mine, a house. Missing in the open. */
   indoors?: boolean
+  /** Yards a second the character runs, standing still too: on a mount, the mount's. Missing from an addon that does not tell. */
+  speed?: number
+  /** True on a mount. */
+  mount?: boolean
   /** The dungeon, raid or battleground the character is inside; missing in the open world. */
   inst?: Instance
   /** True in a fight: only the position comes through, the rest waits for its end. */
