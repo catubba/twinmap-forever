@@ -84,9 +84,6 @@ export function decodeRow(row: Uint8Array): Reading {
   } else if (head[0] !== 0xc7 || head[1] !== 0x1b) {
     return { kind: 'none' }
   }
-  const protocol = head[2]!
-  if (protocol < OLDEST || protocol > PROTOCOL) return { kind: 'protocol', protocol }
-
   const end = HEADER + ((head[5]! << 8) | head[6]!)
   if (end + 2 > capacity) return { kind: 'corrupt' }
   const bytes = read(end + 2, negative)
@@ -96,6 +93,10 @@ export function decodeRow(row: Uint8Array): Reading {
     s2 = (s2 + s1) % 255
   }
   if (bytes[end] !== s1 || bytes[end + 1] !== s2) return { kind: 'corrupt' }
+  // Believed only once the sum holds, which covers it: every protocol keeps this frame and changes only what the payload says. A
+  // strip read halfway through a redraw told protocol 0, which no addon ever spoke, and the app said to update an addon already new.
+  const protocol = head[2]!
+  if (protocol < OLDEST || protocol > PROTOCOL) return { kind: 'protocol', protocol }
 
   let payload: string
   try {

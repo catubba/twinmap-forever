@@ -78,8 +78,8 @@ export interface GameState {
   corrupt: number
 }
 
-// One odd reading can be a strip caught halfway through a redraw: its protocol byte is not
-// covered by anything we can check. Believe it when it comes this many times in a row.
+// A protocol is told only by a strip whose sum holds (strip.ts), and still believed only when
+// it comes this many times in a row.
 const MISMATCH_AFTER = 3
 
 export function protocolMismatch(addon: number): ProtocolMismatch {

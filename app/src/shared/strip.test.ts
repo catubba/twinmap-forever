@@ -154,6 +154,13 @@ test('an addon one protocol behind is still read: its map stays until it is upda
   expect(game.state.sections.pos?.zone).toBe('Elwynn Forest')
 })
 
+test('a strip whose protocol byte is misread is corrupt, not an addon to update', () => {
+  // Cell 7 holds the bit of protocol 2: off, the strip says protocol 0 and its sum no longer holds.
+  const cells = strips.session[0]!, zero = cells.slice(0, 7) + '0' + cells.slice(8)
+  expect(cells[7]).toBe('2')
+  expect(decodeRow(pixels(zero))).toEqual({ kind: 'corrupt' })
+})
+
 test('an addon with an older protocol: the app says to update the addon', () => {
   const game = createGame()
   for (let i = 0; i < 3; i++) game.feed({ kind: 'protocol', protocol: 0 })
