@@ -27,6 +27,8 @@ concurrency:
 
 env:
   FORK: markus-barta/twinmap-forever
+  # The Developer ID it is signed with: a zip signed by anyone else is refused.
+  TEAM: P66J39QV6V
   ZIP: Twinmap-mac-arm64.zip
 
 jobs:
@@ -93,13 +95,20 @@ jobs:
           spctl --assess --type execute --verbose=2 "$app"
           xcrun stapler validate "$app"
           codesign -dv "$app" 2>&1 | grep -E '^(Authority|TeamIdentifier)='
+          codesign -dv "$app" 2>&1 | grep -qx "TeamIdentifier=$TEAM" || { echo "::error::Not signed by team $TEAM"; exit 1; }
       - name: Check that it holds our code and nothing else
         run: |
           set -euo pipefail
           ours=app/dist/mac-arm64/Twinmap.app/Contents/Resources/app.asar
           theirs="$RUNNER_TEMP/fork/app/Twinmap.app/Contents/Resources/app.asar"
           shasum -a 256 "$ours" "$theirs"
-          cmp "$ours" "$theirs" || { echo "::error::app.asar of the fork differs from the one built here from $TAG"; exit 1; }
+          # The archive's index may differ between two machines (the order and the offsets of its files); what it
+          # holds may not: every file of the two archives, byte for byte.
+          extract() { (cd app && node -e "require('@electron/asar').extractAll(process.argv[1], process.argv[2])" "$1" "$2"); }
+          extract "$PWD/$ours" "$RUNNER_TEMP/asar-ours"
+          extract "$theirs" "$RUNNER_TEMP/asar-theirs"
+          diff -r --brief "$RUNNER_TEMP/asar-ours" "$RUNNER_TEMP/asar-theirs" || { echo "::error::app.asar of the fork holds other files than the one built here from $TAG"; exit 1; }
+          echo "app.asar: the same files, byte for byte ($(find "$RUNNER_TEMP/asar-ours" -type f | wc -l | tr -d ' ') files)"
           # The rest of the app is Electron and the capture helper; their files may differ only by their signatures.
           diff <(cd app/dist/mac-arm64/Twinmap.app && find . -type f ! -path '*/_CodeSignature/*' | sort) \
                <(cd "$RUNNER_TEMP/fork/app/Twinmap.app" && find . -type f ! -path '*/_CodeSignature/*' ! -name CodeResources | sort)
