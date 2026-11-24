@@ -22,7 +22,34 @@ jobs:
       - run: npm test
       - run: npm run build
 
+  # Does this push or pull request touch the app? The Mac build waits for a macOS runner, which GitHub does not
+  # always have: it runs only when the app or this file changed. A required check that is skipped counts as passed.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      app: ${{ steps.diff.outputs.app }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: diff
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          # No base to compare with (a new branch, a forced push): build it.
+          if [ -z "$BASE" ] || [ "$BASE" = 0000000000000000000000000000000000000000 ] || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            app=true
+          elif git diff --name-only "$BASE" "$GITHUB_SHA" | grep -qE '^(app/|\.github/workflows/ci\.yml$)'; then
+            app=true
+          else
+            app=false
+          fi
+          echo "app changed: $app"
+          echo "app=$app" >> "$GITHUB_OUTPUT"
+
   app-mac:
+    needs: changes
+    if: needs.changes.outputs.app == 'true'
     runs-on: macos-15
     defaults:
       run:
