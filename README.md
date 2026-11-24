@@ -153,7 +153,7 @@ Twinmap is young and it is being worked on all the time. New versions come out o
 Here is what is planned, in no particular order. These are plans, not promises: what you ask for can change them.
 
 - **Group**: quests you share, pins everyone sees
-- **Travel**: time to arrive, flight paths, boats and zeppelins, your hearthstone
+- **Travel**: flight paths, boats and zeppelins, your hearthstone
 - **More on the map**: zones colored by level, the places you have explored, rares and treasures
 - **Quests**: your whole quest log, chains, item rewards, and a plan for the session
 - **Character**: experience per hour, professions, reputations, a reminder when your trainer has something new

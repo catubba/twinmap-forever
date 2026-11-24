@@ -2,6 +2,26 @@
 
 What changed in each version of Twinmap, newest first. The section of a version is also the text of its release on GitHub and of the addon's file on CurseForge.
 
+## 0.17.0 - 2026-11-24
+
+### New
+
+- **Twinmap on Mac.** Twinmap now runs on Apple Silicon Macs (macOS 14 or later) with the macOS client of WoW: Forever. A download for Mac follows soon; until then the README on GitHub says how to build it. Thanks to markus-barta.
+- **What's new.** After an update, Twinmap shows once what changed in the versions you skipped. Settings, About Twinmap, What's new shows it again.
+- **Arrival times at your speed.** The time on the label of a point and on the band of the next stop now goes at your character's own speed, and on a mount it says so: "0:50 mounted". Thanks to Stalioot.
+- **Metres.** With Twinmap in English or Chinese, Settings, General, Distances writes distances in metres. The numbers stay the game's own, as in the game's clients in other languages: only the unit changes.
+- **The line on the side of the game.** In the addon's options, Position now has Left edge and Right edge too, for setups where the top of the game window is covered or off screen, such as a game stretched over two screens.
+
+### Changed
+
+- **Settings in a window.** Settings opens over the map, with its categories in a column on the left. Every choice is one row, and the side of the map is now in Appearance.
+- **Layers is now Filters.** The button at the top of the map and its menu have a clearer name. The L key still opens it.
+
+### Fixed
+
+- **Followed in dungeons with the minimap in the corner.** With a minimap of some widths right against the top right corner of the screen, Twinmap did not follow your character inside dungeons. It does now.
+- **No more "addon older than this app" by mistake.** A line read while the game was redrawing it could make Twinmap say the addon was too old, with the same version on both sides. Twinmap now believes only a line that checks out.
+
 ## 0.16.1 - 2026-11-24
 
 ### New
