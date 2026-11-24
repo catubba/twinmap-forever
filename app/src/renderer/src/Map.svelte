@@ -24,7 +24,7 @@
   import { addFix, BEHIND, PERIOD, TURN, turnAt, whereAt, type Fix, type Turn } from '../../shared/glide'
   import { boxOf, buildingsAt, killedIn, nameOfBoss, piecesIn, RARE_BOSSES, roomPixels, yardsInside, YARDS_PER_UNIT, type Box, type InteriorMap, type Interiors, type Piece, type UnderRoom, type Yards } from '../../shared/inside'
   import type { Continent, GameMap } from '../../shared/maps'
-  import { questXp, type QuestPin, type QuestReward } from '../../shared/quests'
+  import { objectiveGroups, questXp, type QuestPin, type QuestReward } from '../../shared/quests'
   import { coins } from '../../shared/items'
   import { gatherColour, GATHER_SKILL, HERBS, iconOf, ORES, panelFor, serves, type FixedLayer, type FixedPin, type Travel } from '../../shared/services'
   import { pictureOfBlock, tileOfPicture } from '../../shared/pixels'
@@ -750,7 +750,9 @@
   // A ring around one pin: the one whose row in the Now panel is under the pointer. The map does
   // not move for it: a pin out of view stays out of view.
   const ring = L.marker([0, 0], { interactive: false, keyboard: false, zIndexOffset: 2000, icon: L.divIcon({ className: 'ring', iconSize: [34, 34] }) })
-  export function pointAt(to: { continent: Continent; at: Point } | null): void {
+  export function pointAt(to: { continent: Continent; at: Point; key?: string } | null): void {
+    // A quest of the log (its row's key is q:name) comes in front of the rest of the pins.
+    front = to?.key?.startsWith('q:') ? to.key.slice(2) : null
     if (!map || !to || inside || to.continent !== continent) return void ring.remove()
     ring.setLatLng(at(to.at)).addTo(map)
   }
@@ -1202,9 +1204,12 @@
     }
   }
   const QUEST_PINS = { available: ['quest', 'available', 500], turnin: ['turnin', 'turnin', 1000], objective: ['objective', 'objectives', 0] } as const
+  const DIM = 0.25 // the opacity of a pin that is not of the quest in front
+  let front = $state<string | null>(null) // the quest picked, or pointed at, in the Now column: its pins in front of the rest
   $effect(() => {
     for (const group of Object.values(questLayers)) group.clearLayers()
     const zones = new Map(maps.filter((m) => m.level === 'zone' && m.rect && m.area && m.continent === continent).map((m) => [m.area, m]))
+    const lit = (quests: string[]): number => (front === null || quests.includes(front) ? 1 : DIM)
     // From far the pins to take, and those to hand in, that would lie on each other are one, in their middle: it names them all, and a click goes near enough to tell them apart.
     const far = zoom < PIN_ZOOM ? zoom : null
     const placed = quests.flatMap((p) => {
@@ -1226,27 +1231,54 @@
           tip.append(Object.assign(document.createElement('b'), { textContent: q.p.name }))
           questLines(tip, q.p)
         })
-        L.marker(at(units), { keyboard: false, zIndexOffset: above, icon: L.divIcon({ className: 'door', iconSize: [size, size], html: pin(drawing) }) })
+        L.marker(at(units), { keyboard: false, zIndexOffset: above, opacity: lit(group.of.flatMap((q) => q.p.quests)), icon: L.divIcon({ className: 'door', iconSize: [size, size], html: pin(drawing) }) })
           .bindTooltip(tip, { direction: 'top', offset: [0, -size / 2], className: 'tip' })
           .on('click', () => map?.setView(at(units), PIN_ZOOM + 1.5))
           .addTo(questLayers[layer])
       }
     }
+    const label = (p: QuestPin, zone: GameMap): void => {
+      const units = unitsOfPlace(zone.rect!, p.x, p.y)
+      labelPin(units, p.name, [p.kind ? t(`map.pins.objective.${p.kind}`) : t(`map.pins.quest.${p.type}`), ...p.quests.filter((quest) => quest !== p.name)], { zone, place: { x: p.x, y: p.y } })
+    }
     for (const { p, zone } of alone) {
-      if (!zone.rect) continue
-      const [plain, layer, above] = QUEST_PINS[p.type]
-      // An objective is drawn by what it asks for, where the addon told.
-      const drawing: PinName = p.type === 'objective' && p.kind ? p.kind : plain
+      if (!zone.rect || p.type === 'objective') continue
+      const [drawing, layer, above] = QUEST_PINS[p.type]
       // Names come from the player's QuestieDB: written as text, never as markup.
       const tip = document.createElement('span')
       tip.append(Object.assign(document.createElement('b'), { textContent: p.name }))
       questLines(tip, p)
       const size = pinSize(drawing)
-      const units = unitsOfPlace(zone.rect, p.x, p.y)
-      L.marker(at(units), { keyboard: false, zIndexOffset: above, icon: L.divIcon({ className: p.type === 'objective' ? 'door task' : 'door', iconSize: [size, size], html: pin(drawing) }) })
+      L.marker(at(unitsOfPlace(zone.rect, p.x, p.y)), { keyboard: false, zIndexOffset: above, opacity: lit(p.quests), icon: L.divIcon({ className: 'door', iconSize: [size, size], html: pin(drawing) }) })
         .bindTooltip(tip, { direction: 'top', offset: [0, -size / 2], className: 'tip' })
-        .on('click', () => labelPin(units, p.name, [p.kind ? t(`map.pins.objective.${p.kind}`) : t(`map.pins.quest.${p.type}`), ...p.quests.filter((quest) => quest !== p.name)], { zone, place: { x: p.x, y: p.y } }))
+        .on('click', () => label(p, zone))
         .addTo(questLayers[layer])
+    }
+    // The objectives are many: those near each other that ask for the same thing are one pin, drawn by what they ask for,
+    // with the number of quests it is for when more than one. A click on it goes nearer, where they part; on one alone, its label.
+    if (far !== null) return
+    for (const g of objectiveGroups([...alone].filter((q) => q.p.type === 'objective'), GATHER / 2 ** zoom, front)) {
+      const drawing: PinName = g.kind ?? 'objective', size = pinSize(drawing), one = g.of.length === 1 ? g.of[0]! : null
+      const tip = document.createElement('span')
+      if (one) {
+        tip.append(Object.assign(document.createElement('b'), { textContent: one.p.name }))
+        questLines(tip, one.p)
+      } else
+        g.quests.forEach((quest, i) => {
+          if (i) tip.append(document.createElement('br'))
+          tip.append(Object.assign(document.createElement('b'), { textContent: quest }))
+          const reward = rewardLine(g.of.find((q) => q.p.rewards?.[quest])?.p.rewards?.[quest])
+          if (reward) tip.append(document.createElement('br'), reward)
+        })
+      const count = g.quests.length > 1 ? `<b class="count">${g.quests.length}</b>` : ''
+      L.marker(at(g), { keyboard: false, zIndexOffset: g.lit ? 0 : -100, opacity: g.lit ? 1 : DIM, icon: L.divIcon({ className: 'door', iconSize: [size, size], html: pin(drawing) + count }) })
+        .bindTooltip(tip, { direction: 'top', offset: [0, -size / 2], className: 'tip' })
+        .on('click', () => {
+          if (one) label(one.p, one.zone)
+          else if (map && map.getZoom() < map.getMaxZoom()) map.setView(at(g), Math.min(map.getMaxZoom(), map.getZoom() + 1.5))
+          else label(g.of[0]!.p, g.of[0]!.zone)
+        })
+        .addTo(questLayers.objectives)
     }
   })
   // Not inside a dungeon, whose map is another; not from far, where they would cover the land: the objectives, which are many, go first.
@@ -2244,10 +2276,22 @@
     width: 100%;
     height: 100%;
   }
-  /* A soft light of its own colour under an objective: it is found at a glance on any ground. */
-  .map :global(.task) {
-    border-radius: 50%;
-    box-shadow: 0 0 9px 4px color-mix(in srgb, var(--objective) 55%, transparent);
+  /* On a pin that gathers objectives of more than one quest: how many, on a small dark disc at its lower right. */
+  .map :global(.door .count) {
+    position: absolute;
+    right: -6px;
+    bottom: -5px;
+    min-width: 13px;
+    height: 13px;
+    padding: 0 2px;
+    box-sizing: border-box;
+    border: 1px solid var(--ink);
+    border-radius: 7px;
+    background: var(--float);
+    color: var(--text);
+    font: 600 9px/11px var(--font);
+    text-align: center;
+    pointer-events: none;
   }
 
 

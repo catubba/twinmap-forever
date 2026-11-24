@@ -1,5 +1,6 @@
 // The quests on the map: the icons the addon tells of Questie, and the pins the app makes of them
 // with the names of the player's own QuestieDB.
+import { gathered } from './geo'
 import type { FixedPin } from './services'
 
 /** An icon Questie holds on the game's map: its quest, and its place in percent of the map of a zone. */
@@ -44,6 +45,31 @@ export interface QuestPin {
   quests: string[]
   /** What each of them gives, by its line in quests: missing where nothing is known. */
   rewards?: Record<string, QuestReward>
+}
+
+/** Objectives laid as one pin: where, which, what they ask for, the quests they are for, and whether they are lit. */
+export interface ObjectiveGroup<T> {
+  x: number
+  y: number
+  of: T[]
+  kind?: ObjectiveKind
+  quests: string[]
+  lit: boolean
+}
+/**
+ * The objectives as the map lays them: those within reach of each other that ask for the same thing are one pin in
+ * their middle, as the quests seen from far are (gathered). front: a quest picked in the Now column, or null; its
+ * objectives are gathered on their own and lit, every other one is dim.
+ */
+export function objectiveGroups<T extends { x: number; y: number; p: QuestPin }>(placed: T[], reach: number, front: string | null): ObjectiveGroup<T>[] {
+  const sets = new Map<string, T[]>()
+  for (const q of placed) {
+    const key = `${q.p.kind ?? ''} ${front === null || q.p.quests.includes(front)}`
+    sets.set(key, [...(sets.get(key) ?? []), q])
+  }
+  return [...sets].flatMap(([key, of]) =>
+    gathered(of, reach).map((g) => ({ ...g, kind: of[0]!.p.kind, quests: [...new Set(g.of.flatMap((q) => q.p.quests))], lit: key.endsWith('true') })),
+  )
 }
 
 /** What a quest gives: its XP at the level QuestieDB has it for, and the money the game's cache tells (copper). */
