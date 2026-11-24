@@ -5,6 +5,7 @@ export default {
   categories: {
     label: 'Categorías',
     general: 'General',
+    appearance: 'Apariencia',
     game: 'Juego y addons',
     privacy: 'Privacidad',
     about: 'Acerca de Twinmap',

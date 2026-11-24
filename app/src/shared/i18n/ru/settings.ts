@@ -5,6 +5,7 @@ export default {
   categories: {
     label: 'Разделы',
     general: 'Общие',
+    appearance: 'Внешний вид',
     game: 'Игра и аддоны',
     privacy: 'Конфиденциальность',
     about: 'О Twinmap',

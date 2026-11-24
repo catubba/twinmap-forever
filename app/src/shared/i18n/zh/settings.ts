@@ -5,6 +5,7 @@ export default {
   categories: {
     label: '类别',
     general: '常规',
+    appearance: '外观',
     game: '游戏和插件',
     privacy: '隐私',
     about: '关于 Twinmap',

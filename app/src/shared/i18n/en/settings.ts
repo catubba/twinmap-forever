@@ -7,8 +7,10 @@ export default {
   categories: {
     // The column of the categories, read aloud only.
     label: 'Categories',
-    // The language, the layout of the map and the window.
+    // The language and the window.
     general: 'General',
+    // How the app looks: the layout of the map today; themes and icons later.
+    appearance: 'Appearance',
     // The game folder and what Twinmap found of the game and its addons.
     game: 'Game and addons',
     // Help improve Twinmap.

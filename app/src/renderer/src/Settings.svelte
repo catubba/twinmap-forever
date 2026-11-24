@@ -23,9 +23,10 @@
   // The categories. What only the computer sets (the window, a phone, the programme) is not on a phone's page, and the keys
   // are not on a screen that is touched.
   const touch = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches
-  type Cat = 'general' | 'game' | 'phone' | 'privacy' | 'keys' | 'about'
+  type Cat = 'general' | 'appearance' | 'game' | 'phone' | 'privacy' | 'keys' | 'about'
   const CATS: { key: Cat; name: Key; glyph: GlyphName }[] = [
     { key: 'general', name: 'settings.categories.general', glyph: 'sliders' },
+    { key: 'appearance', name: 'settings.categories.appearance', glyph: 'palette' },
     { key: 'game', name: 'settings.categories.game', glyph: 'folder' },
     ...(inApp
       ? [
@@ -88,13 +89,6 @@
           </div>
         </section>
       {/if}
-      <section class="group">
-        <h3 class="band">{t('settings.layout.title')}</h3>
-        <div class="in">
-          <label class="choice"><input type="radio" class="check" name="map-side" checked={!layout.mapRight} onchange={() => setMapRight(false)} />{t('settings.layout.mapLeft')}</label>
-          <label class="choice"><input type="radio" class="check" name="map-side" checked={layout.mapRight} onchange={() => setMapRight(true)} />{t('settings.layout.mapRight')}</label>
-        </div>
-      </section>
       <!-- The window is the computer's: a phone on the home network has none to set. -->
       {#if inApp}
         <section class="group">
@@ -110,6 +104,14 @@
           </div>
         </section>
       {/if}
+    {:else if cat === 'appearance'}
+      <section class="group">
+        <h3 class="band">{t('settings.layout.title')}</h3>
+        <div class="in">
+          <label class="choice"><input type="radio" class="check" name="map-side" checked={!layout.mapRight} onchange={() => setMapRight(false)} />{t('settings.layout.mapLeft')}</label>
+          <label class="choice"><input type="radio" class="check" name="map-side" checked={layout.mapRight} onchange={() => setMapRight(true)} />{t('settings.layout.mapRight')}</label>
+        </div>
+      </section>
     {:else if cat === 'game'}
       <section class="group">
         <h3 class="band">{t('settings.gameFolder.title')}</h3>

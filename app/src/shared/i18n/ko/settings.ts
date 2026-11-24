@@ -5,6 +5,7 @@ export default {
   categories: {
     label: '분류',
     general: '일반',
+    appearance: '모양',
     game: '게임 및 애드온',
     privacy: '개인정보',
     about: 'Twinmap 정보',
