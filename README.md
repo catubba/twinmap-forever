@@ -12,6 +12,8 @@ An interactive map of World of Warcraft: Forever for your second screen.</p>
   <a href="https://www.curseforge.com/wow/addons/twinmap-forever"><img src="https://img.shields.io/badge/1._The_addon-Get_it_on_CurseForge-F16436?style=for-the-badge&amp;logo=curseforge&amp;logoColor=white" alt="1. The addon: get it on CurseForge" height="44"></a>
   &nbsp;&nbsp;
   <a href="https://github.com/catubba/twinmap-forever/releases/latest/download/Twinmap-Setup.exe"><img src="https://img.shields.io/badge/2._The_app-Download_for_Windows-1f6feb?style=for-the-badge&amp;logoColor=white" alt="2. The app: download for Windows" height="44"></a>
+  &nbsp;&nbsp;
+  <a href="https://github.com/catubba/twinmap-forever/releases/latest/download/Twinmap-mac-arm64.zip"><img src="https://img.shields.io/badge/2._The_app-Download_for_Mac-1f6feb?style=for-the-badge&amp;logo=apple&amp;logoColor=white" alt="2. The app: download for Mac" height="44"></a>
 </p>
 
 <p align="center">You need both. Free, with no account, no ads and no Overwolf.</p>
@@ -29,7 +31,7 @@ An interactive map of World of Warcraft: Forever for your second screen.</p>
 ## Install in three steps
 
 1. **The addon.** Install [Twinmap Forever from CurseForge](https://www.curseforge.com/wow/addons/twinmap-forever) and restart the game.
-2. **The app.** [Download Twinmap for Windows](https://github.com/catubba/twinmap-forever/releases/latest/download/Twinmap-Setup.exe) and open the file. It asks for no administrator rights and starts by itself.
+2. **The app.** [Download Twinmap for Windows](https://github.com/catubba/twinmap-forever/releases/latest/download/Twinmap-Setup.exe) and open the file. It asks for no administrator rights and starts by itself. On a Mac, [download Twinmap for Mac](https://github.com/catubba/twinmap-forever/releases/latest/download/Twinmap-mac-arm64.zip): see below.
 3. **Play.** The app finds your game and builds the map from your own game files, once, in a minute or two. Log in: your arrow appears on its own.
 
 From then on the app updates itself, and the addon is updated from CurseForge.
@@ -58,13 +60,14 @@ Every version of the app, with its notes, is on the [releases page](https://gith
 
 ## macOS
 
-Twinmap also runs on Apple Silicon Macs (macOS 14 or later), with the macOS client of WoW: Forever. There is no download for Mac yet: build it from the source.
+Twinmap runs on Apple Silicon Macs (macOS 14 or later), with the macOS client of WoW: Forever.
 
-1. On a Mac with Node.js 24 and Xcode, run `cd app && npm ci && npm run dist:mac`.
-2. Open `app/dist/mac-arm64/Twinmap.app`.
-3. Allow Twinmap under **System Settings > Privacy & Security > Screen Recording**, then open Twinmap again.
+1. [Download Twinmap for Mac](https://github.com/catubba/twinmap-forever/releases/latest/download/Twinmap-mac-arm64.zip), open the zip and move **Twinmap** to **Applications**.
+2. Open Twinmap. The first time, allow it under **System Settings > Privacy & Security > Screen Recording**, then open it again.
 
-Twinmap looks for the game in `/Applications/World of Warcraft` and `~/Applications/World of Warcraft`. Everything works as on Windows, pins and routes sent to the game included. Not on Mac yet: automatic updates (download each new version by hand) and HDR.
+Twinmap looks for the game in `/Applications/World of Warcraft` and `~/Applications/World of Warcraft`. Everything works as on Windows, pins and routes sent to the game included. Not on Mac yet: automatic updates (download each new version here) and HDR.
+
+The Mac app is signed and notarized by markus-barta, who builds it from the source of each release; every release checks that it holds the same code before attaching it.
 
 ## What it does
 
