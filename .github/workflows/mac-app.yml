@@ -71,6 +71,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ needs.find.outputs.tag }}
+      # The checks come from this workflow's own commit, not from the tag, which may be older than they are.
+      - uses: actions/checkout@v4
+        with:
+          path: .checks
+          sparse-checkout: .github/scripts
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -110,9 +115,11 @@ jobs:
           # A program inside (koffi.node) carries the fork's signature, which changes the file around the code:
           # compared by what its sections hold, on both sides (.github/scripts/macho-content.py).
           for side in ours theirs; do
-            find "$RUNNER_TEMP/asar-$side" -type f -print0 | while IFS= read -r -d '' file; do
-              case "$(file -b "$file")" in Mach-O*) python3 .github/scripts/macho-content.py "$file" > "$file.content" && rm "$file" ;; esac
-            done
+            while IFS= read -r -d '' file; do
+              case "$(file -b "$file")" in
+                Mach-O*) python3 .checks/.github/scripts/macho-content.py "$file" > "$file.content" || exit 1; rm "$file" ;;
+              esac
+            done < <(find "$RUNNER_TEMP/asar-$side" -type f -print0)
           done
           if ! diff -r --brief "$RUNNER_TEMP/asar-ours" "$RUNNER_TEMP/asar-theirs" > "$RUNNER_TEMP/asar.diff"; then
             cat "$RUNNER_TEMP/asar.diff"
