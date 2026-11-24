@@ -10,8 +10,10 @@ An interactive map of World of Warcraft: Forever for your second screen.</p>
 
 <p align="center">
   <a href="https://www.curseforge.com/wow/addons/twinmap-forever"><img src="https://img.shields.io/badge/1._The_addon-Get_it_on_CurseForge-F16436?style=for-the-badge&amp;logo=curseforge&amp;logoColor=white" alt="1. The addon: get it on CurseForge" height="44"></a>
-  &nbsp;&nbsp;
-  <a href="https://github.com/catubba/twinmap-forever/releases/latest/download/Twinmap-Setup.exe"><img src="https://img.shields.io/badge/2._The_app-Download_for_Windows-1f6feb?style=for-the-badge&amp;logoColor=white" alt="2. The app: download for Windows" height="44"></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/catubba/twinmap-forever/releases/latest/download/Twinmap-Setup.exe"><img src="https://img.shields.io/badge/2._The_app-Download_for_Windows-1f6feb?style=for-the-badge&amp;logo=data:image/svg%2bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0id2hpdGUiIGQ9Ik0wIDMuNCA5LjggMnY5LjRIMHptMTEgLTEuNkwyNCAwdjExLjRIMTF6TTAgMTIuNmg5LjhWMjJMMCAyMC42em0xMSAwaDEzVjI0bC0xMy0xLjh6Ii8+PC9zdmc+" alt="2. The app: download for Windows" height="44"></a>
   &nbsp;&nbsp;
   <a href="https://github.com/catubba/twinmap-forever/releases/latest/download/Twinmap-mac-arm64.zip"><img src="https://img.shields.io/badge/2._The_app-Download_for_Mac-1f6feb?style=for-the-badge&amp;logo=apple&amp;logoColor=white" alt="2. The app: download for Mac" height="44"></a>
 </p>
