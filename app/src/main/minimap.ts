@@ -205,7 +205,8 @@ export function startInside(tilesFolder: () => string | null, mosaics: (folder: 
       if (!floors.length) return (report = { ...said, why: 'no rooms' }), null
       const known = last && now - last.at <= KEPT ? last : null
       if (!known && now - searchedAt < LOST_FOR) return null
-      const half = Math.round(mini.size / 2), box = cut(Math.round(mini.x) - half, Math.round(mini.y) - half, half * 2)
+      // Down, not to the nearest: a minimap of an odd width against the corner of the screen reaches half a pixel past it, and a square a pixel out is not read.
+      const half = Math.floor(mini.size / 2), box = cut(Math.round(mini.x) - half, Math.round(mini.y) - half, half * 2)
       if (!box) return (report = { ...said, why: 'screen not read' }), fresh()
       seen = box
       if (!known) searchedAt = now
