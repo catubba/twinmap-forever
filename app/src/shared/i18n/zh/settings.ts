@@ -79,7 +79,7 @@ export default {
   keys: {
     // Key Bindings in the game (GS KEY_BINDINGS).
     title: '按键设置',
-    layers: '图层',
+    layers: '筛选',
     // The map following the character is GS FOLLOW 跟随 (glossary); "打开/关闭" as GS BINDING_NAME_TOGGLEMINIMAPROTATION.
     follow: '打开/关闭跟随',
     north: '地图随角色转向，或保持北方朝上',

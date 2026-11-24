@@ -75,7 +75,7 @@ export default {
   keys: {
     // Key Bindings in the game: "Raccourcis" (GS KEY_BINDINGS).
     title: 'Raccourcis',
-    layers: 'Calques',
+    layers: 'Filtres',
     follow: 'Activer ou désactiver Suivre',
     north: 'La carte tourne avec votre personnage, ou le nord en haut',
     side: 'Carte de l’autre côté du panneau',

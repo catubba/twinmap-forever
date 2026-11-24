@@ -1,9 +1,9 @@
 // El español de España del mapa: the notes on every key are in en/map.ts.
 export default {
   layers: {
-    button: 'Capas',
-    buttonTip: 'Capas (L)',
-    menu: 'Capas',
+    button: 'Filtros',
+    buttonTip: 'Filtros (L)',
+    menu: 'Filtros del mapa',
     // Group after a colon: "todos los {group}" would need the gender of each group name (las Misiones, el Mundo).
     hideAll: 'Ocultar todo: {group}',
     showAll: 'Mostrar todo: {group}',

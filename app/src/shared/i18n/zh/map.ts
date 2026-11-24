@@ -1,9 +1,9 @@
 // 简体中文 地图: the notes on every key are in en/map.ts.
 export default {
   layers: {
-    button: '图层',
-    buttonTip: '图层（L）',
-    menu: '图层',
+    button: '筛选',
+    buttonTip: '筛选（L）',
+    menu: '地图筛选',
     hideAll: '隐藏全部{group}',
     showAll: '显示全部{group}',
     kinds: '{layer}种类',

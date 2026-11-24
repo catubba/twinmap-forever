@@ -75,7 +75,7 @@ export default {
   keys: {
     // Key Bindings in the game: "Teclado" (GS KEY_BINDINGS).
     title: 'Teclado',
-    layers: 'Capas',
+    layers: 'Filtros',
     follow: 'Activar o desactivar Seguir',
     north: 'El mapa gira con tu personaje, o el norte arriba',
     side: 'Mapa al otro lado del panel',

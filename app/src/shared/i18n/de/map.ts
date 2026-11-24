@@ -1,9 +1,9 @@
 // Das Deutsch der Karte: the notes on every key are in en/map.ts.
 export default {
   layers: {
-    button: 'Ebenen',
-    buttonTip: 'Ebenen (L)',
-    menu: 'Ebenen',
+    button: 'Filter',
+    buttonTip: 'Filter (L)',
+    menu: 'Kartenfilter',
     // Group after a colon: "alle {group}" would need the plural and case of each group name (die Quests, die Welt).
     hideAll: 'Alle ausblenden: {group}',
     showAll: 'Alle anzeigen: {group}',

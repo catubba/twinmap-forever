@@ -1,9 +1,9 @@
 // Русский карты: the notes on every key are in en/map.ts.
 export default {
   layers: {
-    button: 'Слои',
-    buttonTip: 'Слои (L)',
-    menu: 'Слои',
+    button: 'Фильтры',
+    buttonTip: 'Фильтры (L)',
+    menu: 'Фильтры карты',
     // Group after a colon: "все {group}" would need the case of each group name.
     hideAll: 'Скрыть все: {group}',
     showAll: 'Показать все: {group}',

@@ -79,7 +79,7 @@ export default {
   keys: {
     // Key Bindings in the game (GS KEY_BINDINGS).
     title: 'Tastaturbelegung',
-    layers: 'Ebenen',
+    layers: 'Filter',
     // The game's "ein/aus" (GS BINDING_NAME_TOGGLEWORLDMAP "Weltkarte ein/aus").
     follow: 'Folgen ein/aus',
     // "genordet" is the German word for a map with north up.

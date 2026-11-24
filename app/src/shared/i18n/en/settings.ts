@@ -105,7 +105,7 @@ export default {
   keys: {
     title: 'Shortcuts',
     // Beside the key L.
-    layers: 'Layers',
+    layers: 'Filters',
     // Beside the key F.
     follow: 'Follow on and off',
     // Beside the key N.

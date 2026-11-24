@@ -1,13 +1,14 @@
 // The English of map: see en/index.ts for how a key is written and noted.
 export default {
-  // The Layers menu, under the Layers button at the top of the map (Map.svelte, layers.ts).
+  // The Filters menu, under the Filters button at the top of the map (Map.svelte, layers.ts): what the map draws. Its words
+  // are the same as the filters of the Auction House (auction.filters).
   layers: {
     // The button that opens the menu: short.
-    button: 'Layers',
+    button: 'Filters',
     // Its tooltip: L is the key that opens it too.
-    buttonTip: 'Layers (L)',
+    buttonTip: 'Filters (L)',
     // The menu itself, read aloud only.
-    menu: 'Layers',
+    menu: 'Map filters',
     // Tooltip on the name of a group, which turns all its layers off or on. {group}: one of map.layers.groups.
     hideAll: 'Hide all {group}',
     showAll: 'Show all {group}',

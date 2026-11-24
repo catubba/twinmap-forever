@@ -78,7 +78,7 @@ export default {
   keys: {
     // Key Bindings in the game (GS KEY_BINDINGS).
     title: 'Назначение клавиш',
-    layers: 'Слои',
+    layers: 'Фильтры',
     follow: 'Следовать: вкл./выкл.',
     north: 'Карта поворачивается вместе с вашим персонажем или север вверху',
     side: 'Карта на другую сторону панели',

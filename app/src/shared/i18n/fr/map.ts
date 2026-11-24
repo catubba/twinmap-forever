@@ -1,9 +1,9 @@
 // Le français de la carte: les notes sur chaque clé sont dans en/map.ts.
 export default {
   layers: {
-    button: 'Calques',
-    buttonTip: 'Calques (L)',
-    menu: 'Calques',
+    button: 'Filtres',
+    buttonTip: 'Filtres (L)',
+    menu: 'Filtres de la carte',
     // Group after a colon: "tous les {group}" would need the gender of each group name (les Quêtes, le Monde).
     hideAll: 'Tout cacher : {group}',
     showAll: 'Tout afficher : {group}',

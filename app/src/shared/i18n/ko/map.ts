@@ -1,9 +1,9 @@
 // 한국어 지도: the notes on every key are in en/map.ts.
 export default {
   layers: {
-    button: '레이어',
-    buttonTip: '레이어 (L)',
-    menu: '레이어',
+    button: '필터',
+    buttonTip: '필터 (L)',
+    menu: '지도 필터',
     // Group after a colon: a particle after {group} would change with its last syllable.
     hideAll: '모두 숨기기: {group}',
     showAll: '모두 표시: {group}',

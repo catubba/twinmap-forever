@@ -76,7 +76,7 @@ export default {
   keys: {
     // "Configurar teclado" (GS KEY_BINDINGS) is a verb, wrong over a table that changes nothing.
     title: 'Atajos de teclado',
-    layers: 'Capas',
+    layers: 'Filtros',
     follow: 'Activar o desactivar Seguir',
     north: 'El mapa gira con tu personaje, o el norte arriba',
     side: 'Mapa al otro lado del panel',

@@ -75,7 +75,7 @@ export default {
   keys: {
     // Key Bindings in the game (GS KEY_BINDINGS).
     title: '단축키 설정',
-    layers: '레이어',
+    layers: '필터',
     // The game's "켜기/끄기" (GS BINDING_NAME_TOGGLEMINIMAPROTATION); Follow is "추적" (glossary).
     follow: '추적 켜기/끄기',
     north: '캐릭터 방향에 맞춰 지도 회전, 또는 북쪽이 위',
