@@ -643,6 +643,11 @@
    * Shows the map of a dungeon or a raid from outside it, with its bosses and its entrance; false where
    * the app has no rooms of it. The character in it: the map follows the character there, as always.
    */
+  /** Opens the Layers menu: the link of an entry of What's new that tells of a layer. */
+  export function openLayers(): void {
+    layersOpen = true
+  }
+
   export function openDungeon(id: number, wing?: string): boolean {
     const m = interiors?.maps.find((d) => d.id === id && d.kind !== 'world')
     if (!map || !m) return false

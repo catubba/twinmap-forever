@@ -13,7 +13,7 @@
   import { layout, setMapRight } from './layout.svelte'
   import { langNow, num, t } from '../../shared/i18n'
 
-  let { setup, tiles, onback, onfirstrun, onfeedback }: { setup: SetupStatus; tiles: TilesStatus | null; onback: () => void; onfirstrun: () => void; onfeedback: () => void } = $props()
+  let { setup, tiles, onback, onfirstrun, onfeedback, onnews }: { setup: SetupStatus; tiles: TilesStatus | null; onback: () => void; onfirstrun: () => void; onfeedback: () => void; onnews: () => void } = $props()
 
   const parties = thirdParties(licences)
   // The licence of each, by its name where the text says it.
@@ -147,6 +147,7 @@
           <div class="in">
             <p class="hint">{t('settings.version.updates')}</p>
             <div class="buttons">
+              <button class="btn" onclick={onnews}>{t('news.button')}</button>
               <button class="btn" onclick={onfeedback}>{t('settings.version.report')}</button>
               {#if inApp}<button class="btn" onclick={onfirstrun}>{t('settings.version.firstRun')}</button>{/if}
             </div>

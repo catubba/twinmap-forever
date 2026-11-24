@@ -9,6 +9,16 @@ export default {
   common: {
     close: '닫기',
   },
+  news: {
+    title: 'Twinmap의 새로운 기능',
+    updatedFrom: '{version}에서 업데이트되었습니다.',
+    again: '다시 보기: {settings}, {button}',
+    button: '새로운 기능',
+    changed: '변경',
+    fixed: '수정',
+    done: '확인',
+    goTo: '{name} 열기',
+  },
 
   participate: {
     title: 'Twinmap 개선에 참여',

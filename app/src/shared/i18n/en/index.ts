@@ -16,6 +16,25 @@ export default {
     // On a cross that closes a window or panel, read aloud only.
     close: 'Close',
   },
+  // What's new (WhatsNew.svelte): the news of the versions the player updated past, once as the app starts after an
+  // update, and again from Settings. The news themselves are the release's text (shared/news.ts), not keys.
+  news: {
+    // The window's title.
+    title: "What's new in Twinmap",
+    // Under the title. {version}: the version the player had before, as 0.16.1.
+    updatedFrom: 'Updated from {version}.',
+    // Under the title, after updatedFrom. {settings}: the name of Settings (app.top.settings); {button}: news.button.
+    again: '{settings}, {button}, shows this again.',
+    // The button in Settings, in the group of the app's version, that opens the window: short.
+    button: "What's new",
+    // Small headings in a version: the changes, then the fixes, after its new things (which have none).
+    changed: 'Changed',
+    fixed: 'Fixed',
+    // The one button that closes the window: short.
+    done: 'Got it',
+    // A link at the end of an entry, to what it tells of. {name}: a tab (Now, Items, Auction House), Settings or Layers, as the app names them.
+    goTo: 'Open {name}',
+  },
 
   // The window that asks once, after the first run, to join the participation programme (Participate.svelte).
   participate: {

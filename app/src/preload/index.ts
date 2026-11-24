@@ -99,6 +99,7 @@ contextBridge.exposeInMainWorld('twinmap', {
   lang: (): Promise<string> => ipcRenderer.invoke('lang'),
   setLang: (code: string): Promise<void> => ipcRenderer.invoke('set-lang', code),
   langAsked: (keep: string | null): Promise<void> => ipcRenderer.invoke('lang-asked', keep),
+  newsSeen: (): Promise<void> => ipcRenderer.invoke('news-seen'),
   // A step bigger (1) or smaller (-1): Ctrl and the wheel.
   zoomBy: (by: 1 | -1): Promise<void> => ipcRenderer.invoke('zoom-by', by),
   // Shows the map to the other devices of the home network, or stops showing it.

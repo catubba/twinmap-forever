@@ -9,6 +9,16 @@ export default {
   common: {
     close: 'Fermer',
   },
+  news: {
+    title: 'Nouveautés de Twinmap',
+    updatedFrom: 'Mis à jour depuis la {version}.',
+    again: 'Pour revoir cette fenêtre : {settings}, {button}.',
+    button: 'Nouveautés',
+    changed: 'Modifié',
+    fixed: 'Corrigé',
+    done: 'Compris',
+    goTo: 'Ouvrir {name}',
+  },
 
   participate: {
     title: 'Aidez à améliorer Twinmap',

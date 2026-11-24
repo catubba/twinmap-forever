@@ -9,6 +9,16 @@ export default {
   common: {
     close: '关闭',
   },
+  news: {
+    title: 'Twinmap 新内容',
+    updatedFrom: '已从 {version} 更新。',
+    again: '再次查看：{settings}，{button}。',
+    button: '新内容',
+    changed: '更改',
+    fixed: '修复',
+    done: '知道了',
+    goTo: '打开{name}',
+  },
 
   participate: {
     title: '帮助改进Twinmap',

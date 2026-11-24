@@ -5,7 +5,7 @@
   import { deathFrom, type Place as DeathPlace } from '../../shared/death'
   import { feedbackDetails } from '../../shared/feedback'
   import { tilesHelp, tilesLine, type TilesStatus } from '../../shared/tiles-status'
-  import { onMount } from 'svelte'
+  import { onMount, tick } from 'svelte'
   import { fade, fly } from 'svelte/transition'
   import type { LogQuest, QuestPin } from '../../shared/quests'
   import type { FixedPin } from '../../shared/services'
@@ -20,6 +20,8 @@
   import Feedback from './Feedback.svelte'
   import Participate from './Participate.svelte'
   import LangAsk from './LangAsk.svelte'
+  import WhatsNew from './WhatsNew.svelte'
+  import { newsFor, type Go } from '../../shared/news'
   import FirstRun from './FirstRun.svelte'
   import Glyph from './Glyph.svelte'
   import { PANEL, layout, setMapRight, setWidth } from './layout.svelte'
@@ -88,6 +90,18 @@
   let onFeedback = $state(false)
   let answered = $state(false) // Help improve Twinmap was answered in this run: the setup may tell it a moment later
   let langClosed = $state(false) // the same for the language asked after the update
+  let newsClosed = $state(false) // the same for What's new
+  let newsAll = $state(false) // What's new opened from Settings, with every version
+  // The news as the app starts after an update: the versions since the one the player last saw them at (main/setup.ts, newsSinceOf).
+  const news = $derived(setup && setup.newsSince != null ? newsFor(langNow(), setup.newsSince, setup.version) : [])
+  // Where the link at the end of an entry leads: a tab, Settings, or the Layers menu of the map.
+  const go = (to: Go): void => {
+    if (to === 'settings') return void (onSettings = true)
+    onSettings = false
+    onItems = to === 'items'
+    onAh = to === 'ah'
+    if (to === 'layers') void tick().then(() => mapView?.openLayers())
+  }
   window.twinmap.onSetup((told) => {
     // Another language chosen (here or on the computer): the page loads again, every text in it.
     if (told.lang && told.lang !== langNow()) {
@@ -325,9 +339,14 @@
 {#if onFeedback && setup}
   <Feedback details={feedbackDetails(setup, tiles, status?.word ?? null)} onclose={() => (onFeedback = false)} />
 {/if}
-<!-- The language after the update, then Help improve Twinmap: each asked once, on this computer only, after the first run and never over another window. -->
+{#if newsAll && setup}
+  <WhatsNew releases={newsFor(langNow(), 'all', setup.version)} all onclose={() => (newsAll = false)} ongo={go} />
+{/if}
+<!-- The language after the update, then What's new, then Help improve Twinmap: each asked once, on this computer only, after the first run and never over another window. -->
 {#if inApp && setup?.askLang && !langClosed && onSetup === false && !onFeedback}
   <LangAsk {setup} onclose={() => (langClosed = true)} />
+{:else if inApp && news.length && !newsClosed && onSetup === false && !onFeedback}
+  <WhatsNew releases={news} since={setup?.newsSince || undefined} onclose={() => (newsClosed = true)} ongo={go} />
 {:else if inApp && setup && setup.participate === null && !answered && onSetup === false && !onFeedback}
   <Participate onclose={() => (answered = true)} />
 {/if}
@@ -347,7 +366,7 @@
 {/if}
 {#if onSettings && setup && onSetup === false}
   <div class="over" in:fade={screen} out:fade={gone}>
-    <Settings {setup} {tiles} onback={() => (onSettings = false)} onfeedback={() => (onFeedback = true)} onfirstrun={() => ((onSettings = false), (onSetup = true))} />
+    <Settings {setup} {tiles} onback={() => (onSettings = false)} onfeedback={() => (onFeedback = true)} onfirstrun={() => ((onSettings = false), (onSetup = true))} onnews={() => (newsAll = true)} />
   </div>
 {/if}
 {#if onItems && onSetup === false && !onSettings}
