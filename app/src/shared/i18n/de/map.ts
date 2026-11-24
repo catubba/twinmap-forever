@@ -1,12 +1,18 @@
 // Das Deutsch der Karte: the notes on every key are in en/map.ts.
 export default {
   layers: {
-    button: 'Ebenen',
-    buttonTip: 'Ebenen (L)',
-    menu: 'Ebenen',
+    button: 'Filter',
+    buttonTip: 'Filter (L)',
+    menu: 'Kartenfilter',
     // Group after a colon: "alle {group}" would need the plural and case of each group name (die Quests, die Welt).
     hideAll: 'Alle ausblenden: {group}',
     showAll: 'Alle anzeigen: {group}',
+    kinds: 'Arten: {layer}',
+    hideGrey: 'Graue ausblenden',
+    hideGreyTip: 'Ausblenden, was Eure Fertigkeit nicht mehr erhöht',
+    skill: 'Fertigkeit {skill}',
+    notLearned: 'Nicht erlernt',
+    skillUnread: 'Fertigkeit noch nicht gelesen',
     groups: {
       you: 'Ihr',
       quests: 'Quests',
@@ -76,6 +82,7 @@ export default {
   nothingToSend: 'Es gibt nichts zu senden.',
 
   pins: {
+    rewardXp: '{xp} EP',
     entrance: 'Eingang',
     entranceOf: 'Eingang: {name}',
     // Rare as the game's map legend says it for creatures (glossary).
@@ -105,15 +112,16 @@ export default {
   },
 
   way: {
-    north: '{yards} m nördlich',
-    northEast: '{yards} m nordöstlich',
-    east: '{yards} m östlich',
-    southEast: '{yards} m südöstlich',
-    south: '{yards} m südlich',
-    southWest: '{yards} m südwestlich',
-    west: '{yards} m westlich',
-    northWest: '{yards} m nordwestlich',
+    north: '{far} nördlich',
+    northEast: '{far} nordöstlich',
+    east: '{far} östlich',
+    southEast: '{far} südöstlich',
+    south: '{far} südlich',
+    southWest: '{far} südwestlich',
+    west: '{far} westlich',
+    northWest: '{far} nordwestlich',
     onFoot: '{time} zu Fuß',
+    mounted: '{time} beritten',
   },
 
   label: {
@@ -142,6 +150,7 @@ export default {
     elsewhere: 'Nicht auf Eurer aktuellen Karte',
     here: 'Hier',
     minutes: 'Min. zu Fuß',
+    minutesMounted: 'Min. beritten',
     // Three buttons side by side: "Auslassen" is shorter than "Überspringen"; the band is about the route already, so the verb alone.
     skip: 'Auslassen',
     edit: 'Bearbeiten',
@@ -161,7 +170,6 @@ export default {
     field: 'Suche',
     results: 'Ergebnisse',
     none: 'Nichts mit diesem Namen.',
-    yards: '{yards} m',
     zone: 'Zone',
     myPin: 'Meine Markierung',
     myPinIn: 'Meine Markierung, {zone}',

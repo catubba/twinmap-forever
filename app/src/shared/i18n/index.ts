@@ -107,6 +107,19 @@ export function around(key: Key, name: string, values: Record<string, string | n
 
 /** A number as the language writes it. */
 export const num = (n: number, options?: Intl.NumberFormatOptions): string => n.toLocaleString(intl, options)
+
+// Distances: always the game's own unit in the code, as the game and the addons count them. Its clients in a metric
+// language write m beside the very same numbers, so metres are a label, never a conversion. The languages whose game
+// writes yards (English, Chinese) may show m instead; the game's other languages already do.
+const YARDS = new Set(['enUS', 'zhCN', PSEUDO])
+let metres = false
+/** Whether the language spoken may show metres: it is the game's own yards otherwise. */
+export const metricOffered = (): boolean => YARDS.has(lang)
+/** Shows metres from now on, where the language may (the player's choice in Settings). */
+export const setMetres = (on: boolean): void => void (metres = on)
+export const metresOn = (): boolean => metres && metricOffered()
+/** A distance as the player reads it: a whole number, and its unit. The number is the game's either way. */
+export const distance = (yards: number): string => t(metresOn() ? 'units.metres' : 'units.yards', { n: num(Math.round(yards)) })
 // English shows dates and hours the British way, as it always has: 23 Nov, 14:05.
 const dates = (): string => (lang === 'enUS' || lang === PSEUDO ? 'en-GB' : intl)
 /** An hour of the day, on 24 hours. */

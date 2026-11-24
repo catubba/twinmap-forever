@@ -27,6 +27,9 @@ const STUB = `
   function GetSubZoneText() return GAME.sub end
   function GetPlayerFacing() return GAME.facing end
   function IsIndoors() return GAME.indoors == true end
+  -- GAME.run: how fast the character runs, as the game tells it; GAME.mount on a mount.
+  function GetUnitSpeed() return 0, GAME.run, 0, 0 end
+  function IsMounted() return GAME.mount == true end
   -- GAME.instance = { name, kind, id } inside a dungeon; GAME.north, GAME.west where the game tells the place in yards.
   function GetInstanceInfo()
     local i = GAME.instance
@@ -345,9 +348,10 @@ const STUB = `
       function t:SetShown(on) self.on = on end
       function t:SetRotation(turn) self.turn = turn end
       function t:SetVertexColor(r, g, b) self.tint = ("%.2f %.2f %.2f"):format(r, g, b) end
-      -- Where it starts on the row, and whether it runs from there to the end of the row.
-      function t:SetPoint(point, _, _, x)
-        if point == "TOPLEFT" then self.x = x elseif point == "BOTTOMRIGHT" then self.fill = true end
+      -- Where it starts on the row, and whether it runs from there to the end of the row. A strip on a side is a
+      -- column, its cells going down from its top: the same string of cells, as long as the window is high.
+      function t:SetPoint(point, _, _, x, y)
+        if point == "TOPLEFT" then self.x, self.down = x - (y or 0), (y or 0) ~= 0 elseif point == "BOTTOMRIGHT" then self.fill = true end
       end
       cells[#cells + 1] = t
       return t
@@ -369,7 +373,7 @@ const STUB = `
         if t.shown == true then
           local v = (t.r > th and 4 or 0) + (t.g > th and 2 or 0) + (t.b > th and 1 or 0)
           if t.fill == true then
-            for i = t.x + 1, GAME.width do row[i] = v end
+            for i = t.x + 1, t.down and GAME.height or GAME.width do row[i] = v end
           else
             row[type(t.x) == "number" and t.x + 1 or #row + 1] = v
           end

@@ -110,7 +110,6 @@ export default {
     cheaper: 'Más barato',
     dearer: 'Más caro',
     otherContinent: 'En el otro continente',
-    yards: '{yards} m',
     finding: 'Buscando el trayecto',
     updateHint: 'Actualiza Shortest Path y el addon Twinmap Forever para ver aquí todo el trayecto',
   },

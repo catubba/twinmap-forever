@@ -79,7 +79,7 @@
         {#if band.state === 'arrived'}
           <div class="time"><b>{t('map.nextStop.here')}</b></div>
         {:else if band.state === 'going'}
-          <div class="time"><b>{band.minutes}</b><span>{t('map.nextStop.minutes')}</span></div>
+          <div class="time"><b>{band.minutes}</b><span>{t(band.mount ? 'map.nextStop.minutesMounted' : 'map.nextStop.minutes')}</span></div>
         {/if}
       {/if}
     </div>

@@ -6,7 +6,7 @@ import { t } from '../shared/i18n'
 import type { LinkStatus } from '../shared/link'
 import { setupComplete, setupPages, timeLeft, type SetupStatus, pageOf } from '../shared/setup'
 import type { TilesStatus } from '../shared/tiles-status'
-import { addonVersion, askLangOf, readSettings, setupStatus, writeSettings } from './setup'
+import { addonVersion, askLangOf, newsSinceOf, readSettings, setupStatus, writeSettings } from './setup'
 
 const folder = (): string => mkdtempSync(join(tmpdir(), 'twinmap-setup-'))
 const addons = (game: string, ...names: string[]): void => {
@@ -126,6 +126,20 @@ test('the language is asked once after the update, only to a player whose game s
   expect(askLangOf({ setupDone: true }, 'enUS', french), 'game in English').toBe(false)
   expect(askLangOf({ setupDone: true }, 'deDE', french), 'game in a language not out yet').toBe(false)
   expect(askLangOf({ setupDone: true }, null, french), 'game folder not found').toBe(false)
+})
+
+test("What's new shows after an update, from the version last seen, never after a first run", () => {
+  expect(newsSinceOf({ setupDone: true, seenVersion: '0.15.1' }, '0.16.1'), 'updated past two versions').toBe('0.15.1')
+  expect(newsSinceOf({ setupDone: true, seenVersion: '0.16.1' }, '0.16.1'), 'seen already').toBeNull()
+  expect(newsSinceOf({ setupDone: true, seenVersion: '0.16.9' }, '0.16.10'), 'numbers, not letters').toBe('0.16.9')
+  expect(newsSinceOf({ setupDone: true }, '0.17.0'), 'had Twinmap before the window: this version only').toBe('')
+  expect(newsSinceOf({}, '0.17.0'), 'a new player, in the first run').toBeNull()
+  // The version seen is kept between runs, and only a version is.
+  const file = join(mkdtempSync(join(tmpdir(), 'twinmap-')), 'settings.json')
+  writeSettings(file, { setupDone: true, seenVersion: '0.17.0' })
+  expect(readSettings(file)).toEqual({ setupDone: true, seenVersion: '0.17.0' })
+  writeSettings(file, { seenVersion: 'latest' } as never)
+  expect(readSettings(file)).toEqual({})
 })
 
 test('the language asked is kept between runs', () => {

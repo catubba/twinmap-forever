@@ -17,6 +17,10 @@ export interface Position {
   facing?: number
   /** True under a roof: in a cave, a mine, a house. Missing in the open. */
   indoors?: boolean
+  /** Yards a second the character runs, standing still too: on a mount, the mount's. Missing from an addon that does not tell. */
+  speed?: number
+  /** True on a mount. */
+  mount?: boolean
   /** The dungeon, raid or battleground the character is inside; missing in the open world. */
   inst?: Instance
   /** True in a fight: only the position comes through, the rest waits for its end. */
@@ -78,8 +82,8 @@ export interface GameState {
   corrupt: number
 }
 
-// One odd reading can be a strip caught halfway through a redraw: its protocol byte is not
-// covered by anything we can check. Believe it when it comes this many times in a row.
+// A protocol is told only by a strip whose sum holds (strip.ts), and still believed only when
+// it comes this many times in a row.
 const MISMATCH_AFTER = 3
 
 export function protocolMismatch(addon: number, automaticUpdates = true): ProtocolMismatch {

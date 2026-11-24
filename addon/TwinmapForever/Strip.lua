@@ -152,6 +152,13 @@ local function BuildPos()
   if facing then out.facing = Round(math.deg(facing), 10) % 360 end
   -- Under a roof (a cave, a mine, a house): the app then shows the rooms of the place.
   if Try(IsIndoors) == true then out.indoors = true end
+  -- How fast the character runs, in yards a second, standing still too: on a mount the mount's
+  -- speed. The app tells from it how long a way takes. It changes only on and off a mount, a form,
+  -- a spell, so it sends nothing new while running.
+  local _, run = Try(GetUnitSpeed, "player")
+  run = Num(run)
+  if run and run > 0 then out.speed = Round(run, 0.1) end
+  if Try(IsMounted) == true then out.mount = true end
   -- Inside a dungeon, a raid or a battleground: which one. It travels with the position, so the
   -- app never holds the place of one moment with the instance of another.
   local name, kind, _, _, _, _, _, id = Try(GetInstanceInfo)
@@ -272,9 +279,25 @@ local strip, anchored, sized
 -- showing one costs nothing, so they can swap every frame. "flat" is one even cell.
 local layers = {}
 
-local function RowCells()
-  return math.floor(GetPhysicalScreenSize() / CELL)
+-- On the left or the right side the strip is a column, read from the top down: the same cells, as long as the window is high.
+-- A window over the game on another monitor (Offhand spreads the game over two) may cover the far end of a row, not a side.
+local function Side()
+  return ns.db.position == "LEFT" or ns.db.position == "RIGHT"
 end
+
+-- How many cells the edge holds: the width of the window, or its height on a side.
+local function RowCells()
+  local width, height = GetPhysicalScreenSize()
+  return math.floor((Side() and height or width) / CELL)
+end
+
+-- Where the cell n cells from the start of the edge goes, from the strip's top left.
+local function Along(n)
+  if Side() then return 0, -n * CELL end
+  return n * CELL, 0
+end
+
+local POINTS = { TOP = "TOPLEFT", BOTTOM = "BOTTOMLEFT", LEFT = "TOPLEFT", RIGHT = "TOPRIGHT" }
 
 local function Place()
   if not strip then
@@ -283,18 +306,18 @@ local function Place()
     strip:SetFrameLevel(10000)
     strip:SetIgnoreParentScale(true)
   end
-  if not sized then -- again whenever the window changes size
+  local point = POINTS[ns.db.position] or "TOPLEFT"
+  if ns.db.position ~= anchored then
+    strip:ClearAllPoints()
+    strip:SetPoint(point, UIParent, point, 0, 0)
+    anchored, sized = ns.db.position, nil
+  end
+  if not sized then -- again whenever the window changes size, or the strip goes to another edge
     -- One UI unit = one physical pixel.
     local _, physH = GetPhysicalScreenSize()
     strip:SetScale(768 / physH)
-    strip:SetSize(RowCells() * CELL, CELL)
+    if Side() then strip:SetSize(CELL, RowCells() * CELL) else strip:SetSize(RowCells() * CELL, CELL) end
     sized = true
-  end
-  local point = ns.db.position == "BOTTOM" and "BOTTOMLEFT" or "TOPLEFT"
-  if point ~= anchored then
-    strip:ClearAllPoints()
-    strip:SetPoint(point, UIParent, point, 0, 0)
-    anchored = point
   end
 end
 
@@ -323,7 +346,7 @@ local function Paint(key, cells)
   local f, row, off, on = Layer(key), RowCells(), Level(false), Level(true)
   local was = painted[key] or { v = {}, used = 0 }
   painted[key] = was
-  local n = math.min(#cells, row)
+  local n, side = math.min(#cells, row), Side()
   -- Other levels: every cell again, the ones past the end of this block too when their turn comes.
   -- One cell left at the levels of before and the app reads the whole row wrong.
   if was.off ~= off or was.on ~= on then was.v, was.off, was.on = {}, off, on end
@@ -334,8 +357,12 @@ local function Paint(key, cells)
     if not t then
       t = f:CreateTexture(nil, "OVERLAY")
       t:SetSize(CELL, CELL)
-      t:SetPoint("TOPLEFT", f, "TOPLEFT", (i - 1) * CELL, 0)
       f.cells[i] = t
+    end
+    if t.side ~= side then -- placed again when the strip goes from a row to a column, or back
+      t:ClearAllPoints()
+      t:SetPoint("TOPLEFT", f, "TOPLEFT", Along(i - 1))
+      t.side = side
     end
     if was.v[i] ~= v then
       t:SetColorTexture(v >= 4 and on or off, v % 4 >= 2 and on or off, v % 2 == 1 and on or off, 1)
@@ -349,7 +376,7 @@ local function Paint(key, cells)
   if n < row then
     local mid = (off + on) / 2
     was.rest:ClearAllPoints()
-    was.rest:SetPoint("TOPLEFT", f, "TOPLEFT", n * CELL, 0)
+    was.rest:SetPoint("TOPLEFT", f, "TOPLEFT", Along(n))
     was.rest:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 0, 0)
     was.rest:SetColorTexture(mid, mid, mid, 1)
     was.rest:Show()
@@ -528,6 +555,15 @@ function ns.ResendAll()
   for _, s in ipairs(SECTIONS) do s.nextAt, s.json = 0, nil end
 end
 
+-- The window changed size, or the strip its edge: the edge has another length and another pixel
+-- scale. Blocks cut for the old one are dropped and everything is sent again, cut for the new one.
+local cutFor -- the edge the blocks in the queue were cut for
+local function Recut()
+  sized, paintedCells = nil, nil
+  queue, steps, last, ahead, timer = {}, {}, nil, nil, 0
+  for _, s in ipairs(SECTIONS) do s.nextAt, s.json = 0, nil end
+end
+
 local driver = CreateFrame("Frame")
 driver:RegisterEvent("PLAYER_ENTERING_WORLD")
 driver:RegisterEvent("DISPLAY_SIZE_CHANGED")
@@ -536,13 +572,13 @@ driver:SetScript("OnEvent", function(_, event)
     startAt = startAt or GetTime() + START_DELAY
     return
   end
-  -- The window changed size: the row has another length and another pixel scale. Blocks cut for
-  -- the old row are dropped and everything is sent again, cut for the new one.
-  sized, paintedCells = nil, nil
-  queue, steps, last, ahead, timer = {}, {}, nil, nil, 0
-  for _, s in ipairs(SECTIONS) do s.nextAt, s.json = 0, nil end
+  Recut()
 end)
 driver:SetScript("OnUpdate", function(_, elapsed)
+  if ns.db.position ~= cutFor then -- the player moved the strip to another edge, which has another length
+    if cutFor then Recut() end
+    cutFor = ns.db.position
+  end
   if watching and Covered() then coveredAt = GetTime() end
   if not startAt then return end
   if ns.db.paused or ns.linkPaused then

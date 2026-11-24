@@ -7,7 +7,7 @@ local L = ns.L
 -- options.<text>.<name>, options.<text>.hint)
 local ROWS = {
   { key = "paused", text = "strip", values = { false, true }, names = { "on", "paused" } },
-  { key = "position", text = "position", values = { "TOP", "BOTTOM" }, names = { "top", "bottom" } },
+  { key = "position", text = "position", values = { "TOP", "BOTTOM", "LEFT", "RIGHT" }, names = { "top", "bottom", "left", "right" } },
   { key = "mode", text = "mode", values = { "steady", "fast" }, names = { "steady", "fast" } },
   { key = "idle", text = "idle", values = { "hide", "flat", "repeat" }, names = { "hide", "flat", "repeat" } },
 }

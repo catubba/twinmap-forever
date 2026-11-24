@@ -1,13 +1,13 @@
 -- Twinmap Forever, the in-game half. It reads and draws; it never acts for the player.
 local _, ns = ...
 
-ns.VERSION = "0.16.0" -- same as the .toc; a test keeps the two in step
+ns.VERSION = "0.16.1" -- same as the .toc; a test keeps the two in step
 ns.PROTOCOL = 2 -- the app refuses a strip whose protocol it does not know; 2 since the app tells everything through the fonts, so that an app from before says to update itself
 
 -- The player's choices, saved by the game in TwinmapForeverDB.
 local DEFAULTS = {
   paused = false,    -- true: nothing is drawn
-  position = "TOP",  -- edge of the window the strip sits on: "TOP" or "BOTTOM"
+  position = "TOP",  -- edge of the window the strip sits on: "TOP", "BOTTOM", "LEFT" or "RIGHT"
   mode = "steady",   -- "steady": every block normal, then in negative. "fast": normal only
   -- Temporary, for the camouflage trials (sliders in Options.lua). These defaults are the values
   -- that hide the strip best on a real screen; the player can still move every one of them.

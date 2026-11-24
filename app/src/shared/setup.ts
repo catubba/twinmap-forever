@@ -39,6 +39,8 @@ export interface SetupStatus {
   gameLang?: string | null
   /** The window that asks for the language once after the update is due (askLangOf, main/setup.ts). */
   askLang?: boolean
+  /** What's new as the app starts (newsSinceOf, main/setup.ts): the version whose news the player last saw, '' when not known, null for none. */
+  newsSince?: string | null
 }
 
 /** Where the addon is published. The app never installs it itself: every install is one CurseForge counts. */
@@ -169,4 +171,11 @@ export function timeLeft(startedAt: number, startedPercent: number, now: number,
   if (elapsed < 3 || gained <= 0 || percent >= 100) return ''
   const seconds = Math.max(1, Math.round(((100 - percent) / gained) * elapsed))
   return seconds < 60 ? t('app.firstRun.secondsLeft', { count: Math.ceil(seconds / 5) * 5 }) : t('app.firstRun.minutesLeft', { count: Math.round(seconds / 60) })
+}
+
+/** Whether version a comes after version b (0.16.10 after 0.16.9). */
+export function after(a: string, b: string): boolean {
+  const x = a.split('.').map(Number), y = b.split('.').map(Number)
+  for (let i = 0; i < Math.max(x.length, y.length); i++) if ((x[i] ?? 0) !== (y[i] ?? 0)) return (x[i] ?? 0) > (y[i] ?? 0)
+  return false
 }

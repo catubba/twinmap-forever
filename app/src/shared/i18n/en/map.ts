@@ -1,16 +1,29 @@
 // The English of map: see en/index.ts for how a key is written and noted.
 export default {
-  // The Layers menu, under the Layers button at the top of the map (Map.svelte, layers.ts).
+  // The Filters menu, under the Filters button at the top of the map (Map.svelte, layers.ts): what the map draws. Its words
+  // are the same as the filters of the Auction House (auction.filters).
   layers: {
     // The button that opens the menu: short.
-    button: 'Layers',
+    button: 'Filters',
     // Its tooltip: L is the key that opens it too.
-    buttonTip: 'Layers (L)',
+    buttonTip: 'Filters (L)',
     // The menu itself, read aloud only.
-    menu: 'Layers',
+    menu: 'Map filters',
     // Tooltip on the name of a group, which turns all its layers off or on. {group}: one of map.layers.groups.
     hideAll: 'Hide all {group}',
     showAll: 'Show all {group}',
+    // The arrow beside Ore and beside Herbs that opens the list of their kinds beside the menu. {layer}: map.layers.names.ore or .herbs.
+    kinds: 'Kinds of {layer}',
+    // The first row of that list: hides the kinds that give the character no more skill points, grey in the game. Short.
+    hideGrey: 'Hide grey',
+    // Its tooltip.
+    hideGreyTip: 'Hide what no longer raises your skill',
+    // Right of Hide grey: the character's skill in Mining or in Herbalism. {skill}: a number.
+    skill: 'Skill {skill}',
+    // In its place when the character has not learned the profession.
+    notLearned: 'Not learned',
+    // In its place before the addon has sent the character's skills.
+    skillUnread: 'Skill not read yet',
     // The groups: a heading in the menu, over its layers. Short.
     groups: {
       you: 'You',
@@ -105,6 +118,8 @@ export default {
 
   // Tooltips on the pins of the map, and the line under a pin's name on its label (Map.svelte).
   pins: {
+    // In the tooltip of a quest pin, under each quest: the XP it gives the character, before its money. {xp}: a number.
+    rewardXp: '{xp} XP',
     // On the door of a dungeon, and on the entrance inside its map.
     entrance: 'Entrance',
     // On the entrance inside the map of a dungeon of several wings. {name}: the wing.
@@ -142,18 +157,20 @@ export default {
   },
 
   // How far a point is from the character and which way, on its label and on the band of the next stop.
-  // {yards}: a number, as 1,335.
+  // {far}: a distance with its unit (units), as 1,335 yd.
   way: {
-    north: '{yards} yd north',
-    northEast: '{yards} yd north-east',
-    east: '{yards} yd east',
-    southEast: '{yards} yd south-east',
-    south: '{yards} yd south',
-    southWest: '{yards} yd south-west',
-    west: '{yards} yd west',
-    northWest: '{yards} yd north-west',
+    north: '{far} north',
+    northEast: '{far} north-east',
+    east: '{far} east',
+    southEast: '{far} south-east',
+    south: '{far} south',
+    southWest: '{far} south-west',
+    west: '{far} west',
+    northWest: '{far} north-west',
     // How long a run it is. {time}: minutes and seconds, as 3:11.
     onFoot: '{time} on foot',
+    // The same on a mount: the time is at the mount's speed.
+    mounted: '{time} mounted',
   },
 
   // The label that opens on a point of the map (PointLabel.svelte).
@@ -195,6 +212,8 @@ export default {
     here: 'Here',
     // Under a number of minutes, which shows above it in large type. Short.
     minutes: 'min on foot',
+    // The same on a mount. Short.
+    minutesMounted: 'min mounted',
     // Three buttons side by side. Short.
     skip: 'Skip',
     edit: 'Edit route',
@@ -218,8 +237,6 @@ export default {
     // The list of results, read aloud only.
     results: 'Results',
     none: 'Nothing by that name.',
-    // At the right of a result: how far it is. {yards}: a number, as 1,335.
-    yards: '{yards} yd',
     // Beside the name of a result, small: what it is. {zone}: where it is.
     zone: 'Zone',
     myPin: 'My pin',

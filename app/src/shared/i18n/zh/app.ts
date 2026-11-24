@@ -112,8 +112,6 @@ export default {
     cheaper: '更便宜',
     dearer: '更贵',
     otherContinent: '在另一块大陆上',
-    // As the game (GS SPELL_RANGE "%s码距离").
-    yards: '{yards}码',
     // "行程" is Shortest Path's journey; "路线" stays Twinmap's own Route (l10n.md).
     finding: '正在规划行程',
     updateHint: '更新Shortest Path和Twinmap Forever插件，即可在这里看到完整行程',

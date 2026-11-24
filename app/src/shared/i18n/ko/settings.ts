@@ -2,7 +2,14 @@
 export default {
   // The game's menu entry (GS GAMEMENU_OPTIONS).
   title: '설정',
-  back: '지도로 돌아가기',
+  categories: {
+    label: '분류',
+    general: '일반',
+    appearance: '모양',
+    game: '게임 및 애드온',
+    privacy: '개인정보',
+    about: 'Twinmap 정보',
+  },
 
   gameFolder: {
     title: '게임 폴더',
@@ -11,14 +18,20 @@ export default {
     choose: '게임 폴더 선택',
   },
 
+  distances: {
+    label: '거리',
+    yards: '야드',
+    metres: '미터',
+  },
+
   layout: {
-    title: '화면 배치',
-    mapLeft: '왼쪽에 지도',
-    mapRight: '오른쪽에 지도',
+    label: '지도',
+    left: '왼쪽',
+    right: '오른쪽',
+    hint: 'M 키로 언제든지 반대쪽으로 옮길 수 있습니다.',
   },
 
   window: {
-    title: '창',
     // Twinmap is read 트윈맵: the particles after it follow the final ㅂ.
     onTop: 'Twinmap을 항상 다른 창 위에 표시',
     // GS FONT_SIZE.
@@ -44,7 +57,7 @@ export default {
   },
 
   found: {
-    title: 'Twinmap이 찾은 항목',
+    inFolder: '폴더에서 찾은 항목',
     addon: 'Twinmap Forever 애드온',
     questie: 'NPC, 편의 시설, 퀘스트',
     // GS OPTIONAL.
@@ -68,7 +81,7 @@ export default {
   keys: {
     // Key Bindings in the game (GS KEY_BINDINGS).
     title: '단축키 설정',
-    layers: '레이어',
+    layers: '필터',
     // The game's "켜기/끄기" (GS BINDING_NAME_TOGGLEMINIMAPROTATION); Follow is "추적" (glossary).
     follow: '추적 켜기/끄기',
     north: '캐릭터 방향에 맞춰 지도 회전, 또는 북쪽이 위',
@@ -80,7 +93,7 @@ export default {
     // "+" between the keys: no particle after Ctrl.
     zoom: '글자 크기, 지도 밖에서는 Ctrl + 마우스 휠로도 조절',
     // "정보 카드": our word for the label that opens on a point.
-    close: '정보 카드, 레이어, 설정 창 닫기',
+    close: '정보 카드, 필터, 설정 창 닫기',
     // "키" after it: the Arrow of the route is "화살표".
     arrows: '화살표 키',
     move: '지도 이동 및 확대/축소',

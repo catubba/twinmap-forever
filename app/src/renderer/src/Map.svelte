@@ -24,14 +24,15 @@
   import { addFix, BEHIND, PERIOD, TURN, turnAt, whereAt, type Fix, type Turn } from '../../shared/glide'
   import { boxOf, buildingsAt, killedIn, nameOfBoss, piecesIn, RARE_BOSSES, roomPixels, yardsInside, YARDS_PER_UNIT, type Box, type InteriorMap, type Interiors, type Piece, type UnderRoom, type Yards } from '../../shared/inside'
   import type { Continent, GameMap } from '../../shared/maps'
-  import type { QuestPin } from '../../shared/quests'
-  import { iconOf, panelFor, serves, type FixedLayer, type FixedPin, type Travel } from '../../shared/services'
+  import { questXp, type QuestPin, type QuestReward } from '../../shared/quests'
+  import { coins } from '../../shared/items'
+  import { gatherColour, GATHER_SKILL, HERBS, iconOf, ORES, panelFor, serves, type FixedLayer, type FixedPin, type Travel } from '../../shared/services'
   import { pictureOfBlock, tileOfPicture } from '../../shared/pixels'
   import { WORLDS } from '../../shared/world'
   import { groupName, LAYER_GROUPS, layerName, layersFrom, type LayerId } from '../../shared/layers'
   import { fitNames, tierRank, tierShows, type Avoid, type NameBox, type NameTier, type Place } from '../../shared/places'
   import { placeText, wayTo, zoneAt, type Size } from '../../shared/point-label'
-  import { t } from '../../shared/i18n'
+  import { num, t } from '../../shared/i18n'
   import { fade, fly } from 'svelte/transition'
   import Glyph from './Glyph.svelte'
   import { drop, gone, still } from './motion'
@@ -48,7 +49,7 @@
 
   // at: when the position was read off the game, in milliseconds.
   // insideReady: the rooms of the buildings are converted, and their list can be asked for.
-  let { pos, group = [], at: readAt, insideReady, quests = [], fixed = [], side, live = false, inbox = null, removed = [], set = [], gameFollows = null, journey = null, route = noRoute(), onroute, onnpc, kills, death = null, back = $bindable(null), looking = $bindable(null) }: { kills?: unknown; death?: Death | null; back?: (DeathPlace & { name: string; door: boolean }) | null; looking?: { zone: string; where: string } | null; journey?: Journey | null; pos: Position | undefined; at: number | undefined; insideReady: boolean; quests?: QuestPin[]; fixed?: FixedPin[]; side?: string; live?: boolean; inbox?: Inbox | null; removed?: string[]; set?: GameMark[]; gameFollows?: Pin | null; route?: Route; onroute?: (stop: Stop) => void; onnpc?: (pin: FixedPin | null) => void; group?: Companion[] } = $props()
+  let { pos, group = [], at: readAt, insideReady, quests = [], fixed = [], side, live = false, inbox = null, removed = [], set = [], gameFollows = null, journey = null, route = noRoute(), onroute, onnpc, kills, death = null, skills, xpLevel, back = $bindable(null), looking = $bindable(null) }: { kills?: unknown; skills?: unknown; xpLevel?: number | null; death?: Death | null; back?: (DeathPlace & { name: string; door: boolean }) | null; looking?: { zone: string; where: string } | null; journey?: Journey | null; pos: Position | undefined; at: number | undefined; insideReady: boolean; quests?: QuestPin[]; fixed?: FixedPin[]; side?: string; live?: boolean; inbox?: Inbox | null; removed?: string[]; set?: GameMark[]; gameFollows?: Pin | null; route?: Route; onroute?: (stop: Stop) => void; onnpc?: (pin: FixedPin | null) => void; group?: Companion[] } = $props()
 
   const TOP_ZOOM = 7 // the detail of the game itself: the picture of a block is four tiles
   const BLANK = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=='
@@ -88,6 +89,20 @@
   // The layers the player wants on the map: remembered from one run of the app to the next.
   let layers = $state(layersFrom(localStorage.getItem('layers')))
   let layersOpen = $state(false)
+  // Of ore and herbs: the kinds turned off ("ore:copper", "herbs:Peacebloom") and the layers whose grey kinds are
+  // hidden, those that give the character no more points. Remembered like the layers. kindsOpen: the list shown beside Layers.
+  const savedList = (key: string): string[] => {
+    try {
+      const read: unknown = JSON.parse(localStorage.getItem(key) ?? '[]')
+      return Array.isArray(read) ? read.filter((x): x is string => typeof x === 'string') : []
+    } catch {
+      return []
+    }
+  }
+  let kindsOff = $state(savedList('kindsOff'))
+  let hideGrey = $state(savedList('hideGrey'))
+  let kindsOpen = $state<'ore' | 'herbs' | null>(null)
+  const toggled = (list: string[], one: string, on: boolean): string[] => (on ? [...new Set([...list, one])] : list.filter((x) => x !== one))
   // The point the player clicked, with its label: in map units, and where that is in the map's box now.
   // pin: the same point as the game names it, a zone map and a place on it; none where no zone is.
   let labelled = $state<{ units: Point; continent: Continent; title: string; where: string; spot: Point; box: Size; pin: { m: number; x: number; y: number } | null; plain?: boolean; notes?: string[]; dungeons?: { id: number; name: string; raid: boolean }[]; wing?: string; item?: number; npc?: FixedPin } | null>(null)
@@ -98,7 +113,7 @@
   let me = $state<{ units: Point; continent: Continent } | null>(null)
   // The yards and the time are those of the way on foot, where one is found: asked for the one point, again every few dozen yards.
   const toLabel = feet(() => (labelled && me && me.continent === labelled.continent ? { continent: me.continent, from: me.units, to: [labelled.units], reach: 20_000 } : null), 40)
-  const way = $derived(labelled && me && me.continent === labelled.continent ? wayTo(me.units, labelled.units, toLabel.yards(labelled.units)) : null)
+  const way = $derived(labelled && me && me.continent === labelled.continent ? wayTo(me.units, labelled.units, toLabel.yards(labelled.units), pos) : null)
   // My pins: the points the player saved, kept by the app from one run to the next and for every screen that shows it.
   const keptPins = keptByApp('pins', savedFrom)
   const myPins = $derived(keptPins.value)
@@ -628,6 +643,11 @@
    * Shows the map of a dungeon or a raid from outside it, with its bosses and its entrance; false where
    * the app has no rooms of it. The character in it: the map follows the character there, as always.
    */
+  /** Opens the Layers menu: the link of an entry of What's new that tells of a layer. */
+  export function openLayers(): void {
+    layersOpen = true
+  }
+
   export function openDungeon(id: number, wing?: string): boolean {
     const m = interiors?.maps.find((d) => d.id === id && d.kind !== 'world')
     if (!map || !m) return false
@@ -1158,6 +1178,29 @@
   // The quests Questie shows, on the zones of the continent in view: where to take one, where to hand
   // one in, where what is still to find is. Each kind is a layer of its own.
   const questLayers = { available: L.layerGroup(), turnin: L.layerGroup(), objectives: L.layerGroup() }
+  /**
+   * Under a quest's line in a pin's tooltip, what it gives: its XP for the character (xpLevel: none at the level cap, as
+   * QuestieDB has it while the level is not known) and its money, where the game's cache tells it.
+   */
+  function rewardLine(r: QuestReward | undefined): HTMLElement | null {
+    const xp = r?.xp && r.level && xpLevel !== null ? (xpLevel === undefined ? r.xp : questXp(r.xp, r.level, xpLevel)) : 0
+    if (!r || (!xp && !r.copper)) return null
+    const line = Object.assign(document.createElement('span'), { className: 'reward' })
+    if (xp) line.append(t('map.pins.rewardXp', { xp: num(xp) }))
+    if (r.copper) {
+      if (xp) line.append(' \u00b7 ')
+      for (const [n, coin] of coins(r.copper)) line.append(num(n), Object.assign(document.createElement('i'), { className: `coin ${coin}` }))
+    }
+    return line
+  }
+  /** A pin's quests in its tooltip, each with what it gives; the one that is the pin's own name has only that. */
+  function questLines(tip: HTMLElement, p: QuestPin): void {
+    for (const quest of p.quests) {
+      if (quest !== p.name) tip.append(document.createElement('br'), quest)
+      const reward = rewardLine(p.rewards?.[quest])
+      if (reward) tip.append(document.createElement('br'), reward)
+    }
+  }
   const QUEST_PINS = { available: ['quest', 'available', 500], turnin: ['turnin', 'turnin', 1000], objective: ['objective', 'objectives', 0] } as const
   $effect(() => {
     for (const group of Object.values(questLayers)) group.clearLayers()
@@ -1181,7 +1224,7 @@
         group.of.forEach((q, i) => {
           if (i) tip.append(document.createElement('br'))
           tip.append(Object.assign(document.createElement('b'), { textContent: q.p.name }))
-          for (const quest of q.p.quests) if (quest !== q.p.name) tip.append(document.createElement('br'), quest)
+          questLines(tip, q.p)
         })
         L.marker(at(units), { keyboard: false, zIndexOffset: above, icon: L.divIcon({ className: 'door', iconSize: [size, size], html: pin(drawing) }) })
           .bindTooltip(tip, { direction: 'top', offset: [0, -size / 2], className: 'tip' })
@@ -1197,7 +1240,7 @@
       // Names come from the player's QuestieDB: written as text, never as markup.
       const tip = document.createElement('span')
       tip.append(Object.assign(document.createElement('b'), { textContent: p.name }))
-      for (const quest of p.quests) if (quest !== p.name) tip.append(document.createElement('br'), quest)
+      questLines(tip, p)
       const size = pinSize(drawing)
       const units = unitsOfPlace(zone.rect, p.x, p.y)
       L.marker(at(units), { keyboard: false, zIndexOffset: above, icon: L.divIcon({ className: p.type === 'objective' ? 'door task' : 'door', iconSize: [size, size], html: pin(drawing) }) })
@@ -1218,6 +1261,39 @@
   // those in view are on the map, and each layer only from the zoom at which its pins stop lying
   // on each other.
   const FIXED_ZOOM: Record<FixedLayer, number> = { flight: 3, inn: 3.5, bank: 4, auction: 4, stable: 4, repair: 4.5, trainers: 4.5, vendors: 4.5, ore: 5.5, herbs: 5.5 }
+  /** The character's skill in the profession that gathers a layer: undefined while the sheet has no skills, 0 when it has not learned it. */
+  function skillOf(layer: 'ore' | 'herbs'): number | undefined {
+    if (!Array.isArray(skills)) return undefined
+    const had = (skills as unknown[]).find((s) => Array.isArray(s) && s[0] === GATHER_SKILL[layer]) as unknown[] | undefined
+    return Number(had?.[1]) || 0
+  }
+  /** The kinds of ore and herbs the map has, from the lowest skill to the highest, each named as most of its pins are. */
+  type Kind = { key: string; name: string; need: number; item: number }
+  const kinds = $derived.by(() => {
+    const names = new Map<string, Map<string, number>>()
+    for (const p of fixed) {
+      if (!p.kind) continue
+      const key = `${p.layers[0]}:${p.kind}`, count = names.get(key) ?? new Map<string, number>()
+      names.set(key, count.set(p.name, (count.get(p.name) ?? 0) + 1))
+    }
+    const out: Record<'ore' | 'herbs', Kind[]> = { ore: [], herbs: [] }
+    for (const [key, count] of names) {
+      const layer = key.startsWith('ore:') ? 'ore' : 'herbs', kind = key.slice(layer.length + 1)
+      const [need, item] = layer === 'ore' ? ORES[kind as keyof typeof ORES] : HERBS[kind]!
+      out[layer].push({ key, name: [...count].sort((a, b) => b[1] - a[1])[0]![0], need, item })
+    }
+    for (const list of Object.values(out)) list.sort((a, b) => a.need - b.need || a.name.localeCompare(b.name))
+    return out
+  })
+  const kindsOf = (id: LayerId): Kind[] => (id === 'ore' || id === 'herbs' ? kinds[id] : [])
+  /** Whether a pin of ore or herbs is of a kind shown: not turned off, and not grey when grey is hidden. */
+  function kindShown(p: FixedPin): boolean {
+    if (!p.kind) return true
+    const layer = p.layers[0] === 'ore' ? 'ore' : 'herbs'
+    if (kindsOff.includes(`${layer}:${p.kind}`)) return false
+    const skill = hideGrey.includes(layer) ? skillOf(layer) : undefined
+    return !skill || p.need === undefined || gatherColour(p.need, skill) !== 'grey'
+  }
   /** Turns a whole group of layers on or off. */
   function showAll(ids: readonly LayerId[], on: boolean): void {
     for (const id of ids) layers[id] = on
@@ -1277,7 +1353,7 @@
     for (const service of [false, true]) {
       for (const { pin: p, at: where, zone } of laid) {
         const shown = (layer: FixedLayer): boolean => layers[layer] && far >= FIXED_ZOOM[layer]
-        if ((p.side !== undefined) !== service || !(p.layers.some(shown) || labelledAt(where)) || !view.contains(where)) continue
+        if ((p.side !== undefined) !== service || !((p.layers.some(shown) && kindShown(p)) || labelledAt(where)) || !view.contains(where)) continue
         // The radius is what the pointer feels, smaller than the picture: two people a few yards apart both answer.
         new FixedPinMark(where, { renderer: fixedCanvas, radius: 7, lozenge: !service, fillColor: service ? '#7fc8ff' : '#d9a066', picture: pictureOf(iconOf(p, shown)), bubblingMouseEvents: false })
           // Made when the pointer comes over the pin, not for every pin. Names come from the
@@ -1309,7 +1385,7 @@
     drawFixed()
   })
   $effect(() => {
-    void [inside, ...Object.values(layers)]
+    void [inside, ...Object.values(layers), kindsOff, hideGrey, skills]
     drawFixed()
   })
 
@@ -1596,6 +1672,8 @@
   // The choices are saved as they are made, and the map follows them.
   $effect(() => {
     localStorage.setItem('layers', JSON.stringify(layers))
+    localStorage.setItem('kindsOff', JSON.stringify(kindsOff))
+    localStorage.setItem('hideGrey', JSON.stringify(hideGrey))
     if (!map) return
     layout()
     if (layers.bosses) pins.addTo(map)
@@ -1611,6 +1689,7 @@
     if (e.ctrlKey || e.altKey || e.metaKey || (e.target instanceof HTMLElement && e.target.matches('input:not([type=checkbox]), textarea'))) return
     if (e.key === 'Escape') {
       if (labelled) labelled = null
+      else if (kindsOpen) kindsOpen = null
       else layersOpen = false
     } else if (e.key === 'l' || e.key === 'L') layersOpen = !layersOpen
     else if (e.key === 'f' || e.key === 'F') follow()
@@ -1718,7 +1797,29 @@
     {/if}
   </div>
   {#if layersOpen}
-    <div class="menu layers" id="layers" role="group" aria-label={t('map.layers.menu')} in:fly={drop()} out:fade={gone}>
+    <div class="menus" in:fly={drop()} out:fade={gone}>
+    <!-- The kinds of ore or of herbs, beside the menu: each with the skill it asks, in the game's colour for the character's skill. -->
+    {#if kindsOpen && kinds[kindsOpen].length}
+      {@const open = kindsOpen}
+      {@const skill = skillOf(open)}
+      <div class="menu kindlist" id="kinds" role="group" aria-label={layerName(open)}>
+        <div class="group">{layerName(open)}</div>
+        <div class="scroll">
+          <label class="item kind" title={t('map.layers.hideGreyTip')}>
+            <input type="checkbox" class="check" disabled={!skill} checked={hideGrey.includes(open)} onchange={(e) => (hideGrey = toggled(hideGrey, open, e.currentTarget.checked))} />{t('map.layers.hideGrey')}
+            <span class="num">{skill === undefined ? t('map.layers.skillUnread') : skill ? t('map.layers.skill', { skill }) : t('map.layers.notLearned')}</span>
+          </label>
+          {#each kinds[open] as k (k.key)}
+            {@const colour = skill ? gatherColour(k.need, skill) : ''}
+            <label class="item kind" class:faded={colour === 'grey' && hideGrey.includes(open)}>
+              <input type="checkbox" class="check" checked={!kindsOff.includes(k.key)} onchange={(e) => (kindsOff = toggled(kindsOff, k.key, !e.currentTarget.checked))} />
+              <img src="{TILES}/items/{k.item}.png" alt="" onerror={(e) => e.currentTarget.remove()} />{k.name}<span class="num {colour}">{k.need}</span>
+            </label>
+          {/each}
+        </div>
+      </div>
+    {/if}
+    <div class="menu layers" id="layers" role="group" aria-label={t('map.layers.menu')}>
       <!-- Only the layers that draw something: a ticked box for one that is not built yet would not be true. -->
       {#each LAYER_GROUPS as group (group.id)}
         {#if group.layers.some((layer) => layer.built)}
@@ -1728,11 +1829,29 @@
           <button class="group" aria-pressed={on} title={on ? t('map.layers.hideAll', { group: groupName(group.id) }) : t('map.layers.showAll', { group: groupName(group.id) })} onclick={() => showAll(all, !on)}>{groupName(group.id)}</button>
           {#each group.layers as layer (layer.id)}
             {#if layer.built}
-              <label class="item"><input type="checkbox" class="check" bind:checked={layers[layer.id]} />{layerName(layer.id)}</label>
+              {@const sub = kindsOf(layer.id)}
+              <label class="item" class:open={kindsOpen === layer.id}>
+                <input type="checkbox" class="check" bind:checked={layers[layer.id]} />{layerName(layer.id)}
+                {#if sub.length}
+                  {@const on = sub.filter((k) => !kindsOff.includes(k.key)).length}
+                  <span class="num">{on < sub.length ? `${on}/${sub.length}` : ''}</span>
+                  <button
+                    class="more"
+                    aria-expanded={kindsOpen === layer.id}
+                    aria-controls="kinds"
+                    title={t('map.layers.kinds', { layer: layerName(layer.id) })}
+                    onclick={(e) => {
+                      e.preventDefault()
+                      kindsOpen = kindsOpen === layer.id ? null : (layer.id as 'ore' | 'herbs')
+                    }}
+                  ></button>
+                {/if}
+              </label>
             {/if}
           {/each}
         {/if}
       {/each}
+    </div>
     </div>
   {/if}
   {#if inside && levels > 0}
@@ -1956,6 +2075,85 @@
     max-height: calc(100vh - 250px);
     overflow-y: auto;
   }
+  /* The kinds of ore or of herbs open beside it, as tall, scrolling on their own. */
+  .menus {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .kindlist {
+    display: flex;
+    flex-direction: column;
+    min-width: 236px;
+    max-height: calc(100vh - 250px);
+  }
+  .kindlist .scroll {
+    overflow-y: auto;
+  }
+  .kindlist .kind {
+    height: 24px;
+    font: 400 14.5px/20px var(--font);
+  }
+  .kind img {
+    flex: none;
+    width: 18px;
+    height: 18px;
+    box-shadow: 0 0 0 1px #000;
+  }
+  .kind.faded {
+    opacity: 0.42;
+  }
+  .kind .num {
+    font: var(--t-small);
+    font-variant-numeric: tabular-nums;
+  }
+  /* The game's colours of a node for the character's skill. */
+  .kind .red {
+    color: #ff3b30;
+  }
+  .kind .orange {
+    color: #ffa040;
+  }
+  .kind .yellow {
+    color: #ffe23a;
+  }
+  .kind .green {
+    color: #52d052;
+  }
+  .kind .grey {
+    color: #9a9a9a;
+  }
+  .layers .item.open {
+    background-color: #ffffff1f;
+  }
+  .layers .num {
+    font: var(--t-small);
+  }
+  /* The arrow that opens the kinds, pointing to where they open. */
+  .more {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    margin-right: -6px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--gold);
+    cursor: pointer;
+  }
+  .more::before {
+    content: '';
+    width: 7px;
+    height: 7px;
+    border: solid currentColor;
+    border-width: 0 0 1.75px 1.75px;
+    transform: translateX(1px) rotate(45deg);
+  }
+  .more[aria-expanded='true']::before {
+    transform: translateX(-1px) rotate(-135deg);
+  }
 
   /* On a narrow map the buttons keep the top and the zone goes under them (App.svelte). */
   @container (max-width: 640px) {
@@ -2143,5 +2341,8 @@
   }
   .map :global(.tip::before) {
     display: none;
+  }
+  .map :global(.tip .reward) {
+    color: var(--text-dim);
   }
 </style>

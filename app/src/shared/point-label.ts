@@ -1,6 +1,7 @@
 // The label on a point of the map: what it says of the point, and where it opens.
 import { unitsOfRect, UNITS_PER_BLOCK, type Point } from './geo'
-import { num, t } from './i18n'
+import { distance, t } from './i18n'
+import type { Position } from './game'
 import type { Continent, GameMap, Rect } from './maps'
 import { BLOCK_YARDS } from './world'
 
@@ -26,20 +27,27 @@ export function zoneAt(maps: GameMap[], continent: Continent, p: Point): { zone:
 }
 
 const WAYS = ['north', 'northEast', 'east', 'southEast', 'south', 'southWest', 'west', 'northWest'] as const
-// ponytail: a runner's pace all the way. The real speed and mounts come with the travel times (M7-F3).
-const RUN = 7 // yards a second on foot
+const RUN = 7 // yards a second on foot, for an addon that does not tell the speed
+
+/** How fast the character goes, as the position tells: its speed, on foot or on a mount. */
+export type Pace = Pick<Position, 'speed' | 'mount'>
+
+/** The seconds a way of so many yards takes at a pace. */
+export const secondsFor = (yards: number, pace?: Pace): number => yards / (pace?.speed || RUN)
 
 /**
  * From one point of the map to another, as the label says it: "260 yd north-east", "0:37 on foot".
  * walked: the yards of the way on foot, where one is known; without it, the yards as the crow
  * flies. The direction is always the crow's: where the point lies, not where the way starts.
+ * pace: the character's, from the position; the time is at its speed, on foot or mounted.
  */
-export function wayTo(from: Point, to: Point, walked?: number): { far: string; time: string } {
+export function wayTo(from: Point, to: Point, walked?: number, pace?: Pace): { far: string; time: string } {
   const dx = to.x - from.x, dy = to.y - from.y // y grows to the south
   const yards = Math.round(walked ?? Math.hypot(dx, dy) * YARDS_PER_UNIT)
   const way = WAYS[((Math.round(Math.atan2(dx, -dy) / (Math.PI / 4)) % 8) + 8) % 8]!
-  const seconds = Math.round(yards / RUN)
-  return { far: t(`map.way.${way}`, { yards: num(yards) }), time: t('map.way.onFoot', { time: `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}` }) }
+  const seconds = Math.round(secondsFor(yards, pace))
+  const time = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
+  return { far: t(`map.way.${way}`, { far: distance(yards) }), time: t(pace?.mount ? 'map.way.mounted' : 'map.way.onFoot', { time }) }
 }
 
 /** A place on a zone's map as the game gives it, "42.3, 65.1"; after the name of the zone when one is given. */

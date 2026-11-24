@@ -2,7 +2,7 @@
 // is. Here the app only looks: the addon comes from CurseForge. What it writes next to the addon is in signal.ts.
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import type { SetupStatus } from '../shared/setup'
+import { after, type SetupStatus } from '../shared/setup'
 import { ZOOMS } from '../shared/window'
 import { questieFile } from './questie'
 import { shortestPathFolder } from './walk'
@@ -34,6 +34,8 @@ export interface Settings {
   lang?: string
   /** The language was chosen or asked for once (first run, the window after the update, Settings): never asked again. */
   langAsked?: boolean
+  /** The version of the app whose news the player last saw (WhatsNew.svelte); missing for one who had Twinmap before that window. */
+  seenVersion?: string
 }
 
 /** The settings as they were saved; nothing where the file is missing or is not ours. */
@@ -41,7 +43,7 @@ export function readSettings(file: string): Settings {
   try {
     const read: unknown = JSON.parse(readFileSync(file, 'utf8'))
     if (typeof read !== 'object' || !read) return {}
-    const { gameFolder, setupDone, onTop, lan, lanCode, participate, zoom, noGpu, lang, langAsked } = read as Record<string, unknown>
+    const { gameFolder, setupDone, onTop, lan, lanCode, participate, zoom, noGpu, lang, langAsked, seenVersion } = read as Record<string, unknown>
     return {
       ...(typeof gameFolder === 'string' ? { gameFolder } : {}),
       ...(setupDone === true ? { setupDone } : {}),
@@ -53,6 +55,7 @@ export function readSettings(file: string): Settings {
       ...(ZOOMS.some((z) => z === zoom) ? { zoom: zoom as number } : {}),
       ...(typeof lanCode === 'string' && /^[\w-]{8,64}$/.test(lanCode) ? { lanCode } : {}),
       ...(typeof lang === 'string' && /^([a-z]{2}[A-Z]{2}|pseudo(-[a-z]{2})?)$/.test(lang) ? { lang } : {}),
+      ...(typeof seenVersion === 'string' && /^\d+\.\d+\.\d+$/.test(seenVersion) ? { seenVersion } : {}),
     }
   } catch {
     return {}
@@ -66,6 +69,17 @@ export function readSettings(file: string): Settings {
  */
 export const askLangOf = (settings: Settings, gameLang: string | null, offered: (code: string) => boolean): boolean =>
   settings.setupDone === true && !settings.langAsked && settings.lang === undefined && !!gameLang && gameLang !== 'enUS' && gameLang !== 'enGB' && offered(gameLang)
+
+/**
+ * What's new, as the app starts (WhatsNew.svelte): the version the player last saw its news at, when this one is newer; '' for a
+ * player who had Twinmap before that window (only this version's news, then); null when there is nothing to show, as after a first
+ * run, which marks its version seen.
+ */
+export const newsSinceOf = (settings: Settings, version: string): string | null => {
+  if (settings.setupDone !== true) return null
+  if (settings.seenVersion === undefined) return ''
+  return after(version, settings.seenVersion) ? settings.seenVersion : null
+}
 
 export function writeSettings(file: string, settings: Settings): void {
   try {

@@ -8,7 +8,7 @@
   import { wayOf, whereIs } from '../../shared/now'
   import { best, dungeonsOf, fold, type Dungeon } from '../../shared/search'
   import { placeText, zoneAt } from '../../shared/point-label'
-  import { num, t } from '../../shared/i18n'
+  import { distance, t } from '../../shared/i18n'
   import type { Travel } from '../../shared/services'
   import { serves } from '../../shared/services'
   import { nearestOnFoot } from '../../shared/walk'
@@ -157,7 +157,7 @@
             {#if result.item}<img class="pic" src="{TILES}/items/{result.item}.png" alt="" onerror={(e) => e.currentTarget.remove()} />{/if}
             <span class="name">{result.title}</span>
             <span class="num">{result.note}</span>
-            {#if result.yards !== undefined}<span class="far">{t('map.search.yards', { yards: num(Math.round(result.yards)) })}</span>{/if}
+            {#if result.yards !== undefined}<span class="far">{distance(result.yards)}</span>{/if}
           </button>
         </li>
       {:else}

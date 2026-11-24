@@ -1,12 +1,18 @@
 // Le français de la carte: les notes sur chaque clé sont dans en/map.ts.
 export default {
   layers: {
-    button: 'Calques',
-    buttonTip: 'Calques (L)',
-    menu: 'Calques',
+    button: 'Filtres',
+    buttonTip: 'Filtres (L)',
+    menu: 'Filtres de la carte',
     // Group after a colon: "tous les {group}" would need the gender of each group name (les Quêtes, le Monde).
     hideAll: 'Tout cacher : {group}',
     showAll: 'Tout afficher : {group}',
+    kinds: 'Types : {layer}',
+    hideGrey: 'Cacher les gris',
+    hideGreyTip: 'Cacher ce qui ne fait plus progresser votre compétence',
+    skill: 'Compétence {skill}',
+    notLearned: 'Non appris',
+    skillUnread: 'Compétence pas encore lue',
     groups: {
       you: 'Vous',
       quests: 'Quêtes',
@@ -76,6 +82,7 @@ export default {
   nothingToSend: 'Il n’y a rien à envoyer.',
 
   pins: {
+    rewardXp: '{xp} EXP',
     entrance: 'Entrée',
     entranceOf: 'Entrée : {name}',
     rareBoss: '{name} (rare)',
@@ -105,15 +112,16 @@ export default {
   },
 
   way: {
-    north: '{yards} m au nord',
-    northEast: '{yards} m au nord-est',
-    east: '{yards} m à l’est',
-    southEast: '{yards} m au sud-est',
-    south: '{yards} m au sud',
-    southWest: '{yards} m au sud-ouest',
-    west: '{yards} m à l’ouest',
-    northWest: '{yards} m au nord-ouest',
+    north: '{far} au nord',
+    northEast: '{far} au nord-est',
+    east: '{far} à l’est',
+    southEast: '{far} au sud-est',
+    south: '{far} au sud',
+    southWest: '{far} au sud-ouest',
+    west: '{far} à l’ouest',
+    northWest: '{far} au nord-ouest',
     onFoot: '{time} à pied',
+    mounted: '{time} en monture',
   },
 
   label: {
@@ -142,6 +150,7 @@ export default {
     elsewhere: 'Pas sur la même carte que vous',
     here: 'Ici',
     minutes: 'min à pied',
+    minutesMounted: 'min en monture',
     skip: 'Passer',
     // Three buttons side by side: the band is about the route already, so the verb alone.
     edit: 'Modifier',
@@ -161,7 +170,6 @@ export default {
     field: 'Recherche',
     results: 'Résultats',
     none: 'Aucun résultat pour ce nom.',
-    yards: '{yards} m',
     zone: 'Zone',
     myPin: 'Mon repère',
     myPinIn: 'Mon repère, {zone}',

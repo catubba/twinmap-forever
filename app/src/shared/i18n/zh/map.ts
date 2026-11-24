@@ -1,11 +1,17 @@
 // 简体中文 地图: the notes on every key are in en/map.ts.
 export default {
   layers: {
-    button: '图层',
-    buttonTip: '图层（L）',
-    menu: '图层',
+    button: '筛选',
+    buttonTip: '筛选（L）',
+    menu: '地图筛选',
     hideAll: '隐藏全部{group}',
     showAll: '显示全部{group}',
+    kinds: '{layer}种类',
+    hideGrey: '隐藏灰色',
+    hideGreyTip: '隐藏不再提高技能的种类',
+    skill: '技能 {skill}',
+    notLearned: '未学会',
+    skillUnread: '尚未读取技能',
     groups: {
       // The character (glossary), never 你: "隐藏全部你" would not read.
       you: '角色',
@@ -80,6 +86,7 @@ export default {
   nothingToSend: '没有可发送的内容。',
 
   pins: {
+    rewardXp: '{xp} 经验值',
     entrance: '入口',
     entranceOf: '入口：{name}',
     // Rare as the game's map legend says it for creatures (MAP_LEGEND_RARE).
@@ -108,17 +115,18 @@ export default {
     inZone: '{zone} {x}, {y}',
   },
 
-  // 码 attached to the number, as the game's SPELL_RANGE; the direction first reads naturally.
+  // The direction first reads naturally.
   way: {
-    north: '北{yards}码',
-    northEast: '东北{yards}码',
-    east: '东{yards}码',
-    southEast: '东南{yards}码',
-    south: '南{yards}码',
-    southWest: '西南{yards}码',
-    west: '西{yards}码',
-    northWest: '西北{yards}码',
+    north: '北{far}',
+    northEast: '东北{far}',
+    east: '东{far}',
+    southEast: '东南{far}',
+    south: '南{far}',
+    southWest: '西南{far}',
+    west: '西{far}',
+    northWest: '西北{far}',
     onFoot: '步行{time}',
+    mounted: '坐骑{time}',
   },
 
   label: {
@@ -146,6 +154,7 @@ export default {
     elsewhere: '不在当前地图上',
     here: '已到达',
     minutes: '分钟（步行）',
+    minutesMounted: '分钟（坐骑）',
     skip: '跳过',
     edit: '编辑路线',
     clear: '清除',
@@ -162,7 +171,6 @@ export default {
     field: '搜索',
     results: '搜索结果',
     none: '没有找到这个名字。',
-    yards: '{yards}码',
     zone: '地区',
     myPin: '我的标记',
     myPinIn: '我的标记，{zone}',

@@ -1,9 +1,23 @@
 // The English of settings: see en/index.ts for how a key is written and noted.
 export default {
-  // The Settings page (Settings.svelte): its title and the button back, side by side at the top.
+  // Settings (Settings.svelte), a window over the map: its title, at the top of the column of its categories.
   title: 'Settings',
-  // A button: short.
-  back: 'Back to the map',
+  // The categories of Settings, in a column on the left of its window, each with its icon: short, they stand beside it.
+  // Phone and tablet and Shortcuts take the titles of their groups (phone.title, keys.title).
+  categories: {
+    // The column of the categories, read aloud only.
+    label: 'Categories',
+    // The language and the window.
+    general: 'General',
+    // How the app looks: the layout of the map today; themes and icons later.
+    appearance: 'Appearance',
+    // The game folder and what Twinmap found of the game and its addons.
+    game: 'Game and addons',
+    // Help improve Twinmap.
+    privacy: 'Privacy',
+    // The version, What's new, Feedback, the first steps and the licences.
+    about: 'About Twinmap',
+  },
 
   // The group that shows the game folder and lets the player pick it.
   gameFolder: {
@@ -15,16 +29,24 @@ export default {
     choose: 'Choose the game folder',
   },
 
-  // The group that puts the map on one side of the panel: two choices, one under the other.
-  layout: {
-    title: 'Layout',
-    mapLeft: 'Map on the left',
-    mapRight: 'Map on the right',
+  // A dropdown in General, only in a language whose game counts in yards (English, Chinese): its label, its choices.
+  distances: {
+    label: 'Distances',
+    yards: 'Yards',
+    metres: 'Metres',
   },
 
-  // The group of the app's window: switches, the text size and the hardware acceleration.
+  // In Appearance: which side of the panel the map stands on.
+  layout: {
+    // A dropdown, short: its label, its two choices, and the line under it (M is the key).
+    label: 'Map',
+    left: 'On the left',
+    right: 'On the right',
+    hint: 'M puts it on the other side at any time.',
+  },
+
+  // In General: the app's window, switches, the text size and the hardware acceleration.
   window: {
-    title: 'Window',
     onTop: 'Keep Twinmap on top of other windows',
     // Followed by a list of sizes: 80%, 90%, 100%...
     textSize: 'Text size',
@@ -55,9 +77,10 @@ export default {
     what: "Off unless you turn it on. Twinmap sends what helps it find you better inside dungeons and fill in what the map lacks: the minimap inside dungeons, where bosses and rares die, the doors of dungeons, what trainers teach, the creatures, objects and quests that Questie does not know, and Twinmap's own errors. Never a name, a character, an account, the chat, or the rest of your screen. Turn it off and nothing more is sent.",
   },
 
-  // The group "What Twinmap found": each line a name on the left and, on the right, what was found or a button.
+  // In Game and addons, under the game folder: each line a name on the left and, on the right, what was found or a button.
   found: {
-    title: 'What Twinmap found',
+    // Over the list: what was found in the game folder, the row above.
+    inFolder: 'Found in it',
     addon: 'Twinmap Forever addon',
     // Small, after the name QuestieDB.
     questie: 'NPCs, services and quests',
@@ -91,7 +114,7 @@ export default {
   keys: {
     title: 'Shortcuts',
     // Beside the key L.
-    layers: 'Layers',
+    layers: 'Filters',
     // Beside the key F.
     follow: 'Follow on and off',
     // Beside the key N.
@@ -105,7 +128,7 @@ export default {
     // Beside the keys Ctrl, +, -, 0.
     zoom: 'Text size, also Ctrl and the wheel outside the map',
     // Beside the key Esc.
-    close: 'Closes a label, Layers, these settings',
+    close: 'Closes a label, Filters, these settings',
     // The name of a key: the arrow keys. Short.
     arrows: 'Arrows',
     // Beside the keys Arrows, +, -.

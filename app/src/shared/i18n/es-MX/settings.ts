@@ -2,7 +2,14 @@
 export default {
   // The game's menu entry is "Opciones" (GS GAMEMENU_OPTIONS), not "Configuración".
   title: 'Opciones',
-  back: 'Volver al mapa',
+  categories: {
+    label: 'Categorías',
+    general: 'General',
+    appearance: 'Apariencia',
+    game: 'Juego y addons',
+    privacy: 'Privacidad',
+    about: 'Acerca de Twinmap',
+  },
 
   gameFolder: {
     title: 'Carpeta del juego',
@@ -11,14 +18,20 @@ export default {
     choose: 'Elegir la carpeta del juego',
   },
 
+  distances: {
+    label: 'Distancias',
+    yards: 'Yardas',
+    metres: 'Metros',
+  },
+
   layout: {
-    title: 'Disposición',
-    mapLeft: 'Mapa a la izquierda',
-    mapRight: 'Mapa a la derecha',
+    label: 'Mapa',
+    left: 'A la izquierda',
+    right: 'A la derecha',
+    hint: 'M lo cambia de lado en cualquier momento.',
   },
 
   window: {
-    title: 'Ventana',
     onTop: 'Mantener Twinmap sobre las demás ventanas',
     textSize: 'Tamaño del texto',
     gpu: 'Usar aceleración por hardware',
@@ -42,7 +55,7 @@ export default {
   },
 
   found: {
-    title: 'Lo que encontró Twinmap',
+    inFolder: 'Encontrado en la carpeta',
     // The game says "addon" in its texts (GS DISABLE_ADDONS "Desactivar addons").
     addon: 'Addon Twinmap Forever',
     questie: 'PNJ, servicios y misiones',
@@ -68,7 +81,7 @@ export default {
   keys: {
     // Key Bindings in the game: "Teclado" (GS KEY_BINDINGS).
     title: 'Teclado',
-    layers: 'Capas',
+    layers: 'Filtros',
     follow: 'Activar o desactivar Seguir',
     north: 'El mapa gira con tu personaje, o el norte arriba',
     side: 'Mapa al otro lado del panel',
@@ -76,7 +89,7 @@ export default {
     ctrl: 'Ctrl',
     zoom: 'Tamaño del texto, también Ctrl y la rueda fuera del mapa',
     // "estas opciones": the page is called Opciones.
-    close: 'Cierra una etiqueta, Capas, estas opciones',
+    close: 'Cierra una etiqueta, Filtros, estas opciones',
     arrows: 'Flechas',
     move: 'Mover el mapa y hacer zoom',
     // The game's short name of the button (GS KEY_BUTTON2 "Botón dcho. ratón"): the drag goes in turn.

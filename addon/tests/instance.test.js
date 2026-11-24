@@ -65,6 +65,14 @@ test('under a roof the position says so, and stops saying it outside', () => {
   assert.deepEqual(positions(addon).map((p) => p.indoors), [true, undefined]);
 });
 
+test('the position tells how fast the character runs, and on a mount', () => {
+  const addon = enterWorld('GAME.run = 7');
+  addon.run(10);
+  addon.lua('GAME.run, GAME.mount = 11.2, true');
+  addon.run(2);
+  assert.deepEqual(positions(addon).map((p) => [p.speed, p.mount]), [[7, undefined], [11.2, true]]);
+});
+
 test('the instance goes out during a fight too', () => {
   const addon = enterWorld();
   addon.run(10);

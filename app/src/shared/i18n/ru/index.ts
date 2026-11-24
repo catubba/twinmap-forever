@@ -9,6 +9,20 @@ export default {
   common: {
     close: 'Закрыть',
   },
+  units: {
+    yards: '{n} м',
+    metres: '{n} м',
+  },
+  news: {
+    title: 'Что нового в Twinmap',
+    updatedFrom: 'Обновлено с версии {version}.',
+    again: 'Открыть снова: {settings}, {button}.',
+    button: 'Что нового',
+    changed: 'Изменено',
+    fixed: 'Исправлено',
+    done: 'Понятно',
+    goTo: 'Открыть: {name}',
+  },
 
   participate: {
     title: 'Помогите улучшить Twinmap',
@@ -30,7 +44,6 @@ export default {
     newTitle: 'Twinmap теперь говорит на вашем языке',
     newIntro: 'Выберите язык Twinmap. Если ничего не выбрать, останется английский.',
     done: 'Готово',
-    settingsTitle: 'Язык',
     label: 'Язык Twinmap',
     hint: 'Меняется сразу. Названия из игры остаются на языке игры.',
   },

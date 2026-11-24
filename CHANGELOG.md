@@ -2,6 +2,18 @@
 
 What changed in each version of Twinmap, newest first. The section of a version is also the text of its release on GitHub and of the addon's file on CurseForge.
 
+## 0.16.1 - 2026-11-24
+
+### New
+
+- **Ore and herbs by kind.** In Layers, the arrow beside Ore and beside Herbs opens the list of their kinds, each with the skill it asks, coloured as the game colours it for your Mining or Herbalism. Turn off the kinds you do not want on the map, or tick Hide grey to hide what no longer raises your skill: the list follows you as you learn.
+- **Each herb its own icon.** Herbs on the map show their own picture on a dark disc, so Peacebloom and Silverleaf are told apart at a glance.
+- **Quest rewards.** The tooltip of a quest icon shows the XP each quest gives your character, and the money it pays for the quests your game has already seen.
+
+### Fixed
+
+- **Ore and herbs in other languages.** With the game in a language other than English, most veins and many herbs were missing from the map since 0.16.0. They are all back, with their names in your game's language.
+
 ## 0.16.0 - 2026-11-23
 
 ### New

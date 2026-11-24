@@ -1,12 +1,18 @@
 // Русский карты: the notes on every key are in en/map.ts.
 export default {
   layers: {
-    button: 'Слои',
-    buttonTip: 'Слои (L)',
-    menu: 'Слои',
+    button: 'Фильтры',
+    buttonTip: 'Фильтры (L)',
+    menu: 'Фильтры карты',
     // Group after a colon: "все {group}" would need the case of each group name.
     hideAll: 'Скрыть все: {group}',
     showAll: 'Показать все: {group}',
+    kinds: 'Виды: {layer}',
+    hideGrey: 'Скрыть серые',
+    hideGreyTip: 'Скрыть то, что больше не повышает навык',
+    skill: 'Навык {skill}',
+    notLearned: 'Не изучено',
+    skillUnread: 'Навык ещё не прочитан',
     groups: {
       you: 'Вы',
       quests: 'Задания',
@@ -77,6 +83,7 @@ export default {
   nothingToSend: 'Нечего отправлять.',
 
   pins: {
+    rewardXp: '{xp} опыта',
     entrance: 'Вход',
     entranceOf: 'Вход: {name}',
     // Rare as the game's map legend says it for creatures (glossary): neuter, so it does not agree with the boss's name.
@@ -108,15 +115,16 @@ export default {
   },
 
   way: {
-    north: '{yards} м к северу',
-    northEast: '{yards} м к северо-востоку',
-    east: '{yards} м к востоку',
-    southEast: '{yards} м к юго-востоку',
-    south: '{yards} м к югу',
-    southWest: '{yards} м к юго-западу',
-    west: '{yards} м к западу',
-    northWest: '{yards} м к северо-западу',
+    north: '{far} к северу',
+    northEast: '{far} к северо-востоку',
+    east: '{far} к востоку',
+    southEast: '{far} к юго-востоку',
+    south: '{far} к югу',
+    southWest: '{far} к юго-западу',
+    west: '{far} к западу',
+    northWest: '{far} к северо-западу',
     onFoot: '{time} пешком',
+    mounted: '{time} верхом',
   },
 
   label: {
@@ -144,6 +152,7 @@ export default {
     elsewhere: 'Не на вашей текущей карте',
     here: 'Здесь',
     minutes: 'мин. пешком',
+    minutesMounted: 'мин. верхом',
     skip: 'Пропустить',
     // Three buttons side by side: the band is about the route already, so the verb alone.
     edit: 'Изменить',
@@ -163,7 +172,6 @@ export default {
     field: 'Поиск',
     results: 'Результаты',
     none: 'Ничего с таким названием.',
-    yards: '{yards} м',
     zone: 'Зона',
     myPin: 'Моя точка',
     myPinIn: 'Моя точка, {zone}',

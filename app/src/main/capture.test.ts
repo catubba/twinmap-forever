@@ -49,8 +49,8 @@ describe.skipIf(process.platform !== 'win32')('Windows capture', () => {
   })
 
   // Blue, green, red, unused: the bytes Windows gives for a cell of the strip (R*4 + G*2 + B).
-  function expected(cell: (x: number) => number): number[] {
-    return Array.from({ length: WIDTH }, (_, x) => cell(x)).flatMap((v) => [v & 1 ? 255 : 0, v & 2 ? 255 : 0, v & 4 ? 255 : 0])
+  function expected(cell: (x: number) => number, length = WIDTH): number[] {
+    return Array.from({ length }, (_, x) => cell(x)).flatMap((v) => [v & 1 ? 255 : 0, v & 2 ? 255 : 0, v & 4 ? 255 : 0])
   }
   const colors = (row: Buffer | null): number[] => [...(row ?? [])].filter((_, i) => i % 4 !== 3)
 
@@ -63,6 +63,17 @@ describe.skipIf(process.platform !== 'win32')('Windows capture', () => {
 
   test('the bottom row is read too, and it is another row', () => {
     expect(colors(readRow(hwnd!, 'bottom'))).toEqual(expected((x) => (x * 5 + 1) % 8))
+  })
+
+  test('the left and right columns are read from the top down, their ends the rows drawn over them', () => {
+    // The top row starts with 3 and ends with (639 * 7 + 3) % 8, the bottom one with 1 and (639 * 5 + 1) % 8.
+    const left = (y: number): number => (y === 0 ? 3 : y === HEIGHT - 1 ? 1 : (y * 3 + 2) % 8)
+    const right = (y: number): number => (y === 0 ? ((WIDTH - 1) * 7 + 3) % 8 : y === HEIGHT - 1 ? ((WIDTH - 1) * 5 + 1) % 8 : (y * 7 + 5) % 8)
+    const column = readRow(hwnd!, 'left')
+    expect(column?.length).toBe(HEIGHT * 4)
+    expect(colors(column)).toEqual(expected(left, HEIGHT))
+    expect(colors(readRow(hwnd!, 'right'))).toEqual(expected(right, HEIGHT))
+    expect(colors(readRow(hwnd!, 'top')), 'a row after a column: the same row as before').toEqual(expected((x) => (x * 7 + 3) % 8))
   })
 
   test('the game is found by its program, whatever its title', () => {

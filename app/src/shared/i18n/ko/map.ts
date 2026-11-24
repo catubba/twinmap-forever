@@ -1,12 +1,18 @@
 // 한국어 지도: the notes on every key are in en/map.ts.
 export default {
   layers: {
-    button: '레이어',
-    buttonTip: '레이어 (L)',
-    menu: '레이어',
+    button: '필터',
+    buttonTip: '필터 (L)',
+    menu: '지도 필터',
     // Group after a colon: a particle after {group} would change with its last syllable.
     hideAll: '모두 숨기기: {group}',
     showAll: '모두 표시: {group}',
+    kinds: '종류: {layer}',
+    hideGrey: '회색 숨기기',
+    hideGreyTip: '더 이상 숙련도가 오르지 않는 것 숨기기',
+    skill: '숙련도 {skill}',
+    notLearned: '배우지 않음',
+    skillUnread: '숙련도를 아직 읽지 않음',
     groups: {
       // The character, never "당신" or "나".
       you: '캐릭터',
@@ -81,6 +87,7 @@ export default {
   nothingToSend: '보낼 것이 없습니다.',
 
   pins: {
+    rewardXp: '경험치 {xp}',
     entrance: '입구',
     entranceOf: '입구: {name}',
     // Rare as the game's map legend says it for creatures (glossary).
@@ -110,17 +117,17 @@ export default {
     inZone: '{zone} {x}, {y}',
   },
 
-  // "미터" attached to the number, as the game's SPELL_RANGE.
   way: {
-    north: '{yards}미터 북쪽',
-    northEast: '{yards}미터 북동쪽',
-    east: '{yards}미터 동쪽',
-    southEast: '{yards}미터 남동쪽',
-    south: '{yards}미터 남쪽',
-    southWest: '{yards}미터 남서쪽',
-    west: '{yards}미터 서쪽',
-    northWest: '{yards}미터 북서쪽',
+    north: '{far} 북쪽',
+    northEast: '{far} 북동쪽',
+    east: '{far} 동쪽',
+    southEast: '{far} 남동쪽',
+    south: '{far} 남쪽',
+    southWest: '{far} 남서쪽',
+    west: '{far} 서쪽',
+    northWest: '{far} 북서쪽',
     onFoot: '도보 {time}',
+    mounted: '탈것 {time}',
   },
 
   label: {
@@ -149,6 +156,7 @@ export default {
     // The character has arrived at the stop.
     here: '도착',
     minutes: '분 (도보)',
+    minutesMounted: '분 (탈것)',
     skip: '건너뛰기',
     // Three buttons side by side: the band is about the route already, so the verb alone.
     edit: '편집',
@@ -167,7 +175,6 @@ export default {
     field: '검색',
     results: '검색 결과',
     none: '해당 이름의 결과가 없습니다.',
-    yards: '{yards}미터',
     zone: '지역',
     myPin: '내 핀',
     myPinIn: '내 핀, {zone}',

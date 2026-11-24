@@ -2,7 +2,14 @@
 export default {
   // The game's menu entry is "Options" (GS GAMEMENU_OPTIONS), not "Réglages".
   title: 'Options',
-  back: 'Retour à la carte',
+  categories: {
+    label: 'Catégories',
+    general: 'Général',
+    appearance: 'Apparence',
+    game: 'Jeu et addons',
+    privacy: 'Confidentialité',
+    about: 'À propos de Twinmap',
+  },
 
   gameFolder: {
     title: 'Dossier du jeu',
@@ -11,14 +18,20 @@ export default {
     choose: 'Choisir le dossier du jeu',
   },
 
+  distances: {
+    label: 'Distances',
+    yards: 'Yards',
+    metres: 'Mètres',
+  },
+
   layout: {
-    title: 'Disposition',
-    mapLeft: 'Carte à gauche',
-    mapRight: 'Carte à droite',
+    label: 'Carte',
+    left: 'À gauche',
+    right: 'À droite',
+    hint: 'M la fait passer de l’autre côté à tout moment.',
   },
 
   window: {
-    title: 'Fenêtre',
     onTop: 'Garder Twinmap au-dessus des autres fenêtres',
     textSize: 'Taille du texte',
     gpu: 'Utiliser l’accélération matérielle',
@@ -43,7 +56,7 @@ export default {
   },
 
   found: {
-    title: 'Ce que Twinmap a trouvé',
+    inFolder: 'Trouvé dans ce dossier',
     addon: 'Addon Twinmap Forever',
     questie: 'PNJ, services et quêtes',
     optional: 'facultatif',
@@ -68,7 +81,7 @@ export default {
   keys: {
     // Key Bindings in the game: "Raccourcis" (GS KEY_BINDINGS).
     title: 'Raccourcis',
-    layers: 'Calques',
+    layers: 'Filtres',
     follow: 'Activer ou désactiver Suivre',
     north: 'La carte tourne avec votre personnage, ou le nord en haut',
     side: 'Carte de l’autre côté du panneau',
@@ -76,7 +89,7 @@ export default {
     ctrl: 'Ctrl',
     zoom: 'Taille du texte, aussi Ctrl et la molette hors de la carte',
     // "ces options": the page is called Options.
-    close: 'Ferme une étiquette, les Calques, ces options',
+    close: 'Ferme une étiquette, les Filtres, ces options',
     arrows: 'Flèches',
     move: 'Déplacer la carte et zoomer',
     // How French players name holding the right button while moving the mouse.

@@ -87,6 +87,16 @@ test('a dungeon with one level tells none', () => {
   expect(Math.abs(found.u - 1300)).toBeLessThanOrEqual(1.5)
 })
 
+test('a minimap of an odd width against the top right corner is cut inside the window', () => {
+  const inside = startInside(() => 'anywhere', () => twoLevels())
+  let at: number[] = []
+  // A window 3440 wide: the middle 126.5 from its top and its right edge.
+  inside.look({ inst: { id: 209, kind: 'party', mini: { x: 3314, y: 126, size: 253, zoom: 0 } } }, (x, y, size) => ((at = [x, y, size]), null), 3000)
+  expect(at[0]).toBeGreaterThanOrEqual(0)
+  expect(at[1]).toBeGreaterThanOrEqual(0)
+  expect(at[0]! + at[2]!).toBeLessThanOrEqual(3440)
+})
+
 test('why the arrow is not there is told: no minimap, a zoom not known, nothing like enough', () => {
   const levels = twoLevels(), inside = startInside(() => 'anywhere', () => levels)
   const mini = { x: 2408, y: 187, size: 238, zoom: 0 }

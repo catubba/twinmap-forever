@@ -85,10 +85,9 @@ export function windowState(hwnd: WindowHandle): 'gone' | 'minimized' | 'open' {
 }
 
 // Kept between calls: the row is read many times a second.
-let screenDC: bigint | undefined, memoryDC: bigint, bitmap: bigint | undefined, bitmapWidth = 0
+let screenDC: bigint | undefined, memoryDC: bigint, bitmap: bigint | undefined, bitmapSize = ''
 const info = Buffer.alloc(40) // BITMAPINFOHEADER: 32 bits per pixel, uncompressed
 info.writeInt32LE(40, 0)
-info.writeInt32LE(1, 8) // height
 info.writeUInt16LE(1, 12) // planes
 info.writeUInt16LE(32, 14) // bits per pixel
 
@@ -163,35 +162,41 @@ export function showsOnly(hwnd: WindowHandle, x: number, y: number, size: number
   return true
 }
 
+/** The edge of the window the addon draws its strip on: a row along the top or the bottom, a column down the left or the right side. */
+export type Edge = 'top' | 'bottom' | 'left' | 'right'
+
 /**
- * The top or bottom row of the window's client area, as shown on screen: 4 bytes per pixel, in the
- * order blue, green, red, unused. Null when there is nothing to read: the window is gone, minimized
- * or empty. A window covered by another one gives the pixels of what covers it.
+ * The top or bottom row of the window's client area, or its left or right column from the top
+ * down, as shown on screen: 4 bytes per pixel, in the order blue, green, red, unused. Null when
+ * there is nothing to read: the window is gone, minimized or empty. A window covered by another
+ * one gives the pixels of what covers it.
  */
-export function readRow(hwnd: WindowHandle, edge: 'top' | 'bottom' = 'top'): Buffer | null {
+export function readRow(hwnd: WindowHandle, edge: Edge = 'top'): Buffer | null {
   if (IsIconic(hwnd)) return null
   const rect = { left: 0, top: 0, right: 0, bottom: 0 }
   if (!GetClientRect(hwnd, rect) || rect.right <= 0 || rect.bottom <= 0) return null
-  const origin = { x: 0, y: edge === 'top' ? 0 : rect.bottom - 1 }
+  const side = edge === 'left' || edge === 'right'
+  const origin = { x: edge === 'right' ? rect.right - 1 : 0, y: edge === 'bottom' ? rect.bottom - 1 : 0 }
   if (!ClientToScreen(hwnd, origin)) return null
-  const width = rect.right
+  const width = side ? 1 : rect.right, height = side ? rect.bottom : 1
 
   if (screenDC === undefined) {
     screenDC = GetDC(null) as bigint
     memoryDC = CreateCompatibleDC(screenDC) as bigint
   }
-  if (width !== bitmapWidth) {
+  if (`${width}x${height}` !== bitmapSize) {
     if (bitmap !== undefined) DeleteObject(bitmap)
-    bitmap = CreateCompatibleBitmap(screenDC, width, 1) as bigint
-    bitmapWidth = width
+    bitmap = CreateCompatibleBitmap(screenDC, width, height) as bigint
+    bitmapSize = `${width}x${height}`
     info.writeInt32LE(width, 4)
+    info.writeInt32LE(-height, 8) // top row first: a column comes from the top down
   }
 
   // GetDIBits wants the bitmap out of the device context again.
   const previous = SelectObject(memoryDC, bitmap)
-  const copied = BitBlt(memoryDC, 0, 0, width, 1, screenDC, origin.x, origin.y, SRCCOPY)
+  const copied = BitBlt(memoryDC, 0, 0, width, height, screenDC, origin.x, origin.y, SRCCOPY)
   SelectObject(memoryDC, previous)
-  const pixels = Buffer.alloc(width * 4)
-  if (!copied || GetDIBits(screenDC, bitmap, 0, 1, pixels, info, 0) !== 1) return null
+  const pixels = Buffer.alloc(width * height * 4)
+  if (!copied || GetDIBits(screenDC, bitmap, 0, height, pixels, info, 0) !== height) return null
   return pixels
 }

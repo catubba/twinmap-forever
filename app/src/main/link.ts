@@ -6,14 +6,16 @@ import { decodeRow, readStrip } from '../shared/strip'
 import { readFileSync } from 'node:fs'
 import { worldOfYards } from '../shared/inside'
 import type { Box } from '../shared/minimap'
-import { captureAllowed, findGameWindow, findWindow, readBox, readRect, readRow, showsOnly, windowState, type WindowHandle } from './capture'
+import { captureAllowed, findGameWindow, findWindow, readBox, readRect, readRow, showsOnly, windowState, type Edge, type WindowHandle } from './capture'
 import { look } from './health'
 import { startInside, type Inside, type InsideReport } from './minimap'
 
 // Tuning knobs.
 const READ_EVERY = 15 // ms: a block stays up 50 ms, so it is seen about three times
 const FIND_EVERY = 3000 // ms between looks for the game's window while it is not open
-const EDGE_KEPT = 5000 // ms without a strip before the other edge of the window is tried again
+const EDGE_KEPT = 5000 // ms without a strip before the edges of the window are read in turn again, one a read
+// The edges the addon may draw on, in the order they are tried: top and bottom first, where most players keep it.
+const EDGES: Edge[] = ['top', 'bottom', 'left', 'right']
 const REPLAY_EVERY = 5000 // ms between the strips of a recorded session
 // Paused, the strip is looked for a second every five: a /reload of the game draws it again, and the
 // app has to ask for the pause once more. A block is up 50 ms and a character standing still sends one
@@ -66,8 +68,8 @@ export function startLink(
   let hwnd: WindowHandle | null = null
   let status: LinkSnapshot['game'] = 'closed'
   let lookAgainAt = 0, reads = 0
-  // The player chooses the edge in the game. Until a strip shows which, both are read in turn.
-  let edge: 'top' | 'bottom' = 'top', edgeSeenAt = 0
+  // The player chooses the edge in the game. Until a strip shows which, each is read in turn.
+  let edge: Edge = 'top', edgeSeenAt = 0
   let drew: number | undefined // how wide the game drew the last strip read
   let stretch = 1 // pixels of the screen for each pixel the game drew: more than 1 on a game stretched to fill its monitor
   // The Pause button: nothing is read but a look for the strip now and then, nothing changes the state, the minimap is not read.
@@ -128,7 +130,7 @@ export function startLink(
         pausedAt = now
       }
     }
-    if (now - edgeSeenAt > EDGE_KEPT) edge = edge === 'top' ? 'bottom' : 'top'
+    if (now - edgeSeenAt > EDGE_KEPT) edge = EDGES[(EDGES.indexOf(edge) + 1) % EDGES.length]!
     const row = readRow(hwnd, edge)
     if (!row) return
     reads++

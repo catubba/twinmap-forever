@@ -1,6 +1,8 @@
 // The Windows and Mac readers bind different system libraries. Only load the one for this process.
 export type WindowHandle = number | bigint
 type Reading = { width: number; height: number; rgb: Uint8Array; at: { x: number; y: number } }
+/** The edge of the window the addon draws its strip on: a row along the top or the bottom, a column down the left or the right side. */
+export type Edge = 'top' | 'bottom' | 'left' | 'right'
 
 interface Capture {
   findWindow(title: string): WindowHandle | null
@@ -11,7 +13,7 @@ interface Capture {
   readRect(window: WindowHandle, x: number, y: number, width: number, height: number, own?: boolean): Reading | null
   readBox(window: WindowHandle, x: number, y: number, size: number): { size: number; rgb: Uint8Array } | null
   showsOnly(window: WindowHandle, x: number, y: number, size: number): boolean
-  readRow(window: WindowHandle, edge?: 'top' | 'bottom'): Buffer | null
+  readRow(window: WindowHandle, edge?: Edge): Buffer | null
   captureAllowed?(): boolean
   requestCapture?(): boolean
   stopCapture?(): void

@@ -1,12 +1,18 @@
 // El español de Latinoamérica del mapa: the notes on every key are in en/map.ts.
 export default {
   layers: {
-    button: 'Capas',
-    buttonTip: 'Capas (L)',
-    menu: 'Capas',
+    button: 'Filtros',
+    buttonTip: 'Filtros (L)',
+    menu: 'Filtros del mapa',
     // Group after a colon: "todos los {group}" would need the gender of each group name (las Misiones, el Mundo).
     hideAll: 'Ocultar todo: {group}',
     showAll: 'Mostrar todo: {group}',
+    kinds: 'Tipos: {layer}',
+    hideGrey: 'Ocultar grises',
+    hideGreyTip: 'Ocultar lo que ya no aumenta tu habilidad',
+    skill: 'Habilidad {skill}',
+    notLearned: 'No aprendido',
+    skillUnread: 'Habilidad aún no leída',
     groups: {
       you: 'Tú',
       quests: 'Misiones',
@@ -75,6 +81,7 @@ export default {
   nothingToSend: 'No hay nada que enviar.',
 
   pins: {
+    rewardXp: '{xp} PE',
     entrance: 'Entrada',
     entranceOf: 'Entrada: {name}',
     rareBoss: '{name} (raro)',
@@ -104,15 +111,16 @@ export default {
   },
 
   way: {
-    north: '{yards} m al norte',
-    northEast: '{yards} m al noreste',
-    east: '{yards} m al este',
-    southEast: '{yards} m al sureste',
-    south: '{yards} m al sur',
-    southWest: '{yards} m al suroeste',
-    west: '{yards} m al oeste',
-    northWest: '{yards} m al noroeste',
+    north: '{far} al norte',
+    northEast: '{far} al noreste',
+    east: '{far} al este',
+    southEast: '{far} al sureste',
+    south: '{far} al sur',
+    southWest: '{far} al suroeste',
+    west: '{far} al oeste',
+    northWest: '{far} al noroeste',
     onFoot: '{time} a pie',
+    mounted: '{time} en montura',
   },
 
   label: {
@@ -141,6 +149,7 @@ export default {
     elsewhere: 'No está en el mismo mapa que tú',
     here: 'Aquí',
     minutes: 'min a pie',
+    minutesMounted: 'min en montura',
     skip: 'Omitir',
     // Three buttons side by side: the band is about the route already, so the verb alone.
     edit: 'Editar',
@@ -160,7 +169,6 @@ export default {
     field: 'Buscar',
     results: 'Resultados',
     none: 'No hay nada con ese nombre.',
-    yards: '{yards} m',
     zone: 'Zona',
     myPin: 'Mi marcador',
     myPinIn: 'Mi marcador, {zone}',

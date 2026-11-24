@@ -9,6 +9,7 @@ import { createInterface } from 'node:readline'
 import { app, screen } from 'electron'
 import koffi from 'koffi'
 import type { Rect } from '../shared/window'
+import type { Edge } from './capture'
 import { contentTop, FOREVER_PROGRAM, inContent, windowRecord, type WindowRecord } from './capture-darwin-frame'
 
 const cg = koffi.load('/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics')
@@ -329,5 +330,18 @@ export function readBox(id: WindowHandle, x: number, y: number, size: number): {
 export const showsOnly = (id: WindowHandle, x: number, y: number, size: number): boolean =>
   withFrame(id, (frame) => inContent(frame, x, y, size, size)) ?? false
 
-export const readRow = (id: WindowHandle, edge: 'top' | 'bottom' = 'top'): Buffer | null =>
-  withFrame(id, (frame) => Buffer.from(frameRow(frame, edge === 'top' ? frame.height + 1 + frame.top : frame.height)))
+/** The left or right column of the content, from the top down, out of the full snapshot: the helper
+ * keeps only the top and bottom rows live, so a column is up to 200 ms behind, as a rectangle is. */
+function frameColumn(frame: Frame, x: number): Buffer {
+  const rowLength = frame.width * 4, height = Math.max(0, frame.height - frame.top)
+  const column = Buffer.alloc(height * 4)
+  for (let y = 0; y < height; y++) copyOut(column.subarray(y * 4, y * 4 + 4), frame.address + BigInt((frame.top + y) * rowLength + x * 4), 4)
+  return column
+}
+
+export const readRow = (id: WindowHandle, edge: Edge = 'top'): Buffer | null =>
+  withFrame(id, (frame) =>
+    edge === 'left' || edge === 'right'
+      ? frameColumn(frame, edge === 'left' ? 0 : frame.width - 1)
+      : Buffer.from(frameRow(frame, edge === 'top' ? frame.height + 1 + frame.top : frame.height)),
+  )

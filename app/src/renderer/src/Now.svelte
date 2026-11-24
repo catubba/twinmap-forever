@@ -20,7 +20,7 @@
   import { kept as keptByApp } from './kept.svelte'
   import type { Alert } from '../../shared/ah'
   import { coins } from '../../shared/items'
-  import { num, t } from '../../shared/i18n'
+  import { distance, t } from '../../shared/i18n'
 
   // onpick: a row was chosen, the map should go there. onpoint: the pointer or the keyboard is on
   // a row (or on none: null), the map should show which pin it is.
@@ -176,7 +176,6 @@
   // Attention: what wants doing first. Its one row for now: dead, the way back to life.
   const attention = $derived<NowRow[]>(back ? [{ key: 'death', name: back.name, kind: back.door ? t('app.now.entrance') : t('app.now.corpse'), tone: 'service', continent: back.continent, at: back.at }] : [])
   const toBack = feet(() => (me && back && back.continent === me.continent ? { continent: me.continent, from: me.at, to: [back.at], reach: FAR } : null), 20)
-  const yards = (n: number): string => t('app.now.yards', { yards: num(Math.round(n)) })
 </script>
 
 <svelte:window
@@ -205,7 +204,7 @@
       <button class="row" title={way ? undefined : t('app.now.otherContinent')} aria-current={row.key === chosen} onclick={() => pick(row)} onpointerenter={() => (over = row)} onpointerleave={() => (over = null)} onfocus={() => (over = row)} onblur={() => (over = null)}>
         <span>{row.name}</span>
         <span class="t-{row.tone}">{row.kind}</span>
-        <span class="num">{way ? yards(way.yards) : ''}</span>
+        <span class="num">{way ? distance(way.yards) : ''}</span>
         {#if way}<Glyph name="direction" size={12} turn={way.turn} />{/if}
       </button>
     {/each}
@@ -228,13 +227,13 @@
         <button class="row" aria-current={row.key === chosen} onclick={() => pick(row)}>
           <span><img src="{TILES}/icons/{back?.door ? 'dungeon' : 'corpse'}.png" alt="" class:swirl={back?.door} />{row.name}</span>
           <span>{row.kind}</span>
-          <span class="num">{way ? yards(way.yards) : ''}</span>
+          <span class="num">{way ? distance(way.yards) : ''}</span>
           {#if way}<Glyph name="direction" size={12} turn={way.turn} />{/if}
         </button>
       {/each}
     </div>{/if}
   {/if}
-  <NextStop {route} band={bandOf(route, me, live, stop && toStop.yards(stop.at))} sending={sendState(live, inbox, news !== null, 'stop')} {inGame} onsend={sendRoute} {onskip} {onarrive} {onclear} {onend} {onremove} {onmove} onpick={onstop} />
+  <NextStop {route} band={bandOf(route, me, live, stop && toStop.yards(stop.at), pos)} sending={sendState(live, inbox, news !== null, 'stop')} {inGame} onsend={sendRoute} {onskip} {onarrive} {onclear} {onend} {onremove} {onmove} onpick={onstop} />
   {#if journey}
     <!-- What Shortest Path guides in the game now: its goal and the legs still ahead, as its tracker words them. -->
     {@render title('game', t('app.now.inGame'), journey.loading ? undefined : span(journey.left))}

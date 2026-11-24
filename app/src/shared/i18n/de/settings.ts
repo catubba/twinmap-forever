@@ -2,7 +2,14 @@
 export default {
   // The game's menu entry is "Optionen" (GS GAMEMENU_OPTIONS), not "Einstellungen".
   title: 'Optionen',
-  back: 'Zurück zur Karte',
+  categories: {
+    label: 'Kategorien',
+    general: 'Allgemein',
+    appearance: 'Darstellung',
+    game: 'Spiel und Addons',
+    privacy: 'Datenschutz',
+    about: 'Über Twinmap',
+  },
 
   gameFolder: {
     title: 'Spielordner',
@@ -11,14 +18,20 @@ export default {
     choose: 'Spielordner wählen',
   },
 
+  distances: {
+    label: 'Entfernungen',
+    yards: 'Yards',
+    metres: 'Meter',
+  },
+
   layout: {
-    title: 'Anordnung',
-    mapLeft: 'Karte links',
-    mapRight: 'Karte rechts',
+    label: 'Karte',
+    left: 'Links',
+    right: 'Rechts',
+    hint: 'Mit M wechselt sie jederzeit die Seite.',
   },
 
   window: {
-    title: 'Fenster',
     // "Immer im Vordergrund" is how Windows and German apps name it.
     onTop: 'Twinmap immer im Vordergrund',
     // The game's "Schriftgröße" (GS FONT_SIZE).
@@ -47,7 +60,7 @@ export default {
   },
 
   found: {
-    title: 'Was Twinmap gefunden hat',
+    inFolder: 'Darin gefunden',
     addon: 'Twinmap-Forever-Addon',
     // "Dienste" as the services layer (de/map.ts).
     questie: 'NSC, Dienste und Quests',
@@ -72,7 +85,7 @@ export default {
   keys: {
     // Key Bindings in the game (GS KEY_BINDINGS).
     title: 'Tastaturbelegung',
-    layers: 'Ebenen',
+    layers: 'Filter',
     // The game's "ein/aus" (GS BINDING_NAME_TOGGLEWORLDMAP "Weltkarte ein/aus").
     follow: 'Folgen ein/aus',
     // "genordet" is the German word for a map with north up.
@@ -83,7 +96,7 @@ export default {
     ctrl: 'Strg',
     zoom: 'Schriftgröße, auch Strg und Mausrad außerhalb der Karte',
     // Our word for the label of a point: "Infofeld". "diese Optionen": the page is called Optionen.
-    close: 'Schließt ein Infofeld, die Ebenen, diese Optionen',
+    close: 'Schließt ein Infofeld, die Filter, diese Optionen',
     // Not "Pfeile": the Arrow of the route is "Pfeil".
     arrows: 'Pfeiltasten',
     move: 'Karte verschieben und zoomen',
