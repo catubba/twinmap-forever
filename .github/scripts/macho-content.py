@@ -23,7 +23,7 @@ def thin(data, base, arch):
             for s in range(nsects):
                 h = at + 72 + s * 80
                 section = data[h:h + 16].rstrip(b'\0').decode()
-                _, _, length, offset = struct.unpack_from('<QQII', data, h + 32)
+                _, length, offset, _ = struct.unpack_from('<QQII', data, h + 32)  # addr, size, offset, align
                 kind = struct.unpack_from('<I', data, h + 64)[0] & 0xFF
                 if segment == '__LINKEDIT' or kind in ZEROFILL:
                     continue
