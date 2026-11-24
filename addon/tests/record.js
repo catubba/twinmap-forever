@@ -51,7 +51,11 @@ function record() {
   instance.lua('GAME.instance = nil; GAME.zone, GAME.sub, GAME.map, GAME.x = "Westfall", "Moonbrook", 1436, 0.423');
   instance.run(3);
 
-  return { session: session.strips(), narrow: narrow.strips(), newer: newer.strips(), older: older.strips(), instance: instance.strips() };
+  // Down the left side of a window 1080 high: a column, read from the top as a row is from the left.
+  const side = enterWorld(null, 'local ns = ...; ns.db.position = "LEFT"');
+  side.run(10);
+
+  return { session: session.strips(), narrow: narrow.strips(), newer: newer.strips(), older: older.strips(), instance: instance.strips(), side: side.strips() };
 }
 
 module.exports = { record, FILE };

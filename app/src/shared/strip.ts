@@ -124,8 +124,11 @@ export function decodeRow(row: Uint8Array): Reading {
 // A game that runs full screen at a size smaller than its monitor is stretched to fill it: the
 // strip it drew, one cell a pixel, comes out wider, each cell blended with its neighbours. The
 // window keeps the size of the monitor, so nothing but the row itself tells how wide the game
-// drew. These are the widths a game is set to, tried in turn when the row as it is holds no strip.
+// drew. These are the widths a game is set to, and the heights for a strip down a side, tried in
+// turn when the row as it is holds no strip.
 const WIDTHS = [3840, 3440, 3200, 2880, 2560, 2048, 1920, 1768, 1680, 1600, 1440, 1400, 1366, 1360, 1280, 1152, 1024, 800]
+const HEIGHTS = [2160, 1600, 1440, 1200, 1080, 1050, 1024, 992, 960, 900, 864, 800, 768, 720, 600]
+const LENGTHS = [...new Set([...WIDTHS, ...HEIGHTS])].sort((a, b) => b - a)
 
 /** The row as the game drew it, cells pixels wide: for each cell, the pixel of the stretched row that holds most of it. */
 function unstretched(row: Uint8Array, cells: number): Uint8Array {
@@ -145,7 +148,7 @@ function unstretched(row: Uint8Array, cells: number): Uint8Array {
  */
 export function readStrip(row: Uint8Array, drew?: number): { reading: Reading; drew?: number } {
   const wide = row.length >> 2
-  for (const cells of [drew ?? wide, wide, ...WIDTHS]) {
+  for (const cells of [drew ?? wide, wide, ...LENGTHS]) {
     if (cells > wide || cells < 1) continue
     const reading = decodeRow(cells === wide ? row : unstretched(row, cells))
     if (reading.kind === 'block') return { reading, drew: cells }

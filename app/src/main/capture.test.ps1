@@ -1,4 +1,4 @@
-# The test window of capture.test.ts: a borderless window whose top and bottom rows are known
+# The test window of capture.test.ts: a borderless window whose top and bottom rows, and left and right columns, are known
 # pixels, drawn one by one. Colors are the strip's own: red, green and blue each fully on or off.
 param([string]$Title, [int]$Width, [int]$Height)
 
@@ -22,6 +22,11 @@ $form.ShowInTaskbar = $false
 # Windows may not grant the size asked for: the rows go where the window really ends.
 $size = $form.ClientSize
 $bitmap = New-Object System.Drawing.Bitmap $size.Width, $size.Height
+# The left and right columns first: the rows go over their ends.
+for ($y = 0; $y -lt $size.Height; $y++) {
+  $bitmap.SetPixel(0, $y, (Cell (($y * 3 + 2) % 8)))
+  $bitmap.SetPixel($size.Width - 1, $y, (Cell (($y * 7 + 5) % 8)))
+}
 for ($x = 0; $x -lt $size.Width; $x++) {
   $bitmap.SetPixel($x, 0, (Cell (($x * 7 + 3) % 8)))
   $bitmap.SetPixel($x, $size.Height - 1, (Cell (($x * 5 + 1) % 8)))

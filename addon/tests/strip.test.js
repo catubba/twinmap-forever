@@ -37,6 +37,38 @@ test('the drawn strip decodes to the position the game reports, with the protoco
   });
 });
 
+test('on the left or the right side the strip is a column as long as the window is high', () => {
+  for (const side of ['LEFT', 'RIGHT']) {
+    const addon = enterWorld(null, `local ns = ...; ns.db.position = "${side}"`);
+    addon.run(10);
+    const strips = addon.strips();
+    assert.equal(strips.length, 2, side);
+    assert.equal(strips[0].length, 1080, `${side}: a cell for each pixel down the side`);
+    assert.deepEqual(data(decodeStrip(strips[0])), { zone: 'Elwynn Forest', sub: 'Goldshire', map: 1429, x: 42.34, y: 65.71, facing: 90 });
+    assert.equal(addon.lua('return TwinmapForeverStrip.point'), side === 'LEFT' ? 'TOPLEFT' : 'TOPRIGHT');
+  }
+});
+
+test('a side shorter than a section cuts it in more blocks, and moving the strip there cuts it again', () => {
+  const zone = 'Città di Roccavento è qui '.repeat(8);
+  const addon = enterWorld(`GAME.height, GAME.zone = 320, ${JSON.stringify(zone)}`, FAST);
+  addon.run(10);
+  const along = blocks(addon).filter((b) => b.section === 'pos');
+  assert.equal(along.length, 1, 'along the top, 1920 cells wide, the position fits one block');
+  addon.lua('local ns = ...; ns.db.position = "LEFT"');
+  addon.run(10);
+  const down = blocks(addon).filter((b) => b.section === 'pos').slice(1);
+  assert.ok(down.length > 1, 'down a side 320 cells high it takes several');
+  assert.ok(addon.strips().slice(-down.length).every((s) => s.length === 320));
+  assert.equal(data({ text: down.map((b) => b.text).join('') }).zone, zone);
+  // And back along the top: every cell where a row has it again.
+  addon.lua('local ns = ...; ns.db.position = "TOP"; GAME.x = 0.5');
+  addon.run(10);
+  const back = addon.strips().at(-1);
+  assert.equal(back.length, 1920);
+  assert.equal(data(decodeStrip(back)).x, 50);
+});
+
 test('every block is followed by its negative, cell by cell', () => {
   const addon = enterWorld();
   addon.run(10);

@@ -7,7 +7,7 @@ import { decodeRow, PROTOCOL, readStrip, type Block } from './strip'
 // Strips the addon really drew, recorded in the simulated game by addon/tests/record.js.
 // Each is a string of cells, one digit 0 to 7 (R*4 + G*2 + B) per pixel.
 const strips = JSON.parse(readFileSync(join(__dirname, 'strips.fixture.json'), 'utf8')) as Record<
-  'session' | 'narrow' | 'newer' | 'older' | 'instance',
+  'session' | 'narrow' | 'newer' | 'older' | 'instance' | 'side',
   string[]
 >
 
@@ -123,6 +123,15 @@ test('a missing block is counted as lost; the numbers restarting is not a loss',
   expect(game.state).toMatchObject({ blocks: 3, lost: 1 })
 })
 
+test('a strip down the left side decodes as a row does, its cells from the top down', () => {
+  const game = createGame()
+  const readings = strips.side.map((s) => decodeRow(pixels(s)))
+  expect(strips.side[0]!.length).toBe(1080)
+  expect(readings.map((r) => r.kind === 'block' && r.negative)).toEqual([false, true])
+  readings.forEach((r) => game.feed(r, 1000))
+  expect(game.state.sections.pos).toMatchObject({ zone: 'Elwynn Forest', sub: 'Goldshire', x: 42.34, y: 65.71 })
+})
+
 test('an addon with a newer protocol is not read, and the app says to update the app', () => {
   const game = createGame()
   game.feed(decodeRow(pixels(strips.session[0]!)))
@@ -188,6 +197,11 @@ test('a strip stretched to fill a wider monitor reads as the one the game drew, 
   expect(readStrip(pixels(strips.session[0]!), 1280), 'not stretched any more').toEqual({ reading: decodeRow(pixels(strips.session[0]!)), drew: 1920 })
   expect(readStrip(new Uint8Array(2560 * 4).fill(50))).toEqual({ reading: { kind: 'none' } })
   expect(readStrip(Uint8Array.from({ length: 2560 * 4 }, (_, i) => (i * 37) % 256))).toEqual({ reading: { kind: 'none' } })
+})
+
+test('a column down the side of a game stretched to fill a higher monitor reads at the height the game drew', () => {
+  const usual = decodeRow(pixels(strips.side[0]!))
+  expect(readStrip(stretched(pixels(strips.side[0]!), 1440))).toEqual({ reading: usual, drew: 1080 })
 })
 
 test('rows read off the real game at 1920 by 1080 on a monitor of 2560 hold a strip', () => {
