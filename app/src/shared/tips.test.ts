@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest'
 import type { Sheet } from './sheet'
-import { holdersOf, piecesOf, shownLines, tipKey, tipsFrom } from './tips'
+import { GAP, holdersOf, piecesOf, shownLines, talentLines, tipKey, tipsFrom } from './tips'
 
 test('the tooltips sent are taken as they are; a line or a key of another shape is left out', () => {
   expect(
@@ -53,4 +53,29 @@ test('a line with colours inside is cut in pieces of one colour; pictures go, a 
   ])
   expect(piecesOf('|TInterface\Icons\coin:0|t 5 a || b |Hitem:1|h[Bolt]|h', '')).toEqual([{ text: ' 5 a | b [Bolt]', color: '' }])
   expect(piecesOf('Plain', '')).toEqual([{ text: 'Plain', color: '' }])
+})
+
+test("the tooltips of spells and talents are the character's own: kept under its name; without one they are not taken", () => {
+  const sent = { 'spell:709': [['Drain Life', '', 'Rank 3', '']], 'talent:105918:2': [['Passive', '']], 'item:159': [['Water', '']] }
+  expect(Object.keys(tipsFrom(sent, 'Catubbio Sucameli'))).toEqual(['spell:709@Catubbio Sucameli', 'talent:105918:2@Catubbio Sucameli', 'item:159'])
+  expect(Object.keys(tipsFrom(sent))).toEqual(['item:159'])
+  // As the file keeps them, read back.
+  expect(Object.keys(tipsFrom({ 'spell:709@Catubbio Sucameli': [['Drain Life', '']] }))).toEqual(['spell:709@Catubbio Sucameli'])
+})
+
+test("a talent's popup as the game's window: its rank, the next under its heading, what it still asks in red", () => {
+  const who = 'Catubbio Sucameli'
+  const tips = tipsFrom({ 'talent:105918:2': [['Passive', ''], ['47% chance', 'ffd200']], 'talent:105918:3': [['Passive', ''], ['70% chance', 'ffd200']], 'talent:105909:1': [['Channeled', '']] }, who)
+  const words = { rank: 'Rank 2/3', next: 'Next Rank:' }
+  expect(talentLines(tips, who, { node: 105918, name: 'Fel Concentration', rank: 2, most: 3 }, words)).toEqual([
+    ['Fel Concentration', ''], ['Rank 2/3', ''], GAP, ['Passive', ''], ['47% chance', 'ffd200'], GAP, ['Next Rank:', ''], ['Passive', ''], ['70% chance', 'ffd200'],
+  ])
+  expect(talentLines(tips, who, { node: 105909, name: 'Wrack', rank: 0, most: 1 }, { rank: 'Rank 0/1', next: 'Next Rank:', need: 'Spend 6 more points in Affliction Talents' })).toEqual([
+    ['Wrack', ''], ['Rank 0/1', ''], GAP, ['Channeled', ''], GAP, ['Spend 6 more points in Affliction Talents', 'ff2020'],
+  ])
+  expect(talentLines(tips, 'Padre Gaetano', { node: 105909, name: 'Wrack', rank: 0, most: 1 }, { rank: 'Rank 0/1', next: '' })).toEqual([['Wrack', ''], ['Rank 0/1', '']])
+})
+
+test('a new line of the game ("|n") is a new line', () => {
+  expect(piecesOf('Reagents: |nSoul Shard', '')).toEqual([{ text: 'Reagents: \nSoul Shard', color: '' }])
 })

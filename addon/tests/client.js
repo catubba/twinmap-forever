@@ -96,14 +96,36 @@ const STUB = `
     GAME.tipReads = (GAME.tipReads or 0) + 1
     return { lines = lines }
   end
+  -- The tooltips of spells and talents: GAME.spellTips[spell] and GAME.talentTips[node][rank], lines as GAME.tips. A spell in
+  -- GAME.unloaded is one the game has not loaded yet: its tooltip comes without its last line (the description), until it
+  -- is asked for (C_Spell.RequestLoadSpellData), which loads it.
+  local function linesOf(list, spell)
+    local lines = {}
+    for i, l in ipairs(list or {}) do
+      if not (spell and GAME.unloaded and GAME.unloaded[spell] and i == #list) then
+        lines[#lines + 1] = { leftText = l[1], leftColor = { r = 1, g = 1, b = 1 }, rightText = l[3] }
+      end
+    end
+    GAME.spellReads = (GAME.spellReads or 0) + 1
+    return { lines = lines }
+  end
   C_TooltipInfo = {
     GetBagItem = function(bag, slot) local c = GAME.bags and GAME.bags[bag] local it = c and c.items[slot] return it and tipOf(it[1]) end,
     GetInventoryItem = function(_, slot) local w = GAME.worn and GAME.worn[slot] return w and tipOf(w[1]) end,
+    GetSpellByID = function(spell) return linesOf(GAME.spellTips and GAME.spellTips[spell], spell) end,
+    GetTraitEntry = function(entry, rank)
+      local node = entry // 10
+      return linesOf(GAME.talentTips and GAME.talentTips[node] and GAME.talentTips[node][rank], GAME.talents[node] and GAME.talents[node][2])
+    end,
+  }
+  C_Spell = {
+    IsSpellDataCached = function(spell) return not (GAME.unloaded and GAME.unloaded[spell]) end,
+    RequestLoadSpellData = function(spell) if GAME.unloaded then GAME.unloaded[spell] = nil end end,
   }
   function GetInventoryItemLink(_, slot) local w = GAME.worn and GAME.worn[slot] return w and (w[4] or ("|cffffffff|Hitem:" .. w[1] .. "::::::::" .. (GAME.level or 1) .. ":::::|h[x]|h|r")) end
   -- Skills, spells, talents and recipes, as Forever has them. GAME.skills = { { skill, rank, most, header } },
   -- GAME.spells = { { spell, notYet, passive } } in one tab, General, GAME.pet = { { name, words, picture, passive } } the pet's,
-  -- GAME.talents = { [node] = { rank, spell } } with GAME.free points,
+  -- GAME.talents = { [node] = { rank, spell, most } } with GAME.free points,
   -- GAME.trade = { profession = n, recipes = { [spell] = learned }, linked = true }: the window of a profession.
   Enum = { SpellBookSpellBank = { Player = 0, Pet = 1 }, SpellBookItemType = { Spell = 1, FutureSpell = 2 } }
   C_SkillInfo = {
@@ -123,7 +145,7 @@ const STUB = `
   C_Traits = {
     GetConfigInfo = function() return { treeIDs = { 1 } } end,
     GetTreeNodes = function() local out = {} for node in pairs(GAME.talents) do out[#out + 1] = node end table.sort(out) return out end,
-    GetNodeInfo = function(_, node) return { currentRank = GAME.talents[node][1], entryIDs = { node * 10 } } end,
+    GetNodeInfo = function(_, node) return { currentRank = GAME.talents[node][1], maxRanks = GAME.talents[node][3], entryIDs = { node * 10 } } end,
     GetEntryInfo = function(_, entry) return { definitionID = entry } end,
     GetDefinitionInfo = function(definition) local t = GAME.talents[definition // 10] return { spellID = t and t[2] } end,
     GetTreeCurrencyInfo = function() return { { quantity = GAME.free or 0 } } end,

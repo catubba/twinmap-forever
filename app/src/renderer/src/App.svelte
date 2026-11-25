@@ -38,6 +38,7 @@
   import Auction from './Auction.svelte'
   import { homeOf, houseFrom, houseNumber, houseOf, type Alert, type Home, type House, type PricesTold } from '../../shared/ah'
   import ItemPopup from './ItemPopup.svelte'
+  import SpellPopup from './SpellPopup.svelte'
   import NpcPanel from './NpcPanel.svelte'
   import { firstName, knownOf, shownOf } from '../../shared/characters'
   import type { PortraitsTold } from '../../shared/portrait'
@@ -611,6 +612,7 @@
 
 <!-- The popup of the item under the pointer, over everything (M10-F15). -->
 <ItemPopup {sheets} known={characters} side={char?.side} {pos} {listing} />
+<SpellPopup />
 
 <style>
   /* Over everything, the top row too; it drags the window as the top row does. */

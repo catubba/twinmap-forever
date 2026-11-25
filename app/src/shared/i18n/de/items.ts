@@ -229,6 +229,8 @@ export default {
     spent: { one: '{count} Punkt verteilt', other: '{count} Punkte verteilt' },
     free: 'Unverteilte Talentpunkte: {count}',
     rank: 'Rang {rank}/{most}',
+    next: 'Nächster Rang:',
+    need: { one: 'Verteilt noch {count} Punkt in {tree}-Talente', other: 'Verteilt noch {count} Punkte in {tree}-Talente' },
     none: 'Noch keine Talente',
     learn: 'Talente gibt es ab Stufe 10, danach einen Punkt pro Stufe. Verteilt sie im Talentfenster des Spiels: Sie erscheinen dann hier.',
   },

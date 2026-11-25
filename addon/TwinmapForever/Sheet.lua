@@ -14,10 +14,11 @@
 --   bank  the same for the bank and its bags, as they were when last open
 --   gear  { { slot, item, durability, most, key }, ... } durability missing for what does not wear (0 and 0 before a key)
 --         key: the item's link (below) when it is more than "item:ID", as one with a suffix ("of the Bear") or an enchant
---   tips  { [key] = { { left, colour, right, colour }, ... } } the lines of the game's own tooltip of each item met, read
---         once (C_TooltipInfo) and sent until the app holds them, then no more: the app keeps them all. Colour "rrggbb",
---         "" for white; right and its colour only where the line has a right side. Lines the game adds itself, as the
---         sell price, are not among them.
+--   tips  { [key] = { { left, colour, right, colour }, ... } } the lines of the game's own tooltips (C_TooltipInfo), sent
+--         until the app holds them, then no more: the app keeps them all. Colour "rrggbb", "" for white; right and its
+--         colour only where the line has a right side. Keys: "item:..." each item met, read once (lines the game adds
+--         itself, as the sell price, are not among them); "spell:ID" each spell of the book and "talent:node:rank" each
+--         talent at its rank and at the next, read again when they change. At most BATCH bytes of them in one sheet.
 --   skills  { { skill, rank, most }, ... } every skill line by the game's number: professions, weapons, languages
 --   spells  { spell, ... } the spells in the spellbook, those not learned yet left out
 --   book    { { name, picture, { spell, ... }, { passive spell, ... } }, ... } the tabs of the spellbook as the game shows
@@ -80,10 +81,9 @@ end
 -- The tooltips read since the last send, by key: those of items not met before (Tips, below).
 local tipsHave, tipsNew = {}, {}
 
-local function Meet(key, read)
-  if not key or tipsHave[key] or tipsNew[key] or not C_TooltipInfo then return end
-  local data = Try(read)
-  if type(data) ~= "table" or type(data.lines) ~= "table" then tipsHave[key] = true return end
+-- The lines of a tooltip as C_TooltipInfo gives it; nothing where it gives none.
+local function Lines(data)
+  if type(data) ~= "table" or type(data.lines) ~= "table" then return nil end
   local lines = {}
   for _, l in ipairs(data.lines) do
     local left = type(l) == "table" and Str(l.leftText)
@@ -94,7 +94,13 @@ local function Meet(key, read)
       lines[#lines + 1] = line
     end
   end
-  if #lines > 0 then tipsNew[key] = lines else tipsHave[key] = true end -- one with no lines is not asked again this session
+  return #lines > 0 and lines or nil
+end
+
+local function Meet(key, read)
+  if not key or tipsHave[key] or tipsNew[key] or not C_TooltipInfo then return end
+  local lines = Lines(Try(read))
+  if lines then tipsNew[key] = lines else tipsHave[key] = true end -- one with no lines is not asked again this session
 end
 
 -- What a container holds, slot by slot; nothing for a container that is not there.
@@ -191,6 +197,67 @@ local function Spells()
   end
   table.sort(out)
   return out, tabs
+end
+
+-- The tooltips of the spells of the book and of the talents (M20-F16), as the game shows them: the game's files hold
+-- them with placeholders that hang on rank, level and talents. Read again when the book, the talents or the level change,
+-- PER_FRAME a frame and never in a fight (0.1 ms a read in the game, 25 November 2026). A spell the game has not loaded
+-- yet gives its tooltip without its description: it is asked for and read again a second later, a few times at most.
+local PER_FRAME, TRIES = 4, 10
+local spellJobs, spellLater, spellsDue, spellAt = {}, {}, true, 0
+
+local function SpellJobs()
+  local T, jobs = C_TooltipInfo, {}
+  if not T then return jobs end
+  local spells = Spells()
+  for _, spell in ipairs(spells) do
+    if T.GetSpellByID then jobs[#jobs + 1] = { key = "spell:" .. spell, spell = spell, read = function() return T.GetSpellByID(spell) end } end
+  end
+  local config = C_ClassTalents and Try(C_ClassTalents.GetActiveConfigID)
+  local info = config and C_Traits and Try(C_Traits.GetConfigInfo, config)
+  if not (T.GetTraitEntry and type(info) == "table" and type(info.treeIDs) == "table") then return jobs end
+  for _, tree in ipairs(info.treeIDs) do
+    for _, node in ipairs(Try(C_Traits.GetTreeNodes, tree) or {}) do
+      local n = Try(C_Traits.GetNodeInfo, config, node)
+      local entry = type(n) == "table" and n.isVisible ~= false and ((type(n.activeEntry) == "table" and n.activeEntry.entryID) or (type(n.entryIDs) == "table" and n.entryIDs[1]))
+      if entry then
+        local rank, most = Num(n.currentRank or n.ranksPurchased) or 0, Num(n.maxRanks) or 1
+        local e = Try(C_Traits.GetEntryInfo, config, entry)
+        local d = type(e) == "table" and e.definitionID and Try(C_Traits.GetDefinitionInfo, e.definitionID)
+        local spell = type(d) == "table" and Num(d.spellID or d.overriddenSpellID)
+        for r = math.max(rank, 1), math.min(rank + 1, most) do
+          jobs[#jobs + 1] = { key = "talent:" .. node .. ":" .. r, spell = spell, read = function() return T.GetTraitEntry(entry, r) end }
+        end
+      end
+    end
+  end
+  return jobs
+end
+
+local function Loaded(spell)
+  local S = C_Spell
+  if not (spell and S and S.IsSpellDataCached) or Try(S.IsSpellDataCached, spell) then return true end
+  Try(S.RequestLoadSpellData, spell)
+  return false
+end
+
+local function ReadSpells(now)
+  if InCombatLockdown() then return end
+  if spellsDue and ns.ready and now >= spellAt then
+    spellsDue, spellJobs, spellLater = false, SpellJobs(), {}
+  end
+  if #spellJobs == 0 and #spellLater > 0 and now >= spellAt then spellJobs, spellLater = spellLater, {} end
+  for _ = 1, PER_FRAME do
+    local job = table.remove(spellJobs, 1)
+    if not job then return end
+    if Loaded(job.spell) or job.tries == TRIES then
+      tipsNew[job.key] = Lines(Try(job.read)) or tipsNew[job.key]
+    else
+      job.tries = (job.tries or 0) + 1
+      spellLater[#spellLater + 1] = job
+      spellAt = now + 1
+    end
+  end
 end
 
 -- The talent trees of the active set, as wow-state reads them in the game.
@@ -466,18 +533,41 @@ ns.receivers = ns.receivers or {} -- Inbox.lua, which calls them, is loaded afte
 local told = {}
 ns.receivers.sheet = function(value) told = type(value) == "table" and value or {} end
 
--- The tooltips the app does not hold yet: each one is kept with the revision it came at, and goes
--- out while the app's revision is older. Once it holds them the piece is empty, and stays so.
+-- The tooltips the app does not hold yet: each one is kept with the revision it went out at, and goes out while the
+-- app's revision is older. Once it holds them the piece is empty, and stays so. A sheet that changes while a long one is
+-- on its way starts again (the app takes a section only whole), so at most BATCH bytes of tooltips go in one: the others
+-- wait, and the next batch goes once the app holds this one. A tooltip whose lines changed waits to go again.
+local BATCH = 6000
+
 local function Tips(s, since)
   s.tips = type(s.tips) == "table" and s.tips or {}
   for key, lines in pairs(tipsNew) do
-    if not s.tips[key] then s.tips[key] = { at = s.rev + 1, lines = lines } end
+    local t = s.tips[key]
+    if type(t) ~= "table" or ns.Json(t.lines) ~= ns.Json(lines) then s.tips[key] = { lines = lines, wait = true } end
   end
   tipsNew = {}
-  local out = {}
+  local out, size, going, waiting = {}, 0, {}, {}
   for key, t in pairs(s.tips) do
     tipsHave[key] = true
-    if type(t) == "table" and Num(t.at) and t.at > since then out[key] = t.lines end
+    if type(t) == "table" and t.wait then waiting[#waiting + 1] = key
+    elseif type(t) == "table" and Num(t.at) and t.at > since then going[#going + 1] = key end
+  end
+  local function Take(key)
+    local n = #ns.Json(s.tips[key].lines)
+    if size > 0 and size + n > BATCH then return false end
+    size, out[key] = size + n, s.tips[key].lines
+    return true
+  end
+  table.sort(going, function(a, b) return s.tips[a].at < s.tips[b].at or (s.tips[a].at == s.tips[b].at and a < b) end)
+  for _, key in ipairs(going) do
+    if not Take(key) then s.tips[key].at, s.tips[key].wait = nil, true end
+  end
+  if #going == 0 then
+    table.sort(waiting)
+    for _, key in ipairs(waiting) do
+      if not Take(key) then break end
+      s.tips[key].at, s.tips[key].wait = s.rev + 1, nil
+    end
   end
   local held = s.pieces.tips
   if not held or ns.Json(held.data) ~= ns.Json(out) then
@@ -525,8 +615,9 @@ end
 -- twice a second, until it is not.
 local trainerAt = 0
 frame:SetScript("OnUpdate", function()
-  if not trainerDue then return end
   local now = GetTime()
+  ReadSpells(now)
+  if not trainerDue then return end
   if now < trainerAt then return end
   trainerAt = now + 0.5
   if ReadTrainer() then trainerDue = false end
@@ -541,7 +632,8 @@ frame:SetScript("OnEvent", function(_, event, recipe)
   elseif event:match("^TRADE_SKILL") then
     scanDue = true
   else
-    slowAt = 0
+    -- The book, the talents, the level or what is worn changed: the tooltips are read again a little later, once.
+    slowAt, spellsDue, spellAt = 0, true, GetTime() + 2
   end
 end)
 

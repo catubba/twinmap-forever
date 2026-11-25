@@ -224,6 +224,8 @@ export default {
     spent: { one: '{count} point dépensé', many: '{count} de points dépensés', other: '{count} points dépensés' },
     free: 'Talents restants : {count}',
     rank: 'Rang {rank}/{most}',
+    next: 'Rang suivant :',
+    need: { one: 'Dépensez encore {count} point dans les talents {tree}', many: 'Dépensez encore {count} de points dans les talents {tree}', other: 'Dépensez encore {count} points dans les talents {tree}' },
     none: 'Aucun talent pour l’instant',
     learn: 'Les talents arrivent au niveau 10, puis un point à chaque niveau. Dépensez-les dans la fenêtre des talents du jeu : ils s’affichent ici.',
   },

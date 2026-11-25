@@ -2,7 +2,7 @@
 // game's tooltips the app keeps (M10-F15). A row or a slot that shows an item takes use:itemTip.
 // Clicked, it is the item chosen (M20-F9): the auction shows its page in the Item panel, or in its search, when the open
 // workspace has one of them; otherwise the click does nothing and the popup is all.
-import type { Tips } from '../../shared/tips'
+import type { TipLine, Tips } from '../../shared/tips'
 import { frame } from './frame.svelte'
 
 export interface Hovered {
@@ -47,6 +47,30 @@ export function itemTip(node: HTMLElement, given: Omit<Hovered, 'box'>): { updat
       node.removeEventListener('pointerenter', enter)
       node.removeEventListener('pointerleave', leave)
       node.removeEventListener('click', click)
+    },
+  }
+}
+
+/** The spell or talent under the pointer or reached with the keyboard (M20-F16): the lines of its popup (SpellPopup.svelte). */
+export const spellHover = $state<{ now: { lines: TipLine[]; box: DOMRect; node: HTMLElement } | null }>({ now: null })
+
+/** A spell or a talent: its popup, with the lines its panel makes, opens under the pointer and on focus, and goes with them. */
+export function spellTip(node: HTMLElement, given: TipLine[]): { update: (p: TipLine[]) => void; destroy: () => void } {
+  let lines = given
+  const enter = (): void => void (spellHover.now = { lines, box: node.getBoundingClientRect(), node })
+  const leave = (): void => {
+    if (spellHover.now?.node === node) spellHover.now = null
+  }
+  const on: [string, () => void][] = [['pointerenter', enter], ['focus', enter], ['pointerleave', leave], ['blur', leave]]
+  for (const [event, f] of on) node.addEventListener(event, f)
+  return {
+    update: (p) => {
+      lines = p
+      if (spellHover.now?.node === node) enter() // what it says changed while it is open: a tooltip that came, a rank taken
+    },
+    destroy: () => {
+      leave()
+      for (const [event, f] of on) node.removeEventListener(event, f)
     },
   }
 }

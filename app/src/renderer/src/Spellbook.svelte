@@ -2,11 +2,14 @@
   // The Spellbook panel of the Character workspace (M20-F11), from the sheet the app keeps for the character shown: on the
   // left the tabs of the game's book, each with its picture and how many spells, on the right the spells of the one chosen
   // in the book's order, down the columns as the game lays them, the passive ones last and round (shared/spellbook.ts).
-  // It reads the same with the game closed.
+  // It reads the same with the game closed. Under the pointer or reached with the keyboard, a spell opens a popup with the
+  // game's own tooltip (M20-F16), once the addon has sent it; before, its name and rank.
   import type { Known } from '../../shared/characters'
   import { t } from '../../shared/i18n'
   import type { Sheets } from '../../shared/sheet'
   import { bookOf, type BookSpell } from '../../shared/spellbook'
+  import type { TipLine } from '../../shared/tips'
+  import { kept, spellTip } from './item-tip.svelte'
   import { askSpellFacts, spellFacts } from './spell-facts.svelte'
   import { TILES } from './web'
 
@@ -23,6 +26,7 @@
   const one = $derived(tabs.find((tab) => tab.name === chosen) ?? tabs[1] ?? tabs[0])
   const spells = $derived(one ? one.spells.filter((s) => s.name.toLowerCase().includes(typed.trim().toLowerCase())) : [])
   const under = (s: BookSpell): string => s.rank || (s.passive ? t('items.spellbook.passive') : '')
+  const linesOf = (s: BookSpell): TipLine[] => (s.spell && kept.tips[`spell:${s.spell}@${shown?.key}`]) || [[s.name, ''], ...(under(s) ? [[under(s), '9d9d9d'] as TipLine] : [])]
 </script>
 
 <main class="surface">
@@ -48,7 +52,8 @@
         </header>
         <ul>
           {#each spells as s, i (i)}
-            <li class:passive={s.passive}>
+            <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+            <li class:passive={s.passive} tabindex="0" use:spellTip={linesOf(s)}>
               <img src="{TILES}/pictures/{s.icon}.png" alt="" onerror={(e) => e.currentTarget.setAttribute('style', 'visibility: hidden')} />
               <span>{s.name}</span>
               <small>{under(s)}</small>

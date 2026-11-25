@@ -648,7 +648,8 @@ function createWindow(): void {
     }
     tellSheets()
   }
-  // The tooltips of the items (M10-F15): sent once each with the sheet, kept here for good, every character's together.
+  // The tooltips of the items (M10-F15), every character's together, and of the spells and talents (M20-F16), each its own:
+  // sent with the sheet, kept here for good.
   const tipsFile = join(app.getPath('userData'), 'tips.json')
   let tips: Tips = {}
   try {
@@ -661,8 +662,8 @@ function createWindow(): void {
     lan?.tell('tips', tips)
   }
   win.webContents.on('did-finish-load', tellTips)
-  const takeTips = (sent: unknown): void => {
-    const news = tipsFrom(sent)
+  const takeTips = (sent: unknown, who: string): void => {
+    const news = tipsFrom(sent, who)
     if (!Object.keys(news).some((key) => JSON.stringify(tips[key]) !== JSON.stringify(news[key]))) return
     tips = { ...tips, ...news }
     try {
@@ -691,7 +692,7 @@ function createWindow(): void {
     if (!sent) return
     // The tooltips go to their own file: the sheet keeps none of them.
     const { tips: sentTips, ...pieces } = sent.p
-    if (sentTips !== undefined) takeTips(sentTips)
+    if (sentTips !== undefined) takeTips(sentTips, sent.key)
     const news = { ...sent, p: pieces }
     const now = mergeSheet(sheets, news, Date.now())
     if (now !== sheets) {

@@ -264,6 +264,11 @@ export default {
     free: 'Unspent Talent Points: {count}',
     // In the tooltip of a talent, under its name, as the game words it (TOOLTIP_TALENT_RANK).
     rank: 'Rank {rank}/{most}',
+    // In the popup of a talent, over the lines of the rank after the one it has, as the game words it (TOOLTIP_TALENT_NEXT_RANK).
+    next: 'Next Rank:',
+    // In red at the bottom of the popup of a talent whose row is not open yet, as Forever words it. {count}: the points still to
+    // spend in its tree; {tree}: the tree's name, as the game writes it.
+    need: { one: 'Spend {count} more point in {tree} Talents', other: 'Spend {count} more points in {tree} Talents' },
     // A character with no talent taken and no point to spend: the title, then what to do in the game.
     none: 'No talents yet',
     learn: "Talents come at level 10, then one point each level. Spend them in the game's talent window: they show here.",

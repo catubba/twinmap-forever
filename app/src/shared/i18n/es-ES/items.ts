@@ -226,6 +226,8 @@ export default {
     spent: { one: '{count} punto gastado', many: '{count} de puntos gastados', other: '{count} puntos gastados' },
     free: 'Talentos sin usar: {count}',
     rank: 'Rango {rank}/{most}',
+    next: 'Siguiente rango:',
+    need: { one: 'Gasta {count} punto más en talentos de {tree}', many: 'Gasta {count} de puntos más en talentos de {tree}', other: 'Gasta {count} puntos más en talentos de {tree}' },
     none: 'Aún no tienes talentos',
     learn: 'Los talentos llegan en el nivel 10 y luego un punto por nivel. Gástalos en la ventana de talentos del juego: aparecerán aquí.',
   },
