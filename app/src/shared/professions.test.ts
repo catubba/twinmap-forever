@@ -8,8 +8,8 @@ const facts: SpellFacts = {
   spells: { 3918: ['Rough Blasting Powder', '', 1, 1], 3919: ['Rough Dynamite', '', 2, 1], 3925: ['Rough Boomstick', '', 3, 1], 4036: ['Engineering', '', 4, 1], 2538: ['Charred Wolf Meat', '', 5, 1] },
   lines: { 202: ['Engineering', 10, 11, 0], 2941: ['Engineering', 10, 11, 202], 182: ['Herbalism', 11, 11, 0], 185: ['Cooking', 12, 9, 0], 43: ['Swords', 13, 6, 0] },
   abilities: {
-    202: [[4036, 0, 0, 0], [3918, 20, 40, 2941], [3919, 30, 60, 2941], [3919, 30, 60, 2941], [3925, 80, 110, 2941]],
-    185: [[2538, 45, 85, 2939]],
+    202: [[4036, 0, 0, 0, 0], [3918, 20, 40, 2941, 2515], [3919, 30, 60, 2941, 2516], [3919, 30, 60, 2941, 2516], [3925, 80, 110, 2941, 2526]],
+    185: [[2538, 45, 85, 2939, 2632]],
   },
   makes: { 3918: 4357, 3919: 4358 },
 }
@@ -19,19 +19,20 @@ test('the colours of the game: yellow from the first number, green half way, gre
   expect(difficulty(5, 0, 0)).toBe('trivial')
 })
 
-test('professions from the sheet: known recipes the hardest first, the others only where the window was seen', () => {
+test('professions from the sheet: known recipes the hardest first under the headings of the window, the others it listed', () => {
   const pieces = {
     skills: [[43, 150, 155], [185, 60, 75], [202, 35, 75], [2941, 35, 75], [182, 12, 75]],
-    recipes: { known: [3918, 3919, 2538], seen: [202] },
+    recipes: { known: [3918, 3919, 2538], seen: [202], listed: [3918, 3919, 3925], cats: [[2515, 'Parts', 2], [2516, 'Explosives', 1]] },
   }
   const [eng, herb, cook, ...rest] = professionsOf(pieces, facts)
   expect(rest).toEqual([])
   expect([eng!.name, herb!.name, cook!.name]).toEqual(['Engineering', 'Herbalism', 'Cooking'])
   expect(eng).toMatchObject({ line: 202, rank: 35, most: 75, secondary: false, crafts: true, seen: true })
   expect(eng!.known.map((r) => [r.name, r.difficulty, r.item])).toEqual([['Rough Dynamite', 'medium', 4358], ['Rough Blasting Powder', 'easy', 4357]])
+  expect(eng!.groups.map((g) => [g.name, g.recipes.map((r) => r.name)])).toEqual([['Explosives', ['Rough Dynamite']], ['Parts', ['Rough Blasting Powder']]])
   expect(eng!.unknown.map((r) => [r.name, r.yellow, r.icon, r.item])).toEqual([['Rough Boomstick', 80, 3, 0]])
   expect(herb).toMatchObject({ crafts: false, known: [], unknown: [] })
   expect(cook).toMatchObject({ secondary: true, seen: false, unknown: [] })
-  expect(cook!.known.map((r) => r.name)).toEqual(['Charred Wolf Meat'])
+  expect(cook!.groups).toEqual([{ name: '', recipes: cook!.known }])
   expect(professionsOf({}, facts)).toEqual([])
 })

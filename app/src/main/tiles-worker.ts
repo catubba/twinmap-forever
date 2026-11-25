@@ -199,22 +199,6 @@ try {
   } catch {
     // The trainer panel goes without the game's lists; tried again at the next start.
   }
-  // The spells of the game, for the panels of what a character knows (shared/spells.ts): once for each build, and again for an older format.
-  try {
-    const spellsFile = join(folder, SPELLS_FILE)
-    let format = 0
-    try {
-      format = (JSON.parse(readFileSync(spellsFile, 'utf8')) as { format?: number }).format ?? 0
-    } catch {
-      // Not there yet.
-    }
-    if (format !== SPELLS_FORMAT) {
-      const facts = spellFacts(open())
-      if (facts) writeFileSync(spellsFile, JSON.stringify(facts))
-    }
-  } catch {
-    // Professions names no recipe; tried again at the next start.
-  }
   // What the app keeps in English, in the game's language (shared/game-names.ts): each table read in English too, and the
   // names of the NPCs from QuestieDB for the bosses the tables have not. Nothing for a game in English.
   if (locale !== 'enUS' && locale !== 'enGB' && !existsSync(join(folder, GAME_NAMES_FILE))) {
@@ -238,6 +222,23 @@ try {
   writeFileSync(localeFile, locale)
   const ready = { state: 'ready', folder, version: build.version, tiles, missing, seconds: (Date.now() - started) / 1000, converted } as const
   tell(ready)
+  // The spells of the game, for the panels of what a character knows (shared/spells.ts): once for each build, and again for an
+  // older format. After the map is ready, which they would hold back a few seconds; the panels ask until the file is there.
+  try {
+    const spellsFile = join(folder, SPELLS_FILE)
+    let format = 0
+    try {
+      format = (JSON.parse(readFileSync(spellsFile, 'utf8')) as { format?: number }).format ?? 0
+    } catch {
+      // Not there yet.
+    }
+    if (format !== SPELLS_FORMAT) {
+      const facts = spellFacts(open())
+      if (facts) writeFileSync(spellsFile, JSON.stringify(facts))
+    }
+  } catch {
+    // Professions names no recipe; tried again at the next start.
+  }
 
   // The insides of buildings come after: the map of the continents is already usable.
   const insideStarted = Date.now()

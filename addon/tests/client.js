@@ -177,7 +177,8 @@ const STUB = `
   function GetQuestID() return GAME.quest or 0 end
   C_TradeSkillUI = {
     GetAllRecipeIDs = function() local out = {} for id in pairs(GAME.trade and GAME.trade.recipes or {}) do out[#out + 1] = id end table.sort(out) return out end,
-    GetRecipeInfo = function(id) return { learned = GAME.trade.recipes[id] } end,
+    GetRecipeInfo = function(id) return { learned = GAME.trade.recipes[id], categoryID = GAME.trade.cats and GAME.trade.cats[id] } end,
+    GetCategoryInfo = function(id) local c = GAME.trade and GAME.trade.names and GAME.trade.names[id] if c then return { categoryID = id, name = c[1], uiOrder = c[2] } end end,
     IsTradeSkillLinked = function() return GAME.trade and GAME.trade.linked == true end,
     GetBaseProfessionInfo = function() return { professionID = GAME.trade and GAME.trade.profession } end,
   }

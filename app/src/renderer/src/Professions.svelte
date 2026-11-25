@@ -1,9 +1,18 @@
 <script module lang="ts">
-  import type { SpellFacts } from '../../shared/spells'
-  // The game's spells (spells.json, made beside the map by tiles-worker.ts), asked for once the map is ready: it is made
-  // before that, at the first start of a build.
+  import { SPELLS_FILE, type SpellFacts } from '../../shared/spells'
+  import { TILES } from './web'
+  // The game's spells (spells.json, made beside the map by tiles-worker.ts just after the map is ready), asked for then, and
+  // again every few seconds until the file is there: at the first start of a build it takes a few seconds more.
   let facts = $state.raw<SpellFacts | null>(null)
   let asked = false
+  // A file not made yet comes back empty (204) or missing.
+  function ask(left: number): void {
+    const again = (): unknown => left > 0 && setTimeout(() => ask(left - 1), 3000)
+    void fetch(`${TILES}/${SPELLS_FILE}`)
+      .then((r) => (r.status === 200 ? r.json() : null))
+      .then((read: SpellFacts | null) => (read ? (facts = read) : again()))
+      .catch(again)
+  }
 </script>
 
 <script lang="ts">
@@ -15,19 +24,14 @@
   import { t } from '../../shared/i18n'
   import { professionsOf, type Recipe } from '../../shared/professions'
   import type { Sheets } from '../../shared/sheet'
-  import { SPELLS_FILE } from '../../shared/spells'
   import { itemTip } from './item-tip.svelte'
-  import { TILES } from './web'
 
   let { sheets, shown, ready }: { sheets: Sheets; shown: Known | null; ready: boolean } = $props()
 
   $effect(() => {
     if (!ready || asked) return
     asked = true
-    void fetch(`${TILES}/${SPELLS_FILE}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((read: SpellFacts | null) => (facts = read))
-      .catch(() => {})
+    ask(40)
   })
   const sheet = $derived(shown ? sheets[shown.key] : undefined)
   const list = $derived(sheet && facts ? professionsOf(sheet.pieces, facts) : [])
@@ -36,6 +40,7 @@
   const one = $derived(list.find((p) => p.line === chosen) ?? list[0])
   const matches = (r: Recipe): boolean => r.name.toLowerCase().includes(typed.trim().toLowerCase())
   const known = $derived(one ? one.known.filter(matches) : [])
+  const groups = $derived(one ? one.groups.map((g) => ({ name: g.name, recipes: g.recipes.filter(matches) })).filter((g) => g.recipes.length) : [])
   const unknown = $derived(one ? one.unknown.filter(matches) : [])
   const picture = (r: Recipe): string => (r.item ? `${TILES}/items/${r.item}.png` : `${TILES}/pictures/${r.icon}.png`)
 </script>
@@ -82,7 +87,10 @@
           {#if one.known.length}
             <h4>{t('items.professions.known')}<small>{one.known.length}</small></h4>
             <p class="key"><i class="optimal">{t('items.professions.optimal')}</i><i class="medium">{t('items.professions.medium')}</i><i class="easy">{t('items.professions.easy')}</i><i class="trivial">{t('items.professions.trivial')}</i></p>
-            <ul>{#each known as r (r.spell)}{@render recipe(r)}{/each}</ul>
+            {#each groups as g (g.name)}
+              {#if g.name}<h5>{g.name}</h5>{/if}
+              <ul>{#each g.recipes as r (r.spell)}{@render recipe(r)}{/each}</ul>
+            {/each}
           {/if}
           {#if one.unknown.length}
             <h4>{t('items.professions.unknown')}<small>{one.unknown.length}</small></h4>
@@ -269,6 +277,14 @@
   }
   .key i {
     font-style: normal;
+  }
+  /* A heading of the game's window: its gold, a thin line under it. */
+  h5 {
+    margin: 10px 0 4px;
+    padding-bottom: 2px;
+    border-bottom: 1px solid var(--bronze-700);
+    font: var(--t-label);
+    color: var(--quest);
   }
   .note {
     margin: 6px 0;
