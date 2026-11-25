@@ -29,6 +29,7 @@ export default {
     left: 'Links',
     right: 'Rechts',
     hint: 'Mit M wechselt sie jederzeit die Seite.',
+    custom: 'Eure Anordnung legt die Karte fest: Verschiebt sie mit {edit}.',
   },
 
   arrow: {
@@ -98,6 +99,7 @@ export default {
     // "genordet" is the German word for a map with north up.
     north: 'Karte dreht sich mit Eurem Charakter oder ist genordet',
     side: 'Karte auf die andere Seite',
+    spaces: 'Die Bereiche oben, von links nach rechts',
     fullScreen: 'Vollbild',
     // German keyboards say Strg, as the game (GS CTRL_KEY_TEXT).
     ctrl: 'Strg',

@@ -40,6 +40,7 @@ export const LAYER_GROUPS = [
       { id: 'caves', built: true },
       { id: 'dungeons', built: true },
       { id: 'routes', built: true },
+      { id: 'vessels', built: true },
       { id: 'bosses', built: true },
     ],
   },

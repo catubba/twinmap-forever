@@ -1,4 +1,5 @@
 // The first run: its pages, one thing each, and what each says.
+import type { Workspaces } from './workspaces'
 import type { LinkStatus } from './link'
 import { tilesHelp, type TilesStatus } from './tiles-status'
 import { num, t } from './i18n'
@@ -41,6 +42,8 @@ export interface SetupStatus {
   askLang?: boolean
   /** What's new as the app starts (newsSinceOf, main/setup.ts): the version whose news the player last saw, '' when not known, null for none. */
   newsSince?: string | null
+  /** The workspaces kept (M20), in the app's own window only: missing until laid out once, and on a phone. */
+  workspaces?: Workspaces
 }
 
 /** Where the addon is published. The app never installs it itself: every install is one CurseForge counts. */

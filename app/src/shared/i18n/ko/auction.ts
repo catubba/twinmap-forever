@@ -135,6 +135,7 @@ export default {
     // After a colon: no particle on {place}.
     back: '돌아가기: {place}',
     theSearch: '검색 결과',
+    notOnSale: '지금 이 경매장에서 판매 중이 아닙니다.',
     // GS ITEM_MIN_LEVEL "최소 요구 레벨 %d", ITEM_LEVEL "아이템 레벨 %d".
     requiresLevel: '최소 요구 레벨 {level}',
     itemLevel: '아이템 레벨 {level}',
@@ -284,6 +285,7 @@ export default {
     attribution: '{source}, Battle.net API 제공. Twinmap은 Blizzard와 제휴하거나 Blizzard의 보증을 받지 않았습니다.',
     source: '경매 데이터: Blizzard Entertainment',
     approximate: '수량은 근삿값',
+    hide: '이 줄 숨기기',
   },
 
   chart: {

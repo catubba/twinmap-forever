@@ -46,6 +46,7 @@ export default {
       caves: 'Höhlen',
       dungeons: 'Dungeons',
       routes: 'Flugrouten',
+      vessels: 'Schiffe und Zeppeline',
       bosses: 'Dungeonbosse',
       companions: 'Gruppe',
     },
@@ -84,6 +85,8 @@ export default {
   pins: {
     rewardXp: '{xp} EP',
     entrance: 'Eingang',
+    shipTo: 'Schiff: {place}',
+    zeppelinTo: 'Zeppelin: {place}',
     entranceOf: 'Eingang: {name}',
     // Rare as the game's map legend says it for creatures (glossary).
     rareBoss: '{name} (selten)',

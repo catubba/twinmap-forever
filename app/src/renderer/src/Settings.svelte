@@ -12,7 +12,7 @@
   import qrcode from 'qrcode-generator'
   import { inApp } from './web'
   import { ZOOMS } from '../../shared/window'
-  import { layout, setMapRight } from './layout.svelte'
+  import { frame, layout, setMapRight } from './frame.svelte'
   import { arrow, setArrow } from './arrow.svelte'
   import { ARROW, ARROW_SIZES } from './look'
   import { langNow, metresOn, metricOffered, num, t, type Key } from '../../shared/i18n'
@@ -113,9 +113,11 @@
         </div>
       {/if}
     {:else if cat === 'appearance'}
+      <!-- The side of the map holds only where a workspace lays the map and Now side by side as at first (frame.svelte.ts). -->
       <div class="setting">
-        <label class="choice">{t('settings.layout.label')} <select class="field size" value={layout.mapRight ? 'right' : 'left'} onchange={(e) => setMapRight(e.currentTarget.value === 'right')}><option value="left">{t('settings.layout.left')}</option><option value="right">{t('settings.layout.right')}</option></select></label>
-        {#if !touch}<p class="hint">{t('settings.layout.hint')}</p>{/if}
+        <label class="choice">{t('settings.layout.label')} <select class="field size" disabled={!layout.sided} value={layout.mapRight ? 'right' : 'left'} onchange={(e) => setMapRight(e.currentTarget.value === 'right')}><option value="left">{t('settings.layout.left')}</option><option value="right">{t('settings.layout.right')}</option></select></label>
+        {#if !layout.sided}<p class="hint">{t('settings.layout.custom', { edit: t('app.layout.editKey') })}</p>
+        {:else if !touch}<p class="hint">{t('settings.layout.hint')}</p>{/if}
       </div>
       <!-- The character's arrow, on the 2D map and on the 3D view: any colour, and a size of the one first drawn. -->
       <div class="setting">
@@ -186,6 +188,8 @@
         <div><dt><kbd>F</kbd></dt><dd>{t('settings.keys.follow')}</dd></div>
         <div><dt><kbd>N</kbd></dt><dd>{t('settings.keys.north')}</dd></div>
         <div><dt><kbd>M</kbd></dt><dd>{t('settings.keys.side')}</dd></div>
+        <div><dt><kbd>{t('settings.keys.ctrl')}</kbd><kbd>1</kbd>{#if frame.spaces.length > 1}<kbd>{frame.spaces.length}</kbd>{/if}</dt><dd>{t('settings.keys.spaces')}</dd></div>
+        <div><dt><kbd>{t('settings.keys.ctrl')}</kbd><kbd>E</kbd></dt><dd>{t('app.layout.editKey')}</dd></div>
         {#if inApp}<div><dt><kbd>F11</kbd></dt><dd>{t('settings.keys.fullScreen')}</dd></div>{/if}
         {#if inApp}<div><dt><kbd>{t('settings.keys.ctrl')}</kbd><kbd>+</kbd><kbd>-</kbd><kbd>0</kbd></dt><dd>{t('settings.keys.zoom')}</dd></div>{/if}
         <div><dt><kbd>Esc</kbd></dt><dd>{t('settings.keys.close')}</dd></div>

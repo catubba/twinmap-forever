@@ -30,6 +30,7 @@ export default {
     left: '左侧',
     right: '右侧',
     hint: '随时按 M 切换到另一侧。',
+    custom: '地图的位置由你的布局决定：用{edit}来移动它。',
   },
 
   arrow: {
@@ -97,6 +98,7 @@ export default {
     follow: '打开/关闭跟随',
     north: '地图随角色转向，或保持北方朝上',
     side: '地图移到面板另一侧',
+    spaces: '顶部的分区，从左到右',
     // GS VIDEO_OPTIONS_FULLSCREEN.
     fullScreen: '全屏幕',
     // Chinese keyboards print Ctrl (GS CTRL_KEY "CTRL键").

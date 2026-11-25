@@ -136,6 +136,7 @@ export default {
     // After a colon: {place} stays in the nominative.
     back: 'Назад: {place}',
     theSearch: 'Поиск',
+    notOnSale: 'Сейчас не продается на этом аукционе.',
     // GS ITEM_MIN_LEVEL "Требуется %d-й уровень", lowercase after the dot.
     requiresLevel: 'требуется {level}-й уровень',
     itemLevel: 'уровень предмета {level}',
@@ -289,6 +290,7 @@ export default {
     attribution: '{source}, через Battle.net API. Twinmap не связан с Blizzard и не одобрен компанией Blizzard.',
     source: 'Данные аукциона: Blizzard Entertainment',
     approximate: 'Количество указано приблизительно',
+    hide: 'Скрыть эту строку',
   },
 
   chart: {

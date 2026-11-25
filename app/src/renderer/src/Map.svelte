@@ -3,7 +3,7 @@
   // character as an arrow. It follows the character until the player drags the map away.
   // Inside a dungeon or a raid it shows that instead: its rooms, its bosses, its entrance.
   import { TILES } from './web'
-  import { layout as sides, setMapRight } from './layout.svelte'
+  import { layout as sides, setMapRight } from './frame.svelte'
   import { arrow as arrowLook } from './arrow.svelte'
   import type { Terrain } from './terrain3d'
   import type { Compass } from './compass'
@@ -558,6 +558,31 @@
   // a dungeon, green for a raid), larger than the other pins so that it stands out. The picture has a glow around
   // the swirl, which is about half of it. Where the game's picture is not there, the drawn door.
   const DOOR = 44
+  // A dock: a dark disc ringed in the colour of what calls there, a galleon or a zeppelin with its gondola
+  // on it, and from near enough (DOCK_NAMES) beside it the name of the dock and where it goes, in the game's names:
+  // as text, never as markup. A sign where a way leaves the continent shown: an arrow and where it goes on.
+  const VESSEL_COLOURS = { ship: '#00bfff', zeppelin: '#ff591a' } as const
+  const DOCK_NAMES = 5.5
+  const DOCK_GLYPHS = {
+    ship: '<path d="M1.4 11.6h12.2l1.4-2h3.6l-1.6 5.6c-.2.9-1 1.5-1.9 1.5H5.2c-.8 0-1.5-.5-1.8-1.2z"/><path d="M8.4 1.6h1v10h-1z"/><path d="M5.6 2.8h6.2c-.4 1-.4 2.1 0 3.1H5.6c.4-1 .4-2.1 0-3.1zM4.4 6.6h8.6c-.5 1.4-.5 2.9 0 4.2H4.4c.5-1.3.5-2.8 0-4.2z"/><path d="M9.4 1.6l2.4.8-2.4.8z"/>',
+    zeppelin: '<ellipse cx="9" cy="7.4" rx="7.6" ry="4.4"/><path d="M15.2 5l3.6-2.6v10L15.2 9.8z"/><path d="M6 13.6h5.8l-.9 2.6H6.9z"/><path d="M7 11.4l-.6 2.4h1l.4-2.2zM10.8 11.4l.6 2.4h-1l-.4-2.2z"/>',
+  }
+  function dockIcon(kind: 'ship' | 'zeppelin', name: string, words: string): L.DivIcon {
+    const mark = document.createElement('div')
+    mark.className = `dock ${kind}`
+    mark.innerHTML = `<svg viewBox="0 0 20 20" width="16" height="16" fill="#fff">${DOCK_GLYPHS[kind]}</svg>`
+    const label = document.createElement('b')
+    label.append(Object.assign(document.createElement('span'), { textContent: name }), Object.assign(document.createElement('small'), { textContent: words }))
+    mark.append(label)
+    return L.divIcon({ className: 'door', iconSize: [24, 24], html: mark })
+  }
+  function signIcon(kind: 'ship' | 'zeppelin', words: string, angle: number): L.DivIcon {
+    const mark = document.createElement('div')
+    mark.className = `sign ${kind}`
+    mark.innerHTML = `<svg viewBox="0 0 12 12" width="14" height="14" style="rotate:${angle}deg"><path d="M2 2l8 4-8 4 2-4z" fill="${VESSEL_COLOURS[kind]}" stroke="#000" stroke-width="1"/></svg>`
+    mark.append(Object.assign(document.createElement('b'), { textContent: words }))
+    return L.divIcon({ className: 'door', iconSize: [16, 16], html: mark })
+  }
   function doorIcon(raid: boolean): L.DivIcon {
     const mark = document.createElement('div'), picture = new Image(DOOR, DOOR)
     mark.className = 'swirl'
@@ -777,6 +802,7 @@
   const TOO_FAR = 100 // yards: beyond this it is a portal or a hearthstone, and the arrow jumps
   let trail: Fix[] = [], gliding = 0
   let tied = false // the map moves with the arrow, frame by frame
+  let seen = true // the map is on the page and in sight (onMount)
   let zooming = false // a zoom is running: the map is left alone until its end
   function frame(): void {
     const now = whereAt(trail, Date.now() - BEHIND), here = L.latLng(now.y, now.x)
@@ -788,7 +814,7 @@
   function glide(here: L.LatLng, jump: boolean): void {
     const fix = { at: readAt ?? Date.now(), x: here.lng, y: here.lat }, last = trail.at(-1)
     const yards = last ? Math.hypot(fix.x - last.x, fix.y - last.y) * YARDS_PER_UNIT : Infinity
-    if (jump || still() || !map?.hasLayer(arrow) || yards > TOO_FAR) {
+    if (jump || still() || !seen || !map?.hasLayer(arrow) || yards > TOO_FAR) {
       cancelAnimationFrame(gliding)
       gliding = 0
       trail = [fix]
@@ -1032,7 +1058,7 @@
       for (const layer of shown) layer.remove()
       terrain.show(folder!)
       lookAsTheMap(0, azimuth)
-      terrain.start()
+      if (seen) terrain.start()
       await terrain.turn(tilted, azimuth)
     } else if (terrain) {
       const left = terrain.looking()
@@ -1175,7 +1201,18 @@
     // The map is told when its box changes: the panel beside it opens and closes, a phone is turned.
     const sized = new ResizeObserver(() => made.invalidateSize())
     sized.observe(holder)
+    // Out of sight (a workspace without the map, a tab behind in a group of panels): the 3D view stops drawing and the
+    // arrow stops gliding, it jumps to each new place; on the way back both go on from where the character is.
+    const sight = new IntersectionObserver((seenNow) => {
+      seen = seenNow.at(-1)!.isIntersecting
+      cancelAnimationFrame(gliding)
+      gliding = seen && trail.length ? requestAnimationFrame(frame) : 0
+      if (threeD && seen) terrain?.start()
+      else if (threeD) terrain?.stop()
+    })
+    sight.observe(holder)
     return () => {
+      sight.disconnect()
       sized.disconnect()
       clearTimeout(laying)
       cancelAnimationFrame(gliding)
@@ -1431,7 +1468,7 @@
 
   // The doors of the dungeons and the flight routes of the character's side, from the game's own tables.
   let travel = $state.raw<Travel>({ doors: [], nodes: [], routes: [] })
-  const travelLayers = { dungeons: L.layerGroup(), routes: L.layerGroup() }
+  const travelLayers = { dungeons: L.layerGroup(), routes: L.layerGroup(), vessels: L.layerGroup() }
   // The maps behind a door the app has the rooms of: a button each on its label.
   const behindDoor = (door: Travel['doors'][number]): { id: number; name: string; raid: boolean }[] =>
     (door.maps ?? []).flatMap((id, i) => (interiors?.maps.some((m) => m.id === id) ? [{ id, name: door.names[i] ?? door.names[0]!, raid: door.raid === true }] : []))
@@ -1451,12 +1488,61 @@
       if (!from || !to || from.continent !== continent || !serves(from, side) || !serves(to, side)) continue
       L.polyline([at(from), at(to)], { color: COLOURS.flights, weight: 1.5, opacity: 0.6, interactive: false, ...ROUTE }).addTo(travelLayers.routes)
     }
+    // Ships and zeppelins of the character's side: a dock at each of their stops on the continent shown. A click on a
+    // dock opens its label and draws the way of its ship or zeppelin, dashed in the colour Shortest Path gives it, as
+    // long as the label stays open. A way that leaves the continent ends in a sign that says where it goes on; a click
+    // on it opens that continent at the dock there, the way still drawn.
+    ;(travel.vessels ?? []).forEach((vessel, v) => {
+      if (!serves(vessel, side)) return
+      vessel.stops.forEach((stop, i) => {
+        if (stop.continent !== continent) return
+        const words = wordsOf(vessel, i)
+        L.marker(at(stop), { keyboard: false, zIndexOffset: 150, icon: dockIcon(vessel.kind, stop.name, words) })
+          .bindTooltip(`${stop.name}: ${words}`, { direction: 'top', offset: [0, -13], className: 'tip' })
+          .on('click', () => openDock(v, i))
+          .addTo(travelLayers.vessels)
+      })
+      if (shownVessel !== v || !map) return
+      const away = vessel.stops.filter((s) => s.continent !== continent), next = away.find((s) => s.continent !== null)
+      for (const run of vessel.way) {
+        if (run.continent !== continent) continue
+        const line = run.points.map(([x, y]) => at({ x, y }))
+        for (const [color, weight] of [['#000', 5.5], [VESSEL_COLOURS[vessel.kind], 3]] as const) L.polyline(line, { color, weight, dashArray: '8 9', lineCap: 'round', interactive: false }).addTo(travelLayers.vessels)
+        if (!away.length) continue
+        // Where it leaves: the last point, the arrow pointing on from the one before.
+        const [a, b] = [map.latLngToLayerPoint(line.at(-2)!), map.latLngToLayerPoint(line.at(-1)!)]
+        const words = t(vessel.kind === 'ship' ? 'map.pins.shipTo' : 'map.pins.zeppelinTo', { place: away.map((s) => s.name).join(', ') })
+        const sign = L.marker(line.at(-1)!, { keyboard: false, zIndexOffset: 140, icon: signIcon(vessel.kind, words, (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI) })
+        if (next) sign.on('click', () => openDock(v, vessel.stops.indexOf(next)))
+        sign.addTo(travelLayers.vessels)
+      }
+    })
   })
+  // The ship or zeppelin whose way is drawn: the one of the dock last opened, while its label is open.
+  let shownVessel = $state<number | null>(null)
+  $effect(() => {
+    if (!labelled) shownVessel = null
+  })
+  /** "Ship to Southshore, Auberdine": from stop i, to every other stop of the vessel. */
+  function wordsOf(vessel: NonNullable<Travel['vessels']>[number], i: number): string {
+    return t(vessel.kind === 'ship' ? 'map.pins.shipTo' : 'map.pins.zeppelinTo', { place: vessel.stops.filter((_, j) => j !== i).map((s) => s.name).join(', ') })
+  }
+  /** Opens the label of dock i of vessel v, on its continent, and draws the vessel's way. */
+  function openDock(v: number, i: number): void {
+    const vessel = travel.vessels?.[v], stop = vessel?.stops[i]
+    if (!map || !vessel || !stop || stop.continent === null) return
+    following = false
+    if (stop.continent !== continent || inside) show(stop.continent, false)
+    if (!map.getBounds().contains(at(stop))) map.setView(at(stop), Math.max(map.getZoom(), 4), { animate: false })
+    labelPin({ x: stop.x, y: stop.y }, stop.name, [wordsOf(vessel, i)])
+    shownVessel = v
+  }
   $effect(() => {
     for (const [id, group] of Object.entries(travelLayers) as [keyof typeof travelLayers, L.LayerGroup][]) {
       if (map && layers[id] && !inside && zoom >= 2) group.addTo(map)
       else group.remove()
     }
+    holder?.classList.toggle("docks-named", zoom >= DOCK_NAMES)
   })
 
   // My pins: a small flag on each saved point of this continent. A click opens its label. The
@@ -2110,9 +2196,9 @@
       0 0 2px #000;
   }
 
-  /* Layers stays open until it is closed. It ends above the zoom buttons; on a low window it scrolls. */
+  /* Layers stays open until it is closed. It ends above the zoom buttons; on a low map it scrolls. */
   .layers {
-    max-height: calc(100vh - 250px);
+    max-height: calc(100cqh - 250px);
     overflow-y: auto;
   }
   /* The kinds of ore or of herbs open beside it, as tall, scrolling on their own. */
@@ -2125,7 +2211,7 @@
     display: flex;
     flex-direction: column;
     min-width: 236px;
-    max-height: calc(100vh - 250px);
+    max-height: calc(100cqh - 250px);
   }
   .kindlist .scroll {
     overflow-y: auto;
@@ -2276,6 +2362,52 @@
   .map :global(.place) {
     background: none;
     border: 0;
+  }
+  /* A dock of a ship or a zeppelin: a dark disc ringed in its colour, where it goes beside it from near enough. */
+  .map :global(.dock) {
+    display: grid;
+    place-items: center;
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    border: 2px solid #00bfff;
+    border-radius: 50%;
+    background: #10161c;
+    box-shadow: 0 0 0 1px #000;
+  }
+  .map :global(.dock.zeppelin) {
+    border-color: #ff591a;
+  }
+  .map :global(.dock b),
+  .map :global(.sign b) {
+    display: none;
+    position: absolute;
+    left: 27px;
+    white-space: nowrap;
+    font: 600 12.5px/15px var(--font);
+    color: #fff;
+    -webkit-text-stroke: 3px #000;
+    paint-order: stroke fill;
+  }
+  .map :global(.dock small) {
+    display: block;
+    font: 500 11.5px/14px var(--font);
+    color: #efe6d2;
+  }
+  .map:global(.docks-named) :global(.dock b) {
+    display: block;
+  }
+  /* Where a way leaves the continent: an arrow in its colour, where it goes on written beside it. */
+  .map :global(.sign) {
+    display: grid;
+    place-items: center;
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
+  }
+  .map :global(.sign b) {
+    display: block;
+    left: 18px;
   }
   /* The swirl of a door, or the drawn door in its place, in the middle of its square. */
   .map :global(.swirl) {

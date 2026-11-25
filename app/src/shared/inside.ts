@@ -33,6 +33,8 @@ export interface Piece {
   top: number
   /** Which of the buildings standing in the map it is a room of, counted from 0. */
   building: number
+  /** Which room of that building it is a picture of, as the game's table of room pictures numbers it. */
+  room: number
   /** How many rooms lie under it, one over the other: 0 for a room with nothing below. Only in dungeons and raids. */
   level: number
 }

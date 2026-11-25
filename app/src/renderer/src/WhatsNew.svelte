@@ -12,7 +12,7 @@
   let going: Go | null = null
   onMount(() => dialog.showModal())
 
-  const name = (go: Go): string => (go === 'now' ? t('app.top.now') : go === 'items' ? t('app.top.items') : go === 'ah' ? t('app.top.auctionHouse') : go === 'settings' ? t('app.top.settings') : t('map.layers.button'))
+  const name = (go: Go): string => (go === 'now' ? t('app.top.map') : go === 'items' ? t('app.top.character') : go === 'ah' ? t('app.top.auctionHouse') : go === 'settings' ? t('app.top.settings') : t('map.layers.button'))
   const dated = (date: string): string => day(Date.parse(date + 'T00:00:00Z'), { dateStyle: 'long', timeZone: 'UTC' })
   const of = (release: Release, kind: Kind) => release.entries.filter((e) => e.kind === kind)
   const closed = (): void => {

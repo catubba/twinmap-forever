@@ -3,7 +3,14 @@ export default {
   top: {
     sections: '섹션',
     now: '현재',
-    items: '아이템',
+    map: '지도',
+    character: '캐릭터',
+    inventory: '소지품',
+    professions: '전문 기술',
+    spellbook: '마법책',
+    talents: '특성',
+    auctionSearch: '경매장 검색',
+    item: '아이템',
     auctionHouse: '경매장',
     // The game's own short name (GS BUTTON_LAG_AUCTIONHOUSE).
     auctionHouseShort: '경매',
@@ -14,6 +21,29 @@ export default {
     feedback: '의견 보내기',
     feedbackHint: '버그 또는 아이디어 제보',
     settings: '설정',
+  },
+
+  layout: {
+    edit: '배치 편집 ({ctrl}+E)',
+    editKey: '배치 편집',
+    hint: '탭을 패널 가장자리로 끌면 옆에 놓이고, 가운데로 끌면 함께 묶입니다.',
+    addPanel: '패널 추가',
+    pull: '패널로 끌어 꺼내거나, 클릭하여 현재 아래에 놓으십시오',
+    reset: '이 작업 공간 초기화',
+    restore: '기본 작업 공간 복원',
+    restoreSure: '모든 작업 공간을 처음 상태로 되돌리시겠습니까?',
+    restoreYes: '복원',
+    restoreNo: '취소',
+    done: '완료',
+    hintSpaces: '위쪽: 작업 공간을 끌면 순서가 바뀌고, 두 번 클릭하면 이름을 바꿀 수 있습니다.',
+    newSpace: '새 작업 공간',
+    spacesMost: '작업 공간은 최대 {most}개',
+    unnamed: '작업 공간',
+    rename: '작업 공간 이름',
+    deleteSpace: '작업 공간 삭제',
+    deleteSure: '작업 공간 "{name}"을(를) 삭제하시겠습니까? 배치는 사라지고, 패널은 다른 작업 공간에 남습니다.',
+    deleteYes: '삭제',
+    deleteNo: '유지',
   },
 
   link: {
@@ -85,7 +115,8 @@ export default {
     levelPercent: '레벨 {level}, {percent}%',
     xp: '경험치 {xp} / {max}',
     experience: '경험치',
-    width: '패널 너비',
+    emptyExperience: 'Twinmap Forever 애드온을 켜고 플레이하면 레벨이 여기에 표시됩니다.',
+    emptyItem: '가방, 은행, 소지품 또는 경매장 검색에서 아이템을 클릭하면 여기에 가격이 표시됩니다.',
     widthHint: '끌어서 크기를 조절합니다. 두 번 클릭하면 초기화됩니다.',
   },
 
@@ -117,6 +148,11 @@ export default {
     finding: '이동 경로 찾는 중',
     // Rewritten so no particle follows Shortest Path.
     updateHint: 'Shortest Path, Twinmap Forever 애드온을 업데이트하면 전체 이동 경로가 여기에 표시됩니다',
+    emptyAttention: '지금은 확인할 것이 없습니다. 죽음이나 조건이 충족된 경매장 알림이 여기에 표시됩니다.',
+    emptyPins: '저장한 핀이 아직 없습니다. 지도에서 장소를 클릭하고 저장하면 여기에 표시됩니다.',
+    emptyQuests: '퀘스트 목록에 퀘스트가 없습니다. 게임에서 퀘스트를 수락하면 여기에 표시됩니다.',
+    emptyNearby: '주변에 아무도 없습니다. 이동하면 주변의 상인, 상급자, 비행 조련사가 여기에 표시됩니다.',
+    allOut: '현재의 모든 블록이 각자의 패널에 있습니다. 패널을 닫으면 그 블록이 여기로 돌아옵니다.',
   },
 
   journey: {
