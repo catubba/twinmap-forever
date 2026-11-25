@@ -200,10 +200,9 @@
       0 0 0 1px #000,
       0 0 0 2px var(--bronze-600);
   }
+  /* A long name goes on two lines, as in the game's book. */
   li span {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow-wrap: break-word;
     font: var(--t-body);
     line-height: 17px;
     color: var(--text);
