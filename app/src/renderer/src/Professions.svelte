@@ -99,6 +99,8 @@
           {/if}
           {#if !one.seen}
             <p class="note"><b>{t('items.professions.unseen')}</b>{t('items.professions.open', { profession: one.name })}</p>
+          {:else if !one.listed}
+            <p class="note">{t('items.professions.again', { profession: one.name })}</p>
           {/if}
           {#if typed.trim() && !known.length && !unknown.length}<p class="key">{t('items.professions.noMatch')}</p>{/if}
         {/if}

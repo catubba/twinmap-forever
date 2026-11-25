@@ -215,6 +215,7 @@ export default {
     also: '烹饪、急救和钓鱼也算在内。',
     unseen: '尚未查看配方',
     open: '在游戏中打开一次{profession}窗口，其配方就会显示在这里，关闭游戏后也能查看。',
+    again: '在游戏中再打开一次{profession}窗口，其分类和未学会的配方也会显示在这里。',
     gathers: '{profession}没有配方，只显示等级。',
   },
 

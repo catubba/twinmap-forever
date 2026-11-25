@@ -238,6 +238,8 @@ export default {
     unseen: 'No recipes seen yet',
     open: 'Open {profession} once in the game: its recipes show here, also when the game is closed.',
     // A profession with no recipes in the game (Herbalism, Skinning). {profession}: its name.
+    // A profession whose window was seen before the addon read its headings and the recipes it lists: what to do. {profession}: its name.
+    again: 'Open {profession} once more in the game: its headings and the recipes not learned show here too.',
     gathers: '{profession} has no recipes: its level is all there is to show.',
   },
 

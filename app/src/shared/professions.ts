@@ -39,6 +39,8 @@ export interface Profession {
   crafts: boolean
   /** Whether its window was seen open: without, the recipes not known are not there and the known ones may be few. */
   seen: boolean
+  /** Whether the addon read the list of its window (recipes not learned, headings): a window seen before it did has none. */
+  listed: boolean
   known: Recipe[]
   /** The known ones under the window's headings, in its order. */
   groups: Group[]
@@ -101,6 +103,7 @@ export function professionsOf(pieces: Record<string, unknown>, facts: SpellFacts
       secondary: fact[2] === LINE.secondary,
       crafts: all.length > 0,
       seen: seen.has(line!),
+      listed: all.some((a) => listed.has(a[0])),
       known: mine,
       groups,
       unknown: all.filter((a) => listed.has(a[0]) && !known.has(a[0])).map(recipe).sort(order),

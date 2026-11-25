@@ -210,6 +210,7 @@ export default {
     also: 'Cocina, Primeros auxilios y Pesca también cuentan.',
     unseen: 'Aún no se han visto recetas',
     open: 'Abre {profession} una vez en el juego: sus recetas aparecerán aquí, incluso con el juego cerrado.',
+    again: 'Abre {profession} una vez más en el juego: sus categorías y las recetas sin aprender también aparecerán aquí.',
     gathers: '{profession} no tiene recetas: solo se muestra su nivel.',
   },
 

@@ -208,6 +208,7 @@ export default {
     also: 'Cuisine, Secourisme et Pêche comptent aussi.',
     unseen: 'Aucune recette vue pour l’instant',
     open: 'Ouvrez {profession} une fois en jeu : ses recettes s’affichent ici, même quand le jeu est fermé.',
+    again: 'Ouvrez {profession} encore une fois en jeu : ses catégories et les recettes pas encore apprises s’affichent aussi ici.',
     gathers: '{profession} n’a pas de recettes : seul son niveau s’affiche.',
   },
 

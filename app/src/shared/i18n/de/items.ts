@@ -213,6 +213,7 @@ export default {
     also: 'Kochkunst, Erste Hilfe und Angeln zählen auch.',
     unseen: 'Noch keine Rezepte gesehen',
     open: 'Öffnet {profession} einmal im Spiel: die Rezepte erscheinen dann hier, auch bei geschlossenem Spiel.',
+    again: 'Öffnet {profession} noch einmal im Spiel: dann erscheinen hier auch die Kategorien und die nicht erlernten Rezepte.',
     gathers: '{profession} hat keine Rezepte: nur die Stufe wird angezeigt.',
   },
 
