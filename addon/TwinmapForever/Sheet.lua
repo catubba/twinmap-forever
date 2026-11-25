@@ -14,15 +14,21 @@
 --   bank  the same for the bank and its bags, as they were when last open
 --   gear  { { slot, item, durability, most, key }, ... } durability missing for what does not wear (0 and 0 before a key)
 --         key: the item's link (below) when it is more than "item:ID", as one with a suffix ("of the Bear") or an enchant
---   tips  { [key] = { { left, colour, right, colour }, ... } } the lines of the game's own tooltip of each item met, read
---         once (C_TooltipInfo) and sent until the app holds them, then no more: the app keeps them all. Colour "rrggbb",
---         "" for white; right and its colour only where the line has a right side. Lines the game adds itself, as the
---         sell price, are not among them.
+--   tips  { [key] = { { left, colour, right, colour }, ... } } the lines of the game's own tooltips (C_TooltipInfo), sent
+--         until the app holds them, then no more: the app keeps them all. Colour "rrggbb", "" for white; right and its
+--         colour only where the line has a right side. Keys: "item:..." each item met, read once (lines the game adds
+--         itself, as the sell price, are not among them); "spell:ID" each spell of the book and "talent:node:rank" each
+--         talent at its rank and at the next, read again when they change. At most BATCH bytes of them in one sheet.
 --   skills  { { skill, rank, most }, ... } every skill line by the game's number: professions, weapons, languages
 --   spells  { spell, ... } the spells in the spellbook, those not learned yet left out
+--   book    { { name, picture, { spell, ... }, { passive spell, ... } }, ... } the tabs of the spellbook as the game shows
+--           them, in its order: the tab's name and picture, then its spells and its passive ones, each in the book's order;
+--           last the pet's tab (picture 0), its entries { name, words under it, picture } as the game words them
 --   talents { free = points not spent, t = { { node, rank, spell }, ... } } the talents taken
---   recipes { known = { spell, ... }, seen = { profession, ... } } the recipes a profession's window
---           showed learned, and those learned since; seen: the professions whose window was opened
+--   recipes { known = { spell, ... }, seen = { profession, ... }, listed = { spell, ... }, cats = { { category, name, order }, ... } }
+--           the recipes a profession's window showed learned, and those learned since; seen: the professions whose window
+--           was opened; listed: every recipe such a window listed, learned or not; cats: the headings it groups them
+--           under, by the game's number, with its order
 --   stats   { { category, { { label, value, colour }, ... } }, ... } the statistics of the game's character window, as it
 --           words them and in its order; colour "rrggbb" where the game colours the value (green for one raised), else missing
 --   trainers { { n = npc, c = class token of a class trainer, s = { { spell, cost, level, skill }, ... } }, ... }
@@ -75,10 +81,9 @@ end
 -- The tooltips read since the last send, by key: those of items not met before (Tips, below).
 local tipsHave, tipsNew = {}, {}
 
-local function Meet(key, read)
-  if not key or tipsHave[key] or tipsNew[key] or not C_TooltipInfo then return end
-  local data = Try(read)
-  if type(data) ~= "table" or type(data.lines) ~= "table" then tipsHave[key] = true return end
+-- The lines of a tooltip as C_TooltipInfo gives it; nothing where it gives none.
+local function Lines(data)
+  if type(data) ~= "table" or type(data.lines) ~= "table" then return nil end
   local lines = {}
   for _, l in ipairs(data.lines) do
     local left = type(l) == "table" and Str(l.leftText)
@@ -89,7 +94,13 @@ local function Meet(key, read)
       lines[#lines + 1] = line
     end
   end
-  if #lines > 0 then tipsNew[key] = lines else tipsHave[key] = true end -- one with no lines is not asked again this session
+  return #lines > 0 and lines or nil
+end
+
+local function Meet(key, read)
+  if not key or tipsHave[key] or tipsNew[key] or not C_TooltipInfo then return end
+  local lines = Lines(Try(read))
+  if lines then tipsNew[key] = lines else tipsHave[key] = true end -- one with no lines is not asked again this session
 end
 
 -- What a container holds, slot by slot; nothing for a container that is not there.
@@ -146,23 +157,107 @@ local function Skills()
   return out
 end
 
+-- The spells, by number, and the book as the game shows it: its tabs in order, each with its name and picture, the
+-- spells it shows and then the passive ones, in its order.
 local function Spells()
-  local out, have = {}, {}
+  local out, have, tabs = {}, {}, {}
   local book = C_SpellBook
-  if not (book and book.GetNumSpellBookSkillLines) then return out end
+  if not (book and book.GetNumSpellBookSkillLines) then return out, tabs end
   local bank = Enum and Enum.SpellBookSpellBank and Enum.SpellBookSpellBank.Player or 0
   local future = Enum and Enum.SpellBookItemType and Enum.SpellBookItemType.FutureSpell
   for line = 1, Num(Try(book.GetNumSpellBookSkillLines)) or 0 do
     local info = Try(book.GetSpellBookSkillLineInfo, line)
     local first = type(info) == "table" and Num(info.itemIndexOffset) or 0
+    local active, passive = {}, {}
     for i = first + 1, first + (type(info) == "table" and Num(info.numSpellBookItems) or 0) do
       local item = Try(book.GetSpellBookItemInfo, i, bank)
       local spell = type(item) == "table" and item.itemType ~= future and Num(item.spellID)
-      if spell and not have[spell] then have[spell], out[#out + 1] = true, spell end
+      if spell then
+        if not have[spell] then have[spell], out[#out + 1] = true, spell end
+        local list = item.isPassive and passive or active
+        list[#list + 1] = spell
+      end
     end
+    if #active + #passive > 0 then tabs[#tabs + 1] = { Str(info.name) or "", Num(info.iconID) or 0, active, passive } end
+  end
+  -- The pet's tab, of the pet summoned last: its commands and stances are no spells the app can name, so each of its
+  -- entries goes as the game words it, { name, words under it, picture }.
+  local pets = Enum and Enum.SpellBookSpellBank and Enum.SpellBookSpellBank.Pet
+  local count = pets and book.HasPetSpells and Num(Try(book.HasPetSpells))
+  if count and count > 0 then
+    local active, passive = {}, {}
+    for i = 1, count do
+      local item = Try(book.GetSpellBookItemInfo, i, pets)
+      if type(item) == "table" and Str(item.name) then
+        local list = item.isPassive and passive or active
+        list[#list + 1] = { item.name, Str(item.subName) or "", Num(item.iconID) or 0 }
+      end
+    end
+    if #active + #passive > 0 then tabs[#tabs + 1] = { Str(PET) or "Pet", 0, active, passive } end
   end
   table.sort(out)
-  return out
+  return out, tabs
+end
+
+-- The tooltips of the spells of the book and of the talents (M20-F16), as the game shows them: the game's files hold
+-- them with placeholders that hang on rank, level and talents. Read again when the book, the talents or the level change,
+-- PER_FRAME a frame and never in a fight (0.1 ms a read in the game, 25 November 2026). A spell the game has not loaded
+-- yet gives its tooltip without its description: it is asked for and read again a second later, a few times at most.
+local PER_FRAME, TRIES = 4, 10
+local spellJobs, spellLater, spellsDue, spellAt = {}, {}, true, 0
+
+local function SpellJobs()
+  local T, jobs = C_TooltipInfo, {}
+  if not T then return jobs end
+  local spells = Spells()
+  for _, spell in ipairs(spells) do
+    if T.GetSpellByID then jobs[#jobs + 1] = { key = "spell:" .. spell, spell = spell, read = function() return T.GetSpellByID(spell) end } end
+  end
+  local config = C_ClassTalents and Try(C_ClassTalents.GetActiveConfigID)
+  local info = config and C_Traits and Try(C_Traits.GetConfigInfo, config)
+  if not (T.GetTraitEntry and type(info) == "table" and type(info.treeIDs) == "table") then return jobs end
+  for _, tree in ipairs(info.treeIDs) do
+    for _, node in ipairs(Try(C_Traits.GetTreeNodes, tree) or {}) do
+      local n = Try(C_Traits.GetNodeInfo, config, node)
+      local entry = type(n) == "table" and n.isVisible ~= false and ((type(n.activeEntry) == "table" and n.activeEntry.entryID) or (type(n.entryIDs) == "table" and n.entryIDs[1]))
+      if entry then
+        local rank, most = Num(n.currentRank or n.ranksPurchased) or 0, Num(n.maxRanks) or 1
+        local e = Try(C_Traits.GetEntryInfo, config, entry)
+        local d = type(e) == "table" and e.definitionID and Try(C_Traits.GetDefinitionInfo, e.definitionID)
+        local spell = type(d) == "table" and Num(d.spellID or d.overriddenSpellID)
+        for r = math.max(rank, 1), math.min(rank + 1, most) do
+          jobs[#jobs + 1] = { key = "talent:" .. node .. ":" .. r, spell = spell, read = function() return T.GetTraitEntry(entry, r) end }
+        end
+      end
+    end
+  end
+  return jobs
+end
+
+local function Loaded(spell)
+  local S = C_Spell
+  if not (spell and S and S.IsSpellDataCached) or Try(S.IsSpellDataCached, spell) then return true end
+  Try(S.RequestLoadSpellData, spell)
+  return false
+end
+
+local function ReadSpells(now)
+  if InCombatLockdown() then return end
+  if spellsDue and ns.ready and now >= spellAt then
+    spellsDue, spellJobs, spellLater = false, SpellJobs(), {}
+  end
+  if #spellJobs == 0 and #spellLater > 0 and now >= spellAt then spellJobs, spellLater = spellLater, {} end
+  for _ = 1, PER_FRAME do
+    local job = table.remove(spellJobs, 1)
+    if not job then return end
+    if Loaded(job.spell) or job.tries == TRIES then
+      tipsNew[job.key] = Lines(Try(job.read)) or tipsNew[job.key]
+    else
+      job.tries = (job.tries or 0) + 1
+      spellLater[#spellLater + 1] = job
+      spellAt = now + 1
+    end
+  end
 end
 
 -- The talent trees of the active set, as wow-state reads them in the game.
@@ -259,7 +354,7 @@ local slow, slowAt = {}, 0
 
 -- Recipes: the window of a profession lists all its recipes, learned or not, and each one learned
 -- since the game tells as it happens. Kept in the saved sheet, so a window opened once is enough.
-local known, seen -- spell -> true, profession -> true
+local known, seen, listed, cats -- spell -> true, profession -> true, spell -> true, category -> { name, order }
 local scanDue, learned = false, {}
 
 local function ScanWindow()
@@ -269,33 +364,49 @@ local function ScanWindow()
   if Try(T.IsTradeSkillLinked) or Try(T.IsTradeSkillGuild) or Try(T.IsNPCCrafting) then return end
   local ids = Try(T.GetAllRecipeIDs)
   if type(ids) ~= "table" or #ids == 0 then return end
-  local now = {}
+  local now, under, heads = {}, {}, 0
   for _, id in ipairs(ids) do
     local info = Try(T.GetRecipeInfo, id)
     -- A recipe not told learned or not is still loading: the window's next update has it.
     if type(info) ~= "table" or type(info.learned) ~= "boolean" or not Num(id) then return end
     now[id] = info.learned
+    if Num(info.categoryID) and not under[info.categoryID] then heads = heads + 1 under[info.categoryID] = heads end
   end
-  for id, yes in pairs(now) do known[id] = yes or nil end
+  for id, yes in pairs(now) do known[id], listed[id] = yes or nil, true end
+  -- The headings, in the window's order: the game's own where it gives one, else as they first came.
+  for category, first in pairs(under) do
+    local info = T.GetCategoryInfo and Try(T.GetCategoryInfo, category)
+    local name = type(info) == "table" and Str(info.name)
+    if name then cats[category] = { name, Num(info.uiOrder) or first } end
+  end
   local base = Try(T.GetBaseProfessionInfo)
   if type(base) == "table" and Num(base.professionID) then seen[base.professionID] = true end
 end
 
 local function Recipes(s)
   if not known then
-    known, seen = {}, {}
+    known, seen, listed, cats = {}, {}, {}, {}
     local held = s.pieces.recipes and s.pieces.recipes.data
-    for _, id in ipairs(type(held) == "table" and type(held.known) == "table" and held.known or {}) do known[id] = true end
-    for _, id in ipairs(type(held) == "table" and type(held.seen) == "table" and held.seen or {}) do seen[id] = true end
+    held = type(held) == "table" and held or {}
+    for _, id in ipairs(type(held.known) == "table" and held.known or {}) do known[id] = true end
+    for _, id in ipairs(type(held.seen) == "table" and held.seen or {}) do seen[id] = true end
+    for _, id in ipairs(type(held.listed) == "table" and held.listed or {}) do listed[id] = true end
+    for _, c in ipairs(type(held.cats) == "table" and held.cats or {}) do
+      if type(c) == "table" and Num(c[1]) and Str(c[2]) then cats[c[1]] = { c[2], Num(c[3]) or 0 } end
+    end
   end
   if scanDue then scanDue = false ScanWindow() end
   for _, id in ipairs(learned) do known[id] = true end
   learned = {}
-  local out = { known = {}, seen = {} }
+  local out = { known = {}, seen = {}, listed = {}, cats = {} }
   for id in pairs(known) do out.known[#out.known + 1] = id end
   for id in pairs(seen) do out.seen[#out.seen + 1] = id end
+  for id in pairs(listed) do out.listed[#out.listed + 1] = id end
+  for id, c in pairs(cats) do out.cats[#out.cats + 1] = { id, c[1], c[2] } end
   table.sort(out.known)
   table.sort(out.seen)
+  table.sort(out.listed)
+  table.sort(out.cats, function(a, b) return a[1] < b[1] end)
   return out
 end
 
@@ -385,9 +496,10 @@ local function Read(s)
   if bankOpen then pieces.bank = Containers(BANK) end
   local now = GetTime()
   if now >= slowAt then
-    slow, slowAt = { skills = Skills(), spells = Spells(), talents = Talents(), stats = Stats() or slow.stats }, now + AGAIN
+    slow, slowAt = { skills = Skills(), talents = Talents(), stats = Stats() or slow.stats }, now + AGAIN
+    slow.spells, slow.book = Spells()
   end
-  pieces.skills, pieces.spells, pieces.talents, pieces.stats = slow.skills, slow.spells, slow.talents, slow.stats
+  pieces.skills, pieces.spells, pieces.book, pieces.talents, pieces.stats = slow.skills, slow.spells, slow.book, slow.talents, slow.stats
   pieces.recipes = Recipes(s)
   pieces.trainers = Trainers(s)
   return pieces
@@ -421,18 +533,45 @@ ns.receivers = ns.receivers or {} -- Inbox.lua, which calls them, is loaded afte
 local told = {}
 ns.receivers.sheet = function(value) told = type(value) == "table" and value or {} end
 
--- The tooltips the app does not hold yet: each one is kept with the revision it came at, and goes
--- out while the app's revision is older. Once it holds them the piece is empty, and stays so.
+-- The tooltips the app does not hold yet: each one is kept with the revision it went out at, and goes out while the
+-- app's revision is older. Once it holds them the piece is empty, and stays so. A sheet that changes while a long one is
+-- on its way starts again (the app takes a section only whole), so at most BATCH bytes of tooltips go in one: the others
+-- wait, and the next batch goes once the app holds this one. A tooltip whose lines changed waits to go again; one that waits
+-- again because it did not fit (to an app that holds less than it was sent at, as at a login before the app's word comes)
+-- keeps the revision it went out at, and needs no more sending once the app holds that.
+local BATCH = 6000
+
 local function Tips(s, since)
   s.tips = type(s.tips) == "table" and s.tips or {}
   for key, lines in pairs(tipsNew) do
-    if not s.tips[key] then s.tips[key] = { at = s.rev + 1, lines = lines } end
+    local t = s.tips[key]
+    if type(t) ~= "table" or ns.Json(t.lines) ~= ns.Json(lines) then s.tips[key] = { lines = lines, wait = true } end
   end
   tipsNew = {}
-  local out = {}
+  local out, size, going, waiting = {}, 0, {}, {}
   for key, t in pairs(s.tips) do
     tipsHave[key] = true
-    if type(t) == "table" and Num(t.at) and t.at > since then out[key] = t.lines end
+    -- One that waits again after it went out once is held already if the app holds what it went out with.
+    if type(t) == "table" and t.wait and Num(t.at) and t.at <= since then t.wait = nil end
+    if type(t) == "table" and t.wait then waiting[#waiting + 1] = key
+    elseif type(t) == "table" and Num(t.at) and t.at > since then going[#going + 1] = key end
+  end
+  local function Take(key)
+    local n = #ns.Json(s.tips[key].lines)
+    if size > 0 and size + n > BATCH then return false end
+    size, out[key] = size + n, s.tips[key].lines
+    return true
+  end
+  table.sort(going, function(a, b) return s.tips[a].at < s.tips[b].at or (s.tips[a].at == s.tips[b].at and a < b) end)
+  for _, key in ipairs(going) do
+    if not Take(key) then s.tips[key].wait = true end
+  end
+  if #going == 0 then
+    table.sort(waiting)
+    for _, key in ipairs(waiting) do
+      if not Take(key) then break end
+      s.tips[key].at, s.tips[key].wait = s.rev + 1, nil
+    end
   end
   local held = s.pieces.tips
   if not held or ns.Json(held.data) ~= ns.Json(out) then
@@ -480,8 +619,9 @@ end
 -- twice a second, until it is not.
 local trainerAt = 0
 frame:SetScript("OnUpdate", function()
-  if not trainerDue then return end
   local now = GetTime()
+  ReadSpells(now)
+  if not trainerDue then return end
   if now < trainerAt then return end
   trainerAt = now + 0.5
   if ReadTrainer() then trainerDue = false end
@@ -496,7 +636,8 @@ frame:SetScript("OnEvent", function(_, event, recipe)
   elseif event:match("^TRADE_SKILL") then
     scanDue = true
   else
-    slowAt = 0
+    -- The book, the talents, the level or what is worn changed: the tooltips are read again a little later, once.
+    slowAt, spellsDue, spellAt = 0, true, GetTime() + 2
   end
 end)
 

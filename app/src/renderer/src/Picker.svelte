@@ -87,6 +87,7 @@
     text-shadow: 0 1px 0 #000;
     cursor: pointer;
     max-width: 100%;
+    overflow: hidden; /* squeezed by many workspaces at the top: cut, never under the tabs */
   }
   .name {
     overflow: hidden;

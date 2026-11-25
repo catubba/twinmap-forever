@@ -164,6 +164,8 @@ export default {
     // On top of the list of kinds, in capitals, after an arrow. {place}: auction.nav.mine, auction.nav.alerts, auction.page.theSearch or a category.
     back: 'Back to {place}',
     theSearch: 'the search',
+    // On the page of an item that is not on sale now, under its name.
+    notOnSale: 'Not on sale at this auction house now.',
     // Below the name, after its kind and a dot. {level}: a level.
     requiresLevel: 'requires level {level}',
     itemLevel: 'item level {level}',
@@ -356,6 +358,8 @@ export default {
     source: 'Auction data: Blizzard Entertainment',
     // At the right of the same line.
     approximate: 'Quantities are approximate',
+    // A small cross at the end of the line, read aloud and on hover: hides it for good (M20-F9).
+    hide: 'Hide this line',
   },
 
   // The chart of prices on the page of an item (Chart.svelte).

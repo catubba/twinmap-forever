@@ -43,6 +43,9 @@ export default {
     left: 'On the left',
     right: 'On the right',
     hint: 'M puts it on the other side at any time.',
+    // In place of hint, the dropdown greyed, when no tab at the top has the map and Now side by side and nothing else.
+    // {edit}: the name of Edit layout (app.layout.editKey).
+    custom: 'Your layout places the map: move it with {edit}.',
   },
 
   // In General: the app's window, switches, the text size and the hardware acceleration.
@@ -121,6 +124,8 @@ export default {
     north: 'The map turns with your character, or north up',
     // Beside the key M.
     side: 'Map on the other side of the panel',
+    // Beside the keys Ctrl, 1 and the number of the last tab.
+    spaces: 'The sections at the top, from the left',
     // Beside the key F11.
     fullScreen: 'Full screen',
     // The name of a key: Control, as printed on the keyboards of the language (Strg in German). Short.

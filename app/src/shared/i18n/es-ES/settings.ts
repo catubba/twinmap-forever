@@ -29,6 +29,7 @@ export default {
     left: 'A la izquierda',
     right: 'A la derecha',
     hint: 'M lo cambia de lado en cualquier momento.',
+    custom: 'Tu disposición coloca el mapa: muévelo con {edit}.',
   },
 
   window: {
@@ -86,6 +87,7 @@ export default {
     follow: 'Activar o desactivar Seguir',
     north: 'El mapa gira con tu personaje, o el norte arriba',
     side: 'Mapa al otro lado del panel',
+    spaces: 'Las secciones de arriba, de izquierda a derecha',
     fullScreen: 'Pantalla completa',
     ctrl: 'Ctrl',
     zoom: 'Tamaño del texto, también Ctrl y la rueda fuera del mapa',

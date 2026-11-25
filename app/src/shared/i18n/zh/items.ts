@@ -153,11 +153,7 @@ export default {
     // GS TYPE "类型".
     filter: '按名称或类型过滤',
     filterLabel: '过滤物品',
-    viewLabel: '视图',
     whereLabel: '位置',
-    // GS BAGSLOTTEXT "背包栏位".
-    slots: '栏位',
-    table: '列表',
     all: '全部',
     // Each part as "label：amount", like GS SELL_PRICE "卖价" and GS MONEY_COLON "金钱：".
     worth: '卖价：{money}',
@@ -180,13 +176,11 @@ export default {
   },
 
   held: {
-    label: '背包和银行',
     bags: '背包',
     bagsNow: '当前状态',
     bagsAsOf: '{ago}的状态',
     bank: '银行',
     bankSeen: '{ago}查看',
-    bankUnseen: '尚未查看：在游戏中打开一次银行',
     // GS BAG_NAME_BACKPACK "行囊"; ItemSubClass 1.11 "材料包"; GS KEYRING.
     backpack: '行囊和背包',
     reagents: '材料包',
@@ -196,6 +190,51 @@ export default {
     used: '已用{used}/{count}格',
     // GS EMPTY "空".
     empty: { other: '空 · {count}格' },
+  },
+
+  bank: {
+    none: '尚未查看银行',
+    open: '在游戏中打开一次银行，其中的物品就会显示在这里，关闭游戏后也能查看。',
+    where: '与任意主城的银行职员交谈。',
+  },
+
+  professions: {
+    primary: '专业',
+    secondary: '辅助技能',
+    filter: '筛选配方',
+    known: '已学会',
+    unknown: '未学会',
+    unknownNote: '数字：配方变为黄色时的技能等级。',
+    optimal: '橙色：必定提升',
+    medium: '黄色：可能提升',
+    easy: '绿色：很少提升',
+    trivial: '灰色：不再提升',
+    noMatch: '没有符合的配方。',
+    none: '尚无专业',
+    learn: '在任意城市找专业训练师学习，其等级和配方会显示在这里。',
+    also: '烹饪、急救和钓鱼也算在内。',
+    unseen: '尚未查看配方',
+    open: '在游戏中打开一次{profession}窗口，其配方就会显示在这里，关闭游戏后也能查看。',
+    again: '在游戏中再打开一次{profession}窗口，其分类和未学会的配方也会显示在这里。',
+    gathers: '{profession}没有配方，只显示等级。',
+  },
+
+  spellbook: {
+    filter: '筛选法术',
+    passive: '被动',
+    noMatch: '没有符合的法术。',
+    none: '尚无法术书',
+    login: '使用最新版的Twinmap插件登录游戏，法术书中的法术就会显示在这里，关闭游戏后也能查看。',
+  },
+
+  talents: {
+    spent: { other: '已用 {count} 点' },
+    free: '剩余天赋点数：{count}',
+    rank: '等级 {rank}/{most}',
+    next: '下一等级：',
+    need: { other: '在{tree}天赋中再分配{count}点' },
+    none: '还没有天赋',
+    learn: '天赋从10级开始，之后每升一级获得一点。在游戏的天赋窗口中分配后，会显示在这里。',
   },
 
   table: {

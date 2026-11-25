@@ -4,9 +4,23 @@ export default {
   top: {
     // The list of the tabs, read aloud only.
     sections: 'Sections',
-    // The tabs: short, under or beside a small icon. Now is also the name of the side panel, read aloud.
+    // The name of the side panel beside the map, read aloud.
     now: 'Now',
-    items: 'Items',
+    // The tabs: short, under or beside a small icon. Map: the map with the panel Now beside it. Character: the character's
+    // gear, bags, bank and stats, and what the other characters hold.
+    map: 'Map',
+    character: 'Character',
+    // A panel of the Character workspace: a row for each item the character holds, and what the others hold.
+    inventory: 'Inventory',
+    // A panel of the Character workspace: the character's professions, their level and their recipes.
+    professions: 'Professions',
+    // A panel of the Character workspace: the spells the character knows, as the game's spellbook shows them.
+    spellbook: 'Spellbook',
+    // A panel of the Character workspace: the character's talent trees and the points spent, as the game shows them.
+    talents: 'Talents',
+    // The panels of the auction (M20-F9): its search, categories and list; the page of the item chosen.
+    auctionSearch: 'Auction search',
+    item: 'Item',
     auctionHouse: 'Auction House',
     // Shown in place of auctionHouse when the window is narrow: two or three letters.
     auctionHouseShort: 'AH',
@@ -20,6 +34,46 @@ export default {
     feedbackHint: 'Report a bug or an idea',
     // A button: short, beside a cog icon.
     settings: 'Settings',
+  },
+
+  // Edit layout (App.svelte, frame.svelte.ts): each tab at the top is a layout of panels (the map, Now, Character,
+  // Auction House), locked until Edit layout unlocks it.
+  layout: {
+    // A button beside the tabs at the top, an icon alone: read aloud and on hover. {ctrl}: the name of the key Control
+    // (settings.keys.ctrl); {ctrl}+E is its key.
+    edit: 'Edit layout ({ctrl}+E)',
+    // In Settings > Shortcuts, beside the keys Ctrl and E.
+    editKey: 'Edit layout',
+    // The bar under the top row while the layout is unlocked, first a hint.
+    hint: 'Drag a tab to the edge of a panel to put it beside, or to its middle to group them.',
+    // The buttons of the bar: short. addPanel opens the list of the panels the tab open has not.
+    addPanel: 'Add panel',
+    // On each block of Now while the layout is unlocked, a button with an icon: read aloud and on hover (M20-F7).
+    pull: 'Drag onto a panel to take it out, or click to put it under Now',
+    reset: 'Reset this workspace',
+    restore: 'Restore default workspaces',
+    // In place of the bar's buttons after restore, before anything is changed: a question, then two buttons.
+    restoreSure: 'Put every workspace back as it was at first?',
+    restoreYes: 'Restore',
+    restoreNo: 'Cancel',
+    // Locks the layout again: short.
+    done: 'Done',
+    // At the end of the hint, what is done with the tabs at the top, the workspaces.
+    hintSpaces: 'At the top: drag a workspace to move it, double-click it to rename it.',
+    // A button after the tabs at the top while the layout is unlocked, a + alone: read aloud and on hover.
+    newSpace: 'New workspace',
+    // The same button once there are as many workspaces as there can be. {most}: that number.
+    spacesMost: 'At most {most} workspaces',
+    // The name of a workspace the player made, until they give it one.
+    unnamed: 'Workspace',
+    // The field a tab at the top becomes on a double click, to rename its workspace: read aloud.
+    rename: 'Name of the workspace',
+    // A cross on each tab at the top while the layout is unlocked: read aloud and on hover.
+    deleteSpace: 'Delete workspace',
+    // In place of the bar's buttons after that cross, before anything is deleted: a question, then two buttons. {name}: the name of the workspace.
+    deleteSure: 'Delete the workspace "{name}"? Its layout is lost; the panels stay in the other workspaces.',
+    deleteYes: 'Delete',
+    deleteNo: 'Keep',
   },
 
   // The state of the link with the game, in the top row (word: short, beside a coloured dot), and the line
@@ -111,10 +165,12 @@ export default {
     levelPercent: 'Level {level}, {percent}%',
     // Under level, dim. {xp} and {max}: numbers of experience points.
     xp: '{xp} of {max} xp',
-    // The experience bar, read aloud only.
+    // The experience bar, read aloud only; the title of its panel too, once taken out of Now (M20-F7).
     experience: 'Experience',
-    // The edge between the map and the panel: its name read aloud, and its hint on hover.
-    width: 'Panel width',
+    // The panel Experience with no character known yet: what to do in the game.
+    emptyExperience: 'Your level shows here once you play with the Twinmap Forever addon on.',
+    // The panel Item with no item chosen yet.
+    emptyItem: 'Click an item in Bags, Bank, Inventory or the auction search to see its prices here.',
     widthHint: 'Drag to resize. Double-click to reset.',
   },
 
@@ -151,6 +207,13 @@ export default {
     // The journey Shortest Path guides, while its first plan is still searched.
     finding: 'Finding the way',
     updateHint: 'Update Shortest Path and the Twinmap Forever addon to see the whole way here',
+    // A block of Now taken out into a panel of its own (M20-F7), with nothing to show: what to do in the game.
+    emptyAttention: 'Nothing needs you now. A death, or an auction alert that is met, shows here.',
+    emptyPins: 'No pin saved yet. Click a place on the map and Save it to keep it here.',
+    emptyQuests: 'No quest in your log. Accept one in the game and it shows here.',
+    emptyNearby: 'Nobody near. Walk on: the vendors, trainers and flight masters around you show here.',
+    // In the Now column once every block of it is in a panel of its own.
+    allOut: 'Every block of Now is in a panel of its own. Close a panel to bring its block back here.',
   },
 
   // Times of the journey of Shortest Path, at the right of its rows (shared/journey.ts): short.
