@@ -1,4 +1,4 @@
-// The Windows and Mac readers bind different system libraries. Only load the one for this process.
+// The readers bind different system libraries. Only load the one for this process.
 export type WindowHandle = number | bigint
 type Reading = { width: number; height: number; rgb: Uint8Array; at: { x: number; y: number } }
 /** The edge of the window the addon draws its strip on: a row along the top or the bottom, a column down the left or the right side. */
@@ -25,6 +25,7 @@ export function loadCapture(): Promise<void> {
   return loading ??= (async () => {
     if (process.platform === 'win32') capture = await import('./capture-win32')
     if (process.platform === 'darwin') capture = await import('./capture-darwin')
+    if (process.platform === 'linux') capture = await import('./capture-linux')
   })()
 }
 

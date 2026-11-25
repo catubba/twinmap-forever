@@ -17,7 +17,9 @@
     "predist:mac": "node scripts/mac-build.cjs",
     "dist:mac": "electron-vite build && electron-builder --mac dir --arm64 --publish never",
     "postdist:mac": "node scripts/mac-build.cjs sign",
-    "probe:mac": "node scripts/mac-build.cjs && electron scripts/capture-mac.cjs"
+    "probe:mac": "node scripts/mac-build.cjs && electron scripts/capture-mac.cjs",
+    "probe:linux": "electron scripts/capture-linux.cjs",
+    "dist:linux": "electron-vite build && electron-builder --linux dir --x64 --publish never"
   },
   "build": {
     "appId": "app.twinmap",
@@ -37,6 +39,9 @@
     ],
     "win": {
       "target": "nsis"
+    },
+    "linux": {
+      "target": [{ "target": "dir", "arch": ["x64"] }]
     },
     "mac": {
       "category": "public.app-category.games",

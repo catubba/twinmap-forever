@@ -99,8 +99,20 @@ export function registryInstallPath(): string | null {
 
 /** Common install locations, in the order they are checked for the Forever build. */
 export function gameInstallPaths(): (string | null)[] {
+  if (process.platform === 'linux') return linuxGameInstallPaths()
   if (process.platform !== 'darwin') return [registryInstallPath()]
   return ['/Applications/World of Warcraft', join(homedir(), 'Applications', 'World of Warcraft')].filter((folder) => existsSync(folder))
+}
+
+export function linuxGameInstallPaths(home = homedir()): string[] {
+  const compatdata = join(home, '.local', 'share', 'Steam', 'steamapps', 'compatdata')
+  let prefixes: string[] = []
+  try { prefixes = readdirSync(compatdata).map((id) => join(compatdata, id, 'pfx')) } catch {}
+  const games = join(home, 'Games')
+  try { prefixes.push(...readdirSync(games).map((name) => join(games, name))) } catch {}
+  return [...prefixes, join(home, '.wine')].flatMap((prefix) =>
+    ['Program Files (x86)', 'Program Files'].map((folder) => join(prefix, 'drive_c', folder, 'World of Warcraft')),
+  ).filter((folder) => existsSync(folder))
 }
 
 /**

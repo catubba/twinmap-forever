@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { deflateSync } from 'node:zlib'
 import { expect, test } from 'vitest'
 import { salsa20 } from '../shared/salsa20'
-import { EncryptedFileError, gameFolderFrom, installedBuild, openClientFiles, registryInstallPath } from './client-files'
+import { EncryptedFileError, gameFolderFrom, installedBuild, linuxGameInstallPaths, openClientFiles, registryInstallPath } from './client-files'
 import { sentKeys } from './keys'
 
 const md5 = (b: Buffer): Buffer => createHash('md5').update(b).digest()
@@ -240,6 +240,18 @@ test.skipIf(process.platform === 'win32')('finds the game folder from inside the
   const executable = join(folder, '_forever_', 'World of Warcraft.app', 'Contents', 'MacOS', 'World of Warcraft')
   expect(gameFolderFrom([executable])).toBe(folder)
   expect(gameFolderFrom([join(folder, 'Data'), executable])).toBe(folder)
+})
+
+test('finds both Program Files folders in Steam, Lutris and default Wine prefixes in order', () => {
+  const home = mkdtempSync(join(tmpdir(), 'twinmap-prefixes-'))
+  expect(linuxGameInstallPaths(home)).toEqual([])
+  const steam = join(home, '.local', 'share', 'Steam', 'steamapps', 'compatdata')
+  const prefixes = [join(steam, '123', 'pfx'), join(steam, '456', 'pfx'), join(home, 'Games', 'warcraft'), join(home, '.wine')]
+  const folders = prefixes.flatMap((prefix) => ['Program Files (x86)', 'Program Files'].map((name) => join(prefix, 'drive_c', name, 'World of Warcraft')))
+  for (const folder of folders) mkdirSync(folder, { recursive: true })
+  mkdirSync(join(steam, '789', 'pfx'), { recursive: true })
+  mkdirSync(join(home, 'Games', 'other-game', 'drive_c'), { recursive: true })
+  expect(linuxGameInstallPaths(home)).toEqual(folders)
 })
 
 // On a PC with the game: the real archive. UiMap is the table of the 60 maps; 1957206 is its file number.
