@@ -536,7 +536,9 @@ ns.receivers.sheet = function(value) told = type(value) == "table" and value or 
 -- The tooltips the app does not hold yet: each one is kept with the revision it went out at, and goes out while the
 -- app's revision is older. Once it holds them the piece is empty, and stays so. A sheet that changes while a long one is
 -- on its way starts again (the app takes a section only whole), so at most BATCH bytes of tooltips go in one: the others
--- wait, and the next batch goes once the app holds this one. A tooltip whose lines changed waits to go again.
+-- wait, and the next batch goes once the app holds this one. A tooltip whose lines changed waits to go again; one that waits
+-- again because it did not fit (to an app that holds less than it was sent at, as at a login before the app's word comes)
+-- keeps the revision it went out at, and needs no more sending once the app holds that.
 local BATCH = 6000
 
 local function Tips(s, since)
@@ -549,6 +551,8 @@ local function Tips(s, since)
   local out, size, going, waiting = {}, 0, {}, {}
   for key, t in pairs(s.tips) do
     tipsHave[key] = true
+    -- One that waits again after it went out once is held already if the app holds what it went out with.
+    if type(t) == "table" and t.wait and Num(t.at) and t.at <= since then t.wait = nil end
     if type(t) == "table" and t.wait then waiting[#waiting + 1] = key
     elseif type(t) == "table" and Num(t.at) and t.at > since then going[#going + 1] = key end
   end
@@ -560,7 +564,7 @@ local function Tips(s, since)
   end
   table.sort(going, function(a, b) return s.tips[a].at < s.tips[b].at or (s.tips[a].at == s.tips[b].at and a < b) end)
   for _, key in ipairs(going) do
-    if not Take(key) then s.tips[key].at, s.tips[key].wait = nil, true end
+    if not Take(key) then s.tips[key].wait = true end
   end
   if #going == 0 then
     table.sort(waiting)

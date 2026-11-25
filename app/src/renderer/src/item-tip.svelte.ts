@@ -51,11 +51,14 @@ export function itemTip(node: HTMLElement, given: Omit<Hovered, 'box'>): { updat
   }
 }
 
-/** The spell or talent under the pointer or reached with the keyboard (M20-F16): the lines of its popup (SpellPopup.svelte). */
-export const spellHover = $state<{ now: { lines: TipLine[]; box: DOMRect; node: HTMLElement } | null }>({ now: null })
+/**
+ * The spell or talent under the pointer or reached with the keyboard (M20-F16): what makes the lines of its popup
+ * (SpellPopup.svelte), read there as it changes: a tooltip that comes, a rank taken, while the popup is open.
+ */
+export const spellHover = $state<{ now: { lines: () => TipLine[]; box: DOMRect; node: HTMLElement } | null }>({ now: null })
 
 /** A spell or a talent: its popup, with the lines its panel makes, opens under the pointer and on focus, and goes with them. */
-export function spellTip(node: HTMLElement, given: TipLine[]): { update: (p: TipLine[]) => void; destroy: () => void } {
+export function spellTip(node: HTMLElement, given: () => TipLine[]): { update: (p: () => TipLine[]) => void; destroy: () => void } {
   let lines = given
   const enter = (): void => void (spellHover.now = { lines, box: node.getBoundingClientRect(), node })
   const leave = (): void => {
@@ -64,10 +67,7 @@ export function spellTip(node: HTMLElement, given: TipLine[]): { update: (p: Tip
   const on: [string, () => void][] = [['pointerenter', enter], ['focus', enter], ['pointerleave', leave], ['blur', leave]]
   for (const [event, f] of on) node.addEventListener(event, f)
   return {
-    update: (p) => {
-      lines = p
-      if (spellHover.now?.node === node) enter() // what it says changed while it is open: a tooltip that came, a rank taken
-    },
+    update: (p) => void (lines = p),
     destroy: () => {
       leave()
       for (const [event, f] of on) node.removeEventListener(event, f)

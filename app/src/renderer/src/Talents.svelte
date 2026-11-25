@@ -98,7 +98,7 @@
             </svg>
             {#each tab.talents as x (x.node)}
               <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-              <div class="t" class:full={x.rank === x.most} class:some={x.rank > 0 && x.rank < x.most} style:grid-area="{x.row + 1} / {x.column + 1}" role="img" aria-label="{x.name}, {t('items.talents.rank', { rank: x.rank, most: x.most })}" tabindex="0" use:spellTip={linesOf(x, tab)}>
+              <div class="t" class:full={x.rank === x.most} class:some={x.rank > 0 && x.rank < x.most} style:grid-area="{x.row + 1} / {x.column + 1}" role="img" aria-label="{x.name}, {t('items.talents.rank', { rank: x.rank, most: x.most })}" tabindex="0" use:spellTip={() => linesOf(x, tab)}>
                 <img src="{TILES}/pictures/{x.icon}.png" alt="" onerror={(e) => e.currentTarget.setAttribute('style', 'visibility: hidden')} />
                 <b>{x.rank}/{x.most}</b>
               </div>

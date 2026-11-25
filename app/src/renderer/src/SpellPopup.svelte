@@ -6,6 +6,7 @@
   import { spellHover } from './item-tip.svelte'
 
   const shown = $derived(spellHover.now)
+  const lines = $derived(shown ? shown.lines() : [])
   // Beside what is pointed at, on the side with room, inside the window.
   let width = $state(0), height = $state(0)
   const place = $derived.by(() => {
@@ -21,9 +22,9 @@
   {#each piecesOf(line, color) as p, i (i)}<span style:color={p.color ? `#${p.color}` : undefined}>{p.text}</span>{/each}
 {/snippet}
 
-{#if shown?.lines.length}
+{#if shown && lines.length}
   <div class="tip" role="tooltip" style:left="{place.left}px" style:top="{place.top}px" bind:offsetWidth={width} bind:offsetHeight={height}>
-    {#each shown.lines as l, i (i)}
+    {#each lines as l, i (i)}
       {#if !l[0]}
         <div class="gap"></div>
       {:else}

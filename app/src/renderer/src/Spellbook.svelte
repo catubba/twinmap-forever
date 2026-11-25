@@ -53,7 +53,7 @@
         <ul>
           {#each spells as s, i (i)}
             <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-            <li class:passive={s.passive} tabindex="0" use:spellTip={linesOf(s)}>
+            <li class:passive={s.passive} tabindex="0" use:spellTip={() => linesOf(s)}>
               <img src="{TILES}/pictures/{s.icon}.png" alt="" onerror={(e) => e.currentTarget.setAttribute('style', 'visibility: hidden')} />
               <span>{s.name}</span>
               <small>{under(s)}</small>

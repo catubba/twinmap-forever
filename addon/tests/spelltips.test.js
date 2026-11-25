@@ -115,3 +115,25 @@ test('nothing is read in a fight: the tooltips wait for its end', () => {
   addon.run(10);
   assert.ok(Number(addon.lua('return GAME.spellReads or 0')) >= 5);
 });
+
+test("tooltips sent before, put back in the line at a login before the app's word, are not sent again once it holds them", () => {
+  const many = Array.from({ length: 60 }, (_, i) => `{ ${1000 + i} }`).join(', ');
+  const addon = enterWorld(WORLD + `\nGAME.spells = { ${many} }
+    for i = 1000, 1059 do GAME.spellTips[i] = { { "Spell " .. i }, { string.rep("A long description. ", 12) } } end`);
+  addon.run(10);
+  for (let k = 0; k < 10; k++) {
+    const last = sheets(addon).at(-1);
+    appHolds(addon, last.code, last.rev);
+    addon.run(4);
+  }
+  // A login again, before the app's word: everything goes, a batch only; then the word says the app holds it all.
+  addon.lua('local ns = ...; ns.receivers.sheet({})');
+  addon.run(4);
+  const held = Number(addon.lua('return TwinmapForeverSheet.rev'));
+  const code = addon.lua('return TwinmapForeverSheet.code');
+  const before = sheets(addon).length;
+  appHolds(addon, code, held);
+  addon.run(40);
+  const after = sheets(addon).slice(before).filter((s) => s.p.tips && Object.keys(s.p.tips).length);
+  assert.deepEqual(after.map((s) => Object.keys(s.p.tips).length), [], 'tooltips the app holds went again');
+});
