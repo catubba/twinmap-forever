@@ -17,6 +17,19 @@ export default {
     settings: 'Opciones',
   },
 
+  layout: {
+    edit: 'Editar disposición ({ctrl}+E)',
+    editKey: 'Editar disposición',
+    hint: 'Arrastra una pestaña al borde de un panel para ponerla al lado, o a su centro para agruparlas.',
+    addPanel: 'Añadir panel',
+    reset: 'Restablecer este espacio de trabajo',
+    restore: 'Restaurar los espacios de trabajo predeterminados',
+    restoreSure: '¿Dejar todos los espacios de trabajo como al principio?',
+    restoreYes: 'Restaurar',
+    restoreNo: 'Cancelar',
+    done: 'Listo',
+  },
+
   link: {
     paused: 'En pausa',
     closed: 'Juego cerrado',

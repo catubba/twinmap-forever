@@ -29,6 +29,7 @@ export default {
     left: 'Links',
     right: 'Rechts',
     hint: 'Mit M wechselt sie jederzeit die Seite.',
+    custom: 'Eure Anordnung legt die Karte fest: Verschiebt sie mit {edit}.',
   },
 
   window: {

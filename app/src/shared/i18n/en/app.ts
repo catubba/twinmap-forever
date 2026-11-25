@@ -25,6 +25,28 @@ export default {
     settings: 'Settings',
   },
 
+  // Edit layout (App.svelte, frame.svelte.ts): each tab at the top is a layout of panels (the map, Now, Character,
+  // Auction House), locked until Edit layout unlocks it.
+  layout: {
+    // A button beside the tabs at the top, an icon alone: read aloud and on hover. {ctrl}: the name of the key Control
+    // (settings.keys.ctrl); {ctrl}+E is its key.
+    edit: 'Edit layout ({ctrl}+E)',
+    // In Settings > Shortcuts, beside the keys Ctrl and E.
+    editKey: 'Edit layout',
+    // The bar under the top row while the layout is unlocked, first a hint.
+    hint: 'Drag a tab to the edge of a panel to put it beside, or to its middle to group them.',
+    // The buttons of the bar: short. addPanel opens the list of the panels the tab open has not.
+    addPanel: 'Add panel',
+    reset: 'Reset this workspace',
+    restore: 'Restore default workspaces',
+    // In place of the bar's buttons after restore, before anything is changed: a question, then two buttons.
+    restoreSure: 'Put every workspace back as it was at first?',
+    restoreYes: 'Restore',
+    restoreNo: 'Cancel',
+    // Locks the layout again: short.
+    done: 'Done',
+  },
+
   // The state of the link with the game, in the top row (word: short, beside a coloured dot), and the line
   // it puts at the foot of the map when the player has something to do (shared/link.ts).
   link: {

@@ -16,6 +16,19 @@ export default {
     settings: 'Options',
   },
 
+  layout: {
+    edit: 'Modifier la disposition ({ctrl}+E)',
+    editKey: 'Modifier la disposition',
+    hint: 'Faites glisser un onglet au bord d’un panneau pour le placer à côté, ou en son milieu pour les regrouper.',
+    addPanel: 'Ajouter un panneau',
+    reset: 'Réinitialiser cet espace de travail',
+    restore: 'Rétablir les espaces de travail par défaut',
+    restoreSure: 'Remettre chaque espace de travail comme au début ?',
+    restoreYes: 'Rétablir',
+    restoreNo: 'Annuler',
+    done: 'Terminé',
+  },
+
   link: {
     paused: 'En pause',
     closed: 'Jeu fermé',

@@ -16,6 +16,19 @@ export default {
     settings: '设置',
   },
 
+  layout: {
+    edit: '编辑布局（{ctrl}+E）',
+    editKey: '编辑布局',
+    hint: '把标签拖到面板边缘可并排放置，拖到中间可合为一组。',
+    addPanel: '添加面板',
+    reset: '重置此工作区',
+    restore: '恢复默认工作区',
+    restoreSure: '要把所有工作区恢复到最初的样子吗？',
+    restoreYes: '恢复',
+    restoreNo: '取消',
+    done: '完成',
+  },
+
   link: {
     paused: '已暂停',
     closed: '游戏未运行',

@@ -29,6 +29,7 @@ export default {
     left: 'À gauche',
     right: 'À droite',
     hint: 'M la fait passer de l’autre côté à tout moment.',
+    custom: 'Votre disposition place la carte : déplacez-la avec {edit}.',
   },
 
   window: {

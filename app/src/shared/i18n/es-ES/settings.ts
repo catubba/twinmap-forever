@@ -29,6 +29,7 @@ export default {
     left: 'A la izquierda',
     right: 'A la derecha',
     hint: 'M lo cambia de lado en cualquier momento.',
+    custom: 'Tu disposición coloca el mapa: muévelo con {edit}.',
   },
 
   window: {

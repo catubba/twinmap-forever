@@ -17,6 +17,19 @@ export default {
     settings: 'Optionen',
   },
 
+  layout: {
+    edit: 'Anordnung bearbeiten ({ctrl}+E)',
+    editKey: 'Anordnung bearbeiten',
+    hint: 'Zieht einen Reiter an den Rand eines Panels, um es daneben zu legen, oder in seine Mitte, um sie zu gruppieren.',
+    addPanel: 'Panel hinzufügen',
+    reset: 'Diesen Arbeitsbereich zurücksetzen',
+    restore: 'Standard-Arbeitsbereiche wiederherstellen',
+    restoreSure: 'Alle Arbeitsbereiche wieder so einrichten wie am Anfang?',
+    restoreYes: 'Wiederherstellen',
+    restoreNo: 'Abbrechen',
+    done: 'Fertig',
+  },
+
   link: {
     paused: 'Pausiert',
     closed: 'Spiel geschlossen',
