@@ -24,7 +24,7 @@
   import { newsFor, type Go } from '../../shared/news'
   import FirstRun from './FirstRun.svelte'
   import Glyph from './Glyph.svelte'
-  import { add as addPanel, create as createSpace, edit, frame, layout, mount, move as moveSpace, nameOf, nowOver, panelName, open as openSpace, reach, remove as removeSpace, rename as renameSpace, reset as resetSpace, restore as restoreSpaces, section, setMapRight, unmount } from './frame.svelte'
+  import { add as addPanel, create as createSpace, edit, frame, layout, mount, move as moveSpace, nameOf, nowOver, open as openSpace, PART_DRAG, reach, remove as removeSpace, rename as renameSpace, reset as resetSpace, restore as restoreSpaces, section, setMapRight, titleOf, unmount } from './frame.svelte'
   import { CHARACTER, MOST, NAME_MOST } from '../../shared/workspaces'
   import Logo from './Logo.svelte'
   import Map from './Map.svelte'
@@ -480,7 +480,7 @@
         {#if adding && frame.missing.length}
           <ul class="menu" in:fly={drop()}>
             {#each frame.missing as id (id)}
-              <li><button class="item" onclick={() => ((adding = false), addPanel(id))}>{panelName(id)}</button></li>
+              <li><button class="item" onclick={() => ((adding = false), addPanel(id))}>{titleOf(id)}</button></li>
             {/each}
           </ul>
         {/if}
@@ -578,17 +578,23 @@
       onmove={(from, to) => setRoute(moveStop(route, from, to))}
       onstop={(stop) => mapView?.goTo({ continent: stop.continent, at: stop.at, title: stop.name })}
       onpick={(row) => mapView?.goTo({ continent: row.continent, at: row.at, title: row.name })} onpoint={(row) => mapView?.pointAt(row)} />
-    {#if char}
-      <footer>
-        <p>
-          <span>{xp ? t('app.panel.levelPercent', { level: char.level, percent: Math.floor(xp.percent) }) : t('app.panel.level', { level: char.level })}</span>
-          {#if xp}<span class="dim">{t('app.panel.xp', { xp: num(char.xp!), max: num(char.max!) })}</span>{/if}
-        </p>
-        {#if xp}
-          <div class="xp" role="progressbar" aria-label={t('app.panel.experience')} aria-valuenow={Math.floor(xp.percent)} style:--v="{xp.percent}%" style:--rest="{xp.rested}%"></div>
-        {/if}
-      </footer>
-    {/if}
+    <!-- Experience, a block of Now that is taken out into a panel of its own as the others are (Now.svelte). -->
+    <div class="block-home"><div class="block surface" use:section={'experience'}>
+      {#if frame.editing}{@const pull = t('app.layout.pull')}<button class="block-pull" draggable="true" title={pull} aria-label="{pull}: {titleOf('experience')}" ondragstart={(e) => e.dataTransfer?.setData(PART_DRAG, 'experience')} onclick={() => addPanel('experience')}><Glyph name="layout" size={14} /></button>{/if}
+      {#if char}
+        <footer>
+          <p>
+            <span>{xp ? t('app.panel.levelPercent', { level: char.level, percent: Math.floor(xp.percent) }) : t('app.panel.level', { level: char.level })}</span>
+            {#if xp}<span class="dim">{t('app.panel.xp', { xp: num(char.xp!), max: num(char.max!) })}</span>{/if}
+          </p>
+          {#if xp}
+            <div class="xp" role="progressbar" aria-label={t('app.panel.experience')} aria-valuenow={Math.floor(xp.percent)} style:--v="{xp.percent}%" style:--rest="{xp.rested}%"></div>
+          {/if}
+        </footer>
+      {:else}
+        <p class="block-empty"><b>{t('app.panel.experience')}</b> {t('app.panel.emptyExperience')}</p>
+      {/if}
+    </div></div>
   </aside>
   {#each CHARACTER as part (part)}
     <div class="sec" use:section={part}><Items {part} {sheets} {portraits} {shown} known={characters} {now} {listing} onpick={(key) => (picked = key)} /></div>
@@ -1344,7 +1350,8 @@
   .panel.closed .viewing,
   .panel.closed :global(.npc),
   .panel.closed footer,
-  .panel.closed :global(.now > :not(.plate, .none)),
+  .panel.closed :global(.now [data-section]:not([data-section='next'])),
+  .panel.closed :global(.now [data-section='next'] > :not(.plate, .none)),
   .panel.closed :global(.plate > :not(h2, .sign, .sheen)) {
     display: none;
   }

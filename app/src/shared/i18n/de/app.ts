@@ -23,6 +23,7 @@ export default {
     editKey: 'Anordnung bearbeiten',
     hint: 'Zieht einen Reiter an den Rand eines Panels, um es daneben zu legen, oder in seine Mitte, um sie zu gruppieren.',
     addPanel: 'Panel hinzufügen',
+    pull: 'Auf ein Panel ziehen, um ihn herauszunehmen, oder klicken, um ihn unter Jetzt zu legen',
     reset: 'Diesen Arbeitsbereich zurücksetzen',
     restore: 'Standard-Arbeitsbereiche wiederherstellen',
     restoreSure: 'Alle Arbeitsbereiche wieder so einrichten wie am Anfang?',
@@ -103,6 +104,7 @@ export default {
     levelPercent: 'Stufe {level}, {percent} %',
     xp: '{xp} von {max} EP',
     experience: 'Erfahrung',
+    emptyExperience: 'Eure Stufe erscheint hier, sobald Ihr mit aktivem Addon Twinmap Forever spielt.',
     widthHint: 'Ziehen, um die Größe zu ändern. Doppelklick zum Zurücksetzen.',
   },
 
@@ -131,6 +133,11 @@ export default {
     otherContinent: 'Auf dem anderen Kontinent',
     finding: 'Weg wird gesucht',
     updateHint: 'Aktualisiert Shortest Path und das Twinmap-Forever-Addon, um hier den ganzen Weg zu sehen',
+    emptyAttention: 'Gerade braucht Euch nichts. Ein Tod oder ein erreichter Alarm im Auktionshaus erscheint hier.',
+    emptyPins: 'Noch keine Markierung gespeichert. Klickt auf einen Ort der Karte und speichert ihn, um ihn hier zu behalten.',
+    emptyQuests: 'Keine Quest in Eurem Questlog. Nehmt im Spiel eine an, dann erscheint sie hier.',
+    emptyNearby: 'Niemand in der Nähe. Geht weiter: Händler, Lehrer und Flugmeister um Euch herum erscheinen hier.',
+    allOut: 'Jeder Block von Jetzt liegt in einem eigenen Panel. Schließt ein Panel, um seinen Block hierher zurückzuholen.',
   },
 
   journey: {
