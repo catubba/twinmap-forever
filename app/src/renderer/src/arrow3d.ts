@@ -3,9 +3,9 @@
 // and are written in design/ui.md, section 4: the outline of the 2D arrow as a soft gem, gold over
 // and dark under, its true size but never too small to see, laid on the slope of the ground, with
 // a soft shadow where it touches, its outline through a hill that hides it, and a stem from afar.
-// Its colour and its size are the player's to choose, the same as the 2D arrow's (M21-F1, layout.svelte.ts).
+// Its colour and its size are the player's to choose, the same as the 2D arrow's (M21-F1, arrow.svelte.ts).
 import * as THREE from 'three'
-import { arrow } from './layout.svelte'
+import { arrow } from './arrow.svelte'
 import type { Terrain } from './terrain3d'
 import { turnAt, type Turn } from '../../shared/glide'
 

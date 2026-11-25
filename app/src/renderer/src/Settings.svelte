@@ -12,7 +12,8 @@
   import qrcode from 'qrcode-generator'
   import { inApp } from './web'
   import { ZOOMS } from '../../shared/window'
-  import { arrow, layout, setArrow, setMapRight } from './layout.svelte'
+  import { layout, setMapRight } from './layout.svelte'
+  import { arrow, setArrow } from './arrow.svelte'
   import { ARROW, ARROW_SIZES } from './look'
   import { langNow, metresOn, metricOffered, num, t, type Key } from '../../shared/i18n'
 

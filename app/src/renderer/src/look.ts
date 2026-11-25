@@ -1,6 +1,6 @@
 // How the map looks, in one place (M21-F1): the colours of its pins (marks.ts), of the character's arrow on the 2D
 // map and on the 3D view (Map.svelte, arrow3d.ts) and of its lines (Map.svelte, pins3d.ts), and the arrow until the
-// player chooses another in Settings > Appearance (the choice is kept in layout.svelte.ts).
+// player chooses another in Settings > Appearance (the choice is kept in arrow.svelte.ts).
 
 export const COLOURS = {
   edge: '#000', // round every pin and under every line
