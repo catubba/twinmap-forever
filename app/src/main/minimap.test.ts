@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest'
 import type { Piece } from '../shared/inside'
-import { widthsOf, type Box, type Mosaic } from '../shared/minimap'
+import { viewHolds, widthsOf, type Box, type Mosaic } from '../shared/minimap'
 import { mosaicOfGround, mosaicOfPieces, startInside } from './minimap'
 
 test('outside dungeons and raids the screen is never read', () => {
@@ -22,7 +22,7 @@ test('the rooms of a dungeon are laid on one picture, each where its piece says'
   // One room of 8 x 4 yards (16 x 8 pixels), all of one colour, not turned.
   const dxt = new Uint8Array((16 / 4) * (8 / 4) * 8)
   for (let block = 0; block < 8; block++) dxt.set([0xff, 0xff, 0x00, 0x00, 0, 0, 0, 0], block * 8) // white, every pixel the first colour
-  const piece: Piece = { file: 1, u: 500, v: 300, width: 8, height: 4, angle: 0, bottom: 0, top: 5, building: 0, level: 0 }
+  const piece: Piece = { file: 1, u: 500, v: 300, width: 8, height: 4, angle: 0, bottom: 0, top: 5, building: 0, room: 0, level: 0 }
   const mosaic = mosaicOfPieces([piece], () => dxt)!
   const at = (u: number, v: number): number => mosaic.grey[(v - mosaic.v0) * mosaic.width + (u - mosaic.u0)]!
   expect(at(500, 300)).toBeCloseTo(255, 0)
@@ -30,6 +30,32 @@ test('the rooms of a dungeon are laid on one picture, each where its piece says'
   expect(at(505, 300)).toBe(0) // past its wall
   expect(at(500, 303)).toBe(0)
   expect(mosaicOfPieces([], () => dxt)).toBeNull()
+})
+
+test('a place is let go when a room the game always draws from there is not on the minimap', () => {
+  // White rooms of 20 x 20 yards: A where the character is, B 40 yards east of it, C laid right over B.
+  const dxt = new Uint8Array((40 / 4) * (40 / 4) * 8)
+  for (let block = 0; block < 100; block++) dxt.set([0xff, 0xff, 0x00, 0x00, 0, 0, 0, 0], block * 8)
+  const room = (u: number, room: number): Piece => ({ file: 1, u, v: 300, width: 20, height: 20, angle: 0, bottom: 0, top: 5, building: 2, room, level: 0 })
+  const mosaic = mosaicOfPieces([room(500, 7), room(540, 8)], () => dxt, true)!
+  // A minimap of 100 yards across at a pixel a yard, centred on A: lit where `shown` says.
+  const minimap = (shown: (u: number) => boolean): Box => {
+    const rgb = new Uint8Array(100 * 100 * 3)
+    for (let y = 0; y < 100; y++) for (let x = 0; x < 100; x++) if (Math.abs(y + 250.5 - 300) < 10 && shown(x + 450.5)) rgb.fill(200, (y * 100 + x) * 3, (y * 100 + x) * 3 + 3)
+    return { size: 100, rgb }
+  }
+  const both = minimap((u) => Math.abs(u - 500) < 10 || Math.abs(u - 540) < 10), onlyA = minimap((u) => Math.abs(u - 500) < 10)
+  const here = { u: 500, v: 300 }, views = { '2.7': '2.8' }
+  expect(viewHolds(mosaic, both, 100, here, views)).toBe(true)
+  expect(viewHolds(mosaic, onlyA, 100, here, views)).toBe(false)
+  // Nothing known of what the game draws from A: no say either way.
+  expect(viewHolds(mosaic, onlyA, 100, here, { '2.8': '2.7' })).toBeNull()
+  expect(viewHolds(mosaic, onlyA, 100, here, undefined)).toBeNull()
+  // B under another room: its yards tell nothing, so it is not missing.
+  const stacked = mosaicOfPieces([room(500, 7), room(540, 8), room(540, 9)], () => dxt, true)!
+  expect(viewHolds(stacked, onlyA, 100, here, views)).toBe(true)
+  // Only the picture asked for keeps its rooms.
+  expect(mosaicOfPieces([room(500, 7)], () => dxt)!.owner).toBeUndefined()
 })
 
 // Two levels of a dungeon: the lower one, and the same with a room laid over its middle.

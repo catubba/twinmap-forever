@@ -7,7 +7,8 @@ import { join } from 'node:path'
 import { inflateSync } from 'node:zlib'
 import type { Position } from '../shared/game'
 import { inPiece, roomPixels, type Interiors, type Piece } from '../shared/inside'
-import { facingOf, levelsOf, locate, readsMinimap, SURE, widthsOf, type Box, type Found, type Levels, type Mosaic } from '../shared/minimap'
+import { facingOf, levelsOf, LIT, locate, readsMinimap, SHARED, SURE, viewHolds, widthsOf, type Box, type Found, type Levels, type Mosaic } from '../shared/minimap'
+import { ROOM_VIEWS } from '../shared/room-views'
 import { pictureOfBlock } from '../shared/pixels'
 import { BLOCK_YARDS } from '../shared/world'
 import { INTERIORS_FILE } from './interiors'
@@ -16,28 +17,38 @@ const AROUND = 160 // yards of nothing kept around the rooms: the minimap sees t
 const PIXELS_PER_YARD = 2 // of a room's picture
 const MOST_GROUND = 36e6 // square yards of open ground kept as a picture: more is a whole land, not a dungeon
 
-/** The rooms of a dungeon laid on one grey picture, a pixel a yard, each turned as its building stands. */
-export function mosaicOfPieces(pieces: Piece[], pictureOf: (file: number) => Uint8Array | null): Mosaic | null {
+/**
+ * The rooms of a dungeon laid on one grey picture, a pixel a yard, each turned as its building stands.
+ * owners: also which room each lit pixel is of (viewHolds), for the picture with every room.
+ */
+export function mosaicOfPieces(pieces: Piece[], pictureOf: (file: number) => Uint8Array | null, owners = false): Mosaic | null {
   if (!pieces.length) return null
   const reach = (p: Piece): number => Math.hypot(p.width, p.height) / 2
   const u0 = Math.floor(Math.min(...pieces.map((p) => p.u - reach(p)))) - AROUND, v0 = Math.floor(Math.min(...pieces.map((p) => p.v - reach(p)))) - AROUND
   const width = Math.ceil(Math.max(...pieces.map((p) => p.u + reach(p)))) + AROUND - u0, height = Math.ceil(Math.max(...pieces.map((p) => p.v + reach(p)))) + AROUND - v0
   const grey = new Uint8Array(width * height) // a byte a yard: a big dungeon has several of these pictures
+  // ponytail: two bytes a yard more, for the one picture with every room. A dungeon with over 65,534 rooms would need more.
+  const owner = owners ? new Uint16Array(width * height) : undefined, rooms: string[] = [], roomOf = new Map<string, number>()
   for (const p of pieces) {
     const dxt = pictureOf(p.file)
     if (!dxt) continue
     const w = Math.round(p.width * PIXELS_PER_YARD), h = Math.round(p.height * PIXELS_PER_YARD), rgba = roomPixels(dxt, w, h)
-    const r = Math.ceil(reach(p)) + 1
+    const r = Math.ceil(reach(p)) + 1, name = `${p.building}.${p.room}`
+    if (owner && !roomOf.has(name)) roomOf.set(name, rooms.push(name))
+    const mine = roomOf.get(name) ?? 0
     for (let v = Math.floor(p.v) - r; v < Math.floor(p.v) + r; v++) {
       for (let u = Math.floor(p.u) - r; u < Math.floor(p.u) + r; u++) {
         const in_ = inPiece(p, u + 0.5, v + 0.5)
         if (!in_) continue
         const i = (Math.min(h - 1, Math.floor(in_[1] * PIXELS_PER_YARD)) * w + Math.min(w - 1, Math.floor(in_[0] * PIXELS_PER_YARD))) * 4
-        if (rgba[i + 3]) grey[(v - v0) * width + (u - u0)] = Math.round(rgba[i]! * 0.299 + rgba[i + 1]! * 0.587 + rgba[i + 2]! * 0.114)
+        if (!rgba[i + 3]) continue
+        const g = Math.round(rgba[i]! * 0.299 + rgba[i + 1]! * 0.587 + rgba[i + 2]! * 0.114), at = (v - v0) * width + (u - u0)
+        grey[at] = g
+        if (owner && g > LIT) owner[at] = owner[at] && owner[at] !== mine ? SHARED : mine
       }
     }
   }
-  return { u0, v0, width, height, grey }
+  return owner ? { u0, v0, width, height, grey, owner, rooms } : { u0, v0, width, height, grey }
 }
 
 /**
@@ -94,7 +105,7 @@ export function mosaicsOf(folder: string, id: number): Mosaic[] {
   if (map.pieces.length) {
     const top = Math.max(0, ...map.pieces.map((p) => p.level))
     for (let level = 0; level <= top; level++) {
-      const mosaic = mosaicOfPieces(map.pieces.filter((p) => p.level <= level), pictureOf)
+      const mosaic = mosaicOfPieces(map.pieces.filter((p) => p.level <= level), pictureOf, level === top)
       if (mosaic) out.push({ ...mosaic, level: top > 0 ? level : undefined })
     }
   }
@@ -156,6 +167,8 @@ export interface InsideReport {
   lostFor?: number
   /** The mouse was over the minimap a moment ago, as the addon tells. */
   hid?: boolean
+  /** The place found was let go: a room the game always draws from there is not on the minimap (viewHolds). */
+  unlike?: boolean
 }
 
 /**
@@ -170,7 +183,7 @@ export interface InsideReport {
  * width each time (half a second of work each: all at once would stop the reading of the strip).
  */
 export function startInside(tilesFolder: () => string | null, mosaics: (folder: string, id: number) => Mosaic[] = mosaicsOf): { report: () => { report: InsideReport; seen: Box | null } | null; look: (pos: Position | undefined, cut: (x: number, y: number, size: number) => Box | null, now: number) => Inside | null } {
-  let dungeon = 0, floors: Levels[] = []
+  let dungeon = 0, floors: Levels[] = [], views: Record<string, string> | undefined
   let last: (Inside & { at: number; picture: number; across: number }) | null = null
   let lookedAt = 0, searchedAt = 0, lostTries = 0
   let report: InsideReport | null = null, seen: Box | null = null, foundAt = 0, enteredAt = 0
@@ -199,6 +212,7 @@ export function startInside(tilesFolder: () => string | null, mosaics: (folder: 
         enteredAt = now
         const folder = tilesFolder()
         floors = (folder ? mosaics(folder, dungeon) : []).map(levelsOf)
+        views = ROOM_VIEWS[dungeon]
       }
       const widths = widthsOf(mini)
       const said = { dungeon, pictures: floors.length, zoom: mini.zoom, size: mini.size, widths, lostFor: now - (foundAt || enteredAt), ...(mini.hid === true ? { hid: true } : {}) }
@@ -246,6 +260,8 @@ export function startInside(tilesFolder: () => string | null, mosaics: (folder: 
       if (known && before && found && (before as Found).score >= (found as Found).score - CLEARLY) (found = before), (picture = known.picture), (across = known.across)
       if (!found || (found as Found).score < (known ? FOLLOW : SURE)) return (report = { ...said, why: 'not sure', scores }), fresh()
       const place = found as Found
+      // Found anew: the rooms the game surely draws from there must be on the minimap, or the place is of elsewhere.
+      if (!known && viewHolds(floors[picture]!.mosaic, box, across, place, views) === false) return (report = { ...said, why: 'not sure', scores, unlike: true }), fresh()
       // Running, the way the place moved is the surest facing; standing, the arrow of the minimap
       // says it (the dots of a party over the arrow can hide its point: then the last facing stays).
       const du = known ? place.u - known.u : 0, dv = known ? place.v - known.v : 0

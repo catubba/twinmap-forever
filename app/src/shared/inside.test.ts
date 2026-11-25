@@ -3,7 +3,7 @@ import { boxOf, buildingsAt, inPiece, killedIn, nameOfBoss, piecesIn, RARE_BOSSE
 import { DUNGEON_PINS } from './dungeon-pins'
 import { MORE_BOSS_PINS } from './more-boss-pins'
 
-const piece = (over: Partial<Piece>): Piece => ({ file: 1, u: 100, v: 100, width: 32, height: 16, angle: 0, bottom: 0, top: 5, building: 0, level: 0, ...over })
+const piece = (over: Partial<Piece>): Piece => ({ file: 1, u: 100, v: 100, width: 32, height: 16, angle: 0, bottom: 0, top: 5, building: 0, room: 0, level: 0, ...over })
 
 test('a unit of the map is a 256th of the square of 64 blocks', () => {
   expect(YARDS_PER_UNIT * 256).toBeCloseTo((64 * 1600) / 3, 6)
@@ -106,7 +106,7 @@ test('a kill in a game in another language marks its boss by the number of the f
 })
 
 test('a building counts as under the ground when half of its floor has the terrain over its ceiling', () => {
-  const room = (building: number, u: number, top: number, width = 10): Piece => ({ file: 1, u, v: 0, width, height: 10, angle: 0, bottom: top - 5, top, building, level: 0 })
+  const room = (building: number, u: number, top: number, width = 10): Piece => ({ file: 1, u, v: 0, width, height: 10, angle: 0, bottom: top - 5, top, building, room: 0, level: 0 })
   // The terrain: 100 yards high everywhere, 60 east of u = 500, none at all east of u = 900.
   const groundAt = (u: number): number | null => (u >= 900 ? null : u >= 500 ? 60 : 100)
   const pieces = [
