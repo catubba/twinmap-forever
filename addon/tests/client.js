@@ -103,7 +103,8 @@ const STUB = `
     local lines = {}
     for i, l in ipairs(list or {}) do
       if not (spell and GAME.unloaded and GAME.unloaded[spell] and i == #list) then
-        lines[#lines + 1] = { leftText = l[1], leftColor = { r = 1, g = 1, b = 1 }, rightText = l[3] }
+        local function colour(hex) if hex and #hex == 6 then return { r = tonumber(hex:sub(1, 2), 16) / 255, g = tonumber(hex:sub(3, 4), 16) / 255, b = tonumber(hex:sub(5, 6), 16) / 255 } end end
+        lines[#lines + 1] = { leftText = l[1], leftColor = colour(l[2]) or { r = 1, g = 1, b = 1 }, rightText = l[3], rightColor = colour(l[4]) }
       end
     end
     GAME.spellReads = (GAME.spellReads or 0) + 1
