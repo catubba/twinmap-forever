@@ -27,18 +27,21 @@
   let maps = $state.raw<GameMap[]>([])
   const key = $derived(shown?.key ?? '')
   const goals = $derived(lists[key] ?? [])
-  let read = false
+  // Read once there is a list; asked again every few seconds while one is missing (the map still being made: a first run, a new build).
+  let tries = $state(0)
   $effect(() => {
-    if (!goals.length || read) return
-    read = true
+    if (!goals.length || (Object.keys(items).length && Object.keys(crafts).length && maps.length)) return
+    void tries
     const get = <T,>(file: string, set: (v: T) => void): void =>
       void fetch(`${TILES}/${file}`)
         .then((r) => (r.ok ? r.json() : null))
         .then((v: T | null) => v && set(v))
         .catch(() => {})
-    get<ItemFacts>(ITEMS_FILE, (v) => (items = v))
-    get<TrainerFacts>('trainers.json', (v) => ((crafts = v.crafts ?? {}), (lines = v.lines ?? {})))
-    get<GameMap[]>('maps.json', (v) => (maps = v))
+    if (!Object.keys(items).length) get<ItemFacts>(ITEMS_FILE, (v) => (items = v))
+    if (!Object.keys(crafts).length) get<TrainerFacts>('trainers.json', (v) => ((crafts = v.crafts ?? {}), (lines = v.lines ?? {})))
+    if (!maps.length) get<GameMap[]>('maps.json', (v) => (maps = v))
+    const again = setTimeout(() => tries++, 5000)
+    return () => clearTimeout(again)
   })
 
   const sheet = $derived(sheets[key])
