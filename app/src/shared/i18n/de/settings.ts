@@ -31,6 +31,13 @@ export default {
     hint: 'Mit M wechselt sie jederzeit die Seite.',
   },
 
+  arrow: {
+    title: 'Pfeil',
+    colour: 'Farbe',
+    size: 'Größe',
+    default: 'Standard',
+  },
+
   window: {
     // "Immer im Vordergrund" is how Windows and German apps name it.
     onTop: 'Twinmap immer im Vordergrund',

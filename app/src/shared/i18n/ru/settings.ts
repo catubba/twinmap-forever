@@ -32,6 +32,13 @@ export default {
     hint: 'M переносит ее на другую сторону в любой момент.',
   },
 
+  arrow: {
+    title: 'Стрелка',
+    colour: 'Цвет',
+    size: 'Размер',
+    default: 'По умолчанию',
+  },
+
   window: {
     onTop: 'Показывать Twinmap поверх других окон',
     textSize: 'Размер текста',

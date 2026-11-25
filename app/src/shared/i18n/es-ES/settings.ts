@@ -31,6 +31,13 @@ export default {
     hint: 'M lo cambia de lado en cualquier momento.',
   },
 
+  arrow: {
+    title: 'Flecha',
+    colour: 'Color',
+    size: 'Tamaño',
+    default: 'Predeterminado',
+  },
+
   window: {
     onTop: 'Mantener Twinmap sobre las demás ventanas',
     textSize: 'Tamaño del texto',

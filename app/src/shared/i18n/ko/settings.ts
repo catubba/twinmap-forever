@@ -31,6 +31,13 @@ export default {
     hint: 'M 키로 언제든지 반대쪽으로 옮길 수 있습니다.',
   },
 
+  arrow: {
+    title: '화살표',
+    colour: '색상',
+    size: '크기',
+    default: '기본값',
+  },
+
   window: {
     // Twinmap is read 트윈맵: the particles after it follow the final ㅂ.
     onTop: 'Twinmap을 항상 다른 창 위에 표시',

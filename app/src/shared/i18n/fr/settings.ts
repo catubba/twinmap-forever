@@ -31,6 +31,13 @@ export default {
     hint: 'M la fait passer de l’autre côté à tout moment.',
   },
 
+  arrow: {
+    title: 'Flèche',
+    colour: 'Couleur',
+    size: 'Taille',
+    default: 'Par défaut',
+  },
+
   window: {
     onTop: 'Garder Twinmap au-dessus des autres fenêtres',
     textSize: 'Taille du texte',

@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest'
-import { companionPin, GLYPHS, pin, PIN_NAMES, pinSize } from './marks'
+import { companionPin, GLYPHS, pin, PIN_NAMES, pinSize, playerPin } from './marks'
+import { ARROW } from './look'
 
 test('every pin of the specification is there, at its size', () => {
   expect(Object.fromEntries(PIN_NAMES.map((name) => [name, pinSize(name)]))).toEqual({
@@ -22,4 +23,10 @@ test('a companion has their role on the disc, or the first letter of their name'
 
 test('every glyph of the specification is there', () => {
   expect(Object.keys(GLYPHS).sort()).toEqual(['bag', 'bug', 'check', 'close', 'coins', 'direction', 'folder', 'gear', 'grip', 'info', 'keyboard', 'menu', 'minus', 'palette', 'pause', 'phone', 'pin', 'play', 'plus', 'search', 'shield', 'sliders', 'swap'])
+})
+
+test("the character's arrow is drawn in the colour and at the size chosen, and as it was until then", () => {
+  expect(playerPin('#3fa9ff', 1.5)).toContain('fill="#3fa9ff"')
+  expect(playerPin('#3fa9ff', 1.5)).toContain('viewBox="0 0 28 28" width="42" height="42"')
+  expect(playerPin(ARROW.colour, 1)).toBe(pin('player'))
 })

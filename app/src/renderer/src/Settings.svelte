@@ -12,7 +12,8 @@
   import qrcode from 'qrcode-generator'
   import { inApp } from './web'
   import { ZOOMS } from '../../shared/window'
-  import { layout, setMapRight } from './layout.svelte'
+  import { arrow, layout, setArrow, setMapRight } from './layout.svelte'
+  import { ARROW, ARROW_SIZES } from './look'
   import { langNow, metresOn, metricOffered, num, t, type Key } from '../../shared/i18n'
 
   let { setup, tiles, onback, onfirstrun, onfeedback, onnews }: { setup: SetupStatus; tiles: TilesStatus | null; onback: () => void; onfirstrun: () => void; onfeedback: () => void; onnews: () => void } = $props()
@@ -114,6 +115,15 @@
       <div class="setting">
         <label class="choice">{t('settings.layout.label')} <select class="field size" value={layout.mapRight ? 'right' : 'left'} onchange={(e) => setMapRight(e.currentTarget.value === 'right')}><option value="left">{t('settings.layout.left')}</option><option value="right">{t('settings.layout.right')}</option></select></label>
         {#if !touch}<p class="hint">{t('settings.layout.hint')}</p>{/if}
+      </div>
+      <!-- The character's arrow, on the 2D map and on the 3D view: any colour, and a size of the one first drawn. -->
+      <div class="setting">
+        <h3 class="sub">{t('settings.arrow.title')}</h3>
+        <div class="line">
+          <label class="choice">{t('settings.arrow.colour')} <input type="color" class="field colour" value={arrow.colour} oninput={(e) => setArrow({ colour: e.currentTarget.value })} /></label>
+          {#if arrow.colour !== ARROW.colour}<button class="btn" onclick={() => setArrow({ colour: ARROW.colour })}>{t('settings.arrow.default')}</button>{/if}
+        </div>
+        <label class="choice">{t('settings.arrow.size')} <select class="field size" value={arrow.size} onchange={(e) => setArrow({ size: Number(e.currentTarget.value) })}>{#each ARROW_SIZES as z (z)}<option value={z}>{num(z, { style: 'percent' })}</option>{/each}</select></label>
       </div>
     {:else if cat === 'game'}
       <div class="setting">
@@ -450,6 +460,18 @@
   .field.size {
     width: auto;
     padding: 0 4px;
+  }
+  .field.colour {
+    width: 44px;
+    padding: 3px;
+    cursor: pointer;
+  }
+  .field.colour::-webkit-color-swatch-wrapper {
+    padding: 0;
+  }
+  .field.colour::-webkit-color-swatch {
+    border: 1px solid #000;
+    border-radius: 2px;
   }
   kbd {
     min-width: 26px;

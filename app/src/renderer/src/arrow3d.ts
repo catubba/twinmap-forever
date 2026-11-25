@@ -3,12 +3,14 @@
 // and are written in design/ui.md, section 4: the outline of the 2D arrow as a soft gem, gold over
 // and dark under, its true size but never too small to see, laid on the slope of the ground, with
 // a soft shadow where it touches, its outline through a hill that hides it, and a stem from afar.
+// Its colour and its size are the player's to choose, the same as the 2D arrow's (M21-F1, layout.svelte.ts).
 import * as THREE from 'three'
+import { arrow } from './layout.svelte'
 import type { Terrain } from './terrain3d'
 import { turnAt, type Turn } from '../../shared/glide'
 
-const LENGTH = 8 // yards from tip to tail
-const LEAST = 30 // pixels on the screen it never goes under
+const LENGTH = 8 // yards from tip to tail, at the size first drawn
+const LEAST = 30 // pixels on the screen it never goes under, at that size
 const HEIGHT = 0.16 * 1.6 // of its length: the "thickness" of the prototype
 const LIFT = 0.175 // of its length, off the ground
 const BAND = 0.02 // half the band round its edge
@@ -18,7 +20,6 @@ const EASE = 0.25 // seconds the slope takes to follow the ground
 const SHADOW = 0.5
 const GHOST = 0.4 // its outline through a hill
 const FLOOR = 3 // yards over the ground from which the character is on a floor, not on the ground (a bridge)
-const GOLD = 0xffd100
 
 // The body: rings of the outline, each [how wide, how high], the tip to -z (north) and a length of 1.
 function body(): THREE.BufferGeometry {
@@ -90,17 +91,19 @@ function body(): THREE.BufferGeometry {
 const UP = new THREE.Vector3(0, 1, 0)
 
 export class Arrow3d {
-  // Lit by the sun of the view as the ground is, with no colour of its own: each face has its light.
-  private gold = new THREE.MeshLambertMaterial({ color: GOLD, transparent: true, side: THREE.DoubleSide })
-  private dark = new THREE.MeshLambertMaterial({ color: 0x2a1c05, emissive: 0x120b02, transparent: true, side: THREE.DoubleSide })
+  // Lit by the sun of the view as the ground is, with no colour of its own: each face has its light. Over in the
+  // colour chosen, under in a dark of it (look()).
+  private gold = new THREE.MeshLambertMaterial({ transparent: true, side: THREE.DoubleSide })
+  private dark = new THREE.MeshLambertMaterial({ transparent: true, side: THREE.DoubleSide })
   // Drawn only where something is in front of it: the hill that hides the arrow.
-  private ghostly = new THREE.MeshBasicMaterial({ color: GOLD, transparent: true, depthFunc: THREE.GreaterDepth, depthWrite: false })
+  private ghostly = new THREE.MeshBasicMaterial({ transparent: true, depthFunc: THREE.GreaterDepth, depthWrite: false })
+  private colour = ''
   private shadowy: THREE.MeshBasicMaterial
   private group = new THREE.Group()
   private shadow: THREE.Mesh
   private sheet: THREE.BufferAttribute
   private flatSheet: Float32Array
-  private stem = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1, 8).translate(0, 0.5, 0), new THREE.MeshBasicMaterial({ color: GOLD, transparent: true, opacity: 0.8 }))
+  private stem = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1, 8).translate(0, 0.5, 0), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.8 }))
   private want: { x: number; z: number; heading: number; opacity: number; floor: number | null } | null = null
   private up = new THREE.Vector3(0, 1, 0)
   private y: number | null = null
@@ -176,10 +179,11 @@ export class Arrow3d {
       room = w.floor !== null && w.floor < ground - FLOOR ? this.terrain.floorAt(w.x, w.z) : null,
       y = lifted ? w.floor! : room ? ground + (w.floor! - ground) * room.open : ground
     for (const o of [this.group, this.shadow, this.stem]) this.terrain.sink(o, !!room && room.open > 0.5)
+    this.look(arrow.colour)
     const camera = this.terrain.camera,
       distance = camera.position.distanceTo(new THREE.Vector3(w.x, y, w.z)),
-      least = (LEAST * 2 * distance * Math.tan((camera.fov * Math.PI) / 360)) / this.terrain.size.height,
-      size = Math.max(LENGTH, least)
+      least = (LEAST * arrow.size * 2 * distance * Math.tan((camera.fov * Math.PI) / 360)) / this.terrain.size.height,
+      size = Math.max(LENGTH * arrow.size, least)
     // The slope: the plane through the ground as far round as the arrow is long.
     const reach = Math.max(2, size / 2),
       at = (dx: number, dz: number): number => {
@@ -199,7 +203,7 @@ export class Arrow3d {
     this.group.position.set(w.x, this.y, w.z).addScaledVector(this.up, LIFT * size)
     this.group.scale.setScalar(size)
     const seen = this.group.position.clone().project(camera), { width, height } = this.terrain.size
-    this.onscreen?.({ x: ((seen.x + 1) / 2) * width, y: ((1 - seen.y) / 2) * height, r: (LEAST * size) / least / 2 })
+    this.onscreen?.({ x: ((seen.x + 1) / 2) * width, y: ((1 - seen.y) / 2) * height, r: (LEAST * arrow.size * size) / least / 2 })
     this.gold.opacity = this.dark.opacity = w.opacity
     this.ghostly.opacity = GHOST * w.opacity
     this.shadowy.opacity = SHADOW * w.opacity * (lifted ? 0.6 : 1)
@@ -210,12 +214,22 @@ export class Arrow3d {
     }
     this.sheet.needsUpdate = true
     // From afar, kept at its least size: a stem over it, to find it by.
-    this.stem.visible = least > LENGTH
+    this.stem.visible = least > LENGTH * arrow.size
     this.stem.position.copy(this.group.position)
     this.stem.scale.set(size, size * 3, size)
     const p = this.group.position,
       q = this.group.quaternion
-    return this.show(true, [p.x, p.y, p.z, q.x, q.y, q.z, size, w.opacity].map((v) => v.toFixed(3)).join())
+    return this.show(true, [p.x, p.y, p.z, q.x, q.y, q.z, size, w.opacity].map((v) => v.toFixed(3)).join() + this.colour)
+  }
+
+  // The colour chosen, on every part of it: the dark under it a sixth of it, as the gold's was (0x2a1c05).
+  private look(colour: string): void {
+    if (colour === this.colour) return
+    this.colour = colour
+    const c = new THREE.Color(colour)
+    for (const m of [this.gold, this.ghostly, this.stem.material as THREE.MeshBasicMaterial]) m.color.copy(c)
+    this.dark.color.copy(c).multiplyScalar(0.16)
+    this.dark.emissive.copy(c).multiplyScalar(0.07)
   }
 
   private show(on: boolean, as: string): boolean {

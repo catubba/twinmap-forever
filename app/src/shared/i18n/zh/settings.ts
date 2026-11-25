@@ -32,6 +32,13 @@ export default {
     hint: '随时按 M 切换到另一侧。',
   },
 
+  arrow: {
+    title: '箭头',
+    colour: '颜色',
+    size: '大小',
+    default: '默认',
+  },
+
   window: {
     onTop: '让Twinmap始终显示在其他窗口上方',
     // GS FONT_SIZE.

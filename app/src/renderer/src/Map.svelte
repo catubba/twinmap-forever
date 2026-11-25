@@ -3,7 +3,7 @@
   // character as an arrow. It follows the character until the player drags the map away.
   // Inside a dungeon or a raid it shows that instead: its rooms, its bosses, its entrance.
   import { TILES } from './web'
-  import { layout as sides, setMapRight } from './layout.svelte'
+  import { arrow as arrowLook, layout as sides, setMapRight } from './layout.svelte'
   import type { Terrain } from './terrain3d'
   import type { Compass } from './compass'
   import { Arrow3d } from './arrow3d'
@@ -45,7 +45,8 @@
   import { kept as keptByApp } from './kept.svelte'
   import { ARRIVE, pinOfMark, removePin, renamePin, savedAt, savedFrom, savePin, yardsBetween, type SavedPin } from '../../shared/saved'
   import { markPart, sendState, type GameMark, type Inbox, type Pin } from '../../shared/send'
-  import { companionPin, pin, pinSize, type PinName } from './marks'
+  import { companionPin, pin, pinSize, playerPin, type PinName } from './marks'
+  import { COLOURS } from './look'
 
   // at: when the position was read off the game, in milliseconds.
   // insideReady: the rooms of the buildings are converted, and their list can be asked for.
@@ -298,15 +299,21 @@
   const names3dSet = (): void => names3d?.set(named.map((n) => ({ tier: n.tier, text: n.text, x: n.at.lng * YARDS_PER_UNIT, z: -n.at.lat * YARDS_PER_UNIT })))
   let places: Place[] = []
   const pins = L.layerGroup()
+  // In the colour and at the size chosen in Settings > Appearance.
+  const arrowIcon = (): L.DivIcon => {
+    const px = Math.round(pinSize('player') * arrowLook.size)
+    return L.divIcon({ className: 'me', iconSize: [px, px], html: playerPin(arrowLook.colour, arrowLook.size) })
+  }
   const arrow = L.marker([0, 0], {
     zIndexOffset: 5000, // over every pin and the ring of a label: the character is never under anything
     interactive: false,
     keyboard: false, // nothing to do on it: not a stop for Tab
-    icon: L.divIcon({
-      className: 'me',
-      iconSize: [28, 28],
-      html: pin('player'),
-    }),
+    icon: arrowIcon(),
+  })
+  // Chosen again: the new arrow, turned at once to where it faces (spin).
+  $effect(() => {
+    arrow.setIcon(arrowIcon())
+    untrack(spinSoon)
   })
   // Under something it can walk on (a bridge, the floor above, the rock over a mine) the arrow
   // fades, a little: the map shows what is on top. The walk worker follows the floor it stands on
@@ -1387,7 +1394,7 @@
         const shown = (layer: FixedLayer): boolean => layers[layer] && far >= FIXED_ZOOM[layer]
         if ((p.side !== undefined) !== service || !((p.layers.some(shown) && kindShown(p)) || labelledAt(where)) || !view.contains(where)) continue
         // The radius is what the pointer feels, smaller than the picture: two people a few yards apart both answer.
-        new FixedPinMark(where, { renderer: fixedCanvas, radius: 7, lozenge: !service, fillColor: service ? '#7fc8ff' : '#d9a066', picture: pictureOf(iconOf(p, shown)), bubblingMouseEvents: false })
+        new FixedPinMark(where, { renderer: fixedCanvas, radius: 7, lozenge: !service, fillColor: service ? COLOURS.service : COLOURS.resource, picture: pictureOf(iconOf(p, shown)), bubblingMouseEvents: false })
           // Made when the pointer comes over the pin, not for every pin. Names come from the
           // player's QuestieDB: written as text, never as markup.
           .bindTooltip(
@@ -1441,7 +1448,7 @@
     for (const [a, b] of travel.routes) {
       const from = travel.nodes[a], to = travel.nodes[b]
       if (!from || !to || from.continent !== continent || !serves(from, side) || !serves(to, side)) continue
-      L.polyline([at(from), at(to)], { color: '#7fc8ff', weight: 1.5, opacity: 0.6, interactive: false, ...ROUTE }).addTo(travelLayers.routes)
+      L.polyline([at(from), at(to)], { color: COLOURS.flights, weight: 1.5, opacity: 0.6, interactive: false, ...ROUTE }).addTo(travelLayers.routes)
     }
   })
   $effect(() => {
@@ -1459,7 +1466,7 @@
     myPinsLayer.clearLayers()
     const flag = (saved: SavedPin, gold: boolean): void => {
       if (saved.continent !== continent) return
-      L.marker(at(saved.at), { keyboard: false, zIndexOffset: gold ? 450 : 400, icon: L.divIcon({ className: 'door mine', iconSize: [16, 16], html: gold ? pin('flag').replaceAll('#f3ead9', '#ffd100') : pin('flag') }) })
+      L.marker(at(saved.at), { keyboard: false, zIndexOffset: gold ? 450 : 400, icon: L.divIcon({ className: 'door mine', iconSize: [16, 16], html: gold ? pin('flag').replaceAll(COLOURS.text, COLOURS.mine) : pin('flag') }) })
         .bindTooltip(Object.assign(document.createElement('span'), { textContent: gold ? t('map.pins.followed', { name: saved.name }) : saved.name }), { direction: 'top', offset: [0, -8], className: 'tip' })
         .on('click', () => {
           if (!map) return
@@ -1580,20 +1587,20 @@
     }
   })
   // The colours Shortest Path gives the legs in the game.
-  const LEG_COLOURS: Record<string, string> = { flight: '#33ff59', boat: '#00bfff', zeppelin: '#ff591a', tram: '#ff8000', lift: '#ff8000' }
+  const LEG_COLOURS = COLOURS.legs
   const journeyLayer = L.layerGroup()
   $effect(() => {
     journeyLayer.clearLayers()
     const goal = journeyGoal
     const dashes = (line: L.LatLng[], colour: string, opacity = 1, air = false): void => {
-      for (const [color, weight] of [['#000', 7.5], [colour, 4.5]] as const) L.polyline(line, { color, weight, opacity, dashArray: '9 13', lineCap: 'round', lineJoin: 'round', interactive: false, ...(air && ARC) }).addTo(journeyLayer)
+      for (const [color, weight] of [[COLOURS.edge, 7.5], [colour, 4.5]] as const) L.polyline(line, { color, weight, opacity, dashArray: '9 13', lineCap: 'round', lineJoin: 'round', interactive: false, ...(air && ARC) }).addTo(journeyLayer)
     }
     // The legs after the one under way, and the one under way when it is no walk: fainter than the walk the character is on.
     ahead?.forEach((leg, i) => {
       if (i === 0 && leg.mode === 'walk') return
       if (leg.mode === 'walk') {
         const found = laterWalks[walkKey(leg)]
-        if (leg.points[0]!.continent === continent && leg.points.at(-1)!.continent === continent) dashes((found ?? leg.points.map((p) => p.at)).map(at), '#ffd100', 0.75)
+        if (leg.points[0]!.continent === continent && leg.points.at(-1)!.continent === continent) dashes((found ?? leg.points.map((p) => p.at)).map(at), COLOURS.journey, 0.75)
         return
       }
       const colour = LEG_COLOURS[leg.mode]
@@ -1611,11 +1618,11 @@
     if (!goal) return
     if (walked && me && walked.continent === continent && me.continent === continent) {
       const rest = restOf(walked.points, me.units).rest.map(at)
-      for (const [color, weight, dashArray] of [['#000', 7.5, '9 13'], ['#ffd100', 4.5, '9 13']] as const) L.polyline(rest, { color, weight, dashArray, lineCap: 'round', lineJoin: 'round', interactive: false }).addTo(journeyLayer)
+      for (const [color, weight, dashArray] of [[COLOURS.edge, 7.5, '9 13'], [COLOURS.journey, 4.5, '9 13']] as const) L.polyline(rest, { color, weight, dashArray, lineCap: 'round', lineJoin: 'round', interactive: false }).addTo(journeyLayer)
     }
     if (goal.continent !== continent) return
-    L.circleMarker(at(goal.at), { radius: 7, color: '#000', weight: 4, fill: false, interactive: false }).addTo(journeyLayer)
-    L.circleMarker(at(goal.at), { radius: 7, color: '#ffd100', weight: 2, fillColor: '#ffd100', fillOpacity: 0.35 })
+    L.circleMarker(at(goal.at), { radius: 7, color: COLOURS.edge, weight: 4, fill: false, interactive: false }).addTo(journeyLayer)
+    L.circleMarker(at(goal.at), { radius: 7, color: COLOURS.journey, weight: 2, fillColor: COLOURS.journey, fillOpacity: 0.35 })
       .bindTooltip(Object.assign(document.createElement('span'), { textContent: t('map.pins.journey', { name: goal.name }) }), { direction: 'top', offset: [0, -8], className: 'tip' })
       .addTo(journeyLayer)
   })
@@ -1629,7 +1636,7 @@
   // foot from the ghost to the corpse. Died in a dungeon, the way goes to its door, where the ghost
   // lives again. Found on the same grid as the journey's walks, again when the ghost strays off it.
   // The tombstone and the ghost are the game's own pictures; the way is in the red of the tombstone.
-  const WAY_BACK = '#e0703a'
+  const WAY_BACK = COLOURS.wayBack
   const deathAt = $derived(death ? deathPlaces(death, maps, travel.doors) : { back: null, yard: null })
   $effect(() => {
     back = deathAt.back
@@ -1662,14 +1669,14 @@
     const { back: to, yard } = deathAt
     if (ghostWalk && me && me.continent === continent && to?.continent === continent) {
       const rest = restOf(ghostWalk.points, me.units).rest.map(at)
-      for (const [color, weight] of [['#000', 7.5], [WAY_BACK, 4.5]] as const) L.polyline(rest, { color, weight, dashArray: '9 13', lineCap: 'round', lineJoin: 'round', interactive: false }).addTo(deathLayer)
+      for (const [color, weight] of [[COLOURS.edge, 7.5], [WAY_BACK, 4.5]] as const) L.polyline(rest, { color, weight, dashArray: '9 13', lineCap: 'round', lineJoin: 'round', interactive: false }).addTo(deathLayer)
     }
     if (death?.ghost && yard?.continent === continent)
       L.marker(at(yard.at), { keyboard: false, zIndexOffset: 700, icon: deathIcon('ghost', 26) }).bindTooltip(t('map.pins.graveyard'), { direction: 'top', offset: [0, -13], className: 'tip' }).addTo(deathLayer)
     if (to?.continent !== continent) return
     if (to.door) {
       // The door has its swirl already: a ring in the colour of the way says it is the one to walk to.
-      for (const [color, weight] of [['#000', 5], [WAY_BACK, 3]] as const) L.circleMarker(at(to.at), { radius: 24, color, weight, fill: false, interactive: false }).addTo(deathLayer)
+      for (const [color, weight] of [[COLOURS.edge, 5], [WAY_BACK, 3]] as const) L.circleMarker(at(to.at), { radius: 24, color, weight, fill: false, interactive: false }).addTo(deathLayer)
       return
     }
     L.marker(at(to.at), { keyboard: false, zIndexOffset: 800, icon: deathIcon('corpse', 28) }).bindTooltip(t('map.pins.corpse'), { direction: 'top', offset: [0, -14], className: 'tip' }).addTo(deathLayer)
@@ -1694,7 +1701,7 @@
         .bindTooltip(Object.assign(document.createElement('span'), { textContent: stop.name }), { direction: 'top', offset: [0, -8], className: 'tip' })
         .addTo(routeLayer)
     })
-    for (const [color, weight] of [['#000', 5.5], ['#fff', 3]] as const) L.polyline(line, { color, weight, interactive: false, lineJoin: 'round' }).addTo(routeLayer)
+    for (const [color, weight] of [[COLOURS.edge, 5.5], [COLOURS.route, 3]] as const) L.polyline(line, { color, weight, interactive: false, lineJoin: 'round' }).addTo(routeLayer)
   })
   $effect(() => {
     if (map && layers.route && !inside) routeLayer.addTo(map)
