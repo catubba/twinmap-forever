@@ -3,7 +3,8 @@ export default {
   top: {
     sections: '섹션',
     now: '현재',
-    items: '아이템',
+    map: '지도',
+    character: '캐릭터',
     auctionHouse: '경매장',
     // The game's own short name (GS BUTTON_LAG_AUCTIONHOUSE).
     auctionHouseShort: '경매',
@@ -85,7 +86,6 @@ export default {
     levelPercent: '레벨 {level}, {percent}%',
     xp: '경험치 {xp} / {max}',
     experience: '경험치',
-    width: '패널 너비',
     widthHint: '끌어서 크기를 조절합니다. 두 번 클릭하면 초기화됩니다.',
   },
 

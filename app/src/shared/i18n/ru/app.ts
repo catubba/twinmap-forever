@@ -3,7 +3,8 @@ export default {
   top: {
     sections: 'Разделы',
     now: 'Сейчас',
-    items: 'Предметы',
+    map: 'Карта',
+    character: 'Персонаж',
     // The game's short form of Аукционный дом: a tab has no room for the long one.
     auctionHouse: 'Аукцион',
     // As Russian players write it.
@@ -92,7 +93,6 @@ export default {
     levelPercent: '{level}-й уровень, {percent} %',
     xp: '{xp} из {max} опыта',
     experience: 'Опыт',
-    width: 'Ширина панели',
     widthHint: 'Перетащите, чтобы изменить размер. Дважды щелкните, чтобы сбросить.',
   },
 

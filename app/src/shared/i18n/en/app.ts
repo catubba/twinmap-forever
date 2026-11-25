@@ -4,9 +4,12 @@ export default {
   top: {
     // The list of the tabs, read aloud only.
     sections: 'Sections',
-    // The tabs: short, under or beside a small icon. Now is also the name of the side panel, read aloud.
+    // The name of the side panel beside the map, read aloud.
     now: 'Now',
-    items: 'Items',
+    // The tabs: short, under or beside a small icon. Map: the map with the panel Now beside it. Character: the character's
+    // gear, bags, bank and stats, and what the other characters hold.
+    map: 'Map',
+    character: 'Character',
     auctionHouse: 'Auction House',
     // Shown in place of auctionHouse when the window is narrow: two or three letters.
     auctionHouseShort: 'AH',
@@ -113,8 +116,6 @@ export default {
     xp: '{xp} of {max} xp',
     // The experience bar, read aloud only.
     experience: 'Experience',
-    // The edge between the map and the panel: its name read aloud, and its hint on hover.
-    width: 'Panel width',
     widthHint: 'Drag to resize. Double-click to reset.',
   },
 

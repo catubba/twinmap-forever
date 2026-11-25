@@ -121,6 +121,8 @@ export default {
     north: 'The map turns with your character, or north up',
     // Beside the key M.
     side: 'Map on the other side of the panel',
+    // Beside the keys Ctrl, 1 and the number of the last tab.
+    spaces: 'The sections at the top, from the left',
     // Beside the key F11.
     fullScreen: 'Full screen',
     // The name of a key: Control, as printed on the keyboards of the language (Strg in German). Short.

@@ -2,6 +2,7 @@
 // only: to forget a character, to pick the game folder, to open the addon's page on CurseForge, to build the map again after a
 // failure, to stay over other windows, to show the map on the home network, to search the player's QuestieDB, to mark a point in the
 // game, to send it a route, to step ahead on that route, to fetch the prices of an auction house, and to set alerts on them. It says one: that its opening screen is drawn.
+import type { Workspaces } from '../shared/workspaces'
 import { contextBridge, ipcRenderer } from 'electron'
 import type { Alert, History, PricesTold } from '../shared/ah'
 import type { FeedbackSent, FeedbackWay } from '../shared/feedback'
@@ -92,6 +93,8 @@ contextBridge.exposeInMainWorld('twinmap', {
   drawn: (): void => ipcRenderer.send('drawn'),
   setOnTop: (on: boolean): Promise<void> => ipcRenderer.invoke('set-on-top', on),
   setZoom: (zoom: number): Promise<void> => ipcRenderer.invoke('set-zoom', zoom),
+  // The workspaces as they are laid out now, and the one open: kept for the next start.
+  setWorkspaces: (kept: Workspaces): Promise<void> => ipcRenderer.invoke('set-workspaces', kept),
   // Hardware acceleration, from the next start; restart starts the app again now.
   setGpu: (on: boolean): Promise<void> => ipcRenderer.invoke('set-gpu', on),
   restart: (): Promise<void> => ipcRenderer.invoke('restart'),

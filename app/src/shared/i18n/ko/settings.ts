@@ -86,6 +86,7 @@ export default {
     follow: '추적 켜기/끄기',
     north: '캐릭터 방향에 맞춰 지도 회전, 또는 북쪽이 위',
     side: '지도를 패널 반대쪽으로',
+    spaces: '위쪽 섹션, 왼쪽부터 차례로',
     // GS VIDEO_OPTIONS_FULLSCREEN.
     fullScreen: '전체 화면',
     // Korean keyboards print Ctrl (GS CTRL_KEY "CTRL 키").

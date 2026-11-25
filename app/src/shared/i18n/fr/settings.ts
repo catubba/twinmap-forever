@@ -85,6 +85,7 @@ export default {
     follow: 'Activer ou désactiver Suivre',
     north: 'La carte tourne avec votre personnage, ou le nord en haut',
     side: 'Carte de l’autre côté du panneau',
+    spaces: 'Les sections du haut, de gauche à droite',
     fullScreen: 'Plein écran',
     ctrl: 'Ctrl',
     zoom: 'Taille du texte, aussi Ctrl et la molette hors de la carte',

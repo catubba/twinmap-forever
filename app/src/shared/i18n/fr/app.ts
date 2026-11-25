@@ -3,7 +3,8 @@ export default {
   top: {
     sections: 'Sections',
     now: 'Maintenant',
-    items: 'Objets',
+    map: 'Carte',
+    character: 'Personnage',
     auctionHouse: 'Hôtel des ventes',
     auctionHouseShort: 'HV',
     pause: 'Mettre Twinmap en pause',
@@ -79,7 +80,6 @@ export default {
     levelPercent: 'Niveau {level}, {percent} %',
     xp: '{xp} sur {max} EXP',
     experience: 'Expérience',
-    width: 'Largeur du panneau',
     widthHint: 'Faites glisser pour redimensionner. Double-cliquez pour réinitialiser.',
   },
 
