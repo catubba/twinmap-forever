@@ -63,7 +63,7 @@
     </header>
     <nav class="tabs">
       {#each tree.tabs as tab, i (i)}
-        <button class:on={i === on} aria-pressed={i === on} onclick={() => (chosen = i)}>
+        <button class:on={i === on} aria-pressed={i === on} aria-label="{tab.name} {tab.spent}" title={tab.name} onclick={() => (chosen = i)}>
           <img src="{TILES}/pictures/{tab.icon}.png" alt="" onerror={(e) => e.currentTarget.setAttribute('style', 'visibility: hidden')} />
           <span>{tab.name}</span><em>{tab.spent}</em>
         </button>
@@ -172,6 +172,7 @@
   }
   .tabs span,
   h3 span {
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -326,6 +327,12 @@
     }
     .tree:not(.on),
     h3 {
+      display: none;
+    }
+  }
+  /* Where the names would be cut to a few letters, the trees' pictures tell them apart, as in the game. */
+  @container talents (width < 400px) {
+    .tabs span {
       display: none;
     }
   }
