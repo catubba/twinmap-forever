@@ -7,6 +7,8 @@ export default {
     character: 'Charakter',
     inventory: 'Inventar',
     professions: 'Berufe',
+    auctionSearch: 'AH-Suche',
+    item: 'Gegenstand',
     auctionHouse: 'Auktionshaus',
     // As German players write it.
     auctionHouseShort: 'AH',
@@ -106,6 +108,7 @@ export default {
     xp: '{xp} von {max} EP',
     experience: 'Erfahrung',
     emptyExperience: 'Eure Stufe erscheint hier, sobald Ihr mit aktivem Addon Twinmap Forever spielt.',
+    emptyItem: 'Klickt auf einen Gegenstand in Taschen, Bank, Inventar oder der AH-Suche, um hier seine Preise zu sehen.',
     widthHint: 'Ziehen, um die Größe zu ändern. Doppelklick zum Zurücksetzen.',
   },
 

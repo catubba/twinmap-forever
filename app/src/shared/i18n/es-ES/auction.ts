@@ -131,6 +131,7 @@ export default {
     // After a colon: a category name may start with an article.
     back: 'Volver: {place}',
     theSearch: 'búsqueda',
+    notOnSale: 'Ahora no está a la venta en esta casa de subastas.',
     // GS ITEM_MIN_LEVEL, lowercase after the dot.
     requiresLevel: 'necesitas ser de nivel {level}',
     itemLevel: 'nivel de objeto {level}',
@@ -277,6 +278,7 @@ export default {
     attribution: '{source}, mediante la API de Battle.net. Twinmap no está afiliado a Blizzard ni cuenta con su aprobación.',
     source: 'Datos de subastas: Blizzard Entertainment',
     approximate: 'Las cantidades son aproximadas',
+    hide: 'Ocultar esta línea',
   },
 
   chart: {

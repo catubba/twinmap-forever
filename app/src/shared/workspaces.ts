@@ -5,11 +5,14 @@
 export const WORKSPACES_VERSION = 1
 
 /** The panels there are, by their id: a panel of a layout kept that is none of these is taken out, but for Items, which
- * became the four of the Character workspace (M20-F8). */
-export const PANELS = ['map', 'now', 'character', 'bags', 'bank', 'inventory', 'professions', 'ah', 'next', 'attention', 'pins', 'quests', 'nearby', 'experience'] as const
+ * became the four of the Character workspace (M20-F8), and the Auction House, which became its search (M20-F9). */
+export const PANELS = ['map', 'now', 'character', 'bags', 'bank', 'inventory', 'professions', 'search', 'item', 'mine', 'alerts', 'next', 'attention', 'pins', 'quests', 'nearby', 'experience'] as const
 
 /** The panels of the Character workspace, in the order they are laid out at first. */
 export const CHARACTER = ['character', 'bags', 'bank', 'inventory'] as const
+
+/** The panels of the auction that live in its search, as its views, until taken out into panels of their own (M20-F9). */
+export const AUCTION = ['item', 'mine', 'alerts'] as const
 
 /** A workspace by its id; the name the player gave it, if any (without, the default one in the language spoken, never
  * translated once written); its layout as dockview gives it (toJSON). */

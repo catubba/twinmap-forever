@@ -7,6 +7,8 @@ export default {
     character: '캐릭터',
     inventory: '소지품',
     professions: '전문 기술',
+    auctionSearch: '경매장 검색',
+    item: '아이템',
     auctionHouse: '경매장',
     // The game's own short name (GS BUTTON_LAG_AUCTIONHOUSE).
     auctionHouseShort: '경매',
@@ -112,6 +114,7 @@ export default {
     xp: '경험치 {xp} / {max}',
     experience: '경험치',
     emptyExperience: 'Twinmap Forever 애드온을 켜고 플레이하면 레벨이 여기에 표시됩니다.',
+    emptyItem: '가방, 은행, 소지품 또는 경매장 검색에서 아이템을 클릭하면 여기에 가격이 표시됩니다.',
     widthHint: '끌어서 크기를 조절합니다. 두 번 클릭하면 초기화됩니다.',
   },
 

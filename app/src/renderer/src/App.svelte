@@ -96,7 +96,7 @@
   const go = (to: Go): void => {
     if (to === 'settings') return void (onSettings = true)
     onSettings = false
-    reach(to === 'items' ? 'character' : to === 'ah' ? 'ah' : 'map')
+    reach(to === 'items' ? 'character' : to === 'ah' ? 'search' : 'map')
     if (to === 'layers') void tick().then(() => mapView?.openLayers())
   }
   window.twinmap.onSetup((told) => {
@@ -569,7 +569,7 @@
       {journey}
       back={death ? back : null}
       met={alerts.filter((a) => a.met)}
-      onalerts={() => ((onSettings = false), reach('ah'), showAlerts++)}
+      onalerts={() => ((onSettings = false), reach('alerts') || reach('search'), showAlerts++)}
       onsent={(t) => setRoute({ ...route, sent: true, t })}
       onskip={skip}
       onarrive={() => setRoute(advance(route))}
@@ -601,7 +601,7 @@
     <div class="sec" use:section={part}><Items {part} {sheets} {portraits} {shown} known={characters} {now} {listing} onpick={(key) => (picked = key)} /></div>
   {/each}
   <div class="sec" use:section={'professions'}><Professions {sheets} {shown} ready={mapReady} /></div>
-  <div class="sec" use:section={'ah'}><Auction {house} chosen={!!chosenHouse} hints={char ?? null} who={char?.name ?? null} {prices} {listing} {sheets} known={characters} {homes} {now} {alerts} {showAlerts} onchoose={chooseHouse} /></div>
+  <div class="sec" use:section={'search'}><Auction {house} chosen={!!chosenHouse} hints={char ?? null} who={char?.name ?? null} {prices} {listing} {sheets} known={characters} {homes} {now} {alerts} {showAlerts} onchoose={chooseHouse} /></div>
 </div>
 {/if}
 

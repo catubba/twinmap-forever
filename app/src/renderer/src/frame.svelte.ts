@@ -13,7 +13,7 @@ import type { DockviewComponent as Dock, DockviewGroupPanel, IContentRenderer, S
 // @ts-expect-error no declaration for the UMD build
 import * as built from 'dockview-core/dist/dockview-core.js'
 import { t } from '../../shared/i18n'
-import { CHARACTER, MOST, NAME_MOST, PANELS, WORKSPACES_VERSION, type Workspaces } from '../../shared/workspaces'
+import { AUCTION, CHARACTER, MOST, NAME_MOST, PANELS, WORKSPACES_VERSION, type Workspaces } from '../../shared/workspaces'
 
 const { DockviewComponent, positionToDirection } = built as typeof import('dockview-core')
 
@@ -43,7 +43,10 @@ const TITLES: Record<string, () => string> = {
   bank: () => t('items.places.bank'),
   inventory: () => t('app.top.inventory'),
   professions: () => t('app.top.professions'),
-  ah: () => t('app.top.auctionHouse'),
+  search: () => t('app.top.auctionSearch'),
+  item: () => t('app.top.item'),
+  mine: () => t('auction.nav.mine'),
+  alerts: () => t('auction.nav.alerts'),
   next: () => t('map.nextStop.title'),
   attention: () => t('app.now.attention'),
   pins: () => t('app.now.pins'),
@@ -58,7 +61,7 @@ export const titleOf = (id: string): string => TITLES[id]?.() ?? id
 export const PARTS = ['next', 'attention', 'pins', 'quests', 'nearby', 'experience'] as const
 /** What a block of Now carries while its handle is dragged: its id. */
 export const PART_DRAG = 'application/x-twinmap-part'
-const NAMES: Record<string, () => string> = { map: TITLES.map!, character: TITLES.character!, ah: TITLES.ah! }
+const NAMES: Record<string, () => string> = { map: TITLES.map!, character: TITLES.character!, ah: () => t('app.top.auctionHouse') }
 
 /** The name a workspace has without one of the player's: the default ones' in the language spoken now. */
 export const nameFirst = (id: string): string => NAMES[id]?.() ?? t('app.layout.unnamed')
@@ -71,7 +74,9 @@ export const nameOf = (space: Space): string => space.name ?? nameFirst(space.id
 type Made = { dock: Dock; box: HTMLElement; seen: ResizeObserver; width?: number }
 const made: Made[] = []
 const sections = new Map<string, HTMLElement>()
-// Where a block of Now goes back to when no panel holds it: its place in the column.
+// Where a block of Now goes back to when no panel holds it: its place in the column. The same for the views of the
+// auction (AUCTION), whose home is in its search.
+const HOMED: readonly string[] = [...PARTS, ...AUCTION]
 const homes = new Map<string, HTMLElement>()
 // The element dockview gives each panel, by workspace and panel.
 const hosts = new Map<string, HTMLElement>()
@@ -86,7 +91,7 @@ let saving = 0
 export function section(node: HTMLElement, id: string): { destroy(): void } {
   sections.set(id, node)
   node.dataset.section = id
-  if ((PARTS as readonly string[]).includes(id) && node.parentElement) homes.set(id, node.parentElement)
+  if (HOMED.includes(id) && node.parentElement) homes.set(id, node.parentElement)
   if (made.length) lay()
   return { destroy: () => sections.delete(id) }
 }
@@ -227,7 +232,7 @@ function characters(dock: Dock, at?: string): void {
 function lay0(dock: Dock, id: string, right = localStorage.getItem('map-side') === 'right', wide = Number(localStorage.getItem('panel-width'))): number | undefined {
   if (id === 'character') return void characters(dock)
   if (id === 'ah') {
-    dock.addPanel({ id: 'ah', component: 'ah', title: TITLES.ah!() })
+    dock.addPanel({ id: 'search', component: 'search', title: TITLES.search!() })
     return undefined
   }
   dock.addPanel({ id: 'map', component: 'map', title: TITLES.map!() })
@@ -275,8 +280,13 @@ function make(space: Space, kept?: unknown, right?: boolean, wide?: number): voi
     const now = groupOf(dock, 'now')
     if (now) me.width = Math.round(now.api.width)
     dock.layout(root.clientWidth, root.clientHeight)
-    // Items, as it was before M20-F8: the Character panels in its place.
+    // Items, as it was before M20-F8: the Character panels in its place. The Auction House, as it was before M20-F9: its
+    // search in its place, the item, My items and Alerts in it as before.
     if (has(dock, 'items')) characters(dock, 'items')
+    if (has(dock, 'ah') && !has(dock, 'search')) {
+      dock.addPanel({ id: 'search', component: 'search', title: TITLES.search!(), position: { referencePanel: 'ah', direction: 'within' } })
+      dock.removePanel(dock.getGroupPanel('ah')!)
+    }
     // A panel this version has not: out. Titles in the language spoken now.
     for (const panel of [...dock.panels]) if (!(PANELS as readonly string[]).includes(panel.id)) dock.removePanel(panel)
     if (!dock.panels.length) throw new Error('empty')
@@ -365,11 +375,12 @@ export function open(space: number): void {
   save()
 }
 
-/** Opens a workspace that has this panel: the open one if it has it, else the first that does. */
-export function reach(panel: string): void {
-  if (made[frame.open] && has(made[frame.open]!.dock, panel)) return
+/** Opens a workspace that has this panel: the open one if it has it, else the first that does. False if none has it. */
+export function reach(panel: string): boolean {
+  if (made[frame.open] && has(made[frame.open]!.dock, panel)) return true
   const i = made.findIndex((m) => has(m.dock, panel))
   if (i >= 0) open(i)
+  return i >= 0
 }
 
 /** Edit layout on or off: the open workspace unlocked (all of them, as they are opened), or locked again. */

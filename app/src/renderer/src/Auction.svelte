@@ -15,8 +15,14 @@
   import { columns } from './columns'
   import { untrack } from 'svelte'
   import Glyph from './Glyph.svelte'
+  import { AUCTION } from '../../shared/workspaces'
   import { TILES } from './web'
   import { around, clock, langTag, num, t, type Key } from '../../shared/i18n'
+  import { frame, section } from './frame.svelte'
+  import { chosen as clicked } from './item-tip.svelte'
+  // In panels (M20-F9): this is the search (the tools, the categories, the list); the page of an item, My items and Alerts
+  // are sections of their own whose home is here, shown in place of the list as before, until a panel of the open
+  // workspace holds them. Then the list stays, and what is chosen in it shows in that panel.
 
   // listing: the prices of the house on show (App.svelte). homes: each character's own house, as the game told it.
   // alerts: of every character (M18-F10); showAlerts: a number new each time Now asks for the Alerts view.
@@ -69,13 +75,33 @@
 
   // The page of an item, and which of its kinds.
   let page = $state<{ id: number; key: string } | null>(null)
+  // What the search shows in place of its list: the page of the item, My items or Alerts; the list again where that one is
+  // in a panel of the open workspace.
+  type View = 'list' | 'item' | 'mine' | 'alerts'
+  let view = $state<View>('list')
+  const out = (id: string): boolean => !frame.missing.includes(id)
+  const shown = $derived<View>(view === 'list' || out(view) ? 'list' : view)
+  // An item chosen here, in My items, in Alerts or elsewhere (Bags, Inventory): its page in the Item panel if the open
+  // workspace has one, else in the search instead of the list, with Back to where it was chosen.
+  function pick(id: number, key: string, origin: View): void {
+    page = { id, key }
+    if (out('item')) return
+    from = origin === 'list' || origin === 'item' || out(origin) ? null : origin
+    view = 'item'
+  }
+  let taken = clicked.n
+  $effect(() => {
+    if (clicked.n <= taken) return
+    taken = clicked.n
+    untrack(() => (out('item') || out('search')) && pick(clicked.item, clicked.key ?? '', shown))
+  })
   const pageItem = $derived(page ? items.find((it) => it.id === page!.id) : undefined)
   const pageKind = $derived(pageItem?.kinds.find((k) => k.key === page!.key) ?? pageItem?.kinds[0])
 
   // The history (M18-F9): the last 24 hours of the rows on show for their column, and the days too for the page's chart.
   let sparks = $state.raw<{ snapshot: string; of: Record<string, History> }>({ snapshot: '', of: {} })
   $effect(() => {
-    const snapshot = listing?.snapshot ?? '', keys = page || yours ? [] : found.slice(0, most).map((it) => it.kinds[0]!.key)
+    const snapshot = listing?.snapshot ?? '', keys = shown !== 'list' ? [] : found.slice(0, most).map((it) => it.kinds[0]!.key)
     if (!snapshot || !keys.length) return
     let gone = false
     void window.twinmap.ahHistory(keys, false).then((of) => !gone && (sparks = { snapshot, of: sparks.snapshot === snapshot ? { ...sparks.of, ...of } : of }))
@@ -106,10 +132,21 @@
   $effect(() => {
     if (!house && !choosing) startChoosing()
   })
+  // The house known and its prices here: the search shows its list, or the view chosen.
+  const ready = $derived(!!house && !!listing && !choosing)
+  // The line Blizzard's terms ask for, once in a workspace: at the foot of the search where it has it, else of the first
+  // part of the auction it has in a panel. The player may hide it for good (chosen by Catubba in M20-F9).
+  let sourceShut = $state(localStorage.getItem('ahSource') === 'shut')
+  const sourceAt = $derived(out('search') ? 'search' : AUCTION.find(out))
+  const shutSource = (): void => {
+    sourceShut = true
+    localStorage.setItem('ahSource', 'shut')
+  }
   function choose(): void {
     onchoose({ region, ruleset, side: neutral ? 'N' : (side as Side) })
     choosing = false
     page = null
+    if (view === 'item') view = 'list'
   }
 
   const snapshot = $derived(listing ? Date.parse(listing.snapshot) : 0)
@@ -134,7 +171,6 @@
   const levelOf = (it: AhItem): string => (it.level ? ` (${it.level})` : '')
   const kindName = (it: AhItem, k: Kind): string => (k.suffix ? `${it.name} ${k.suffix}` : it.name)
   // My items (M18-F8): what the characters of this house hold, each kind at its own lowest price.
-  let yours = $state<'mine' | 'alerts' | null>(null) // My items or Alerts on show, instead of a category
   let from = $state<'mine' | 'alerts' | null>(null) // the page of an item was opened from there: Back goes there
   const YOURS = { mine: (): string => t('auction.nav.mine'), alerts: (): string => t('auction.nav.alerts') }
   let where = $state<OwnedPlace | null>(null)
@@ -172,8 +208,7 @@
   $effect(() => {
     if (showAlerts <= alertsTaken) return
     alertsTaken = showAlerts
-    yours = 'alerts'
-    page = null
+    view = 'alerts'
   })
   let alertWhen = $state<AlertWhen>('below'), alertPrice = $state(''), alertKind = $state(true), alertGame = $state(true), alertSet = $state('')
   // The price asked for in silver, as the field says: "3.2" is 3 silver 20 copper.
@@ -218,14 +253,195 @@
 
 {#snippet tree(list: Category[], depth: number)}
   {#each list as c (c.key)}
-    <button class="cat" class:on={category === c.key} style:padding-left="{16 + depth * 16}px" onclick={() => ((category = category === c.key && !c.kids.length ? null : c.key), (page = null), (yours = null))}>{c.name} <small>{c.n}</small></button>
+    <button class="cat" class:on={category === c.key} style:padding-left="{16 + depth * 16}px" onclick={() => ((category = category === c.key && !c.kids.length ? null : c.key), (view = 'list'))}>{c.name} <small>{c.n}</small></button>
     {#if c.kids.length && category?.split('.').slice(0, depth + 1).join('.') === c.key}{@render tree(c.kids, depth + 1)}{/if}
   {/each}
 {/snippet}
 
-<main class="surface">
+<!-- In a panel of its own, a part shows the line Blizzard's terms ask for under what it shows. -->
+{#snippet shut()}
+  <button class="hide" aria-label={t('auction.foot.hide')} title={t('auction.foot.hide')} onclick={shutSource}><Glyph name="close" size={12} /></button>
+{/snippet}
+
+{#snippet source(id: string)}
+  {#if !sourceShut && sourceAt === id}<p class="src">{foot[0]}<b>{t('auction.foot.source')}</b>{foot[1]}{@render shut()}</p>{/if}
+{/snippet}
+
+<!-- Who holds an item, of the characters of this house; the kind on show given, the others say theirs. -->
+{#snippet holding(id: number, key: string | null)}
+  <h5 class="first">{t('auction.page.youHave')}</h5>
+  {#each owned.filter((o) => o.id === id) as o (o.who + o.place + o.key)}
+    {@const [before, after] = around('auction.page.have', 'who', { count: o.n, place: t(`auction.held.${PLACE[o.place]}`) })}
+    <div>{before}<span style:color={colorOf(o.who)}>{o.who}</span>{after}{#if key !== null && o.key !== key}<span class="dim">{' '}{t('auction.page.otherKind', { kind: suffixOf(o.key, names) || t('auction.page.plain') })}</span>{/if}</div>
+  {:else}
+    <div class="dim">{t('auction.page.none')}</div>
+  {/each}
+{/snippet}
+
+{#snippet findIt(name: string)}
+  <h5>{t('auction.page.findInGame')}</h5>
+  <div class="dim">{t('auction.page.quoted', { name })} · <button class="link" onclick={() => copy(name)}>{copied ? t('auction.page.copied') : t('auction.page.copy')}</button></div>
+{/snippet}
+
+<!-- The page of an item chosen that is not on sale here now, or with no prices yet: what the game and the sheets say of it. -->
+{#snippet lone(id: number)}
+  {@const f = facts[id]}
+  <div class="lone">
+    <div class="head">
+      {@render icon(id, true)}
+      <div><h2 style:color={QUALITY_COLORS[f?.[1] ?? 1]}>{f?.[0] ?? t('auction.unknownItem', { id })}</h2>{#if f}<span class="dim">{typeOf(f[3], f[4])}</span>{/if}</div>
+    </div>
+    <p class="dim">{listing ? t('auction.page.notOnSale') : t('auction.wait.noPrices')}</p>
+    <div class="facts"><div><small>{t('auction.page.vendorGives')}</small><span>{@render money(f?.[2])}</span></div></div>
+    {@render holding(id, null)}
+    {#if f}{@render findIt(f[0])}{/if}
+  </div>
+{/snippet}
+
+{#snippet itemPart()}
+  {#if !page}
+    <p class="block-empty"><b>{t('app.top.item')}</b>{t('app.panel.emptyItem')}</p>
+  {:else if listing && pageItem && pageKind}
+    {@const it = pageItem}
+    {@const k = pageKind}
+    {@const draws = disenchantOf(it)}
+    <div class="itempage">
+      <div class="kinds">
+        {#if !out('item')}<button class="back" onclick={() => ((view = from ?? 'list'), (from = null))}>‹ {t('auction.page.back', { place: from ? YOURS[from]() : typed.trim() ? t('auction.page.theSearch') : category_(category) })}</button>{/if}
+        {#each it.kinds as x (x.key)}
+          <button class="kind" class:on={x.key === k.key} onclick={() => (page = { id: it.id, key: x.key })}><span style:color={QUALITY_COLORS[it.quality]}>{x.suffix || it.name}{levelOf(it)}</span><span>{@render money(x.lowest)}</span></button>
+        {/each}
+      </div>
+      <div class="mid">
+        <div class="head">
+          {@render icon(it.id, true)}
+          <div><h2 style:color={QUALITY_COLORS[it.quality]}>{kindName(it, k)}</h2><span class="dim">{names.subs[`${it.cls}.${it.sub}`] ? `${names.classes[it.cls]} · ${names.subs[`${it.cls}.${it.sub}`]}` : typeOf(it.cls, it.sub)}{it.level ? ` · ${t('auction.page.requiresLevel', { level: it.level })}` : ''}{it.itemLevel ? ` · ${t('auction.page.itemLevel', { level: it.itemLevel })}` : ''}</span></div>
+        </div>
+        <div class="facts">
+          <div><small>{t('auction.page.lowest')}</small><span>{@render money(k.lowest)}</span></div>
+          <div><small>{t('auction.page.typical')}</small><span>{@render money(k.typical)}</span></div>
+          <div><small>{t('auction.page.available')}</small><span>{num(k.available)}</span></div>
+          <div><small>{t('auction.page.vendorGives')}</small><span>{@render money(it.vendor)}</span></div>
+        </div>
+        <Chart history={chartOf?.key === k.key && chartOf.snapshot === listing.snapshot ? chartOf.history : null} snapshot={listing.snapshot} {now} />
+        <h5>{t('auction.page.onSale')}</h5>
+        <table class="list" use:columns={'ah-ladder'}>
+          <thead><tr><th>{t('auction.page.priceEach')}</th><th>{t('auction.page.howMany')}</th><th>{t('auction.page.upToHere')}</th><th>{t('auction.page.costUpToHere')}</th></tr></thead>
+          <tbody>
+            {#each k.ladder.reduce<[number, number, number, number][]>((rows, [p, q]) => [...rows, [p, q, (rows.at(-1)?.[2] ?? 0) + q, (rows.at(-1)?.[3] ?? 0) + p * q]], []) as [p, q, upTo, cost], i (i)}
+              <tr><td>{@render money(p)}</td><td>{num(q)}</td><td>{num(upTo)}</td><td>{@render money(cost)}</td></tr>
+            {/each}
+          </tbody>
+        </table>
+        <p class="note">{t('auction.page.asAt', { time: clock(snapshot) })}</p>
+      </div>
+      <div class="side">
+        {@render holding(it.id, k.key)}
+        {#if draws}
+          {@const worth = disenchantValue(draws, listing)}
+          <h5>{t('auction.page.disenchant')}</h5>
+          <div class="facts two">
+            <div><small>{t('auction.page.expected')}</small><span>{#if worth !== null}{@render money(worth)}{:else}<span class="dim small">{t('auction.page.notAllOnSale')}</span>{/if}</span></div>
+            <div><small>{t('auction.page.best')}</small><span class="dim small">{worth !== null && worth > afterCut(k.lowest) && worth > it.vendor ? t('auction.page.disenchantIt') : afterCut(k.lowest) >= it.vendor ? t('auction.page.sellIt') : t('auction.page.vendorIt')}</span></div>
+          </div>
+          <div class="note">{t('auction.page.draws', { draws: draws.map(([id, chance, least, most]) => t('auction.page.draw', { item: facts[id]?.[0] ?? t('auction.unknownItem', { id }), count: least === most ? least : `${least}-${most}`, chance: num(Math.round(chance * 1000) / 10) })).join(', '), time: clock(snapshot) })}</div>
+        {/if}
+        <h5>{t('auction.page.alert')}</h5>
+        <div class="alert">
+          <label class="line">{whenCut[0]}<select class="field sel" bind:value={alertWhen}>{#each ALERT_WHEN as w (w)}<option value={w}>{t(`auction.when.${w}`)}</option>{/each}</select>{whenCut[1]}</label>
+          {#if alertWhen !== 'appears'}
+            {@const [fieldBefore, fieldAfter] = around('auction.page.silver', 'field')}
+            {@const [nowBefore, nowAfter] = around('auction.page.now', 'price')}
+            <div class="line">{fieldBefore}<input class="field price" inputmode="decimal" aria-label={t('auction.page.priceLabel')} aria-invalid={!alertPriceOk} bind:value={alertPrice} />{fieldAfter} <span class="dim">{nowBefore}{@render money(k.lowest)}{nowAfter}</span></div>
+          {:else}
+            <div class="dim">{t('auction.page.appearsNote')}</div>
+          {/if}
+          <label class="opt"><input type="checkbox" bind:checked={alertKind} /> {t('auction.page.kindOnly', { kind: k.suffix || t('auction.page.plain') })}</label>
+          <label class="opt"><input type="checkbox" bind:checked={alertGame} /> {t('auction.page.inGame')}</label>
+          {#if alertSet === k.key}
+            {@const [setBefore, setAfter] = around('auction.page.alertSet', 'see')}
+            <div>{setBefore}<button class="link" onclick={() => ((view = 'alerts'), (from = null))}>{t('auction.page.seeAlerts')}</button>{setAfter}</div>
+          {:else}
+            <div><button class="btn" disabled={!who || !alertPriceOk} onclick={() => setAlert(it, k)}>{t('auction.page.setAlert')}</button></div>
+          {/if}
+          <div class="note">{who ? t('auction.page.checked') : t('auction.page.playFirst')}</div>
+        </div>
+        {@render findIt(it.name)}
+      </div>
+    </div>
+  {:else}
+    {@render lone(page.id)}
+  {/if}
+{/snippet}
+
+{#snippet minePart()}
+  {#if house && listing}
+      {@const ah = ownedRows.reduce((n, o) => n + o.at, 0)}
+      {@const vendor = ownedRows.reduce((n, o) => n + o.vendor, 0)}
+      <div class="main">
+        <div class="tot">
+          <div><small>{t('auction.mine.worthAh')}</small><span>{@render money(ah)}</span></div>
+          <div><small>{t('auction.mine.atVendor')}</small><span>{@render money(vendor)}</span></div>
+          <div><small>{t('auction.mine.notOnSale')}</small><span>{t('auction.mine.items', { count: ownedRows.filter((o) => o.each === undefined).length })}</span></div>
+          <span class="seg" role="group" aria-label={t('auction.mine.where')}>{#each [null, 'Bags', 'Bank', 'Worn'] as const as p (p)}<button aria-pressed={where === p} onclick={() => (where = p)}>{p ? t(`auction.place.${PLACE[p]}`) : t('auction.mine.everything')}</button>{/each}</span>
+        </div>
+        <table class="list" use:columns={'ah-mine'}>
+          <thead><tr>{#each [['name', t('auction.mine.colItem'), true], ['place', t('auction.mine.colWhere'), true], ['n', t('auction.mine.colHowMany')], ['each', t('auction.mine.colLowestEach')], ['at', t('auction.mine.colAh')], ['vendor', t('auction.mine.colVendor')], ['better', t('auction.mine.colBetter'), true]] as [by, label, text] (by)}{@render head(by as string, label as string, mineSort, (s) => (mineSort = turn(s, by as string, !!text)))}{/each}</tr></thead>
+          <tbody>
+            {#each ownedSorted as o, i (o.who + o.place + o.key)}
+              {#if o.who !== ownedSorted[i - 1]?.who}<tr class="who"><td colspan="7" style:color={colorOf(o.who)}>{o.who}</td></tr>{/if}
+              <tr data-key={o.key} data-who={o.who} data-place={o.place} class:item={o.each !== undefined} onclick={() => o.each !== undefined && pick(o.id, o.key, 'mine')}>
+                <td><span class="nm">{@render icon(o.id)}<span class="n" style:color={QUALITY_COLORS[o.quality]}>{o.name}{o.suffix ? ` ${o.suffix}` : ''}</span></span></td>
+                <td class="dim">{t(`auction.place.${PLACE[o.place]}`)}</td>
+                <td>{num(o.n)}</td>
+                <td>{#if o.each !== undefined}{@render money(o.each)}{:else}<span class="off">{t('auction.mine.notOnSaleRow')}</span>{/if}</td>
+                <td>{#if o.at}{@render money(o.at)}{/if}</td>
+                <td>{@render money(o.vendor)}</td>
+                <td>{#if o.better}<span class="tag {o.better.toLowerCase()}">{o.better === 'AH' ? t('auction.mine.better.ah') : t('auction.mine.better.vendor')}</span>{/if}</td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+        {#if !ours.length}<p class="none">{t('auction.mine.none')}</p>{/if}
+        <p class="note pad">{t('auction.mine.betterNote')}{#if guessed.length && house}{' '}{t('auction.mine.guessed', { count: guessed.length, names: guessed.join(', '), region: house.region, ruleset: rulesetName(house.ruleset) })}{/if}</p>
+      </div>
+  {:else}
+    <p class="none">{t('auction.wait.noPrices')}</p>
+  {/if}
+{/snippet}
+
+{#snippet alertsPart()}
+  {#if house && listing}
+      <div class="main">
+        <table class="list" use:columns={'ah-alerts'}>
+          <thead><tr><th>{t('auction.alerts.item')}</th><th>{t('auction.alerts.whenLowest')}</th><th>{t('auction.alerts.now')}</th><th>{t('auction.alerts.state')}</th><th>{t('auction.alerts.inGame')}</th><th></th></tr></thead>
+          <tbody>
+            {#each here as a, i (a.t)}
+              {@const f = facts[a.item]}
+              {@const lowest = alertLowest(a, listing)}
+              {#if a.who !== here[i - 1]?.who}<tr class="who"><td colspan="6" style:color={colorOf(a.who)}>{a.who}</td></tr>{/if}
+              <tr data-alert={a.t} data-met={a.met ?? ''} class:item={lowest !== undefined} onclick={(e) => lowest !== undefined && !(e.target as Element).closest('button') && pick(a.item, a.key ?? items.find((it) => it.id === a.item)?.kinds[0]?.key ?? '', 'alerts')}>
+                <td><span class="nm">{@render icon(a.item)}<span class="n" style:color={QUALITY_COLORS[f?.[1] ?? 1]}>{a.name}</span>{#if a.key === null}<span class="more">{t('auction.alerts.anyKind')}</span>{/if}</span></td>
+                <td>{#if a.when === 'appears'}{t('auction.when.appears')}{:else}{@const [before, after] = around(`auction.alerts.${a.when}`, 'price')}{before}{@render money(a.price)}{after}{/if}</td>
+                <td>{#if lowest !== undefined}{@render money(lowest)}{:else}<span class="off">{t('auction.alerts.notOnSale')}</span>{/if}</td>
+                <td>{#if a.met}{@const time = clock(Date.parse(a.met))}{@const [before, after] = around('auction.alerts.metAt', 'price', { time })}<span class="met">● {#if a.at !== null}{before}{@render money(a.at)}{after}{:else}{t('auction.alerts.met', { time })}{/if}</span>{:else}<span class="dim">{t('auction.alerts.waiting')}</span>{/if}</td>
+                <td class="dim">{a.game ? (a.met ? t('auction.alerts.sent') : t('auction.alerts.on')) : t('auction.alerts.off')}</td>
+                <td><button class="btn small" onclick={() => window.twinmap.ahUnalert(a.t)}>{t('auction.alerts.remove')}</button></td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+        {#if !here.length}<p class="none">{t('auction.alerts.none')}</p>{/if}
+        <p class="note pad">{t('auction.alerts.note')}</p>
+      </div>
+  {:else}
+    <p class="none">{t('auction.wait.noPrices')}</p>
+  {/if}
+{/snippet}
+
+<main class="surface" class:shut={sourceShut}>
   <div class="tools">
-    <span class="srch"><span class="glass"><Glyph name="search" /></span><input class="field" type="search" placeholder={t('auction.tools.searchPlaceholder')} aria-label={t('auction.tools.searchLabel')} bind:value={typed} oninput={() => (page = null)} /></span>
+    <span class="srch"><span class="glass"><Glyph name="search" /></span><input class="field" type="search" placeholder={t('auction.tools.searchPlaceholder')} aria-label={t('auction.tools.searchLabel')} bind:value={typed} oninput={() => view === 'item' && (view = 'list')} /></span>
     <button class="btn" aria-pressed={filtersOpen} onclick={() => (filtersOpen = !filtersOpen)}>{active ? t('auction.tools.filtersOn', { count: active }) : t('auction.tools.filters')}</button>
     <span class="seg" role="group" aria-label={t('auction.tools.prices')}><button aria-pressed={!perStack} onclick={() => (perStack = false)}>{t('auction.tools.perUnit')}</button><button aria-pressed={perStack} onclick={() => (perStack = true)}>{t('auction.tools.perStack')}</button></span>
     <div class="house">
@@ -289,142 +505,13 @@
     {:else}
       <nav class="cats" aria-label={t('auction.nav.categories')}>
         <h4>{t('auction.nav.yours')}</h4>
-        <button class="cat" class:on={yours === 'mine'} onclick={() => ((yours = 'mine'), (page = null))}>{t('auction.nav.mine')} <small>{owned.length}</small></button>
-        <button class="cat" class:on={yours === 'alerts'} onclick={() => ((yours = 'alerts'), (page = null))}>{t('auction.nav.alerts')} <small>{here.length}</small></button>
+        <button class="cat" class:on={shown === 'mine'} onclick={() => (view = 'mine')}>{t('auction.nav.mine')} <small>{owned.length}</small></button>
+        <button class="cat" class:on={shown === 'alerts'} onclick={() => (view = 'alerts')}>{t('auction.nav.alerts')} <small>{here.length}</small></button>
         <h4>{t('auction.nav.categories')}</h4>
-        <button class="cat" class:on={!category && !yours} onclick={() => ((category = null), (page = null), (yours = null))}>{t('auction.nav.all')} <small>{items.length}</small></button>
+        <button class="cat" class:on={!category && shown !== 'mine' && shown !== 'alerts'} onclick={() => ((category = null), (view = 'list'))}>{t('auction.nav.all')} <small>{items.length}</small></button>
         {@render tree(cats, 0)}
       </nav>
-      {#if page && pageItem && pageKind}
-        {@const it = pageItem}
-        {@const k = pageKind}
-        {@const have = owned.filter((o) => o.id === it.id)}
-        {@const draws = disenchantOf(it)}
-        <div class="itempage">
-          <div class="kinds">
-            <button class="back" onclick={() => ((page = null), (yours = from), (from = null))}>‹ {t('auction.page.back', { place: from ? YOURS[from]() : typed.trim() ? t('auction.page.theSearch') : category_(category) })}</button>
-            {#each it.kinds as x (x.key)}
-              <button class="kind" class:on={x.key === k.key} onclick={() => (page = { id: it.id, key: x.key })}><span style:color={QUALITY_COLORS[it.quality]}>{x.suffix || it.name}{levelOf(it)}</span><span>{@render money(x.lowest)}</span></button>
-            {/each}
-          </div>
-          <div class="mid">
-            <div class="head">
-              {@render icon(it.id, true)}
-              <div><h2 style:color={QUALITY_COLORS[it.quality]}>{kindName(it, k)}</h2><span class="dim">{names.subs[`${it.cls}.${it.sub}`] ? `${names.classes[it.cls]} · ${names.subs[`${it.cls}.${it.sub}`]}` : typeOf(it.cls, it.sub)}{it.level ? ` · ${t('auction.page.requiresLevel', { level: it.level })}` : ''}{it.itemLevel ? ` · ${t('auction.page.itemLevel', { level: it.itemLevel })}` : ''}</span></div>
-            </div>
-            <div class="facts">
-              <div><small>{t('auction.page.lowest')}</small><span>{@render money(k.lowest)}</span></div>
-              <div><small>{t('auction.page.typical')}</small><span>{@render money(k.typical)}</span></div>
-              <div><small>{t('auction.page.available')}</small><span>{num(k.available)}</span></div>
-              <div><small>{t('auction.page.vendorGives')}</small><span>{@render money(it.vendor)}</span></div>
-            </div>
-            <Chart history={chartOf?.key === k.key && chartOf.snapshot === listing.snapshot ? chartOf.history : null} snapshot={listing.snapshot} {now} />
-            <h5>{t('auction.page.onSale')}</h5>
-            <table class="list" use:columns={'ah-ladder'}>
-              <thead><tr><th>{t('auction.page.priceEach')}</th><th>{t('auction.page.howMany')}</th><th>{t('auction.page.upToHere')}</th><th>{t('auction.page.costUpToHere')}</th></tr></thead>
-              <tbody>
-                {#each k.ladder.reduce<[number, number, number, number][]>((rows, [p, q]) => [...rows, [p, q, (rows.at(-1)?.[2] ?? 0) + q, (rows.at(-1)?.[3] ?? 0) + p * q]], []) as [p, q, upTo, cost], i (i)}
-                  <tr><td>{@render money(p)}</td><td>{num(q)}</td><td>{num(upTo)}</td><td>{@render money(cost)}</td></tr>
-                {/each}
-              </tbody>
-            </table>
-            <p class="note">{t('auction.page.asAt', { time: clock(snapshot) })}</p>
-          </div>
-          <div class="side">
-            <h5 class="first">{t('auction.page.youHave')}</h5>
-            {#each have as o (o.who + o.place + o.key)}
-              {@const [before, after] = around('auction.page.have', 'who', { count: o.n, place: t(`auction.held.${PLACE[o.place]}`) })}
-              <div>{before}<span style:color={colorOf(o.who)}>{o.who}</span>{after}{#if o.key !== k.key}<span class="dim">{' '}{t('auction.page.otherKind', { kind: suffixOf(o.key, names) || t('auction.page.plain') })}</span>{/if}</div>
-            {:else}
-              <div class="dim">{t('auction.page.none')}</div>
-            {/each}
-            {#if draws}
-              {@const worth = disenchantValue(draws, listing)}
-              <h5>{t('auction.page.disenchant')}</h5>
-              <div class="facts two">
-                <div><small>{t('auction.page.expected')}</small><span>{#if worth !== null}{@render money(worth)}{:else}<span class="dim small">{t('auction.page.notAllOnSale')}</span>{/if}</span></div>
-                <div><small>{t('auction.page.best')}</small><span class="dim small">{worth !== null && worth > afterCut(k.lowest) && worth > it.vendor ? t('auction.page.disenchantIt') : afterCut(k.lowest) >= it.vendor ? t('auction.page.sellIt') : t('auction.page.vendorIt')}</span></div>
-              </div>
-              <div class="note">{t('auction.page.draws', { draws: draws.map(([id, chance, least, most]) => t('auction.page.draw', { item: facts[id]?.[0] ?? t('auction.unknownItem', { id }), count: least === most ? least : `${least}-${most}`, chance: num(Math.round(chance * 1000) / 10) })).join(', '), time: clock(snapshot) })}</div>
-            {/if}
-            <h5>{t('auction.page.alert')}</h5>
-            <div class="alert">
-              <label class="line">{whenCut[0]}<select class="field sel" bind:value={alertWhen}>{#each ALERT_WHEN as w (w)}<option value={w}>{t(`auction.when.${w}`)}</option>{/each}</select>{whenCut[1]}</label>
-              {#if alertWhen !== 'appears'}
-                {@const [fieldBefore, fieldAfter] = around('auction.page.silver', 'field')}
-                {@const [nowBefore, nowAfter] = around('auction.page.now', 'price')}
-                <div class="line">{fieldBefore}<input class="field price" inputmode="decimal" aria-label={t('auction.page.priceLabel')} aria-invalid={!alertPriceOk} bind:value={alertPrice} />{fieldAfter} <span class="dim">{nowBefore}{@render money(k.lowest)}{nowAfter}</span></div>
-              {:else}
-                <div class="dim">{t('auction.page.appearsNote')}</div>
-              {/if}
-              <label class="opt"><input type="checkbox" bind:checked={alertKind} /> {t('auction.page.kindOnly', { kind: k.suffix || t('auction.page.plain') })}</label>
-              <label class="opt"><input type="checkbox" bind:checked={alertGame} /> {t('auction.page.inGame')}</label>
-              {#if alertSet === k.key}
-                {@const [setBefore, setAfter] = around('auction.page.alertSet', 'see')}
-                <div>{setBefore}<button class="link" onclick={() => ((page = null), (yours = 'alerts'), (from = null))}>{t('auction.page.seeAlerts')}</button>{setAfter}</div>
-              {:else}
-                <div><button class="btn" disabled={!who || !alertPriceOk} onclick={() => setAlert(it, k)}>{t('auction.page.setAlert')}</button></div>
-              {/if}
-              <div class="note">{who ? t('auction.page.checked') : t('auction.page.playFirst')}</div>
-            </div>
-            <h5>{t('auction.page.findInGame')}</h5>
-            <div class="dim">{t('auction.page.quoted', { name: it.name })} · <button class="link" onclick={() => copy(it.name)}>{copied ? t('auction.page.copied') : t('auction.page.copy')}</button></div>
-          </div>
-        </div>
-      {:else if yours === 'alerts'}
-        <div class="main">
-          <table class="list" use:columns={'ah-alerts'}>
-            <thead><tr><th>{t('auction.alerts.item')}</th><th>{t('auction.alerts.whenLowest')}</th><th>{t('auction.alerts.now')}</th><th>{t('auction.alerts.state')}</th><th>{t('auction.alerts.inGame')}</th><th></th></tr></thead>
-            <tbody>
-              {#each here as a, i (a.t)}
-                {@const f = facts[a.item]}
-                {@const lowest = alertLowest(a, listing)}
-                {#if a.who !== here[i - 1]?.who}<tr class="who"><td colspan="6" style:color={colorOf(a.who)}>{a.who}</td></tr>{/if}
-                <tr data-alert={a.t} data-met={a.met ?? ''} class:item={lowest !== undefined} onclick={(e) => lowest !== undefined && !(e.target as Element).closest('button') && ((yours = null), (from = 'alerts'), (page = { id: a.item, key: a.key ?? items.find((it) => it.id === a.item)?.kinds[0]?.key ?? '' }))}>
-                  <td><span class="nm">{@render icon(a.item)}<span class="n" style:color={QUALITY_COLORS[f?.[1] ?? 1]}>{a.name}</span>{#if a.key === null}<span class="more">{t('auction.alerts.anyKind')}</span>{/if}</span></td>
-                  <td>{#if a.when === 'appears'}{t('auction.when.appears')}{:else}{@const [before, after] = around(`auction.alerts.${a.when}`, 'price')}{before}{@render money(a.price)}{after}{/if}</td>
-                  <td>{#if lowest !== undefined}{@render money(lowest)}{:else}<span class="off">{t('auction.alerts.notOnSale')}</span>{/if}</td>
-                  <td>{#if a.met}{@const time = clock(Date.parse(a.met))}{@const [before, after] = around('auction.alerts.metAt', 'price', { time })}<span class="met">● {#if a.at !== null}{before}{@render money(a.at)}{after}{:else}{t('auction.alerts.met', { time })}{/if}</span>{:else}<span class="dim">{t('auction.alerts.waiting')}</span>{/if}</td>
-                  <td class="dim">{a.game ? (a.met ? t('auction.alerts.sent') : t('auction.alerts.on')) : t('auction.alerts.off')}</td>
-                  <td><button class="btn small" onclick={() => window.twinmap.ahUnalert(a.t)}>{t('auction.alerts.remove')}</button></td>
-                </tr>
-              {/each}
-            </tbody>
-          </table>
-          {#if !here.length}<p class="none">{t('auction.alerts.none')}</p>{/if}
-          <p class="note pad">{t('auction.alerts.note')}</p>
-        </div>
-      {:else if yours === 'mine'}
-        {@const ah = ownedRows.reduce((n, o) => n + o.at, 0)}
-        {@const vendor = ownedRows.reduce((n, o) => n + o.vendor, 0)}
-        <div class="main">
-          <div class="tot">
-            <div><small>{t('auction.mine.worthAh')}</small><span>{@render money(ah)}</span></div>
-            <div><small>{t('auction.mine.atVendor')}</small><span>{@render money(vendor)}</span></div>
-            <div><small>{t('auction.mine.notOnSale')}</small><span>{t('auction.mine.items', { count: ownedRows.filter((o) => o.each === undefined).length })}</span></div>
-            <span class="seg" role="group" aria-label={t('auction.mine.where')}>{#each [null, 'Bags', 'Bank', 'Worn'] as const as p (p)}<button aria-pressed={where === p} onclick={() => (where = p)}>{p ? t(`auction.place.${PLACE[p]}`) : t('auction.mine.everything')}</button>{/each}</span>
-          </div>
-          <table class="list" use:columns={'ah-mine'}>
-            <thead><tr>{#each [['name', t('auction.mine.colItem'), true], ['place', t('auction.mine.colWhere'), true], ['n', t('auction.mine.colHowMany')], ['each', t('auction.mine.colLowestEach')], ['at', t('auction.mine.colAh')], ['vendor', t('auction.mine.colVendor')], ['better', t('auction.mine.colBetter'), true]] as [by, label, text] (by)}{@render head(by as string, label as string, mineSort, (s) => (mineSort = turn(s, by as string, !!text)))}{/each}</tr></thead>
-            <tbody>
-              {#each ownedSorted as o, i (o.who + o.place + o.key)}
-                {#if o.who !== ownedSorted[i - 1]?.who}<tr class="who"><td colspan="7" style:color={colorOf(o.who)}>{o.who}</td></tr>{/if}
-                <tr data-key={o.key} data-who={o.who} data-place={o.place} class:item={o.each !== undefined} onclick={() => o.each !== undefined && ((yours = null), (from = 'mine'), (page = { id: o.id, key: o.key }))}>
-                  <td><span class="nm">{@render icon(o.id)}<span class="n" style:color={QUALITY_COLORS[o.quality]}>{o.name}{o.suffix ? ` ${o.suffix}` : ''}</span></span></td>
-                  <td class="dim">{t(`auction.place.${PLACE[o.place]}`)}</td>
-                  <td>{num(o.n)}</td>
-                  <td>{#if o.each !== undefined}{@render money(o.each)}{:else}<span class="off">{t('auction.mine.notOnSaleRow')}</span>{/if}</td>
-                  <td>{#if o.at}{@render money(o.at)}{/if}</td>
-                  <td>{@render money(o.vendor)}</td>
-                  <td>{#if o.better}<span class="tag {o.better.toLowerCase()}">{o.better === 'AH' ? t('auction.mine.better.ah') : t('auction.mine.better.vendor')}</span>{/if}</td>
-                </tr>
-              {/each}
-            </tbody>
-          </table>
-          {#if !ours.length}<p class="none">{t('auction.mine.none')}</p>{/if}
-          <p class="note pad">{t('auction.mine.betterNote')}{#if guessed.length && house}{' '}{t('auction.mine.guessed', { count: guessed.length, names: guessed.join(', '), region: house.region, ruleset: rulesetName(house.ruleset) })}{/if}</p>
-        </div>
-      {:else}
+      {#if shown === 'list'}
         <div class="main">
           <table class="list" use:columns={'ah-browse'}>
             <thead><tr>{#each [['name', t('auction.browse.name'), true], ['lowest', t('auction.browse.lowest')], ['typical', t('auction.browse.typical')], ['available', t('auction.browse.available')], ['vendor', t('auction.browse.vendor')]] as [by, label, text] (by)}{@render head(by as string, label as string, browseSort, (s) => (browseSort = turn(s, by as string, !!text)))}{/each}<th>{t('auction.browse.hours')}</th></tr></thead>
@@ -432,7 +519,7 @@
               {#each found.slice(0, most) as it (it.id)}
                 {@const many = it.kinds.length > 1}
                 {@const k = it.kinds[0]!}
-                <tr class="item" onclick={() => (many ? ((open = new Set(open.has(it.id) ? [...open].filter((x) => x !== it.id) : [...open, it.id]))) : (page = { id: it.id, key: k.key }))}>
+                <tr class="item" onclick={() => (many ? ((open = new Set(open.has(it.id) ? [...open].filter((x) => x !== it.id) : [...open, it.id]))) : pick(it.id, k.key, 'list'))}>
                   <td><span class="nm">{@render icon(it.id)}<span class="n" style:color={QUALITY_COLORS[it.quality]}>{it.name}</span>{#if many}<span class="more">{open.has(it.id) ? '▾' : '▸'} {t('auction.browse.kinds', { count: it.kinds.length })}</span>{/if}</span></td>
                   <td>{#if many}<span class="dim">{t('auction.browse.from')}&nbsp;</span>{/if}{@render money(it.lowest * times(it))}</td>
                   <td>{#if !many}{@render money(k.typical * times(it))}{/if}</td>
@@ -442,7 +529,7 @@
                 </tr>
                 {#if many && open.has(it.id)}
                   {#each it.kinds as x (x.key)}
-                    <tr class="item kind" onclick={() => (page = { id: it.id, key: x.key })}><td style:color={QUALITY_COLORS[it.quality]}>{x.suffix || t('auction.browse.plainRow')}{levelOf(it)}</td><td>{@render money(x.lowest * times(it))}</td><td>{@render money(x.typical * times(it))}</td><td>{num(x.available)}</td><td></td><td></td></tr>
+                    <tr class="item kind" onclick={() => pick(it.id, x.key, 'list')}><td style:color={QUALITY_COLORS[it.quality]}>{x.suffix || t('auction.browse.plainRow')}{levelOf(it)}</td><td>{@render money(x.lowest * times(it))}</td><td>{@render money(x.typical * times(it))}</td><td>{num(x.available)}</td><td></td><td></td></tr>
                   {/each}
                 {/if}
               {/each}
@@ -453,11 +540,17 @@
         </div>
       {/if}
     {/if}
+    <div class="home" class:on={ready && shown === 'item'}><div class="ahpart" use:section={'item'}>{@render itemPart()}{#if page}{@render source('item')}{/if}</div></div>
+    <div class="home" class:on={ready && shown === 'mine'}><div class="ahpart" use:section={'mine'}>{@render minePart()}{@render source('mine')}</div></div>
+    <div class="home" class:on={ready && shown === 'alerts'}><div class="ahpart" use:section={'alerts'}>{@render alertsPart()}{@render source('alerts')}</div></div>
   </div>
-  <div class="foot">
-    <span>{foot[0]}<b>{t('auction.foot.source')}</b>{foot[1]}</span>
-    <span class="right">{t('auction.foot.approximate')}</span>
-  </div>
+  {#if !sourceShut}
+    <div class="foot">
+      <span>{foot[0]}<b>{t('auction.foot.source')}</b>{foot[1]}</span>
+      <span class="right">{t('auction.foot.approximate')}</span>
+      {@render shut()}
+    </div>
+  {/if}
 </main>
 
 <style>
@@ -969,6 +1062,75 @@
   }
   .foot .right {
     margin-left: auto;
+  }
+  /* The page of an item, My items and Alerts at home in the search: in place of the list, in its cell. */
+  .home {
+    display: none;
+    grid-template-rows: minmax(0, 1fr);
+    min-height: 0;
+  }
+  .home.on {
+    display: grid;
+  }
+  .ahpart {
+    display: grid;
+    grid-template-rows: minmax(0, 1fr);
+    min-height: 0;
+  }
+  /* In a panel of their own (M20-F9): all of it, a narrow form of their own, the line of Blizzard's terms at the foot. */
+  :global(.dv-host > .ahpart) {
+    position: absolute;
+    inset: 0;
+    grid-template-rows: minmax(0, 1fr) auto;
+    container: ahpart / inline-size;
+    font-variant-numeric: tabular-nums;
+    background:
+      var(--grain),
+      linear-gradient(var(--stone-800), var(--stone-900));
+  }
+  .ahpart .block-empty {
+    display: block;
+  }
+  .lone {
+    overflow: auto;
+    padding: 12px 16px;
+  }
+  .src {
+    margin: 0;
+    padding: 6px 18px;
+    color: var(--text-dim);
+    font: var(--t-small);
+    border-top: 1px solid var(--bronze-900);
+  }
+  .src b {
+    font-weight: 400;
+  }
+  main.shut {
+    grid-template-rows: auto auto minmax(0, 1fr) 0;
+  }
+  .hide {
+    flex: none;
+    display: inline-flex;
+    vertical-align: middle;
+    margin-left: 8px;
+    padding: 2px;
+    border: 0;
+    background: none;
+    color: var(--text-off);
+    cursor: pointer;
+  }
+  .hide:hover {
+    color: var(--text);
+  }
+  @container ahpart (max-width: 900px) {
+    .itempage {
+      grid-template-columns: minmax(0, 1fr);
+      overflow: auto;
+    }
+    .itempage > div {
+      overflow: visible;
+      min-height: auto;
+    }
   }
   /* A narrow place: the tools wrap, the categories go over the list, the page of an item is one column. */
   @container auction (max-width: 900px) {
