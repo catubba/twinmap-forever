@@ -12,6 +12,8 @@ export default {
     character: 'Character',
     // A panel of the Character workspace: a row for each item the character holds, and what the others hold.
     inventory: 'Inventory',
+    // A panel of the Character workspace: the character's professions, their level and their recipes.
+    professions: 'Professions',
     // The panels of the auction (M20-F9): its search, categories and list; the page of the item chosen.
     auctionSearch: 'Auction search',
     item: 'Item',

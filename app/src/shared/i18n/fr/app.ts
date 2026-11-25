@@ -6,6 +6,7 @@ export default {
     map: 'Carte',
     character: 'Personnage',
     inventory: 'Inventaire',
+    professions: 'Métiers',
     auctionSearch: 'Recherche HV',
     item: 'Objet',
     auctionHouse: 'Hôtel des ventes',

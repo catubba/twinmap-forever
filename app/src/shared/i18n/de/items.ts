@@ -196,6 +196,27 @@ export default {
     where: 'Sprecht in einer beliebigen Hauptstadt mit einem Bankier.',
   },
 
+  professions: {
+    primary: 'Berufe',
+    secondary: 'Sekundäre Fertigkeiten',
+    filter: 'Rezepte filtern',
+    known: 'Bekannt',
+    unknown: 'Nicht erlernt',
+    unknownNote: 'Die Zahl: die Fertigkeit, ab der ein Rezept gelb wird.',
+    optimal: 'Orange: sicherer Anstieg',
+    medium: 'Gelb: wahrscheinlich',
+    easy: 'Grün: selten',
+    trivial: 'Grau: keiner',
+    noMatch: 'Kein Rezept passt.',
+    none: 'Noch keine Berufe',
+    learn: 'Erlernt einen bei einem Berufsausbilder in einer beliebigen Stadt: Stufe und Rezepte erscheinen dann hier.',
+    also: 'Kochkunst, Erste Hilfe und Angeln zählen auch.',
+    unseen: 'Noch keine Rezepte gesehen',
+    open: 'Öffnet {profession} einmal im Spiel: die Rezepte erscheinen dann hier, auch bei geschlossenem Spiel.',
+    again: 'Öffnet {profession} noch einmal im Spiel: dann erscheinen hier auch die Kategorien und die nicht erlernten Rezepte.',
+    gathers: '{profession} hat keine Rezepte: nur die Stufe wird angezeigt.',
+  },
+
   table: {
     columns: {
       item: 'Gegenstand',

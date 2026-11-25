@@ -6,6 +6,7 @@ export default {
     map: 'Mapa',
     character: 'Personaje',
     inventory: 'Inventario',
+    professions: 'Profesiones',
     auctionSearch: 'Buscar en subastas',
     item: 'Objeto',
     auctionHouse: 'Casa de subastas',

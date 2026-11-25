@@ -42,6 +42,7 @@ const TITLES: Record<string, () => string> = {
   bags: () => t('items.places.bags'),
   bank: () => t('items.places.bank'),
   inventory: () => t('app.top.inventory'),
+  professions: () => t('app.top.professions'),
   search: () => t('app.top.auctionSearch'),
   item: () => t('app.top.item'),
   mine: () => t('auction.nav.mine'),
@@ -201,9 +202,11 @@ function write(): void {
 const fit = (): void => made.forEach((m, i) => (dress(m.dock), hold(i)))
 
 // The Character workspace as it is at first (chosen on the preview of M20-F8): the Character panel on the left, Bags and
-// Bank side by side on its right, Inventory under them. Laid out in the place of a panel of an older layout (`at`, the
+// Bank side by side on its right, Inventory under them, and Professions a tab behind Inventory (M20-F10, the same for
+// Spellbook and Talents). Laid out in the place of a panel of an older layout (`at`, the
 // Items panel of before), and as tabs of one group where that place is narrower than CHARACTER_WIDE.
 const CHARACTER_WIDE = 1000
+const BEHIND_INVENTORY = ['professions']
 function characters(dock: Dock, at?: string): void {
   const put = (id: string, position?: Parameters<Dock['addPanel']>[0]['position']): void => void dock.addPanel({ id, component: id, title: TITLES[id]!(), ...(position && { position }) })
   put('character', at ? { referencePanel: at, direction: 'within' } : undefined)
@@ -211,13 +214,15 @@ function characters(dock: Dock, at?: string): void {
   if (old) dock.removePanel(old)
   const group = groupOf(dock, 'character')!
   if (group.api.width < CHARACTER_WIDE) {
-    for (const id of CHARACTER.slice(1)) put(id, { referencePanel: 'character', direction: 'within' })
+    for (const id of [...CHARACTER.slice(1), ...BEHIND_INVENTORY]) put(id, { referencePanel: 'character', direction: 'within' })
     dock.getGroupPanel('character')!.api.setActive()
     return
   }
   put('bags', { referencePanel: 'character', direction: 'right' })
   put('inventory', { referencePanel: 'bags', direction: 'below' })
   put('bank', { referencePanel: 'bags', direction: 'right' })
+  for (const id of BEHIND_INVENTORY) put(id, { referencePanel: 'inventory', direction: 'within' })
+  dock.getGroupPanel('inventory')!.api.setActive()
   group.api.setSize({ width: 500 })
 }
 

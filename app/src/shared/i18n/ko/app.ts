@@ -6,6 +6,7 @@ export default {
     map: '지도',
     character: '캐릭터',
     inventory: '소지품',
+    professions: '전문 기술',
     auctionSearch: '경매장 검색',
     item: '아이템',
     auctionHouse: '경매장',

@@ -6,6 +6,7 @@ export default {
     map: 'Karte',
     character: 'Charakter',
     inventory: 'Inventar',
+    professions: 'Berufe',
     auctionSearch: 'AH-Suche',
     item: 'Gegenstand',
     auctionHouse: 'Auktionshaus',

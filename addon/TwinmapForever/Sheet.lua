@@ -21,8 +21,10 @@
 --   skills  { { skill, rank, most }, ... } every skill line by the game's number: professions, weapons, languages
 --   spells  { spell, ... } the spells in the spellbook, those not learned yet left out
 --   talents { free = points not spent, t = { { node, rank, spell }, ... } } the talents taken
---   recipes { known = { spell, ... }, seen = { profession, ... } } the recipes a profession's window
---           showed learned, and those learned since; seen: the professions whose window was opened
+--   recipes { known = { spell, ... }, seen = { profession, ... }, listed = { spell, ... }, cats = { { category, name, order }, ... } }
+--           the recipes a profession's window showed learned, and those learned since; seen: the professions whose window
+--           was opened; listed: every recipe such a window listed, learned or not; cats: the headings it groups them
+--           under, by the game's number, with its order
 --   stats   { { category, { { label, value, colour }, ... } }, ... } the statistics of the game's character window, as it
 --           words them and in its order; colour "rrggbb" where the game colours the value (green for one raised), else missing
 --   trainers { { n = npc, c = class token of a class trainer, s = { { spell, cost, level, skill }, ... } }, ... }
@@ -259,7 +261,7 @@ local slow, slowAt = {}, 0
 
 -- Recipes: the window of a profession lists all its recipes, learned or not, and each one learned
 -- since the game tells as it happens. Kept in the saved sheet, so a window opened once is enough.
-local known, seen -- spell -> true, profession -> true
+local known, seen, listed, cats -- spell -> true, profession -> true, spell -> true, category -> { name, order }
 local scanDue, learned = false, {}
 
 local function ScanWindow()
@@ -269,33 +271,49 @@ local function ScanWindow()
   if Try(T.IsTradeSkillLinked) or Try(T.IsTradeSkillGuild) or Try(T.IsNPCCrafting) then return end
   local ids = Try(T.GetAllRecipeIDs)
   if type(ids) ~= "table" or #ids == 0 then return end
-  local now = {}
+  local now, under, heads = {}, {}, 0
   for _, id in ipairs(ids) do
     local info = Try(T.GetRecipeInfo, id)
     -- A recipe not told learned or not is still loading: the window's next update has it.
     if type(info) ~= "table" or type(info.learned) ~= "boolean" or not Num(id) then return end
     now[id] = info.learned
+    if Num(info.categoryID) and not under[info.categoryID] then heads = heads + 1 under[info.categoryID] = heads end
   end
-  for id, yes in pairs(now) do known[id] = yes or nil end
+  for id, yes in pairs(now) do known[id], listed[id] = yes or nil, true end
+  -- The headings, in the window's order: the game's own where it gives one, else as they first came.
+  for category, first in pairs(under) do
+    local info = T.GetCategoryInfo and Try(T.GetCategoryInfo, category)
+    local name = type(info) == "table" and Str(info.name)
+    if name then cats[category] = { name, Num(info.uiOrder) or first } end
+  end
   local base = Try(T.GetBaseProfessionInfo)
   if type(base) == "table" and Num(base.professionID) then seen[base.professionID] = true end
 end
 
 local function Recipes(s)
   if not known then
-    known, seen = {}, {}
+    known, seen, listed, cats = {}, {}, {}, {}
     local held = s.pieces.recipes and s.pieces.recipes.data
-    for _, id in ipairs(type(held) == "table" and type(held.known) == "table" and held.known or {}) do known[id] = true end
-    for _, id in ipairs(type(held) == "table" and type(held.seen) == "table" and held.seen or {}) do seen[id] = true end
+    held = type(held) == "table" and held or {}
+    for _, id in ipairs(type(held.known) == "table" and held.known or {}) do known[id] = true end
+    for _, id in ipairs(type(held.seen) == "table" and held.seen or {}) do seen[id] = true end
+    for _, id in ipairs(type(held.listed) == "table" and held.listed or {}) do listed[id] = true end
+    for _, c in ipairs(type(held.cats) == "table" and held.cats or {}) do
+      if type(c) == "table" and Num(c[1]) and Str(c[2]) then cats[c[1]] = { c[2], Num(c[3]) or 0 } end
+    end
   end
   if scanDue then scanDue = false ScanWindow() end
   for _, id in ipairs(learned) do known[id] = true end
   learned = {}
-  local out = { known = {}, seen = {} }
+  local out = { known = {}, seen = {}, listed = {}, cats = {} }
   for id in pairs(known) do out.known[#out.known + 1] = id end
   for id in pairs(seen) do out.seen[#out.seen + 1] = id end
+  for id in pairs(listed) do out.listed[#out.listed + 1] = id end
+  for id, c in pairs(cats) do out.cats[#out.cats + 1] = { id, c[1], c[2] } end
   table.sort(out.known)
   table.sort(out.seen)
+  table.sort(out.listed)
+  table.sort(out.cats, function(a, b) return a[1] < b[1] end)
   return out
 end
 

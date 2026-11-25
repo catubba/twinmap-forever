@@ -6,6 +6,7 @@ export default {
     map: 'Карта',
     character: 'Персонаж',
     inventory: 'Инвентарь',
+    professions: 'Профессии',
     auctionSearch: 'Поиск на аукционе',
     item: 'Предмет',
     // The game's short form of Аукционный дом: a tab has no room for the long one.

@@ -198,6 +198,27 @@ export default {
     where: '아무 수도에서나 은행원에게 말을 거십시오.',
   },
 
+  professions: {
+    primary: '전문 기술',
+    secondary: '보조 기술',
+    filter: '제조법 검색',
+    known: '배운 제조법',
+    unknown: '배우지 않은 제조법',
+    unknownNote: '숫자: 노란색이 되는 숙련도입니다.',
+    optimal: '주황색: 숙련도가 확실히 오름',
+    medium: '노란색: 오를 가능성 높음',
+    easy: '녹색: 거의 오르지 않음',
+    trivial: '회색: 오르지 않음',
+    noMatch: '일치하는 제조법이 없습니다.',
+    none: '아직 전문 기술이 없습니다',
+    learn: '아무 도시에서나 전문 기술 전문가에게 배우십시오. 숙련도와 제조법이 여기에 표시됩니다.',
+    also: '요리, 응급치료, 낚시도 포함됩니다.',
+    unseen: '아직 본 제조법이 없습니다',
+    open: '게임에서 {profession} 창을 한 번 여십시오. 게임을 종료한 뒤에도 제조법이 여기에 표시됩니다.',
+    again: '게임에서 {profession} 창을 한 번 더 여십시오. 분류와 배우지 않은 제조법도 여기에 표시됩니다.',
+    gathers: '{profession}에는 제조법이 없습니다. 숙련도만 표시됩니다.',
+  },
+
   table: {
     columns: {
       item: '아이템',

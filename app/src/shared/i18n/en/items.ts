@@ -211,6 +211,38 @@ export default {
     where: 'Talk to a banker in any capital.',
   },
 
+  // The panel Professions: the character's professions with their level, and the recipes of the one chosen.
+  professions: {
+    // Headings of the two lists of the Professions panel: the main professions, then Cooking, First Aid, Fishing. As the game names them.
+    primary: 'Professions',
+    secondary: 'Secondary Skills',
+    // Placeholder of the field that narrows the recipes by name. Short.
+    filter: 'Filter recipes',
+    // Heading over the recipes the character knows, followed by how many.
+    known: 'Known',
+    // Heading over the recipes the profession's window lists that the character has not learned, followed by how many.
+    unknown: 'Not learned',
+    unknownNote: 'The number: the skill at which each turns yellow.',
+    // The key of the colours of the known recipes, as the game colours them: four short items on one line.
+    optimal: 'Orange: sure skill-up',
+    medium: 'Yellow: likely',
+    easy: 'Green: seldom',
+    trivial: 'Grey: none',
+    // In place of the recipes when none matches what is typed in the filter.
+    noMatch: 'No recipe matches.',
+    // A character with no profession: the title, what to do in the game, a note.
+    none: 'No professions yet',
+    learn: 'Learn one at a profession trainer, in any city: its level and its recipes show here.',
+    also: 'Cooking, First Aid and Fishing count too.',
+    // A profession whose window the addon never saw open: the title, then what to do. {profession}: its name, as the game writes it.
+    unseen: 'No recipes seen yet',
+    open: 'Open {profession} once in the game: its recipes show here, also when the game is closed.',
+    // A profession with no recipes in the game (Herbalism, Skinning). {profession}: its name.
+    // A profession whose window was seen before the addon read its headings and the recipes it lists: what to do. {profession}: its name.
+    again: 'Open {profession} once more in the game: its headings and the recipes not learned show here too.',
+    gathers: '{profession} has no recipes: its level is all there is to show.',
+  },
+
   // The panel Inventory: a row for each item.
   table: {
     // Column headings, in capitals: short.

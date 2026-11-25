@@ -47,7 +47,7 @@ test('the whole sheet goes out at first, with who, money, bags with the reagent 
     gear: [[1, 4245, 30, 35], [5, 6097]],
     skills: [],
     spells: [],
-    recipes: { known: [], seen: [] },
+    recipes: { known: [], seen: [], listed: [], cats: [] },
     trainers: [],
     tips: [],
   });
@@ -197,15 +197,17 @@ test('the recipes come from the window of a profession, and one learned since wi
   const first = sheets(addon).at(-1);
   appHolds(addon, first.code, first.rev);
 
-  addon.lua('GAME.trade = { profession = 202, recipes = { [3930] = true, [3931] = false } }');
+  // Two headings: the game orders Parts after Explosives.
+  addon.lua('GAME.trade = { profession = 202, recipes = { [3930] = true, [3931] = false }, cats = { [3930] = 2515, [3931] = 2516 }, names = { [2515] = { "Parts", 2 }, [2516] = { "Explosives", 1 } } }');
   addon.fire('TRADE_SKILL_SHOW');
   addon.run(4);
-  assert.deepEqual(sheets(addon).at(-1).p, { recipes: { known: [3930], seen: [202] } });
+  const cats = [[2515, 'Parts', 2], [2516, 'Explosives', 1]];
+  assert.deepEqual(sheets(addon).at(-1).p, { recipes: { known: [3930], seen: [202], listed: [3930, 3931], cats } });
   appHolds(addon, first.code, sheets(addon).at(-1).rev);
 
   addon.lua('GAME.trade = nil; T_fire("NEW_RECIPE_LEARNED", 3931)');
   addon.run(4);
-  assert.deepEqual(sheets(addon).at(-1).p, { recipes: { known: [3930, 3931], seen: [202] } });
+  assert.deepEqual(sheets(addon).at(-1).p, { recipes: { known: [3930, 3931], seen: [202], listed: [3930, 3931], cats } });
 
   // Kept across a /reload: the window needs no opening again.
   addon.reload();
@@ -213,7 +215,7 @@ test('the recipes come from the window of a profession, and one learned since wi
   addon.fire('PLAYER_ENTERING_WORLD');
   addon.lua(`local ns = ...; ns.receivers.sheet({ ["${KEY}"] = { code = "${first.code}", rev = 0 } })`);
   addon.run(10);
-  assert.deepEqual(sheets(addon).at(-1).p.recipes, { known: [3930, 3931], seen: [202] });
+  assert.deepEqual(sheets(addon).at(-1).p.recipes, { known: [3930, 3931], seen: [202], listed: [3930, 3931], cats });
 });
 
 test("a recipe the window has not loaded yet, or a window of someone else's recipes, changes nothing", () => {
@@ -233,7 +235,7 @@ test("a recipe the window has not loaded yet, or a window of someone else's reci
   addon.lua('GAME.trade.linked = false');
   addon.fire('TRADE_SKILL_LIST_UPDATE');
   addon.run(4);
-  assert.deepEqual(sheets(addon).at(-1).p, { recipes: { known: [3930], seen: [202] } });
+  assert.deepEqual(sheets(addon).at(-1).p, { recipes: { known: [3930], seen: [202], listed: [3930], cats: [] } });
 });
 
 // Springspindle Fizzlegear: a rank, two recipes learned already or not yet within reach (hidden by the window), a header.

@@ -9,6 +9,7 @@ import { NEW_DUNGEON_PINS } from '../shared/new-dungeon-pins'
 import { NPC, openQuestie } from './questie'
 import { FACTS, gameItemFacts, type ItemFacts, ITEMS_FILE } from '../shared/items'
 import { AH_NAMES_FILE, gameAhNames } from '../shared/ah'
+import { spellFacts, SPELLS_FILE, SPELLS_FORMAT } from '../shared/spells'
 import { trainerFacts, TRAINERS_FILE, TRAINERS_FORMAT } from '../shared/trainers'
 import { gameMaps, UI_MAP_ASSIGNMENT_FILE, UI_MAP_FILE, type GameMap } from '../shared/maps'
 import { AREA_POI_FILE, AREA_TABLE_FILE, places, UI_MAP_X_MAP_ART_FILE, WORLD_MAP_OVERLAY_FILE } from '../shared/places'
@@ -67,7 +68,7 @@ try {
   } catch {
     // A map made before the app read the game's language, or none yet.
   }
-  if (madeIn !== locale) for (const made of [MAPS_FILE, PLACES_FILE, TRAVEL_FILE, INTERIORS_FILE, ITEMS_FILE, AH_NAMES_FILE, TRAINERS_FILE, GAME_NAMES_FILE]) rmSync(join(folder, made), { force: true })
+  if (madeIn !== locale) for (const made of [MAPS_FILE, PLACES_FILE, TRAVEL_FILE, INTERIORS_FILE, ITEMS_FILE, AH_NAMES_FILE, TRAINERS_FILE, SPELLS_FILE, GAME_NAMES_FILE]) rmSync(join(folder, made), { force: true })
   // The game's archive is opened only when there is something to convert: it takes half a second
   // and a few hundred megabytes, and on most starts the tiles are already there.
   let client: ClientFiles | undefined
@@ -221,6 +222,23 @@ try {
   writeFileSync(localeFile, locale)
   const ready = { state: 'ready', folder, version: build.version, tiles, missing, seconds: (Date.now() - started) / 1000, converted } as const
   tell(ready)
+  // The spells of the game, for the panels of what a character knows (shared/spells.ts): once for each build, and again for an
+  // older format. After the map is ready, which they would hold back a few seconds; the panels ask until the file is there.
+  try {
+    const spellsFile = join(folder, SPELLS_FILE)
+    let format = 0
+    try {
+      format = (JSON.parse(readFileSync(spellsFile, 'utf8')) as { format?: number }).format ?? 0
+    } catch {
+      // Not there yet.
+    }
+    if (format !== SPELLS_FORMAT) {
+      const facts = spellFacts(open())
+      if (facts) writeFileSync(spellsFile, JSON.stringify(facts))
+    }
+  } catch {
+    // Professions names no recipe; tried again at the next start.
+  }
 
   // The insides of buildings come after: the map of the continents is already usable.
   const insideStarted = Date.now()

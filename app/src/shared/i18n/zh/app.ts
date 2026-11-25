@@ -6,6 +6,7 @@ export default {
     map: '地图',
     character: '角色',
     inventory: '物品栏',
+    professions: '专业',
     auctionSearch: '拍卖行搜索',
     item: '物品',
     auctionHouse: '拍卖行',
