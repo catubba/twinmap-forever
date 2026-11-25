@@ -5,6 +5,7 @@ export default {
     now: 'Сейчас',
     map: 'Карта',
     character: 'Персонаж',
+    inventory: 'Инвентарь',
     // The game's short form of Аукционный дом: a tab has no room for the long one.
     auctionHouse: 'Аукцион',
     // As Russian players write it.

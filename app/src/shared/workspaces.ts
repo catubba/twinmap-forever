@@ -4,8 +4,12 @@
 /** The version of what is kept: another one is not read, and the defaults are laid out again. */
 export const WORKSPACES_VERSION = 1
 
-/** The panels there are, by their id: a panel of a layout kept that is none of these is taken out. */
-export const PANELS = ['map', 'now', 'items', 'ah'] as const
+/** The panels there are, by their id: a panel of a layout kept that is none of these is taken out, but for Items, which
+ * became the four of the Character workspace (M20-F8). */
+export const PANELS = ['map', 'now', 'character', 'bags', 'bank', 'inventory', 'ah'] as const
+
+/** The panels of the Character workspace, in the order they are laid out at first. */
+export const CHARACTER = ['character', 'bags', 'bank', 'inventory'] as const
 
 /** A workspace by its id; the name the player gave it, if any (without, the default one in the language spoken, never
  * translated once written); its layout as dockview gives it (toJSON). */

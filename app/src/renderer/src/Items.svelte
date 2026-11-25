@@ -1,11 +1,19 @@
+<script module lang="ts">
+  import type { ItemFacts } from '../../shared/items'
+  // What the four panels share: what the game says of each item, asked for once, and what is typed in the filter of
+  // Inventory, which dims what does not match in the slots of the others too.
+  let facts = $state.raw<ItemFacts>({})
+  let asked = false
+  const filter = $state({ typed: '' })
+</script>
+
 <script lang="ts">
-  // Items: bags, bank, keyring and what is worn by the character shown, as wide as the window, from
-  // the sheet the app keeps (shared/items.ts). It reads the same with the game closed, and says how
-  // old it is. What is typed in the filter is looked for in every other character's sheet too.
-  // Two views (M10-F14, mockup design/vendors/mockup/items2.html): Slots, what is worn as the game's
-  // character window lays it and the bags and the bank as grids; Table, a row for each item.
+  // The panels of the Character workspace (M20-F8), each one part of what was Items, from the sheet the app keeps
+  // (shared/items.ts), for the character shown; they read the same with the game closed, and say how old they are.
+  // character: what is worn as the game's character window lays it, the picture taken off it, the statistics; bags and
+  // bank: their grids; inventory: a row for each item, and the other characters' rows of what is typed in its filter.
   import { ago, type Known } from '../../shared/characters'
-  import { coins, filterRows, ITEMS_FILE, gridsOf, itemMatches, itemRows, othersHolding, placeName, PLACES, QUALITY_COLORS, QUALITY_TEXT, sortRows, wornOf, WORN_LEFT, WORN_RIGHT, WORN_WEAPONS, type Cell, type Column, type Grid, type ItemFacts, type ItemRow, type Place } from '../../shared/items'
+  import { coins, filterRows, ITEMS_FILE, gridsOf, itemMatches, itemRows, othersHolding, placeName, PLACES, QUALITY_COLORS, QUALITY_TEXT, sortRows, wornOf, WORN_LEFT, WORN_RIGHT, WORN_WEAPONS, type Cell, type Column, type Grid, type ItemRow, type Place } from '../../shared/items'
   import { around, t, type Key } from '../../shared/i18n'
   import type { PortraitsTold } from '../../shared/portrait'
   import type { Sheets } from '../../shared/sheet'
@@ -16,20 +24,17 @@
   import { inApp, TILES } from './web'
 
   // listing: the prices of the auction house on show (M18-F8), for what each item fetches there; null without them.
-  let { sheets, portraits, shown, known, now, listing = null, onpick }: { sheets: Sheets; portraits: PortraitsTold; shown: Known | null; known: Known[]; now: number; listing?: Listing | null; onpick: (key: string) => void } = $props()
+  let { part, sheets, portraits, shown, known, now, listing = null, onpick }: { part: 'character' | 'bags' | 'bank' | 'inventory'; sheets: Sheets; portraits: PortraitsTold; shown: Known | null; known: Known[]; now: number; listing?: Listing | null; onpick: (key: string) => void } = $props()
 
   // What the game says of each item, made beside the map (tiles-worker.ts). Without it the items have their numbers and no prices.
-  let facts = $state.raw<ItemFacts>({})
-  $effect(() => {
+  if (!asked) {
+    asked = true
     void fetch(`${TILES}/${ITEMS_FILE}`)
       .then((r) => (r.ok ? r.json() : {}))
       .then((read: ItemFacts) => (facts = read))
       .catch(() => {})
-  })
-
-  let typed = $state('')
-  let view = $state<'slots' | 'table'>(localStorage.getItem('itemsView') === 'table' ? 'table' : 'slots')
-  $effect(() => localStorage.setItem('itemsView', view))
+  }
+  const typed = $derived(filter.typed)
   let place = $state<Place | null>(null)
   let column = $state<Column>('value')
   let up = $state(false)
@@ -131,80 +136,79 @@
 {/snippet}
 
 <main class="surface">
-  {#if !shown || !sheet}
+  {#if !shown || !sheet || !grids}
     <p class="empty">{t('items.page.noCharacter')}</p>
-  {:else}
-    <div class="tools">
-      <input type="search" placeholder={t('items.page.filter')} aria-label={t('items.page.filterLabel')} bind:value={typed} />
-      <div class="views" role="group" aria-label={t('items.page.viewLabel')}>
-        <button aria-pressed={view === 'slots'} onclick={() => (view = 'slots')}>{t('items.page.slots')}</button>
-        <button aria-pressed={view === 'table'} onclick={() => (view = 'table')}>{t('items.page.table')}</button>
+  {:else if part === 'character'}
+    <section class="doll" aria-label={t('items.doll.label')}>
+      <header><span class="who" style:color={shown.color}>{shown.key}</span><span class="line">{shown.line}</span></header>
+      <div class="body">
+        <div class="col">{#each WORN_LEFT as s (s[0])}{@render wornSlot(s)}{/each}</div>
+        <div>
+          <div class="picture" style:background-image={portraitUrl ? `url("${portraitUrl}")` : null}>
+            {#if portraits.retake === shown.key}
+              <div class="wait">
+                <p>{t('items.doll.open')}<br />{KEY_HINT[0]}<kbd>C</kbd>{KEY_HINT[1]}</p>
+                <small>{t('items.doll.waitNote')}</small>
+                <span><button class="pbtn" onclick={() => void window.twinmap.retakePortrait(null)}>{t('items.doll.cancel')}</button></span>
+              </div>
+            {:else if portrait && portraitUrl}
+              <div class="under">
+                <span class="when">{t('items.doll.taken', { ago: ago(portrait.at, now) })}</span>
+                {#if inApp}
+                  <button class="pbtn" onclick={() => void window.twinmap.savePortrait(shown.key)}>{t('items.doll.save')}</button>
+                {:else}
+                  <a class="pbtn" href={portraitUrl} download="{shown.key}.png">{t('items.doll.save')}</a>
+                {/if}
+                {#if shown.live}<button class="pbtn" onclick={() => void window.twinmap.retakePortrait(shown.key)}>{t('items.doll.retake')}</button>{/if}
+              </div>
+            {:else}
+              <span>{t('items.doll.none', { name: shown.key.split(' ')[0] ?? '' })}</span>
+              <small>{t('items.doll.noneNote')}</small>
+            {/if}
+          </div>
+          <div class="weapons">{#each WORN_WEAPONS as s (s[0])}{@render wornSlot(s)}{/each}</div>
+        </div>
+        <div class="col">{#each WORN_RIGHT as s (s[0])}{@render wornSlot(s)}{/each}</div>
       </div>
-      {#if view === 'table'}
-        <div class="chips" role="group" aria-label={t('items.page.whereLabel')}>
-          <button class="chip" aria-pressed={!place} onclick={() => (place = null)}>{t('items.page.all')} <b>{all.length}</b></button>
-          {#each places as { p, n } (p)}
-            <button class="chip" aria-pressed={place === p} onclick={() => (place = place === p ? null : p)}>{placeName(p)} <b>{n}</b></button>
+      {#if stats.length}
+        <div class="stats">
+          {#each stats as group (group.name)}
+            <h4>{group.name}</h4>
+            {#each group.lines as line (line.label)}
+              <div>{line.label} <b style:color={line.color}>{line.value}</b></div>
+            {/each}
+            {#if group.lines.length % 2}<div></div>{/if}
           {/each}
         </div>
       {/if}
+    </section>
+  {:else if part === 'bags'}
+    <section aria-label={t('items.held.bags')}>
+      <h2>{t('items.held.bags')}<span>{shown.live ? t('items.held.bagsNow') : t('items.held.bagsAsOf', { ago: ago(shown.seen, now) })}</span></h2>
+      {@render grid(t('items.held.backpack'), grids.bags)}
+      {#if grids.reagents.slots}{@render grid(t('items.held.reagents'), grids.reagents)}{/if}
+      {#if grids.keyring.slots}{@render grid(t('items.held.keyring'), grids.keyring)}{/if}
+    </section>
+  {:else if part === 'bank'}
+    {#if sheet.at.bank}
+      <section aria-label={t('items.held.bank')}>
+        <h2>{t('items.held.bank')}<span>{t('items.held.bankSeen', { ago: ago(sheet.at.bank, now) })}</span></h2>
+        {#if grids.bank.slots}{@render grid(t('items.held.bankBags'), grids.bank)}{/if}
+      </section>
+    {:else}
+      <p class="empty"><b>{t('items.bank.none')}</b>{t('items.bank.open')}<small>{t('items.bank.where')}</small></p>
+    {/if}
+  {:else}
+    <div class="tools">
+      <input type="search" placeholder={t('items.page.filter')} aria-label={t('items.page.filterLabel')} bind:value={filter.typed} />
+      <div class="chips" role="group" aria-label={t('items.page.whereLabel')}>
+        <button class="chip" aria-pressed={!place} onclick={() => (place = null)}>{t('items.page.all')} <b>{all.length}</b></button>
+        {#each places as { p, n } (p)}
+          <button class="chip" aria-pressed={place === p} onclick={() => (place = place === p ? null : p)}>{placeName(p)} <b>{n}</b></button>
+        {/each}
+      </div>
       <p class="sum">{WORTH[0]}{@render money_(worth)}{WORTH[1]}{#if listing}{' · '}{AUCTION[0]}{@render money_(auction)}{AUCTION[1]}{/if}{#if money !== null}{' · '}{MONEY[0]}{@render money_(money)}{MONEY[1]}{/if}</p>
     </div>
-    {#if view === 'slots' && grids}
-      <div class="page">
-        <section class="doll" aria-label={t('items.doll.label')}>
-          <header><span class="who" style:color={shown.color}>{shown.key}</span><span class="line">{shown.line}</span></header>
-          <div class="body">
-            <div class="col">{#each WORN_LEFT as s (s[0])}{@render wornSlot(s)}{/each}</div>
-            <div>
-              <div class="picture" style:background-image={portraitUrl ? `url("${portraitUrl}")` : null}>
-                {#if portraits.retake === shown.key}
-                  <div class="wait">
-                    <p>{t('items.doll.open')}<br />{KEY_HINT[0]}<kbd>C</kbd>{KEY_HINT[1]}</p>
-                    <small>{t('items.doll.waitNote')}</small>
-                    <span><button class="pbtn" onclick={() => void window.twinmap.retakePortrait(null)}>{t('items.doll.cancel')}</button></span>
-                  </div>
-                {:else if portrait && portraitUrl}
-                  <div class="under">
-                    <span class="when">{t('items.doll.taken', { ago: ago(portrait.at, now) })}</span>
-                    {#if inApp}
-                      <button class="pbtn" onclick={() => void window.twinmap.savePortrait(shown.key)}>{t('items.doll.save')}</button>
-                    {:else}
-                      <a class="pbtn" href={portraitUrl} download="{shown.key}.png">{t('items.doll.save')}</a>
-                    {/if}
-                    {#if shown.live}<button class="pbtn" onclick={() => void window.twinmap.retakePortrait(shown.key)}>{t('items.doll.retake')}</button>{/if}
-                  </div>
-                {:else}
-                  <span>{t('items.doll.none', { name: shown.key.split(' ')[0] ?? '' })}</span>
-                  <small>{t('items.doll.noneNote')}</small>
-                {/if}
-              </div>
-              <div class="weapons">{#each WORN_WEAPONS as s (s[0])}{@render wornSlot(s)}{/each}</div>
-            </div>
-            <div class="col">{#each WORN_RIGHT as s (s[0])}{@render wornSlot(s)}{/each}</div>
-          </div>
-          {#if stats.length}
-            <div class="stats">
-              {#each stats as group (group.name)}
-                <h4>{group.name}</h4>
-                {#each group.lines as line (line.label)}
-                  <div>{line.label} <b style:color={line.color}>{line.value}</b></div>
-                {/each}
-                {#if group.lines.length % 2}<div></div>{/if}
-              {/each}
-            </div>
-          {/if}
-        </section>
-        <section class="held" aria-label={t('items.held.label')}>
-          <h2>{t('items.held.bags')}<span>{shown.live ? t('items.held.bagsNow') : t('items.held.bagsAsOf', { ago: ago(shown.seen, now) })}</span></h2>
-          {@render grid(t('items.held.backpack'), grids.bags)}
-          {#if grids.reagents.slots}{@render grid(t('items.held.reagents'), grids.reagents)}{/if}
-          {#if grids.keyring.slots}{@render grid(t('items.held.keyring'), grids.keyring)}{/if}
-          <h2>{t('items.held.bank')}<span>{sheet.at.bank ? t('items.held.bankSeen', { ago: ago(sheet.at.bank, now) }) : t('items.held.bankUnseen')}</span></h2>
-          {#if grids.bank.slots}{@render grid(t('items.held.bankBags'), grids.bank)}{/if}
-        </section>
-      </div>
-    {:else}
     <table use:columns={'items-table'}>
       {@render heads(COLUMNS)}
       <tbody>
@@ -216,7 +220,6 @@
       </tbody>
     </table>
     <p class="foot">{when}</p>
-    {/if}
 
     {#if othersSorted.length}
       <h2>{t('items.others.title')}<span>{t('items.others.where')}</span></h2>
@@ -250,6 +253,18 @@
     margin: 64px auto;
     color: var(--text-dim);
     text-align: center;
+  }
+  /* A panel with nothing yet: what it is, then what to do in the game. */
+  .empty b {
+    display: block;
+    margin-bottom: 8px;
+    font: var(--t-title);
+    color: var(--gold);
+  }
+  .empty small {
+    display: block;
+    margin-top: 8px;
+    color: var(--text-off);
   }
   .tools {
     display: flex;
@@ -299,35 +314,8 @@
   .chip[aria-pressed='true'] b {
     color: var(--text-dim);
   }
-  .views {
-    display: inline-flex;
-    border-radius: 15px;
-    box-shadow: inset 0 0 0 1px var(--bronze-600);
-    overflow: hidden;
-  }
-  .views button {
-    padding: 4px 13px;
-    border: 0;
-    background: none;
-    color: var(--text-dim);
-    font: var(--t-body);
-    cursor: pointer;
-  }
-  .views button[aria-pressed='true'] {
-    background: var(--bronze-700);
-    color: var(--text);
-  }
-  .page {
-    display: grid;
-    grid-template-columns: 470px minmax(0, 1fr);
-    gap: 18px;
-    align-items: start;
-  }
   .doll {
-    padding: 12px 14px 14px;
-    border-radius: 3px;
-    background: linear-gradient(#ffffff08, #00000030);
-    box-shadow: inset 0 0 0 1px #ffffff12, 0 0 0 1px #000;
+    max-width: 470px;
   }
   .doll header {
     display: flex;
@@ -461,7 +449,7 @@
     gap: 10px;
     margin-top: 12px;
   }
-  .held h2:first-child {
+  section > h2:first-child {
     margin-top: 0;
   }
   .box {
@@ -645,13 +633,9 @@
     font: var(--t-small);
     color: var(--text-off);
   }
-  /* A narrow place: the character over the bags, the doll as wide as there is room for. */
   /* The tables as wide as the place, whatever widths were dragged: the name gives first, then the columns that
      matter least go (the type, then what a vendor gives, then where it is). */
   @container items (max-width: 700px) {
-    .page {
-      grid-template-columns: minmax(0, 470px);
-    }
     table {
       width: 100% !important;
       table-layout: auto !important;

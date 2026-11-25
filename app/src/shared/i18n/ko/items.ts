@@ -153,11 +153,7 @@ export default {
     // GS TYPE "종류".
     filter: '이름 또는 종류로 필터',
     filterLabel: '아이템 필터',
-    viewLabel: '보기',
     whereLabel: '위치',
-    // Bag slots are "칸" in the game (GS CONTAINER_SLOTS "%d칸").
-    slots: '칸',
-    table: '목록',
     all: '전체',
     // Each part as "label: amount", like the game's "돈:" (GS MONEY_COLON) and GS SELL_PRICE.
     worth: '판매 가격: {money}',
@@ -181,13 +177,11 @@ export default {
   },
 
   held: {
-    label: '가방과 은행',
     bags: '가방',
     bagsNow: '현재 상태',
     bagsAsOf: '{ago} 기준',
     bank: '은행',
     bankSeen: '{ago} 확인',
-    bankUnseen: '아직 열어 보지 않음: 게임에서 한 번 여십시오',
     // GS BAG_NAME_BACKPACK "배낭"; ItemSubClass 1.11 "재료 가방"; GS KEYRING.
     backpack: '배낭과 가방',
     reagents: '재료 가방',
@@ -196,6 +190,12 @@ export default {
     used: '{count}칸 중 {used}칸 사용',
     // GS CONTAINER_SLOTS "%d칸".
     empty: { other: '비어 있음 · {count}칸' },
+  },
+
+  bank: {
+    none: '아직 은행을 열어 보지 않았습니다',
+    open: '게임에서 은행을 한 번 여십시오. 게임을 종료한 뒤에도 은행에 있는 물건이 여기에 표시됩니다.',
+    where: '아무 수도에서나 은행원에게 말을 거십시오.',
   },
 
   table: {

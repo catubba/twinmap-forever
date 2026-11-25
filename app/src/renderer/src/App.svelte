@@ -24,8 +24,8 @@
   import { newsFor, type Go } from '../../shared/news'
   import FirstRun from './FirstRun.svelte'
   import Glyph from './Glyph.svelte'
-  import { add as addPanel, create as createSpace, edit, frame, layout, mount, move as moveSpace, nameOf, nowOver, open as openSpace, reach, remove as removeSpace, rename as renameSpace, reset as resetSpace, restore as restoreSpaces, section, setMapRight, unmount } from './frame.svelte'
-  import { MOST, NAME_MOST } from '../../shared/workspaces'
+  import { add as addPanel, create as createSpace, edit, frame, layout, mount, move as moveSpace, nameOf, nowOver, panelName, open as openSpace, reach, remove as removeSpace, rename as renameSpace, reset as resetSpace, restore as restoreSpaces, section, setMapRight, unmount } from './frame.svelte'
+  import { CHARACTER, MOST, NAME_MOST } from '../../shared/workspaces'
   import Logo from './Logo.svelte'
   import Map from './Map.svelte'
   import { drop, gone, opened, screen } from './motion'
@@ -95,7 +95,7 @@
   const go = (to: Go): void => {
     if (to === 'settings') return void (onSettings = true)
     onSettings = false
-    reach(to === 'items' ? 'items' : to === 'ah' ? 'ah' : 'map')
+    reach(to === 'items' ? 'character' : to === 'ah' ? 'ah' : 'map')
     if (to === 'layers') void tick().then(() => mapView?.openLayers())
   }
   window.twinmap.onSetup((told) => {
@@ -287,7 +287,6 @@
   // The bar of Edit layout: the list of Add panel open, the question before Restore default workspaces.
   let adding = $state(false)
   let sure = $state(false)
-  const PANEL_NAMES: Record<string, () => string> = { map: () => t('app.top.map'), now: () => t('app.top.now'), items: () => t('app.top.character'), ah: () => t('app.top.auctionHouse') }
   // The workspaces at the top, while the layout is unlocked: the one whose name is a field, the one asked about before it
   // is deleted, the one dragged and where it would land (before or after the tab under the pointer).
   let naming = $state<string | null>(null)
@@ -481,7 +480,7 @@
         {#if adding && frame.missing.length}
           <ul class="menu" in:fly={drop()}>
             {#each frame.missing as id (id)}
-              <li><button class="item" onclick={() => ((adding = false), addPanel(id))}>{PANEL_NAMES[id]?.()}</button></li>
+              <li><button class="item" onclick={() => ((adding = false), addPanel(id))}>{panelName(id)}</button></li>
             {/each}
           </ul>
         {/if}
@@ -591,7 +590,9 @@
       </footer>
     {/if}
   </aside>
-  <div class="sec" use:section={'items'}><Items {sheets} {portraits} {shown} known={characters} {now} {listing} onpick={(key) => (picked = key)} /></div>
+  {#each CHARACTER as part (part)}
+    <div class="sec" use:section={part}><Items {part} {sheets} {portraits} {shown} known={characters} {now} {listing} onpick={(key) => (picked = key)} /></div>
+  {/each}
   <div class="sec" use:section={'ah'}><Auction {house} chosen={!!chosenHouse} hints={char ?? null} who={char?.name ?? null} {prices} {listing} {sheets} known={characters} {homes} {now} {alerts} {showAlerts} onchoose={chooseHouse} /></div>
 </div>
 {/if}

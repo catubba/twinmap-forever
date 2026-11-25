@@ -148,11 +148,7 @@ export default {
     noCharacter: 'Todavía no hay personajes. Activa el addon Twinmap Forever, juega con uno y sus bolsas aparecerán aquí, incluso con el juego cerrado.',
     filter: 'Filtrar por nombre o tipo',
     filterLabel: 'Filtrar objetos',
-    viewLabel: 'Vista',
     whereLabel: 'Lugar',
-    // A switch half, short: bag slots are "casillas" in the game (GS CONTAINER_SLOTS).
-    slots: 'Casillas',
-    table: 'Lista',
     all: 'Todo',
     // Each part as "label: amount", like the game's "Dinero:" (GS MONEY_COLON).
     worth: 'Venta al mercader: {money}',
@@ -175,13 +171,11 @@ export default {
   },
 
   held: {
-    label: 'Bolsas y banco',
     bags: 'Bolsas',
     bagsNow: 'en este momento',
     bagsAsOf: 'vistas {ago}',
     bank: 'Banco',
     bankSeen: 'visto {ago}',
-    bankUnseen: 'todavía sin ver: ábrelo una vez en el juego',
     // GS BAG_NAME_BACKPACK "Mochila"; ItemSubClass 1.11 "Bolsa de componentes".
     backpack: 'Mochila y bolsas',
     reagents: 'Bolsa de componentes',
@@ -191,6 +185,12 @@ export default {
     used: '{used} de {count} ocupadas',
     // "vacío/vacía" would agree with the grid's heading (Llavero, Mochila...).
     empty: { one: 'sin objetos · {count} casilla', many: 'sin objetos · {count} casillas', other: 'sin objetos · {count} casillas' },
+  },
+
+  bank: {
+    none: 'Todavía no se ha visto el banco',
+    open: 'Abre tu banco una vez en el juego: lo que contiene aparecerá aquí, incluso con el juego cerrado.',
+    where: 'Habla con un banquero en cualquier capital.',
   },
 
   table: {
