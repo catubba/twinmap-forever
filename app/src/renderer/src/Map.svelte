@@ -2114,9 +2114,9 @@
       0 0 2px #000;
   }
 
-  /* Layers stays open until it is closed. It ends above the zoom buttons; on a low window it scrolls. */
+  /* Layers stays open until it is closed. It ends above the zoom buttons; on a low map it scrolls. */
   .layers {
-    max-height: calc(100vh - 250px);
+    max-height: calc(100cqh - 250px);
     overflow-y: auto;
   }
   /* The kinds of ore or of herbs open beside it, as tall, scrolling on their own. */
@@ -2129,7 +2129,7 @@
     display: flex;
     flex-direction: column;
     min-width: 236px;
-    max-height: calc(100vh - 250px);
+    max-height: calc(100cqh - 250px);
   }
   .kindlist .scroll {
     overflow-y: auto;
