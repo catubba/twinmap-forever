@@ -8,6 +8,7 @@ export default {
     inventory: '소지품',
     professions: '전문 기술',
     spellbook: '마법책',
+    talents: '특성',
     auctionSearch: '경매장 검색',
     item: '아이템',
     auctionHouse: '경매장',

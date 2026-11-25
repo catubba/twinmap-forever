@@ -8,6 +8,7 @@ export default {
     inventory: '物品栏',
     professions: '专业',
     spellbook: '法术书',
+    talents: '天赋',
     auctionSearch: '拍卖行搜索',
     item: '物品',
     auctionHouse: '拍卖行',

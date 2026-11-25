@@ -8,6 +8,7 @@ export default {
     inventory: 'Inventaire',
     professions: 'Métiers',
     spellbook: 'Grimoire',
+    talents: 'Talents',
     auctionSearch: 'Recherche HV',
     item: 'Objet',
     auctionHouse: 'Hôtel des ventes',

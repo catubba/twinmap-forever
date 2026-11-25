@@ -222,6 +222,14 @@ export default {
     login: 'Entra al juego con el addon de Twinmap actualizado: los hechizos de tu libro aparecerán aquí, incluso con el juego cerrado.',
   },
 
+  talents: {
+    spent: { one: '{count} punto gastado', many: '{count} de puntos gastados', other: '{count} puntos gastados' },
+    free: 'Talentos sin usar: {count}',
+    rank: 'Rango {rank}/{most}',
+    none: 'Aún no tienes talentos',
+    learn: 'Los talentos llegan en el nivel 10 y luego un punto por nivel. Gástalos en la ventana de talentos del juego: aparecerán aquí.',
+  },
+
   table: {
     columns: {
       item: 'Objeto',

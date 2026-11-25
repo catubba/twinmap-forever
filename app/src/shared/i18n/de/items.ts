@@ -225,6 +225,14 @@ export default {
     login: 'Loggt Euch mit dem aktuellen Twinmap-Addon ins Spiel ein: die Zauber Eures Zauberbuchs erscheinen dann hier, auch bei geschlossenem Spiel.',
   },
 
+  talents: {
+    spent: { one: '{count} Punkt verteilt', other: '{count} Punkte verteilt' },
+    free: 'Unverteilte Talentpunkte: {count}',
+    rank: 'Rang {rank}/{most}',
+    none: 'Noch keine Talente',
+    learn: 'Talente gibt es ab Stufe 10, danach einen Punkt pro Stufe. Verteilt sie im Talentfenster des Spiels: Sie erscheinen dann hier.',
+  },
+
   table: {
     columns: {
       item: 'Gegenstand',

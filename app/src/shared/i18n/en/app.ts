@@ -16,6 +16,8 @@ export default {
     professions: 'Professions',
     // A panel of the Character workspace: the spells the character knows, as the game's spellbook shows them.
     spellbook: 'Spellbook',
+    // A panel of the Character workspace: the character's talent trees and the points spent, as the game shows them.
+    talents: 'Talents',
     // The panels of the auction (M20-F9): its search, categories and list; the page of the item chosen.
     auctionSearch: 'Auction search',
     item: 'Item',
