@@ -18,12 +18,15 @@
   // The Talents panel of the Character workspace (M20-F12), from the sheet the app keeps for the character shown: the three
   // trees of its class side by side as the game's window draws them, each talent with the ranks taken, the arrows between
   // them, the points spent in each tree. Where the place is too narrow for three, one tree at a time under three tabs. It
-  // shows, it does not plan: nothing here changes a talent. It reads the same with the game closed.
+  // shows, it does not plan: nothing here changes a talent. It reads the same with the game closed. Under the pointer or
+  // reached with the keyboard, a talent opens a popup as the game's talent window does (M20-F16, shared/tips.ts).
   import type { Known } from '../../shared/characters'
   import { t } from '../../shared/i18n'
   import type { Sheets } from '../../shared/sheet'
-  import { treeOf, type Talent } from '../../shared/talents'
+  import { treeOf, type Tab, type Talent } from '../../shared/talents'
+  import { talentLines, type TipLine } from '../../shared/tips'
   import { CLASS_IDS } from '../../shared/trainers'
+  import { kept, spellTip } from './item-tip.svelte'
 
   let { sheets, shown, ready }: { sheets: Sheets; shown: Known | null; ready: boolean } = $props()
 
@@ -37,6 +40,16 @@
   let chosen = $state<number | null>(null)
   // The tab on show where only one fits: the one chosen, else the one with the most points.
   const on = $derived(chosen ?? (tree ? tree.tabs.reduce((best, tab, i) => (tab.spent > tree.tabs[best]!.spent ? i : best), 0) : 0))
+
+  // A row of a tree opens with five points spent in it for each row above (the game's window says how many are still to spend).
+  const linesOf = (x: Talent, tab: Tab): TipLine[] => {
+    const left = x.row * 5 - tab.spent
+    return talentLines(kept.tips, shown?.key ?? '', x, {
+      rank: t('items.talents.rank', { rank: x.rank, most: x.most }),
+      next: t('items.talents.next'),
+      need: x.rank === 0 && left > 0 ? t('items.talents.need', { count: left, tree: tab.name }) : undefined,
+    })
+  }
 
   // The arrows, in units of a talent's side: talents 1 apart and 0.35 between them, as the grid lays them out.
   const STEP = 1.35
@@ -84,10 +97,10 @@
               {/each}
             </svg>
             {#each tab.talents as x (x.node)}
-              <div class="t" class:full={x.rank === x.most} class:some={x.rank > 0 && x.rank < x.most} class:right={x.column > 1} style:grid-area="{x.row + 1} / {x.column + 1}" role="img" aria-label="{x.name}, {t('items.talents.rank', { rank: x.rank, most: x.most })}">
+              <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+              <div class="t" class:full={x.rank === x.most} class:some={x.rank > 0 && x.rank < x.most} style:grid-area="{x.row + 1} / {x.column + 1}" role="img" aria-label="{x.name}, {t('items.talents.rank', { rank: x.rank, most: x.most })}" tabindex="0" use:spellTip={() => linesOf(x, tab)}>
                 <img src="{TILES}/pictures/{x.icon}.png" alt="" onerror={(e) => e.currentTarget.setAttribute('style', 'visibility: hidden')} />
                 <b>{x.rank}/{x.most}</b>
-                <span class="tip"><strong>{x.name}</strong>{t('items.talents.rank', { rank: x.rank, most: x.most })}<small>{tab.name}</small></span>
               </div>
             {/each}
           </div>
@@ -281,42 +294,6 @@
   }
   .t.full b {
     color: var(--gold);
-  }
-  .tip {
-    display: none;
-    position: absolute;
-    z-index: 2;
-    top: calc(100% + 10px);
-    left: 0;
-    width: max-content;
-    max-width: 220px;
-    padding: 8px 10px;
-    border: 1px solid var(--bronze-500);
-    border-radius: 4px;
-    background: var(--stone-950);
-    box-shadow: 0 6px 18px #000a;
-    font: var(--t-body);
-    color: var(--text-dim);
-  }
-  .t.right .tip {
-    right: 0;
-    left: auto;
-  }
-  .t:hover {
-    z-index: 3;
-  }
-  .t:hover .tip {
-    display: block;
-  }
-  .tip strong {
-    display: block;
-    font-weight: 600;
-    color: var(--gold);
-  }
-  .tip small {
-    display: block;
-    margin-top: 4px;
-    color: var(--text-off);
   }
   @container talents (width < 600px) {
     .tabs {

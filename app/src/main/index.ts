@@ -648,7 +648,8 @@ function createWindow(): void {
     }
     tellSheets()
   }
-  // The tooltips of the items (M10-F15): sent once each with the sheet, kept here for good, every character's together.
+  // The tooltips of the items (M10-F15), every character's together, and of the spells and talents (M20-F16), each its own:
+  // sent with the sheet, kept here for good.
   const tipsFile = join(app.getPath('userData'), 'tips.json')
   let tips: Tips = {}
   try {
@@ -661,8 +662,8 @@ function createWindow(): void {
     lan?.tell('tips', tips)
   }
   win.webContents.on('did-finish-load', tellTips)
-  const takeTips = (sent: unknown): void => {
-    const news = tipsFrom(sent)
+  const takeTips = (sent: unknown, who: string): void => {
+    const news = tipsFrom(sent, who)
     if (!Object.keys(news).some((key) => JSON.stringify(tips[key]) !== JSON.stringify(news[key]))) return
     tips = { ...tips, ...news }
     try {
@@ -673,11 +674,21 @@ function createWindow(): void {
     }
     tellTips()
   }
+  // What the app holds of each sheet, told to the addon. A character whose book is here without the tooltips of its spells
+  // (an app from before M20-F16 took them and left them out: the addon will not send them again) is told it is held at
+  // revision 0, so that the addon sends it all again; until a sheet with its book comes, once a run.
+  let again: Set<string> | null = null
+  const held = (): ReturnType<typeof heldOf> => {
+    again ??= new Set(Object.keys(sheets).filter((key) => Array.isArray(sheets[key]!.pieces.book) && !Object.keys(tips).some((k) => k.startsWith('spell:') && k.endsWith(`@${key}`))))
+    const out = heldOf(sheets)
+    for (const key of again) if (out[key]) out[key] = { ...out[key], rev: 0 }
+    return out
+  }
   const tellHeld = (): void => {
     if (!gameFolder) return
     try {
-      const addons = addonsFolder(gameFolder), held = heldOf(sheets)
-      if (JSON.stringify(sentParts(addons).sheet) !== JSON.stringify(held)) send(addons, { sheet: held }, addonHearsFonts(gameFolder))
+      const addons = addonsFolder(gameFolder), now = held()
+      if (JSON.stringify(sentParts(addons).sheet) !== JSON.stringify(now)) send(addons, { sheet: now }, addonHearsFonts(gameFolder))
     } catch {
       // the way to the game is not there yet: the addon sends again until it is
     }
@@ -691,7 +702,8 @@ function createWindow(): void {
     if (!sent) return
     // The tooltips go to their own file: the sheet keeps none of them.
     const { tips: sentTips, ...pieces } = sent.p
-    if (sentTips !== undefined) takeTips(sentTips)
+    if (sentTips !== undefined) takeTips(sentTips, sent.key)
+    if (sent.p.book !== undefined) again?.delete(sent.key)
     const news = { ...sent, p: pieces }
     const now = mergeSheet(sheets, news, Date.now())
     if (now !== sheets) {
@@ -821,7 +833,7 @@ function createWindow(): void {
     }
     channel = installChannel(addons, !fonts)
       // The pause is taken back too: one asked by a run of the app that closed while paused is not to stay.
-      .then(() => void send(addons, { sync: Date.now(), latest: app.getVersion(), sheet: heldOf(sheets), log: participates(), ...(fonts ? { pause: paused ? Date.now() : false } : {}) }, addonHearsFonts(gameFolder!)))
+      .then(() => void send(addons, { sync: Date.now(), latest: app.getVersion(), sheet: held(), log: participates(), ...(fonts ? { pause: paused ? Date.now() : false } : {}) }, addonHearsFonts(gameFolder!)))
       .then(() => (marksTimer ??= setTimeout(sendMarks, MARKS_WAIT)))
       .catch(() => {})
   }
