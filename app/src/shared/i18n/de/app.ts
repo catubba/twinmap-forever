@@ -6,6 +6,7 @@ export default {
     map: 'Karte',
     character: 'Charakter',
     inventory: 'Inventar',
+    professions: 'Berufe',
     auctionHouse: 'Auktionshaus',
     // As German players write it.
     auctionHouseShort: 'AH',

@@ -6,6 +6,7 @@ export default {
     map: 'Carte',
     character: 'Personnage',
     inventory: 'Inventaire',
+    professions: 'Métiers',
     auctionHouse: 'Hôtel des ventes',
     auctionHouseShort: 'HV',
     pause: 'Mettre Twinmap en pause',

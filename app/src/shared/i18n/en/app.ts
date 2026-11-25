@@ -12,6 +12,8 @@ export default {
     character: 'Character',
     // A panel of the Character workspace: a row for each item the character holds, and what the others hold.
     inventory: 'Inventory',
+    // A panel of the Character workspace: the character's professions, their level and their recipes.
+    professions: 'Professions',
     auctionHouse: 'Auction House',
     // Shown in place of auctionHouse when the window is narrow: two or three letters.
     auctionHouseShort: 'AH',

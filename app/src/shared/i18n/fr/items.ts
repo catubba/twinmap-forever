@@ -191,6 +191,26 @@ export default {
     where: 'Parlez à un banquier dans n’importe quelle capitale.',
   },
 
+  professions: {
+    primary: 'Métiers',
+    secondary: 'Compétences secondaires',
+    filter: 'Filtrer les recettes',
+    known: 'Connues',
+    unknown: 'Pas encore apprises',
+    unknownNote: 'Le nombre : la compétence à partir de laquelle chacune passe au jaune.',
+    optimal: 'Orange : progression assurée',
+    medium: 'Jaune : probable',
+    easy: 'Vert : rare',
+    trivial: 'Gris : aucune',
+    noMatch: 'Aucune recette ne correspond.',
+    none: 'Aucun métier pour l’instant',
+    learn: 'Apprenez-en un auprès d’un maître de métier, dans n’importe quelle ville : son niveau et ses recettes s’affichent ici.',
+    also: 'Cuisine, Secourisme et Pêche comptent aussi.',
+    unseen: 'Aucune recette vue pour l’instant',
+    open: 'Ouvrez {profession} une fois en jeu : ses recettes s’affichent ici, même quand le jeu est fermé.',
+    gathers: '{profession} n’a pas de recettes : seul son niveau s’affiche.',
+  },
+
   table: {
     columns: {
       item: 'Objet',

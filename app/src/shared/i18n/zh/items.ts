@@ -198,6 +198,26 @@ export default {
     where: '与任意主城的银行职员交谈。',
   },
 
+  professions: {
+    primary: '专业',
+    secondary: '辅助技能',
+    filter: '筛选配方',
+    known: '已学会',
+    unknown: '未学会',
+    unknownNote: '数字：配方变为黄色时的技能等级。',
+    optimal: '橙色：必定提升',
+    medium: '黄色：可能提升',
+    easy: '绿色：很少提升',
+    trivial: '灰色：不再提升',
+    noMatch: '没有符合的配方。',
+    none: '尚无专业',
+    learn: '在任意城市找专业训练师学习，其等级和配方会显示在这里。',
+    also: '烹饪、急救和钓鱼也算在内。',
+    unseen: '尚未查看配方',
+    open: '在游戏中打开一次{profession}窗口，其配方就会显示在这里，关闭游戏后也能查看。',
+    gathers: '{profession}没有配方，只显示等级。',
+  },
+
   table: {
     columns: {
       item: '物品',

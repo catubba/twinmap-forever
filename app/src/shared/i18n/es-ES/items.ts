@@ -193,6 +193,26 @@ export default {
     where: 'Habla con un banquero en cualquier capital.',
   },
 
+  professions: {
+    primary: 'Profesiones',
+    secondary: 'Habilidades secundarias',
+    filter: 'Filtrar recetas',
+    known: 'Conocidas',
+    unknown: 'Sin aprender',
+    unknownNote: 'El número: la habilidad a partir de la que cada una se vuelve amarilla.',
+    optimal: 'Naranja: subida segura',
+    medium: 'Amarillo: probable',
+    easy: 'Verde: rara vez',
+    trivial: 'Gris: ninguna',
+    noMatch: 'Ninguna receta coincide.',
+    none: 'Aún no tienes profesiones',
+    learn: 'Aprende una con un instructor de profesiones en cualquier ciudad: su nivel y sus recetas aparecerán aquí.',
+    also: 'Cocina, Primeros auxilios y Pesca también cuentan.',
+    unseen: 'Aún no se han visto recetas',
+    open: 'Abre {profession} una vez en el juego: sus recetas aparecerán aquí, incluso con el juego cerrado.',
+    gathers: '{profession} no tiene recetas: solo se muestra su nivel.',
+  },
+
   table: {
     columns: {
       item: 'Objeto',

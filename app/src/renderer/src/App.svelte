@@ -32,6 +32,7 @@
   import Settings from './Settings.svelte'
   import Picker from './Picker.svelte'
   import Items from './Items.svelte'
+  import Professions from './Professions.svelte'
   import Auction from './Auction.svelte'
   import { homeOf, houseFrom, houseNumber, houseOf, type Alert, type Home, type House, type PricesTold } from '../../shared/ah'
   import ItemPopup from './ItemPopup.svelte'
@@ -599,6 +600,7 @@
   {#each CHARACTER as part (part)}
     <div class="sec" use:section={part}><Items {part} {sheets} {portraits} {shown} known={characters} {now} {listing} onpick={(key) => (picked = key)} /></div>
   {/each}
+  <div class="sec" use:section={'professions'}><Professions {sheets} {shown} ready={mapReady} /></div>
   <div class="sec" use:section={'ah'}><Auction {house} chosen={!!chosenHouse} hints={char ?? null} who={char?.name ?? null} {prices} {listing} {sheets} known={characters} {homes} {now} {alerts} {showAlerts} onchoose={chooseHouse} /></div>
 </div>
 {/if}
