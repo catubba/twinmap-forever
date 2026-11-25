@@ -72,9 +72,16 @@ function findGameFolder(picked: string | undefined): string | null {
 // Makes the map tiles from the game's files, once per build of the game, and keeps the latest word on it.
 // The folder: TWINMAP_DATA when set (for trials), or Twinmap under the local application data.
 type Picture = 'items' | 'pictures'
-function startTiles(gameFolder: string | null): { status: () => TilesStatus; item: (kind: Picture, id: number) => Promise<boolean>; stop: () => void } {
+function startTiles(gameFolder: string | null): { status: () => TilesStatus; item: (kind: Picture, id: number) => Promise<boolean>; settled: () => Promise<void>; stop: () => void } {
   let status: TilesStatus = { state: 'looking' }
-  if (!gameFolder) return { status: () => ({ state: 'no-game' }), item: () => Promise.resolve(false), stop: () => {} }
+  if (!gameFolder) return { status: () => ({ state: 'no-game' }), item: () => Promise.resolve(false), settled: () => Promise.resolve(), stop: () => {} }
+  // Whoever waits for the map to be ready, or to have failed.
+  let waiting: (() => void)[] = []
+  const settle = (): void => {
+    if (status.state === 'looking' || status.state === 'converting') return
+    for (const go of waiting) go()
+    waiting = []
+  }
   const base = process.env.TWINMAP_DATA ?? join(process.env.LOCALAPPDATA ?? app.getPath('userData'), 'Twinmap')
   const worker = startTilesWorker({ workerData: { gameFolder, base, nav: navFolder() } })
   // The picture of an item, or of a spell by its file, the folder does not have yet is made by the worker, which has the game's archive (item-icons.ts).
@@ -82,7 +89,8 @@ function startTiles(gameFolder: string | null): { status: () => TilesStatus; ite
   worker.on('message', (told: TilesStatus | { asked: string; made: boolean }) => {
     if (!('asked' in told)) {
       if (told.state === 'failed') fault(`map: ${told.message}`)
-      return void (status = told)
+      status = told
+      return settle()
     }
     for (const answer of items.get(told.asked) ?? []) answer(told.made)
     items.delete(told.asked)
@@ -90,6 +98,7 @@ function startTiles(gameFolder: string | null): { status: () => TilesStatus; ite
   worker.on('error', (e) => {
     fault(`map: worker stopped: ${describe(e)}`)
     status = { state: 'failed', message: e instanceof Error ? e.message : String(e) }
+    settle()
     for (const answers of items.values()) for (const answer of answers) answer(false)
     items.clear()
   })
@@ -100,7 +109,13 @@ function startTiles(gameFolder: string | null): { status: () => TilesStatus; ite
       items.set(asked, [answer])
       worker.postMessage({ kind, id })
     })
-  return { status: () => status, item, stop: () => void worker.terminate() }
+  const settled = (): Promise<void> => (status.state === 'looking' || status.state === 'converting' ? new Promise((go) => waiting.push(go)) : Promise.resolve())
+  const stop = (): void => {
+    void worker.terminate()
+    for (const go of waiting) go()
+    waiting = []
+  }
+  return { status: () => status, item, settled, stop }
 }
 
 // The quests on the map: the player's QuestieDB is opened once, and asked for the pins of what
@@ -422,11 +437,13 @@ function createWindow(): void {
       const bytes = key ? await readFile(portraitFile(key)).catch(() => null) : null
       return bytes ? { status: 200, type: 'image/png', bytes } : { status: 404 }
     }
+    // The picture of an item is made the first time it is asked for; one the game has none of is no picture at all. One asked
+    // before the map is ready (the Character panels, at the start) waits for it: answered missing, the page would drop it.
+    const item = /^\/(items|pictures)\/(\d+)\.png$/.exec(path)
+    if (item) await tiles.settled()
     const status = tiles.status()
     const file = status.state === 'ready' ? servedFile(status.folder, path) : null
     let bytes = file ? await readFile(file).catch(() => null) : null
-    // The picture of an item is made the first time it is asked for; one the game has none of is no picture at all.
-    const item = /^\/(items|pictures)\/(\d+)\.png$/.exec(path)
     if (item && file && !bytes) bytes = (await tiles.item(item[1] as Picture, Number(item[2]))) ? await readFile(file).catch(() => null) : null
     if (item && !bytes) return { status: 404 }
     // Where the game has no picture there is no file. That is the sea, not a fault: an empty picture for
