@@ -219,6 +219,14 @@ export default {
     gathers: '{profession}没有配方，只显示等级。',
   },
 
+  talents: {
+    spent: { other: '已用 {count} 点' },
+    free: '剩余天赋点数：{count}',
+    rank: '等级 {rank}/{most}',
+    none: '还没有天赋',
+    learn: '天赋从10级开始，之后每升一级获得一点。在游戏的天赋窗口中分配后，会显示在这里。',
+  },
+
   table: {
     columns: {
       item: '物品',

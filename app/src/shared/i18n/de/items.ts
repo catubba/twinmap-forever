@@ -217,6 +217,14 @@ export default {
     gathers: '{profession} hat keine Rezepte: nur die Stufe wird angezeigt.',
   },
 
+  talents: {
+    spent: { one: '{count} Punkt verteilt', other: '{count} Punkte verteilt' },
+    free: 'Unverteilte Talentpunkte: {count}',
+    rank: 'Rang {rank}/{most}',
+    none: 'Noch keine Talente',
+    learn: 'Talente gibt es ab Stufe 10, danach einen Punkt pro Stufe. Verteilt sie im Talentfenster des Spiels: Sie erscheinen dann hier.',
+  },
+
   table: {
     columns: {
       item: 'Gegenstand',
