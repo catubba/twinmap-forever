@@ -461,12 +461,14 @@
 </main>
 
 <style>
+  /* Its narrow form follows the width of its place, not of the window: a panel beside the map is narrow too. */
   main {
     position: absolute;
     inset: 46px 0 0;
     display: grid;
     grid-template-rows: auto auto minmax(0, 1fr) 28px;
     font-variant-numeric: tabular-nums;
+    container: auction / inline-size;
   }
   /* Not .bar: that is the thin progress bar of ui.css, 6 px tall, which a wrapped row would spill out of. */
   .tools {
@@ -968,8 +970,8 @@
   .foot .right {
     margin-left: auto;
   }
-  /* A narrow window: the tools wrap, the categories go over the list, the page of an item is one column. */
-  @media (max-width: 900px) {
+  /* A narrow place: the tools wrap, the categories go over the list, the page of an item is one column. */
+  @container auction (max-width: 900px) {
     .tools {
       flex-wrap: wrap;
     }
@@ -993,8 +995,10 @@
       grid-template-columns: minmax(0, 1fr);
       overflow: auto;
     }
+    /* Each part as tall as what it holds, one under the other: the chart no longer runs under the alert. */
     .itempage > div {
       overflow: visible;
+      min-height: auto;
     }
     .foot {
       white-space: normal;
