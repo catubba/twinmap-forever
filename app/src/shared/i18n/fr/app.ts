@@ -7,6 +7,7 @@ export default {
     character: 'Personnage',
     inventory: 'Inventaire',
     professions: 'Métiers',
+    spellbook: 'Grimoire',
     talents: 'Talents',
     auctionSearch: 'Recherche HV',
     item: 'Objet',

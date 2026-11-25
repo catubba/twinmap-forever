@@ -1,20 +1,3 @@
-<script module lang="ts">
-  import { SPELLS_FILE, type SpellFacts } from '../../shared/spells'
-  import { TILES } from './web'
-  // The game's spells (spells.json, made beside the map by tiles-worker.ts just after the map is ready), asked for then, and
-  // again every few seconds until the file is there: at the first start of a build it takes a few seconds more.
-  let facts = $state.raw<SpellFacts | null>(null)
-  let asked = false
-  // A file not made yet comes back empty (204) or missing.
-  function ask(left: number): void {
-    const again = (): unknown => left > 0 && setTimeout(() => ask(left - 1), 3000)
-    void fetch(`${TILES}/${SPELLS_FILE}`)
-      .then((r) => (r.status === 200 ? r.json() : null))
-      .then((read: SpellFacts | null) => (read ? (facts = read) : again()))
-      .catch(again)
-  }
-</script>
-
 <script lang="ts">
   // The Professions panel of the Character workspace (M20-F10), from the sheet the app keeps for the character shown: on the
   // left each profession with its level, the main ones first; on the right the recipes of the one chosen, those known in the
@@ -25,14 +8,15 @@
   import { professionsOf, type Recipe } from '../../shared/professions'
   import type { Sheets } from '../../shared/sheet'
   import { itemTip } from './item-tip.svelte'
+  import { askSpellFacts, spellFacts } from './spell-facts.svelte'
+  import { TILES } from './web'
 
   let { sheets, shown, ready }: { sheets: Sheets; shown: Known | null; ready: boolean } = $props()
 
   $effect(() => {
-    if (!ready || asked) return
-    asked = true
-    ask(40)
+    if (ready) askSpellFacts()
   })
+  const facts = $derived(spellFacts.facts)
   const sheet = $derived(shown ? sheets[shown.key] : undefined)
   const list = $derived(sheet && facts ? professionsOf(sheet.pieces, facts) : [])
   let chosen = $state(0)

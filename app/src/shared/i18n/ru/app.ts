@@ -7,6 +7,7 @@ export default {
     character: 'Персонаж',
     inventory: 'Инвентарь',
     professions: 'Профессии',
+    spellbook: 'Книга заклинаний',
     talents: 'Таланты',
     auctionSearch: 'Поиск на аукционе',
     item: 'Предмет',

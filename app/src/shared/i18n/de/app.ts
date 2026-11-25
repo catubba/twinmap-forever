@@ -7,6 +7,7 @@ export default {
     character: 'Charakter',
     inventory: 'Inventar',
     professions: 'Berufe',
+    spellbook: 'Zauberbuch',
     talents: 'Talente',
     auctionSearch: 'AH-Suche',
     item: 'Gegenstand',

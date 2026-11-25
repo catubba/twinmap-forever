@@ -214,6 +214,14 @@ export default {
     gathers: '{profession} no tiene recetas: solo se muestra su nivel.',
   },
 
+  spellbook: {
+    filter: 'Filtrar hechizos',
+    passive: 'Pasivo',
+    noMatch: 'Ningún hechizo coincide.',
+    none: 'Aún no hay libro de hechizos',
+    login: 'Entra en el juego con el addon de Twinmap actualizado: los hechizos de tu libro aparecerán aquí, incluso con el juego cerrado.',
+  },
+
   talents: {
     spent: { one: '{count} punto gastado', many: '{count} de puntos gastados', other: '{count} puntos gastados' },
     free: 'Talentos sin usar: {count}',

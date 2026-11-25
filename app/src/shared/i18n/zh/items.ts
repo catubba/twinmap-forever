@@ -219,6 +219,14 @@ export default {
     gathers: '{profession}没有配方，只显示等级。',
   },
 
+  spellbook: {
+    filter: '筛选法术',
+    passive: '被动',
+    noMatch: '没有符合的法术。',
+    none: '尚无法术书',
+    login: '使用最新版的Twinmap插件登录游戏，法术书中的法术就会显示在这里，关闭游戏后也能查看。',
+  },
+
   talents: {
     spent: { other: '已用 {count} 点' },
     free: '剩余天赋点数：{count}',

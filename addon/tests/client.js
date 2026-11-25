@@ -102,17 +102,22 @@ const STUB = `
   }
   function GetInventoryItemLink(_, slot) local w = GAME.worn and GAME.worn[slot] return w and (w[4] or ("|cffffffff|Hitem:" .. w[1] .. "::::::::" .. (GAME.level or 1) .. ":::::|h[x]|h|r")) end
   -- Skills, spells, talents and recipes, as Forever has them. GAME.skills = { { skill, rank, most, header } },
-  -- GAME.spells = { { spell, notYet } }, GAME.talents = { [node] = { rank, spell } } with GAME.free points,
+  -- GAME.spells = { { spell, notYet, passive } } in one tab, General, GAME.pet = { { name, words, picture, passive } } the pet's,
+  -- GAME.talents = { [node] = { rank, spell } } with GAME.free points,
   -- GAME.trade = { profession = n, recipes = { [spell] = learned }, linked = true }: the window of a profession.
-  Enum = { SpellBookSpellBank = { Player = 0 }, SpellBookItemType = { Spell = 1, FutureSpell = 2 } }
+  Enum = { SpellBookSpellBank = { Player = 0, Pet = 1 }, SpellBookItemType = { Spell = 1, FutureSpell = 2 } }
   C_SkillInfo = {
     GetNumSkillLines = function() return GAME.skills and #GAME.skills or 0 end,
     GetSkillLineInfo = function(i) local l = GAME.skills[i] return l and { skillID = l[1], rank = l[2], maxRank = l[3], isHeader = l[4] == true } end,
   }
   C_SpellBook = {
     GetNumSpellBookSkillLines = function() return GAME.spells and 1 or 0 end,
-    GetSpellBookSkillLineInfo = function() return { itemIndexOffset = 0, numSpellBookItems = #GAME.spells } end,
-    GetSpellBookItemInfo = function(i) local sp = GAME.spells[i] return sp and { spellID = sp[1], itemType = sp[2] and 2 or 1 } end,
+    GetSpellBookSkillLineInfo = function() return { name = "General", iconID = 136830, itemIndexOffset = 0, numSpellBookItems = #GAME.spells } end,
+    GetSpellBookItemInfo = function(i, bank)
+      if bank == 1 then local p = GAME.pet and GAME.pet[i] return p and { name = p[1], subName = p[2], iconID = p[3], isPassive = p[4] == true, itemType = 3 } end
+      local sp = GAME.spells[i] return sp and { spellID = sp[1], itemType = sp[2] and 2 or 1, isPassive = sp[3] == true }
+    end,
+    HasPetSpells = function() return GAME.pet and #GAME.pet or nil end,
   }
   C_ClassTalents = { GetActiveConfigID = function() return GAME.talents and 7 end }
   C_Traits = {

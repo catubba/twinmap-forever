@@ -217,6 +217,14 @@ export default {
     gathers: '{profession} hat keine Rezepte: nur die Stufe wird angezeigt.',
   },
 
+  spellbook: {
+    filter: 'Zauber filtern',
+    passive: 'Passiv',
+    noMatch: 'Kein Zauber passt.',
+    none: 'Noch kein Zauberbuch',
+    login: 'Loggt Euch mit dem aktuellen Twinmap-Addon ins Spiel ein: die Zauber Eures Zauberbuchs erscheinen dann hier, auch bei geschlossenem Spiel.',
+  },
+
   talents: {
     spent: { one: '{count} Punkt verteilt', other: '{count} Punkte verteilt' },
     free: 'Unverteilte Talentpunkte: {count}',
