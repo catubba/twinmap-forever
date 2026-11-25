@@ -28,6 +28,15 @@ export default {
     restoreYes: '복원',
     restoreNo: '취소',
     done: '완료',
+    hintSpaces: '위쪽: 작업 공간을 끌면 순서가 바뀌고, 두 번 클릭하면 이름을 바꿀 수 있습니다.',
+    newSpace: '새 작업 공간',
+    spacesMost: '작업 공간은 최대 {most}개',
+    unnamed: '작업 공간',
+    rename: '작업 공간 이름',
+    deleteSpace: '작업 공간 삭제',
+    deleteSure: '작업 공간 "{name}"을(를) 삭제하시겠습니까? 배치는 사라지고, 패널은 다른 작업 공간에 남습니다.',
+    deleteYes: '삭제',
+    deleteNo: '유지',
   },
 
   link: {

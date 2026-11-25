@@ -7,13 +7,20 @@ export const WORKSPACES_VERSION = 1
 /** The panels there are, by their id: a panel of a layout kept that is none of these is taken out. */
 export const PANELS = ['map', 'now', 'items', 'ah'] as const
 
-/** A workspace by its id, and its layout as dockview gives it (toJSON). */
-export type Workspace = { id: string; layout: unknown }
+/** A workspace by its id; the name the player gave it, if any (without, the default one in the language spoken, never
+ * translated once written); its layout as dockview gives it (toJSON). */
+export type Workspace = { id: string; name?: string; layout: unknown }
 
 export type Workspaces = { version: typeof WORKSPACES_VERSION; open: number; spaces: Workspace[] }
 
 /** At most this many workspaces. */
 export const MOST = 6
+
+/** A name the player writes, at most this long. */
+export const NAME_MOST = 32
+
+// The name as written, trimmed and cut short; undefined for none.
+const nameOf = (name: unknown): string | undefined => (typeof name === 'string' && name.trim() ? name.trim().slice(0, NAME_MOST) : undefined)
 
 /** What was kept, if it is ours and of this version; undefined otherwise. The layouts are looked into by dockview. */
 export function workspacesOf(kept: unknown): Workspaces | undefined {
@@ -29,6 +36,9 @@ export function workspacesOf(kept: unknown): Workspaces | undefined {
   return {
     version,
     open: Number.isInteger(open) && (open as number) >= 0 && (open as number) < spaces.length ? (open as number) : 0,
-    spaces: spaces.map(({ id, layout }: Workspace) => ({ id, layout })),
+    spaces: spaces.map(({ id, name, layout }: Workspace) => {
+      const named = nameOf(name)
+      return named ? { id, name: named, layout } : { id, layout }
+    }),
   }
 }

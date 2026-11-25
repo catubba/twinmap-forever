@@ -12,7 +12,7 @@
   import qrcode from 'qrcode-generator'
   import { inApp } from './web'
   import { ZOOMS } from '../../shared/window'
-  import { SPACES, layout, setMapRight } from './frame.svelte'
+  import { frame, layout, setMapRight } from './frame.svelte'
   import { langNow, metresOn, metricOffered, num, t, type Key } from '../../shared/i18n'
 
   let { setup, tiles, onback, onfirstrun, onfeedback, onnews }: { setup: SetupStatus; tiles: TilesStatus | null; onback: () => void; onfirstrun: () => void; onfeedback: () => void; onnews: () => void } = $props()
@@ -177,7 +177,7 @@
         <div><dt><kbd>F</kbd></dt><dd>{t('settings.keys.follow')}</dd></div>
         <div><dt><kbd>N</kbd></dt><dd>{t('settings.keys.north')}</dd></div>
         <div><dt><kbd>M</kbd></dt><dd>{t('settings.keys.side')}</dd></div>
-        <div><dt><kbd>{t('settings.keys.ctrl')}</kbd><kbd>1</kbd><kbd>{SPACES.length}</kbd></dt><dd>{t('settings.keys.spaces')}</dd></div>
+        <div><dt><kbd>{t('settings.keys.ctrl')}</kbd><kbd>1</kbd>{#if frame.spaces.length > 1}<kbd>{frame.spaces.length}</kbd>{/if}</dt><dd>{t('settings.keys.spaces')}</dd></div>
         <div><dt><kbd>{t('settings.keys.ctrl')}</kbd><kbd>E</kbd></dt><dd>{t('app.layout.editKey')}</dd></div>
         {#if inApp}<div><dt><kbd>F11</kbd></dt><dd>{t('settings.keys.fullScreen')}</dd></div>{/if}
         {#if inApp}<div><dt><kbd>{t('settings.keys.ctrl')}</kbd><kbd>+</kbd><kbd>-</kbd><kbd>0</kbd></dt><dd>{t('settings.keys.zoom')}</dd></div>{/if}

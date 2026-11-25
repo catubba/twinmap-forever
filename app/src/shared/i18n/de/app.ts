@@ -28,6 +28,15 @@ export default {
     restoreYes: 'Wiederherstellen',
     restoreNo: 'Abbrechen',
     done: 'Fertig',
+    hintSpaces: 'Oben: Zieht einen Arbeitsbereich, um ihn zu verschieben, doppelklickt ihn, um ihn umzubenennen.',
+    newSpace: 'Neuer Arbeitsbereich',
+    spacesMost: 'Höchstens {most} Arbeitsbereiche',
+    unnamed: 'Arbeitsbereich',
+    rename: 'Name des Arbeitsbereichs',
+    deleteSpace: 'Arbeitsbereich löschen',
+    deleteSure: 'Den Arbeitsbereich "{name}" löschen? Seine Anordnung geht verloren; die Panels bleiben in den anderen Arbeitsbereichen.',
+    deleteYes: 'Löschen',
+    deleteNo: 'Behalten',
   },
 
   link: {
