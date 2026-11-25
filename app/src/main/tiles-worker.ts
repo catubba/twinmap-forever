@@ -10,6 +10,7 @@ import { NPC, openQuestie } from './questie'
 import { FACTS, gameItemFacts, type ItemFacts, ITEMS_FILE } from '../shared/items'
 import { AH_NAMES_FILE, gameAhNames } from '../shared/ah'
 import { spellFacts, SPELLS_FILE, SPELLS_FORMAT } from '../shared/spells'
+import { talentFacts, TALENTS_FILE, TALENTS_FORMAT } from '../shared/talents'
 import { trainerFacts, TRAINERS_FILE, TRAINERS_FORMAT } from '../shared/trainers'
 import { gameMaps, UI_MAP_ASSIGNMENT_FILE, UI_MAP_FILE, type GameMap } from '../shared/maps'
 import { AREA_POI_FILE, AREA_TABLE_FILE, places, UI_MAP_X_MAP_ART_FILE, WORLD_MAP_OVERLAY_FILE } from '../shared/places'
@@ -68,7 +69,7 @@ try {
   } catch {
     // A map made before the app read the game's language, or none yet.
   }
-  if (madeIn !== locale) for (const made of [MAPS_FILE, PLACES_FILE, TRAVEL_FILE, INTERIORS_FILE, ITEMS_FILE, AH_NAMES_FILE, TRAINERS_FILE, SPELLS_FILE, GAME_NAMES_FILE]) rmSync(join(folder, made), { force: true })
+  if (madeIn !== locale) for (const made of [MAPS_FILE, PLACES_FILE, TRAVEL_FILE, INTERIORS_FILE, ITEMS_FILE, AH_NAMES_FILE, TRAINERS_FILE, SPELLS_FILE, TALENTS_FILE, GAME_NAMES_FILE]) rmSync(join(folder, made), { force: true })
   // The game's archive is opened only when there is something to convert: it takes half a second
   // and a few hundred megabytes, and on most starts the tiles are already there.
   let client: ClientFiles | undefined
@@ -238,6 +239,22 @@ try {
     }
   } catch {
     // Professions names no recipe; tried again at the next start.
+  }
+  // The talent trees (shared/talents.ts), the same way: once for each build and again for an older format.
+  try {
+    const talentsFile = join(folder, TALENTS_FILE)
+    let format = 0
+    try {
+      format = (JSON.parse(readFileSync(talentsFile, 'utf8')) as { format?: number }).format ?? 0
+    } catch {
+      // Not there yet.
+    }
+    if (format !== TALENTS_FORMAT) {
+      const facts = talentFacts(open())
+      if (facts) writeFileSync(talentsFile, JSON.stringify(facts))
+    }
+  } catch {
+    // Talents draws no tree; tried again at the next start.
   }
 
   // The insides of buildings come after: the map of the continents is already usable.

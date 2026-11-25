@@ -219,6 +219,14 @@ export default {
     gathers: '{profession}에는 제조법이 없습니다. 숙련도만 표시됩니다.',
   },
 
+  talents: {
+    spent: { other: '{count} 포인트 사용' },
+    free: '사용하지 않은 특성 포인트: {count}',
+    rank: '등급 {rank}/{most}',
+    none: '아직 특성이 없습니다',
+    learn: '특성은 10레벨부터 레벨마다 1포인트씩 얻습니다. 게임의 특성 창에서 포인트를 사용하면 여기에 표시됩니다.',
+  },
+
   table: {
     columns: {
       item: '아이템',

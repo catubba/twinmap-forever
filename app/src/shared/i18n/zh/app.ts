@@ -7,6 +7,7 @@ export default {
     character: '角色',
     inventory: '物品栏',
     professions: '专业',
+    talents: '天赋',
     auctionSearch: '拍卖行搜索',
     item: '物品',
     auctionHouse: '拍卖行',

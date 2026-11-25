@@ -243,6 +243,19 @@ export default {
     gathers: '{profession} has no recipes: its level is all there is to show.',
   },
 
+  // The panel Talents: the character's talent trees as the game's window draws them, and the points spent in each.
+  talents: {
+    // Beside the title of the panel. {count}: the points spent in all three trees.
+    spent: { one: '{count} point spent', other: '{count} points spent' },
+    // Beside it, in green, when the character has points not spent yet. As the game words it (UNSPENT_TALENT_POINTS).
+    free: 'Unspent Talent Points: {count}',
+    // In the tooltip of a talent, under its name, as the game words it (TOOLTIP_TALENT_RANK).
+    rank: 'Rank {rank}/{most}',
+    // A character with no talent taken and no point to spend: the title, then what to do in the game.
+    none: 'No talents yet',
+    learn: "Talents come at level 10, then one point each level. Spend them in the game's talent window: they show here.",
+  },
+
   // The panel Inventory: a row for each item.
   table: {
     // Column headings, in capitals: short.

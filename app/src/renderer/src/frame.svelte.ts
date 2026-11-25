@@ -43,6 +43,7 @@ const TITLES: Record<string, () => string> = {
   bank: () => t('items.places.bank'),
   inventory: () => t('app.top.inventory'),
   professions: () => t('app.top.professions'),
+  talents: () => t('app.top.talents'),
   search: () => t('app.top.auctionSearch'),
   item: () => t('app.top.item'),
   mine: () => t('auction.nav.mine'),
@@ -206,7 +207,7 @@ const fit = (): void => made.forEach((m, i) => (dress(m.dock), hold(i)))
 // Spellbook and Talents). Laid out in the place of a panel of an older layout (`at`, the
 // Items panel of before), and as tabs of one group where that place is narrower than CHARACTER_WIDE.
 const CHARACTER_WIDE = 1000
-const BEHIND_INVENTORY = ['professions']
+const BEHIND_INVENTORY = ['professions', 'talents']
 function characters(dock: Dock, at?: string): void {
   const put = (id: string, position?: Parameters<Dock['addPanel']>[0]['position']): void => void dock.addPanel({ id, component: id, title: TITLES[id]!(), ...(position && { position }) })
   put('character', at ? { referencePanel: at, direction: 'within' } : undefined)

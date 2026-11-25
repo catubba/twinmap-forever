@@ -7,6 +7,7 @@ export default {
     character: 'Charakter',
     inventory: 'Inventar',
     professions: 'Berufe',
+    talents: 'Talente',
     auctionSearch: 'AH-Suche',
     item: 'Gegenstand',
     auctionHouse: 'Auktionshaus',

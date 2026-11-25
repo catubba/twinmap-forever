@@ -214,6 +214,14 @@ export default {
     gathers: '{profession} no tiene recetas: solo se muestra su nivel.',
   },
 
+  talents: {
+    spent: { one: '{count} punto gastado', many: '{count} de puntos gastados', other: '{count} puntos gastados' },
+    free: 'Talentos sin usar: {count}',
+    rank: 'Rango {rank}/{most}',
+    none: 'Aún no tienes talentos',
+    learn: 'Los talentos llegan en el nivel 10 y luego un punto por nivel. Gástalos en la ventana de talentos del juego: aparecerán aquí.',
+  },
+
   table: {
     columns: {
       item: 'Objeto',

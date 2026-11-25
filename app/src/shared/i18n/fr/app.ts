@@ -7,6 +7,7 @@ export default {
     character: 'Personnage',
     inventory: 'Inventaire',
     professions: 'Métiers',
+    talents: 'Talents',
     auctionSearch: 'Recherche HV',
     item: 'Objet',
     auctionHouse: 'Hôtel des ventes',
