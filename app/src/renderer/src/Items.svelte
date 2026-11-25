@@ -120,7 +120,7 @@
   <thead>
     <tr>
       {#each columns as [c, label] (label)}
-        <th class:num={c === 'n' || c === 'value' || c === 'auction'} class:on={c === column} aria-sort={c === column ? (up ? 'ascending' : 'descending') : undefined}>
+        <th class="c-{c ?? 'who'}" class:num={c === 'n' || c === 'value' || c === 'auction'} class:on={c === column} aria-sort={c === column ? (up ? 'ascending' : 'descending') : undefined}>
           {#if c}
             <button onclick={() => sortBy(c)}>{label}{#if c === column}<svg viewBox="0 0 10 10" aria-hidden="true"><path d={up ? 'M1 7h8L5 2z' : 'M1 3h8L5 8z'} /></svg>{/if}</button>
           {:else}{label}{/if}
@@ -209,7 +209,7 @@
       {@render heads(COLUMNS)}
       <tbody>
         {#each rows as r (r.place + r.id)}
-          <tr use:itemTip={{ item: r.id, n: r.n }}><td>{@render item(r)}</td><td class="dim">{r.type}</td><td>{placeName(r.place)}</td><td class="num">{r.n}</td><td class="num">{@render money_(r.value)}</td>{#if listing}<td class="num">{@render money_(r.auction)}</td>{/if}</tr>
+          <tr use:itemTip={{ item: r.id, n: r.n }}><td>{@render item(r)}</td><td class="dim c-type">{r.type}</td><td class="c-place">{placeName(r.place)}</td><td class="num">{r.n}</td><td class="num c-value">{@render money_(r.value)}</td>{#if listing}<td class="num">{@render money_(r.auction)}</td>{/if}</tr>
         {:else}
           <tr><td colspan={COLUMNS.length} class="none">{typed ? t('items.table.nothingLike', { name: shown.key, typed }) : t('items.table.nothing')}</td></tr>
         {/each}
@@ -225,7 +225,7 @@
         <tbody>
           {#each othersSorted as r (r.who?.key + r.place + r.id)}
             <tr class="other" onclick={() => r.who && onpick(r.who.key)} title={t('items.others.show', { name: r.who?.key ?? '' })}>
-              <td>{@render item(r)}</td><td style:color={r.who?.color}>{r.who?.key}</td><td class="dim">{r.type}</td><td>{placeName(r.place)}</td><td class="num">{r.n}</td><td class="num">{@render money_(r.value)}</td>{#if listing}<td class="num">{@render money_(r.auction)}</td>{/if}
+              <td>{@render item(r)}</td><td style:color={r.who?.color}>{r.who?.key}</td><td class="dim c-type">{r.type}</td><td class="c-place">{placeName(r.place)}</td><td class="num">{r.n}</td><td class="num c-value">{@render money_(r.value)}</td>{#if listing}<td class="num">{@render money_(r.auction)}</td>{/if}
             </tr>
           {/each}
         </tbody>
@@ -236,12 +236,14 @@
 </main>
 
 <style>
+  /* Its narrow form follows the width of its place, not of the window: a panel beside the map is narrow too. */
   main {
     position: absolute;
     inset: 46px 0 0;
     overflow-y: auto;
     padding: 14px 20px 32px;
     font-variant-numeric: tabular-nums;
+    container: items / inline-size;
   }
   .empty {
     max-width: 520px;
@@ -257,7 +259,7 @@
     margin: 0 0 12px;
   }
   input {
-    width: 280px;
+    width: min(280px, 100%);
     height: 30px;
     padding: 0 10px;
     border: 0;
@@ -642,5 +644,56 @@
     margin: 10px 0 0;
     font: var(--t-small);
     color: var(--text-off);
+  }
+  /* A narrow place: the character over the bags, the doll as wide as there is room for. */
+  /* The tables as wide as the place, whatever widths were dragged: the name gives first, then the columns that
+     matter least go (the type, then what a vendor gives, then where it is). */
+  @container items (max-width: 700px) {
+    .page {
+      grid-template-columns: minmax(0, 470px);
+    }
+    table {
+      width: 100% !important;
+      table-layout: auto !important;
+    }
+    th {
+      width: auto !important;
+    }
+    td:first-child {
+      max-width: 0;
+      width: 100%;
+    }
+    .it {
+      min-width: 0;
+    }
+    .nm {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .c-type {
+      display: none;
+    }
+  }
+  @container items (max-width: 480px) {
+    .c-value {
+      display: none;
+    }
+  }
+  @container items (max-width: 340px) {
+    .c-place {
+      display: none;
+    }
+  }
+  @container items (max-width: 440px) {
+    main {
+      padding: 12px 12px 24px;
+    }
+    .stats {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .stats h4 {
+      grid-column: auto;
+    }
   }
 </style>
