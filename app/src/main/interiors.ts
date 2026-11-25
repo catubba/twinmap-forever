@@ -33,7 +33,7 @@ export const MAP_FILE = 1349477
 export const ROOM_PICTURES_FILE = 1323241
 export const ENCOUNTERS_FILE = 1347279
 export const INTERIORS_FILE = 'interiors.json'
-const FORMAT = 3 // 1 had no bosses, 2 no levels and no buildings
+const FORMAT = 4 // 1 had no bosses, 2 no levels and no buildings, 3 no rooms
 
 // Which column is what, found by reading the real tables.
 const NAME = 1, KIND = 8, WORLD_FILE = 21
@@ -178,6 +178,7 @@ export function layOut(p: Placed, b: Building, pictures: RoomPicture[], sizeOf: 
       bottom: round(room.min[2]! * p.scale + p.height, 1),
       top: round(room.max[2]! * p.scale + p.height, 1),
       building: 0,
+      room: pic.room,
       level: 0,
     })
   }

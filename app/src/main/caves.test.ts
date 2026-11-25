@@ -14,7 +14,7 @@ afterAll(() => rmSync(base, { recursive: true, force: true }))
 
 // One block of the Eastern Kingdoms, column 30 and row 40, level at 100 yards; a mine under it and a house on it.
 const u = 30.5 * BLOCK_YARDS, v = 40.5 * BLOCK_YARDS
-const room = (building: number, top: number): Piece => ({ file: 1, u, v, width: 20, height: 20, angle: 0, bottom: top - 6, top, building, level: 0 })
+const room = (building: number, top: number): Piece => ({ file: 1, u, v, width: 20, height: 20, angle: 0, bottom: top - 6, top, building, room: 0, level: 0 })
 const inside: Interiors = { format: 1, dropped: 0, maps: [{ id: 0, name: 'Eastern Kingdoms', kind: 'world', ground: 'azeroth', bosses: [], pieces: [room(3, 80), room(7, 108)] }] }
 
 test('no list while the continent has no heights, and nothing written', () => {

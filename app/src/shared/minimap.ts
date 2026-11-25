@@ -23,6 +23,52 @@ export interface Mosaic {
   level?: number
   /** True for the picture of the open ground: what the minimap shows under no roof. */
   open?: boolean
+  /** Which room each pixel is of: 1 + its place in `rooms`, 0 for none, SHARED where rooms lie one over the other. */
+  owner?: Uint16Array
+  /** The rooms on the picture, as "building.room" (room-views.ts). */
+  rooms?: string[]
+}
+
+/** In `Mosaic.owner`: a pixel two rooms cover, which tells nothing of either. */
+export const SHARED = 0xffff
+const VIEW_FROM = 2 // yards around the place found where the room the character is in is looked for
+const VIEW_LEAST = 20 // pixels of a room in the circle, at the least, before it is said missing
+const VIEW_MISSING = 0.1 // of a room's pixels lit on the minimap: under this the game does not draw it
+
+/**
+ * Whether the minimap fits what the game draws from the room at the place found: the rooms the
+ * samples saw it surely draw from there (views: room-views.ts) must show. False when one of them
+ * is plainly not on the minimap: the place is wrong, the picture is of elsewhere. Null when it
+ * cannot be told (no table for that room, a picture without rooms).
+ */
+export function viewHolds(mosaic: Mosaic, box: Box, across: number, place: { u: number; v: number }, views: Record<string, string> | undefined): boolean | null {
+  const { owner, rooms, u0, v0, width, height } = mosaic
+  if (!owner || !rooms || !views) return null
+  const ownerAt = (u: number, v: number): number => {
+    const x = Math.floor(u) - u0, y = Math.floor(v) - v0
+    return x < 0 || y < 0 || x >= width || y >= height ? 0 : owner[y * width + x]!
+  }
+  let from = 0
+  for (let r = 0; r <= VIEW_FROM && !from; r++) for (let dv = -r; dv <= r && !from; dv++) for (let du = -r; du <= r && !from; du++) {
+    const o = ownerAt(place.u + du, place.v + dv)
+    if (o && o !== SHARED) from = o
+  }
+  const drawn = from ? views[rooms[from - 1]!] : undefined
+  if (!drawn) return null
+  const want = new Set(drawn.split(' ')), all = new Map<number, number>(), lit = new Map<number, number>()
+  const half = box.size / 2, per = across / box.size
+  for (let y = 0; y < box.size; y++) {
+    for (let x = 0; x < box.size; x++) {
+      const far = Math.hypot(x + 0.5 - half, y + 0.5 - half) / half
+      if (far >= KEEP || far <= ARROW) continue
+      const o = ownerAt(place.u - across / 2 + (x + 0.5) * per, place.v - across / 2 + (y + 0.5) * per)
+      if (!o || o === SHARED || o === from || !want.has(rooms[o - 1]!)) continue
+      all.set(o, (all.get(o) ?? 0) + 1)
+      if (grey(box.rgb, (y * box.size + x) * 3) > LIT) lit.set(o, (lit.get(o) ?? 0) + 1)
+    }
+  }
+  for (const [o, n] of all) if (n >= VIEW_LEAST && (lit.get(o) ?? 0) < n * VIEW_MISSING) return false
+  return true
 }
 
 /**
@@ -39,7 +85,7 @@ const ARROW = 0.1 // of the radius, around the middle: the arrow of the characte
 export const SURE = 0.75 // a likeness under this is not a place: the arrow goes, it does not guess
 const STEPS = [6, 2, 1] // yards a pixel, from the look at the whole dungeon to the last yard
 const NEAR = 12 // yards around the last place where the next is looked for: more than a second of running
-const LIT = 40 // of 255: a pixel of the minimap lighter than this shows something; its background under a roof is black
+export const LIT = 40 // of 255: a pixel of the minimap lighter than this shows something; its background under a roof is black
 const BAND = 9 // yards around what the minimap shows that still count: the walls of a room are told by the black beside it
 // Of the round middle: less lit than this and the minimap shows nothing to look for, only the dots of the
 // party. The cove of the ship in Deadmines: at most 0.5%; a room, 8% and more.

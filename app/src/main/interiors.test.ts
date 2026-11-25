@@ -75,7 +75,7 @@ test('a picture starts at the lowest corner of its room, and the building is tur
   // The middle of the picture is at x 10 + 16, y 20 + 8 of the building.
   const { pieces, dropped } = layOut(at(180), ONE_ROOM, [{ room: 0, across: 0, up: 0, file: 77 }], size)
   expect(dropped).toBe(0)
-  expect(pieces).toEqual([{ file: 77, u: 17000 - 28, v: 17100 - 26, width: 32, height: 16, angle: 1.5708, bottom: 55, top: 65, building: 0, level: 0 }])
+  expect(pieces).toEqual([{ file: 77, u: 17000 - 28, v: 17100 - 26, width: 32, height: 16, angle: 1.5708, bottom: 55, top: 65, building: 0, room: 0, level: 0 }])
   // Turned 0: the other way round.
   const other = layOut(at(0), ONE_ROOM, [{ room: 0, across: 0, up: 0, file: 77 }], size).pieces[0]!
   expect([other.u, other.v, other.angle]).toEqual([17000 + 28, 17100 + 26, -1.5708])
@@ -204,7 +204,7 @@ test('a dungeon is converted once: its pictures as the game has them, its ground
     reads = 0
     expect(finishedInteriors(folder)).toEqual(made)
     expect(reads).toBe(0)
-    expect(JSON.parse(readFileSync(join(folder, INTERIORS_FILE), 'utf8')).format).toBe(3)
+    expect(JSON.parse(readFileSync(join(folder, INTERIORS_FILE), 'utf8')).format).toBe(4)
   } finally {
     rmSync(folder, { recursive: true, force: true })
   }
@@ -228,7 +228,7 @@ test('the solid blocks of a picture are told from its see-through ones', () => {
 test('a room is a level up when it covers the ground of a lower one, not when they only meet at a door', () => {
   // Pictures of 8 x 4 blocks: 16 x 8 yards.
   const full = shape(['########', '########', '########', '########'])
-  const piece = (file: number, u: number, v: number, bottom: number): Piece => ({ file, u, v, width: 16, height: 8, angle: 0, bottom, top: bottom + 5, building: 0, level: 0 })
+  const piece = (file: number, u: number, v: number, bottom: number): Piece => ({ file, u, v, width: 16, height: 8, angle: 0, bottom, top: bottom + 5, building: 0, room: 0, level: 0 })
   const pieces = [
     piece(1, 100, 100, 0), // the ground floor
     piece(1, 102, 100, 10), // right over it
