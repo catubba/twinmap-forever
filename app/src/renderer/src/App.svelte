@@ -24,7 +24,7 @@
   import { newsFor, type Go } from '../../shared/news'
   import FirstRun from './FirstRun.svelte'
   import Glyph from './Glyph.svelte'
-  import { SPACES, frame, layout, mount, nowOver, open as openSpace, section, setMapRight, unmount } from './frame.svelte'
+  import { SPACES, add as addPanel, edit, frame, layout, mount, nowOver, open as openSpace, reset as resetSpace, restore as restoreSpaces, section, setMapRight, unmount } from './frame.svelte'
   import Logo from './Logo.svelte'
   import Map from './Map.svelte'
   import { drop, gone, opened, screen } from './motion'
@@ -264,15 +264,29 @@
     const over = !panelOpen || small
     untrack(() => nowOver(over))
   })
-  // Ctrl with 1, 2, 3...: the workspaces by their place among the tabs.
+  // Now closes, and lies over the map, only beside it as the app was before the workspaces (frame.paired) and while the
+  // layout is locked; in any other layout it is a panel as the others, closed with Edit layout.
+  const nowShut = $derived(!panelOpen && frame.paired && !frame.editing)
+  const nowAbove = $derived((!panelOpen || small) && frame.paired && !frame.editing)
+  // Ctrl with 1, 2, 3...: the workspaces by their place among the tabs. Ctrl and E: Edit layout, on and off.
   function spaceKey(e: KeyboardEvent): void {
     if (!e.ctrlKey || e.altKey || e.metaKey || e.shiftKey || onSetup !== false) return
+    if (e.key === 'e' || e.key === 'E') {
+      e.preventDefault()
+      onSettings = false
+      edit(!frame.editing)
+      return
+    }
     const n = Number(e.key)
     if (!Number.isInteger(n) || n < 1 || n > SPACES.length) return
     e.preventDefault()
     onSettings = false
     openSpace(n - 1)
   }
+  // The bar of Edit layout: the list of Add panel open, the question before Restore default workspaces.
+  let adding = $state(false)
+  let sure = $state(false)
+  const PANEL_NAMES: Record<string, () => string> = { map: () => t('app.top.map'), now: () => t('app.top.now'), items: () => t('app.top.character'), ah: () => t('app.top.auctionHouse') }
   function togglePanel(): void {
     panelOpen = !panelOpen
     if (!matchMedia(SMALL).matches) localStorage.setItem('panel', panelOpen ? 'open' : 'closed')
@@ -280,7 +294,7 @@
   let panelHeight = $state(0)
   let peek = $state(0)
   $effect(() => {
-    if (!panelOpen) peek = panelHeight
+    if (nowShut) peek = panelHeight
   })
   async function choose(): Promise<void> {
     wrong = (await window.twinmap.chooseGameFolder()) ?? ''
@@ -315,6 +329,10 @@
       <!-- Its name gives first: Auction House, then AH, then the glyph alone with the others. -->
       <button class="tab" title={t('app.top.auctionHouse')} aria-label={t('app.top.auctionHouse')} aria-current={frame.open === SPACES.indexOf('ah') ? 'page' : undefined} onclick={() => ((onSettings = false), openSpace(SPACES.indexOf('ah')))}><Glyph name="coins" size={18} /><span class="word long">{t('app.top.auctionHouse')}</span><span class="word short">{t('app.top.auctionHouseShort')}</span></button>
     </nav>
+    {#if onSetup === false}
+      {@const editName = t('app.layout.edit', { ctrl: t('settings.keys.ctrl') })}
+      <button class="edit" title={editName} aria-label={editName} aria-pressed={frame.editing} onclick={() => ((onSettings = false), edit(!frame.editing))}><Glyph name="layout" size={18} /></button>
+    {/if}
   {/if}
   {#if onSetup === false && mapReady}
     <Search ready={mapReady} {pos} side={char?.side} onpick={(place) => (openSpace(SPACES.indexOf('map')), mapView?.goTo(place))} />
@@ -366,7 +384,32 @@
 {/if}
 {#if onSetup === false}
 <!-- The workspaces; the sections made once, in the stash until a panel of the open workspace takes them (frame.svelte.ts). -->
-<div class="work" class:shut={!panelOpen} class:map-right={layout.mapRight} in:fade={screen} style:--peek="{peek}px" bind:this={frameBox}></div>
+{#if frame.editing}
+  <!-- Edit layout: what can be done while the open workspace is unlocked. -->
+  <div class="editbar" role="toolbar" aria-label={t('app.layout.editKey')} in:fly={drop(8)}>
+    {#if sure}
+      <span class="hint">{t('app.layout.restoreSure')}</span>
+      <button class="btn" onclick={() => ((sure = false), restoreSpaces())}>{t('app.layout.restoreYes')}</button>
+      <button class="btn" onclick={() => (sure = false)}>{t('app.layout.restoreNo')}</button>
+    {:else}
+      <span class="hint">{t('app.layout.hint')}</span>
+      <span class="adding">
+        <button class="btn" title={t('app.layout.addPanel')} aria-expanded={adding} disabled={!frame.missing.length} onclick={() => (adding = !adding)}><Glyph name="plus" /><span>{t('app.layout.addPanel')}</span></button>
+        {#if adding && frame.missing.length}
+          <ul class="menu" in:fly={drop()}>
+            {#each frame.missing as id (id)}
+              <li><button class="item" onclick={() => ((adding = false), addPanel(id))}>{PANEL_NAMES[id]?.()}</button></li>
+            {/each}
+          </ul>
+        {/if}
+      </span>
+      <button class="btn" title={t('app.layout.reset')} onclick={() => ((adding = false), resetSpace())}><span>{t('app.layout.reset')}</span></button>
+      <button class="btn" title={t('app.layout.restore')} onclick={() => ((adding = false), (sure = true))}><span>{t('app.layout.restore')}</span></button>
+    {/if}
+    <button class="btn done" onclick={() => ((adding = sure = false), edit(false))}><Glyph name="check" />{t('app.layout.done')}</button>
+  </div>
+{/if}
+<div class="work" class:editing={frame.editing} class:shut={nowShut} class:map-right={layout.mapRight} in:fade={screen} style:--peek="{peek}px" bind:this={frameBox}></div>
 <div class="stash" inert bind:this={stashBox}>
   <div class="mapbox" style:--readout="{readoutWidth}px" use:section={'map'}>
     {#if mapReady}
@@ -406,15 +449,18 @@
     {/if}
   </div>
 
-  <aside class="panel surface" class:closed={!panelOpen} class:over={!panelOpen || small} aria-label={t('app.top.now')} bind:clientHeight={panelHeight} use:section={'now'}>
-    <div class="head">
-      <button class="grip" aria-expanded={panelOpen} onclick={togglePanel}><Glyph name="menu" turn={panelOpen ? 0 : 180} />{panelOpen ? t('app.panel.close') : t('app.panel.open')}</button>
-      <!-- On the end of the bar next to the map: the map goes to the other side. -->
-      {#if panelOpen}
-        {@const to = layout.mapRight ? t('app.panel.mapLeft') : t('app.panel.mapRight')}
-        <button class="swap" title={to} aria-label={to} onclick={() => setMapRight(!layout.mapRight)}><Glyph name="swap" /></button>
-      {/if}
-    </div>
+  <aside class="panel surface" class:closed={nowShut} class:over={nowAbove} aria-label={t('app.top.now')} bind:clientHeight={panelHeight} use:section={'now'}>
+    <!-- Its bar only beside the map, locked: closed or open, and the map to the other side. -->
+    {#if frame.paired && !frame.editing}
+      <div class="head">
+        <button class="grip" aria-expanded={panelOpen} onclick={togglePanel}><Glyph name="menu" turn={panelOpen ? 0 : 180} />{panelOpen ? t('app.panel.close') : t('app.panel.open')}</button>
+        <!-- On the end of the bar next to the map: the map goes to the other side. -->
+        {#if panelOpen}
+          {@const to = layout.mapRight ? t('app.panel.mapLeft') : t('app.panel.mapRight')}
+          <button class="swap" title={to} aria-label={to} onclick={() => setMapRight(!layout.mapRight)}><Glyph name="swap" /></button>
+        {/if}
+      </div>
+    {/if}
     {#if inGame && shown && !shown.live}
       {@const showing = around('app.panel.showing', 'name')}
       <!-- Another character than the one in game: said where its bags and spells will show, with the way back. -->
@@ -619,12 +665,122 @@
     position: absolute;
     inset: 46px 0 0;
   }
+  /* Edit layout: the button after the tabs, gold while on; the bar under the top row; every group with a gold edge. */
+  .edit {
+    flex: none;
+    display: inline-grid;
+    place-items: center;
+    width: 33px;
+    height: 29px;
+    margin: 0 0 2px -12px;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    background: none;
+    color: var(--nav-rest);
+    cursor: pointer;
+    -webkit-app-region: no-drag;
+  }
+  .edit:hover {
+    border-color: var(--bronze-500);
+    color: var(--text);
+  }
+  .edit[aria-pressed='true'] {
+    border-color: var(--gold);
+    background: #eacba426;
+    color: var(--gold);
+  }
+  .editbar {
+    position: absolute;
+    inset: 46px 0 auto;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 12px;
+    background: var(--stone-950);
+    box-shadow: inset 0 -2px 0 var(--gold);
+    white-space: nowrap;
+  }
+  .editbar .hint {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font: var(--t-body);
+    color: var(--text-dim);
+  }
+  /* Narrow, the hint goes first, then the buttons shorten their words; Done keeps its own. */
+  .editbar .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .editbar .btn > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .editbar > .btn,
+  .editbar .adding {
+    flex: 0 1 auto;
+    min-width: 48px;
+  }
+  .editbar .btn.done {
+    flex: none;
+  }
+  .editbar .adding {
+    position: relative;
+    display: flex;
+  }
+  @media (max-width: 1000px) {
+    .editbar .hint {
+      display: none;
+    }
+    .editbar .done {
+      margin-left: auto;
+    }
+  }
+  .editbar .menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    z-index: 2100;
+  }
+  .work.editing {
+    top: 86px;
+  }
+  .work.editing :global(.dv-groupview) {
+    position: relative;
+  }
+  .work.editing :global(.dv-groupview::after) {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 2000;
+    border: 2px solid var(--gold);
+    box-shadow: inset 0 0 24px #eacba470;
+    pointer-events: none;
+  }
+  /* The drop zones: a gold veil with a full gold edge (M20-F1, drop B). */
+  :global(.dockview-theme-twinmap .dv-drop-target-selection),
+  :global(.dockview-theme-twinmap .dv-drop-target-anchor) {
+    background-color: #eacba44d !important;
+    border: 2px solid var(--gold) !important;
+  }
+  /* The last panel of a workspace has no cross: a workspace is never empty. */
+  :global(.dockview-theme-twinmap .last .dv-default-tab-action) {
+    display: none !important;
+  }
   .work :global(.space) {
     position: absolute;
     inset: 0;
   }
+  /* Hidden all through: dockview shows the cross of a tab with a visibility of its own. */
   .work :global(.space:not(.open)) {
     visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
   }
   /* The sections no panel of the open workspace holds: out of sight, at the size they had. */
   .stash {
@@ -1028,8 +1184,8 @@
     .work :global(.mapbox) {
       --lift: var(--peek, 0px);
     }
-    .panel,
-    .panel.closed {
+    /* Only over the map: as a panel of another layout it stays in its place. */
+    .panel.over {
       position: absolute;
       left: 0;
       right: 0;

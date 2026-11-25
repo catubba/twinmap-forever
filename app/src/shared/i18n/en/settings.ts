@@ -43,6 +43,9 @@ export default {
     left: 'On the left',
     right: 'On the right',
     hint: 'M puts it on the other side at any time.',
+    // In place of hint, the dropdown greyed, when no tab at the top has the map and Now side by side and nothing else.
+    // {edit}: the name of Edit layout (app.layout.editKey).
+    custom: 'Your layout places the map: move it with {edit}.',
   },
 
   // In General: the app's window, switches, the text size and the hardware acceleration.

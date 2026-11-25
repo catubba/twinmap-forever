@@ -30,6 +30,7 @@ export default {
     left: '左侧',
     right: '右侧',
     hint: '随时按 M 切换到另一侧。',
+    custom: '地图的位置由你的布局决定：用{edit}来移动它。',
   },
 
   window: {

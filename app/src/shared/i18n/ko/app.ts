@@ -17,6 +17,19 @@ export default {
     settings: '설정',
   },
 
+  layout: {
+    edit: '배치 편집 ({ctrl}+E)',
+    editKey: '배치 편집',
+    hint: '탭을 패널 가장자리로 끌면 옆에 놓이고, 가운데로 끌면 함께 묶입니다.',
+    addPanel: '패널 추가',
+    reset: '이 작업 공간 초기화',
+    restore: '기본 작업 공간 복원',
+    restoreSure: '모든 작업 공간을 처음 상태로 되돌리시겠습니까?',
+    restoreYes: '복원',
+    restoreNo: '취소',
+    done: '완료',
+  },
+
   link: {
     paused: '일시 정지됨',
     closed: '게임 실행 안 됨',
