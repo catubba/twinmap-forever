@@ -235,7 +235,6 @@
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
       gap: 2px 8px;
-      max-height: 45%;
       padding: 8px;
       border-right: 0;
       border-bottom: 1px solid var(--bronze-700);
