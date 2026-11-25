@@ -131,6 +131,7 @@ export default {
     // After a colon: "à" would need "aux" or "au" before some category names.
     back: 'Retour : {place}',
     theSearch: 'la recherche',
+    notOnSale: 'Pas en vente dans cet Hôtel des ventes en ce moment.',
     requiresLevel: 'niveau {level} requis',
     itemLevel: 'niveau d’objet {level}',
     lowest: 'Plus bas',
@@ -273,6 +274,7 @@ export default {
     attribution: '{source}, via l’API Battle.net. Twinmap n’est ni affilié à Blizzard ni approuvé par Blizzard.',
     source: 'Données de l’Hôtel des ventes : Blizzard Entertainment',
     approximate: 'Les quantités sont approximatives',
+    hide: 'Masquer cette ligne',
   },
 
   chart: {

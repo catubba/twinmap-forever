@@ -12,6 +12,9 @@ export default {
     character: 'Character',
     // A panel of the Character workspace: a row for each item the character holds, and what the others hold.
     inventory: 'Inventory',
+    // The panels of the auction (M20-F9): its search, categories and list; the page of the item chosen.
+    auctionSearch: 'Auction search',
+    item: 'Item',
     auctionHouse: 'Auction House',
     // Shown in place of auctionHouse when the window is narrow: two or three letters.
     auctionHouseShort: 'AH',
@@ -160,6 +163,8 @@ export default {
     experience: 'Experience',
     // The panel Experience with no character known yet: what to do in the game.
     emptyExperience: 'Your level shows here once you play with the Twinmap Forever addon on.',
+    // The panel Item with no item chosen yet.
+    emptyItem: 'Click an item in Bags, Bank, Inventory or the auction search to see its prices here.',
     widthHint: 'Drag to resize. Double-click to reset.',
   },
 

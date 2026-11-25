@@ -6,6 +6,8 @@ export default {
     map: 'Mapa',
     character: 'Personaje',
     inventory: 'Inventario',
+    auctionSearch: 'Buscar en subastas',
+    item: 'Objeto',
     auctionHouse: 'Casa de subastas',
     // The game has no short form of Casa de subastas: CS, as players write it.
     auctionHouseShort: 'CS',
@@ -107,6 +109,7 @@ export default {
     xp: '{xp} de {max} PE',
     experience: 'Experiencia',
     emptyExperience: 'Tu nivel aparece aquí en cuanto juegues con el addon Twinmap Forever activado.',
+    emptyItem: 'Haz clic en un objeto de Bolsas, Banco, Inventario o la búsqueda de subastas para ver aquí sus precios.',
     widthHint: 'Arrastra para cambiar el tamaño. Haz doble clic para restablecer.',
   },
 

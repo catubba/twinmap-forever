@@ -6,6 +6,8 @@ export default {
     map: 'Карта',
     character: 'Персонаж',
     inventory: 'Инвентарь',
+    auctionSearch: 'Поиск на аукционе',
+    item: 'Предмет',
     // The game's short form of Аукционный дом: a tab has no room for the long one.
     auctionHouse: 'Аукцион',
     // As Russian players write it.
@@ -118,6 +120,7 @@ export default {
     xp: '{xp} из {max} опыта',
     experience: 'Опыт',
     emptyExperience: 'Ваш уровень появится здесь, как только вы начнете играть с включенным аддоном Twinmap Forever.',
+    emptyItem: 'Нажмите на предмет в разделах «Сумки», «Банк», «Инвентарь» или в поиске на аукционе, чтобы увидеть здесь его цены.',
     widthHint: 'Перетащите, чтобы изменить размер. Дважды щелкните, чтобы сбросить.',
   },
 

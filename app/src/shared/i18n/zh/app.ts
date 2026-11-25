@@ -6,6 +6,8 @@ export default {
     map: '地图',
     character: '角色',
     inventory: '物品栏',
+    auctionSearch: '拍卖行搜索',
+    item: '物品',
     auctionHouse: '拍卖行',
     auctionHouseShort: '拍卖',
     pause: '暂停Twinmap',
@@ -109,6 +111,7 @@ export default {
     xp: '经验值：{xp} / {max}',
     experience: '经验值',
     emptyExperience: '开启Twinmap Forever插件游玩后，你的等级会显示在这里。',
+    emptyItem: '在背包、银行、物品栏或拍卖行搜索中点击一件物品，即可在这里查看它的价格。',
     widthHint: '拖动以调整大小。双击以重置。',
   },
 

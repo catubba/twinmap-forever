@@ -132,6 +132,7 @@ export default {
   page: {
     back: '返回{place}',
     theSearch: '搜索结果',
+    notOnSale: '此拍卖行目前没有出售。',
     // GS ITEM_MIN_LEVEL "需要等级 %d", ITEM_LEVEL "物品等级 %d", with the game's space.
     requiresLevel: '需要等级 {level}',
     itemLevel: '物品等级 {level}',
@@ -281,6 +282,7 @@ export default {
     attribution: '{source}，通过Battle.net API获取。Twinmap与Blizzard无关联，也未获得其认可。',
     source: '拍卖数据：Blizzard Entertainment',
     approximate: '数量为近似值',
+    hide: '隐藏此行',
   },
 
   chart: {
