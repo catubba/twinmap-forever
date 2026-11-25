@@ -16,6 +16,8 @@ const FACTS: TrainerFacts = {
   },
   spells: { 4037: ['Journeyman', 136243], 3922: ['Handful of Copper Bolts', 133588], 3958: ['Iron Strut', 133608] },
   makes: { 3922: 4359 },
+  crafts: {},
+  lines: {},
 }
 const NONE = trainerReads({})
 const sheet = (trainers: TrainerRead[], at: number): Sheet => ({ code: 'c', rev: 1, pieces: { trainers }, at: { trainers: at } })
@@ -122,4 +124,12 @@ test.skipIf(!real)("the real game lists the warlock's spells by level, and Sprin
   expect([17962, 1230656, 1249634].map((s) => facts.spells[s]?.[0])).toEqual(['Conflagrate', 'Reagent Bot', 'Sandpaper'])
   // A recipe makes its item: Copper Tube.
   expect(facts.makes[3924]).toBe(4361)
+  // What recipes take (M10-F4), from the game's own table: Iron Strut 2 Iron Bar; Bolt of Silk Cloth 4 Silk Cloth; Rough Dynamite makes 2;
+  // Smelt Silver is Mining's. As One for All lists them (its Data/Professions), all of its 2176 recipes there.
+  expect(facts.crafts[3958]).toEqual([202, 4387, 1, 3575, 2])
+  expect(facts.crafts[3839]).toEqual([197, 4305, 1, 4306, 4])
+  expect(facts.crafts[3919]?.slice(0, 3)).toEqual([202, 4358, 2])
+  expect(facts.crafts[2658]?.slice(0, 2)).toEqual([186, 2842])
+  expect([197, 186].map((l) => facts.lines[l])).toEqual(['Tailoring', 'Mining'])
+  expect(Object.keys(facts.crafts).length).toBeGreaterThan(2000)
 }, 60_000)

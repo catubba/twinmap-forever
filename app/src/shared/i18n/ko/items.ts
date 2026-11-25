@@ -297,6 +297,33 @@ export default {
     bankUnseen: '은행을 아직 열어 보지 않았습니다: 게임에서 한 번 여십시오 · {name}',
   },
 
+  // The shopping list (M10-F4): en/items.ts says where each text shows.
+  shopping: {
+    title: '구매 목록',
+    forWho: '{name}의 목록',
+    making: '제작 · {count}',
+    makeFirst: '먼저 제작 · {count}',
+    missing: '부족 · {count}',
+    ready: '준비됨 · {count}',
+    toBuy: '구매 비용 {price}',
+    youKnow: '{profession} · 배운 제조법',
+    needs: '{profession} {skill} 필요, 현재 {have}',
+    notKnown: '{profession} · 배우지 않음',
+    takes: '1회당 {items}',
+    takesFor: '{count}개당 {items}',
+    amount: '{item} {count}개',
+    toLearn: '{profession} {skill}에 배울 수 있음',
+    make: '{count}개 제작',
+    of: '{count}개 중 {missing}개',
+    folded: { other: '{count}개 부족' },
+    foldedNone: '모두 준비되었습니다',
+    fold: '구매 목록 접기',
+    unfold: '구매 목록 펼치기',
+    fewer: '하나 줄이기',
+    more: '하나 늘리기',
+    add: '구매 목록에 추가: {item}',
+  },
+
   picker: {
     inGame: '접속 중',
     seen: '최종 접속 {ago}',

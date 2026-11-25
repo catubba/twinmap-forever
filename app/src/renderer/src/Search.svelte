@@ -17,7 +17,8 @@
   import { savedFrom } from '../../shared/saved'
 
   export interface Place { continent: Continent; at: Point; title: string; where?: string; whole?: GameMap; dungeon?: { id: number; wing?: string }; item?: number }
-  let { ready, onpick, pos, side }: { ready: boolean; onpick: (place: Place) => void; pos?: { map?: number; x?: number; y?: number }; side?: string } = $props()
+  // onadd: puts an item found on the shopping list of the character picked (M10-F4).
+  let { ready, onpick, pos, side, onadd }: { ready: boolean; onpick: (place: Place) => void; pos?: { map?: number; x?: number; y?: number }; side?: string; onadd?: (item: number) => void } = $props()
 
   const MOST = 14 // results under the field
   const DOERS = 8 // of which found by what they do, the nearest, at most
@@ -159,6 +160,10 @@
             <span class="num">{result.note}</span>
             {#if result.yards !== undefined}<span class="far">{distance(result.yards)}</span>{/if}
           </button>
+          {#if onadd && result.item}
+            {@const add = t('items.shopping.add', { item: result.title })}
+            <button class="plus" aria-label={add} title={add} tabindex="-1" onclick={() => onadd(result.item!)}>+</button>
+          {/if}
         </li>
       {:else}
         <li class="none">{t('map.search.none')}</li>
@@ -227,6 +232,16 @@
     text-align: right;
     color: var(--text);
     font-variant-numeric: tabular-nums;
+  }
+  /* The + that puts an item found on the shopping list (M10-F4), at the end of its row. */
+  li:has(.plus) {
+    display: flex;
+    align-items: center;
+    padding-right: 8px;
+  }
+  li:has(.plus) .item {
+    flex: 1;
+    min-width: 0;
   }
   .none {
     padding: 4px 12px;

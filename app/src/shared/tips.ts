@@ -2,6 +2,10 @@
 // tooltip, which the addon reads once for each item met and sends with the sheet (Sheet.lua, the piece
 // "tips"), kept by the app for good in a file of their own; under them what the app adds: who holds it,
 // who sells it and where it drops. An item never met has only what the game's files say.
+import { unitsOfPlace } from './geo'
+import type { GameMap } from './maps'
+import type { whereIs } from './now'
+import { serves } from './services'
 import type { Sheets } from './sheet'
 
 /** A line of a tooltip: the left text and its colour ("rrggbb", "" for white), and a right side where there is one. */
@@ -105,4 +109,15 @@ export function piecesOf(text: string, color: string): Piece[] {
   }
   put(clean.slice(from))
   return out
+}
+
+/** The sellers of the character's side, the nearest first where it is on a map (far: Infinity elsewhere); the others after, as QuestieDB lists them. */
+export function sellersOf(sold: ItemSources['sold'], side: string | undefined, zones: Map<number, GameMap>, here: ReturnType<typeof whereIs>): (ItemSources['sold'][number] & { far: number })[] {
+  const far = (s: { area: number; x: number; y: number }): number => {
+    const zone = zones.get(s.area)
+    if (!here || !zone?.rect || zone.continent !== here.continent) return Infinity
+    const at = unitsOfPlace(zone.rect, s.x, s.y)
+    return Math.hypot(at.x - here.at.x, at.y - here.at.y)
+  }
+  return sold.filter((s) => serves(s, side)).map((s) => ({ ...s, far: far(s) })).sort((a, b) => a.far - b.far)
 }

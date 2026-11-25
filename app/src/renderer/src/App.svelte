@@ -35,6 +35,8 @@
   import { homeOf, houseFrom, houseNumber, houseOf, type Alert, type Home, type House, type PricesTold } from '../../shared/ah'
   import ItemPopup from './ItemPopup.svelte'
   import NpcPanel from './NpcPanel.svelte'
+  import ShoppingList from './ShoppingList.svelte'
+  import { addTo, shoppingFrom } from '../../shared/shopping'
   import { firstName, knownOf, shownOf } from '../../shared/characters'
   import type { PortraitsTold } from '../../shared/portrait'
   import type { Sheets } from '../../shared/sheet'
@@ -68,6 +70,11 @@
   const route = $derived(keptRoute.value)
   const setRoute = (to: Route): void => {
     keptRoute.value = to
+  }
+  // The shopping lists (M10-F4), kept the same way: a + puts a recipe or an item on the list of the character picked.
+  const keptShopping = kept('shopping', shoppingFrom)
+  const addToList = (item: number, spell?: number): void => {
+    if (shown) keptShopping.value = addTo(keptShopping.value, shown.key, item, spell)
   }
   let tiles = $state<TilesStatus | null>(null)
   window.twinmap.onTiles((status) => {
@@ -321,7 +328,7 @@
     </nav>
   {/if}
   {#if onSetup === false && mapReady}
-    <Search ready={mapReady} {pos} side={char?.side} onpick={(place) => ((onItems = false), (onAh = false), mapView?.goTo(place))} />
+    <Search ready={mapReady} {pos} side={char?.side} onadd={shown ? addToList : undefined} onpick={(place) => ((onItems = false), (onAh = false), mapView?.goTo(place))} />
   {/if}
   {#if status}
     <!-- The state of the link is the Pause button too: two bars to pause, the arrow of play to resume. -->
@@ -436,8 +443,9 @@
       </p>
     {/if}
     {#if npc}
-      {#key npc}<NpcPanel pin={npc} {sheets} {shown} {now} {listing} onclose={() => (npc = null)} />{/key}
+      {#key npc}<NpcPanel pin={npc} {sheets} {shown} {now} {listing} onclose={() => (npc = null)} onadd={addToList} />{/key}
     {/if}
+    <ShoppingList lists={keptShopping.value} onchange={(to) => (keptShopping.value = to)} {sheets} {shown} side={char?.side} {pos} {now} />
     <Now
       {pos}
       {quests}

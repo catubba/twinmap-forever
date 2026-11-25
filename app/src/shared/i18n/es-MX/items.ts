@@ -288,6 +288,33 @@ export default {
     bankUnseen: 'Banco todavía sin ver: ábrelo una vez en el juego · {name}',
   },
 
+  // The shopping list (M10-F4): en/items.ts says where each text shows.
+  shopping: {
+    title: 'Lista de compras',
+    forWho: 'Para {name}',
+    making: 'Por fabricar · {count}',
+    makeFirst: 'Fabricar primero · {count}',
+    missing: 'Falta · {count}',
+    ready: 'Ya lo tienes · {count}',
+    toBuy: 'por comprar: {price}',
+    youKnow: '{profession} · ya la conoces',
+    needs: '{profession}: se requiere {skill}, tienes {have}',
+    notKnown: '{profession} · sin aprender',
+    takes: '{items} cada vez',
+    takesFor: '{items} por {count}',
+    amount: '{count} {item}',
+    toLearn: '{profession}: {skill} para aprenderla',
+    make: 'fabricar {count}',
+    of: '{missing} de {count}',
+    folded: { one: 'Falta {count}', many: 'Faltan {count}', other: 'Faltan {count}' },
+    foldedNone: 'Tienes todo a la mano',
+    fold: 'Contraer la lista de compras',
+    unfold: 'Expandir la lista de compras',
+    fewer: 'Uno menos',
+    more: 'Uno más',
+    add: 'Agregar a la lista de compras: {item}',
+  },
+
   picker: {
     inGame: 'En el juego',
     seen: 'visto {ago}',

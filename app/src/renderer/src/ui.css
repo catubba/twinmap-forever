@@ -620,6 +620,27 @@ body {
   color: var(--text-dim);
 }
 
+/* The small square + that puts something on the shopping list (M10-F4), and the - and + of a count on it. */
+.plus {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
+  background: #0006;
+  box-shadow: inset 0 0 0 1px var(--bronze-500);
+  font: 500 15px/1 var(--font);
+  color: var(--gold);
+  cursor: pointer;
+}
+.plus:hover {
+  background: var(--stone-600);
+  color: var(--text);
+}
+
 /* Experience bar: twenty ticks, the rested part after the filled one. Set --v and --rest as percentages. */
 .xp {
   position: relative;

@@ -6,13 +6,11 @@
   import { firstName, type Known } from '../../shared/characters'
   import { coins, ITEMS_FILE, QUALITY_COLORS, typeOf, type ItemFacts } from '../../shared/items'
   import type { Position } from '../../shared/game'
-  import { unitsOfPlace } from '../../shared/geo'
   import type { GameMap } from '../../shared/maps'
   import { whereIs } from '../../shared/now'
-  import { serves } from '../../shared/services'
   import type { Sheets } from '../../shared/sheet'
   import { around, t } from '../../shared/i18n'
-  import { holdersOf, piecesOf, shownLines, tipKey, type ItemSources } from '../../shared/tips'
+  import { holdersOf, piecesOf, sellersOf, shownLines, tipKey, type ItemSources } from '../../shared/tips'
   import { hover, kept } from './item-tip.svelte'
   import { TILES } from './web'
 
@@ -53,13 +51,7 @@
   const holders = $derived(shown ? holdersOf(sheets, shown.item) : [])
   // The vendors of the character's side, the nearest first where it is on a map; the others after, as QuestieDB lists them.
   const here = $derived(whereIs(maps, pos))
-  const far = (s: { area: number; x: number; y: number }): number => {
-    const zone = zones.get(s.area)
-    if (!here || !zone?.rect || zone.continent !== here.continent) return Infinity
-    const at = unitsOfPlace(zone.rect, s.x, s.y)
-    return Math.hypot(at.x - here.at.x, at.y - here.at.y)
-  }
-  const sellers = $derived((sources?.sold ?? []).filter((s) => serves(s, side)).map((s) => ({ ...s, far: far(s) })).sort((a, b) => a.far - b.far))
+  const sellers = $derived(sellersOf(sources?.sold ?? [], side, zones, here))
   const sold = $derived(sellers.slice(0, 2))
   const where = (area: number): string => zones.get(area)?.name ?? ''
   const colorOf = (key: string): string | undefined => known.find((k) => k.key === key)?.color

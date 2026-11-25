@@ -293,6 +293,33 @@ export default {
     bankUnseen: '银行尚未查看：在游戏中打开一次 · {name}',
   },
 
+  // The shopping list (M10-F4): en/items.ts says where each text shows.
+  shopping: {
+    title: '购物清单',
+    forWho: '{name}的清单',
+    making: '制作 · {count}',
+    makeFirst: '先制作 · {count}',
+    missing: '缺少 · {count}',
+    ready: '已备齐 · {count}',
+    toBuy: '需购买 {price}',
+    youKnow: '{profession} · 已学会',
+    needs: '需要{profession} {skill}，当前 {have}',
+    notKnown: '{profession} · 未学会',
+    takes: '每次{items}',
+    takesFor: '每{count}个需{items}',
+    amount: '{item}×{count}',
+    toLearn: '{profession} {skill}可学',
+    make: '制作{count}个',
+    of: '缺{missing}/{count}',
+    folded: { other: '缺少{count}项' },
+    foldedNone: '材料已全部备齐',
+    fold: '折叠购物清单',
+    unfold: '展开购物清单',
+    fewer: '减少一个',
+    more: '增加一个',
+    add: '加入购物清单：{item}',
+  },
+
   picker: {
     inGame: '游戏中',
     // GS LASTONLINE "最后上线".

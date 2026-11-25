@@ -303,6 +303,33 @@ export default {
     bankUnseen: 'Банк еще не открывали: откройте его один раз в игре · {name}',
   },
 
+  // The shopping list (M10-F4): en/items.ts says where each text shows.
+  shopping: {
+    title: 'Список покупок',
+    forWho: 'Персонаж: {name}',
+    making: 'Изготовить · {count}',
+    makeFirst: 'Сначала изготовить · {count}',
+    missing: 'Не хватает · {count}',
+    ready: 'Уже есть · {count}',
+    toBuy: 'купить на {price}',
+    youKnow: '{profession} · рецепт известен',
+    needs: '{profession}: нужно {skill}, у вас {have}',
+    notKnown: '{profession} · не изучено',
+    takes: '{items} за раз',
+    takesFor: '{items} за {count} шт.',
+    amount: '{item} ({count} шт.)',
+    toLearn: '{profession}: изучить на {skill}',
+    make: 'изготовить: {count}',
+    of: '{missing} из {count}',
+    folded: { one: 'Не хватает: {count}', few: 'Не хватает: {count}', many: 'Не хватает: {count}', other: 'Не хватает: {count}' },
+    foldedNone: 'Все под рукой',
+    fold: 'Свернуть список покупок',
+    unfold: 'Развернуть список покупок',
+    fewer: 'На один меньше',
+    more: 'На один больше',
+    add: 'Добавить в список покупок: {item}',
+  },
+
   picker: {
     inGame: 'В игре',
     // "был в игре" would need the character's gender: without the verb.

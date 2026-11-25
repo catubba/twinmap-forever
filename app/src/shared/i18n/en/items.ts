@@ -327,6 +327,48 @@ export default {
     bankUnseen: 'Bank not seen yet: open it in game once · {name}',
   },
 
+  // The shopping list in the side panel, above Now (ShoppingList.svelte, M10-F4), and the + that puts things on it.
+  shopping: {
+    // On the band at its top.
+    title: 'Shopping list',
+    // Under the band, at the left, the money at the right. {name}: the character's first name.
+    forWho: 'For {name}',
+    // Headings of the groups, in capitals (written normally here: the page raises them). {count}: how many lines.
+    making: 'Making · {count}',
+    makeFirst: 'Make first · {count}',
+    missing: 'Missing · {count}',
+    ready: 'Ready · {count}',
+    // At the right of the missing heading, small. {price}: gold, silver and copper with their coins.
+    toBuy: 'to buy {price}',
+    // Small, under a recipe on the list. {profession}: the profession as the game names it; {skill}, {have}: numbers. needs is red.
+    youKnow: '{profession} · you know it',
+    needs: '{profession} {skill} needed, you have {have}',
+    notKnown: '{profession} · not learned',
+    // Small, under a part to make or an item a recipe makes: what one go takes. {items}: amounts, one after another with ", ".
+    takes: '{items} each',
+    // The same for a recipe that makes more than one at a go. {count}: how many it makes.
+    takesFor: '{items} for {count}',
+    // One amount of takes. {count}: a number; {item}: an item's name as the game writes it.
+    amount: '{count} {item}',
+    // Before takes, then " · ", for a recipe not learned yet: the skill it asks at the trainer.
+    toLearn: '{profession} {skill} to learn',
+    // At the right of a part to make, small. {count}: how many to make, bold.
+    make: 'make {count}',
+    // At the right of a missing line, small. {missing}: how many are missing, bold and red; {count}: how many in all.
+    of: '{missing} of {count}',
+    // On the band when the list is folded, small; then " · " and toBuy when there is something to buy.
+    folded: { other: '{count} missing' },
+    foldedNone: 'Everything at hand',
+    // Read aloud and as the pointer rests on the band.
+    fold: 'Fold the shopping list',
+    unfold: 'Unfold the shopping list',
+    // The two small buttons around a goal's count: read aloud and as the pointer rests.
+    fewer: 'One fewer',
+    more: 'One more',
+    // The + on a recipe of a trainer's panel and on an item the search finds: read aloud and as the pointer rests. {item}: its name.
+    add: 'Add {item} to the shopping list',
+  },
+
   // The character picker at the start of the top row (Picker.svelte).
   picker: {
     // On the green light, and in the list in place of when it was seen: short.

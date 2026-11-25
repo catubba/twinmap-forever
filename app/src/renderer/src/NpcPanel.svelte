@@ -18,11 +18,12 @@
   import { lowestOf, type Listing } from '../../shared/ah'
 
   // listing: the prices of the auction house on show (M18-F8): beside a vendor's price, the lowest there for as many.
-  let { pin, sheets, shown, now, listing = null, onclose }: { pin: FixedPin; sheets: Sheets; shown: Known | null; now: number; listing?: Listing | null; onclose: () => void } = $props()
+  // onadd: puts a recipe on the shopping list of the character picked (M10-F4).
+  let { pin, sheets, shown, now, listing = null, onclose, onadd }: { pin: FixedPin; sheets: Sheets; shown: Known | null; now: number; listing?: Listing | null; onclose: () => void; onadd?: (item: number, spell: number) => void } = $props()
 
   // What the game says of the items and of the trainers, made beside the map (tiles-worker.ts).
   let items = $state.raw<ItemFacts | null>(null)
-  let trainers = $state.raw<TrainerFacts>({ format: 0, classes: {}, spells: {}, makes: {} })
+  let trainers = $state.raw<TrainerFacts>({ format: 0, classes: {}, spells: {}, makes: {}, crafts: {}, lines: {} })
   $effect(() => {
     const read = <T,>(file: string, set: (v: T) => void): void =>
       void fetch(`${TILES}/${file}`)
@@ -92,6 +93,10 @@
     {@render pic(picture(r))}
     <span class="name" style:color={color(r, open)}>{r.name}{#if r.rank}<span class="rank">{t('items.npc.rank', { rank: r.rank })}</span>{/if}</span>
     {#if r.talent}<span class="tag">{t('items.npc.talent')}</span>{:else if r.quest !== undefined}<span class="tag" title={r.quest ? t('items.npc.questTaught', { quest: r.quest }) : t('items.npc.classQuest')}>{t('items.npc.quest')}</span>{:else}{@render price(r.cost)}{/if}
+    {#if onadd && shown && made(r)}
+      {@const add = t('items.shopping.add', { item: r.name })}
+      <button class="plus" aria-label={add} title={add} onclick={() => onadd(made(r)!, r.spell)}>+</button>
+    {/if}
   </div>
 {/snippet}
 
@@ -305,6 +310,23 @@
   .t:hover,
   .r:hover {
     background: #ffffff0f;
+  }
+  /* The + of a recipe, after its price: shown on the row under the pointer, or reached with the keyboard. */
+  .t:has(.plus) {
+    grid-template-columns: 26px minmax(0, 1fr) auto auto;
+  }
+  .t .plus {
+    margin-left: -2px;
+    opacity: 0;
+  }
+  .t:hover .plus,
+  .t .plus:focus-visible {
+    opacity: 1;
+  }
+  @media (hover: none) {
+    .t .plus {
+      opacity: 1;
+    }
   }
   .name {
     overflow: hidden;
