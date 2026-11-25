@@ -243,6 +243,19 @@ export default {
     gathers: '{profession} has no recipes: its level is all there is to show.',
   },
 
+  // The panel Spellbook: the tabs of the game's spellbook and the spells of the one chosen. The tabs' and spells' names come from the game.
+  spellbook: {
+    // Placeholder of the field that narrows the spells of the tab by name. Short.
+    filter: 'Filter spells',
+    // Under a passive spell the game writes nothing under: as the game's book words it.
+    passive: 'Passive',
+    // In place of the spells when none matches what is typed in the filter.
+    noMatch: 'No spell matches.',
+    // A sheet without the book: the title, then what to do in the game.
+    none: 'No spellbook yet',
+    login: "Log in to the game with Twinmap's addon up to date: the spells of your book show here, also when the game is closed.",
+  },
+
   // The panel Inventory: a row for each item.
   table: {
     // Column headings, in capitals: short.

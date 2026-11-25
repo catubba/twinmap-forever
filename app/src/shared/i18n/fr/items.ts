@@ -212,6 +212,14 @@ export default {
     gathers: '{profession} n’a pas de recettes : seul son niveau s’affiche.',
   },
 
+  spellbook: {
+    filter: 'Filtrer les sorts',
+    passive: 'Passif',
+    noMatch: 'Aucun sort ne correspond.',
+    none: 'Pas encore de grimoire',
+    login: 'Connectez-vous au jeu avec l’addon de Twinmap à jour : les sorts de votre grimoire s’affichent ici, même quand le jeu est fermé.',
+  },
+
   table: {
     columns: {
       item: 'Objet',

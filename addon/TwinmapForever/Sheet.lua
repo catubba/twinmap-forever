@@ -20,6 +20,9 @@
 --         sell price, are not among them.
 --   skills  { { skill, rank, most }, ... } every skill line by the game's number: professions, weapons, languages
 --   spells  { spell, ... } the spells in the spellbook, those not learned yet left out
+--   book    { { name, picture, { spell, ... }, { passive spell, ... } }, ... } the tabs of the spellbook as the game shows
+--           them, in its order: the tab's name and picture, then its spells and its passive ones, each in the book's order;
+--           last the pet's tab (picture 0), its entries { name, words under it, picture } as the game words them
 --   talents { free = points not spent, t = { { node, rank, spell }, ... } } the talents taken
 --   recipes { known = { spell, ... }, seen = { profession, ... }, listed = { spell, ... }, cats = { { category, name, order }, ... } }
 --           the recipes a profession's window showed learned, and those learned since; seen: the professions whose window
@@ -148,23 +151,46 @@ local function Skills()
   return out
 end
 
+-- The spells, by number, and the book as the game shows it: its tabs in order, each with its name and picture, the
+-- spells it shows and then the passive ones, in its order.
 local function Spells()
-  local out, have = {}, {}
+  local out, have, tabs = {}, {}, {}
   local book = C_SpellBook
-  if not (book and book.GetNumSpellBookSkillLines) then return out end
+  if not (book and book.GetNumSpellBookSkillLines) then return out, tabs end
   local bank = Enum and Enum.SpellBookSpellBank and Enum.SpellBookSpellBank.Player or 0
   local future = Enum and Enum.SpellBookItemType and Enum.SpellBookItemType.FutureSpell
   for line = 1, Num(Try(book.GetNumSpellBookSkillLines)) or 0 do
     local info = Try(book.GetSpellBookSkillLineInfo, line)
     local first = type(info) == "table" and Num(info.itemIndexOffset) or 0
+    local active, passive = {}, {}
     for i = first + 1, first + (type(info) == "table" and Num(info.numSpellBookItems) or 0) do
       local item = Try(book.GetSpellBookItemInfo, i, bank)
       local spell = type(item) == "table" and item.itemType ~= future and Num(item.spellID)
-      if spell and not have[spell] then have[spell], out[#out + 1] = true, spell end
+      if spell then
+        if not have[spell] then have[spell], out[#out + 1] = true, spell end
+        local list = item.isPassive and passive or active
+        list[#list + 1] = spell
+      end
     end
+    if #active + #passive > 0 then tabs[#tabs + 1] = { Str(info.name) or "", Num(info.iconID) or 0, active, passive } end
+  end
+  -- The pet's tab, of the pet summoned last: its commands and stances are no spells the app can name, so each of its
+  -- entries goes as the game words it, { name, words under it, picture }.
+  local pets = Enum and Enum.SpellBookSpellBank and Enum.SpellBookSpellBank.Pet
+  local count = pets and book.HasPetSpells and Num(Try(book.HasPetSpells))
+  if count and count > 0 then
+    local active, passive = {}, {}
+    for i = 1, count do
+      local item = Try(book.GetSpellBookItemInfo, i, pets)
+      if type(item) == "table" and Str(item.name) then
+        local list = item.isPassive and passive or active
+        list[#list + 1] = { item.name, Str(item.subName) or "", Num(item.iconID) or 0 }
+      end
+    end
+    if #active + #passive > 0 then tabs[#tabs + 1] = { Str(PET) or "Pet", 0, active, passive } end
   end
   table.sort(out)
-  return out
+  return out, tabs
 end
 
 -- The talent trees of the active set, as wow-state reads them in the game.
@@ -403,9 +429,10 @@ local function Read(s)
   if bankOpen then pieces.bank = Containers(BANK) end
   local now = GetTime()
   if now >= slowAt then
-    slow, slowAt = { skills = Skills(), spells = Spells(), talents = Talents(), stats = Stats() or slow.stats }, now + AGAIN
+    slow, slowAt = { skills = Skills(), talents = Talents(), stats = Stats() or slow.stats }, now + AGAIN
+    slow.spells, slow.book = Spells()
   end
-  pieces.skills, pieces.spells, pieces.talents, pieces.stats = slow.skills, slow.spells, slow.talents, slow.stats
+  pieces.skills, pieces.spells, pieces.book, pieces.talents, pieces.stats = slow.skills, slow.spells, slow.book, slow.talents, slow.stats
   pieces.recipes = Recipes(s)
   pieces.trainers = Trainers(s)
   return pieces

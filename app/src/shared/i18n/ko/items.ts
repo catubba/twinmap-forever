@@ -219,6 +219,14 @@ export default {
     gathers: '{profession}에는 제조법이 없습니다. 숙련도만 표시됩니다.',
   },
 
+  spellbook: {
+    filter: '주문 검색',
+    passive: '지속 효과',
+    noMatch: '일치하는 주문이 없습니다.',
+    none: '아직 마법책이 없습니다',
+    login: '최신 Twinmap 애드온으로 게임에 접속하십시오. 게임을 종료한 뒤에도 마법책의 주문이 여기에 표시됩니다.',
+  },
+
   table: {
     columns: {
       item: '아이템',

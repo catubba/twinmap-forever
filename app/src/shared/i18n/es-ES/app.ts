@@ -7,6 +7,7 @@ export default {
     character: 'Personaje',
     inventory: 'Inventario',
     professions: 'Profesiones',
+    spellbook: 'Libro de hechizos',
     auctionSearch: 'Buscar en subastas',
     item: 'Objeto',
     auctionHouse: 'Casa de subastas',
