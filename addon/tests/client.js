@@ -96,29 +96,57 @@ const STUB = `
     GAME.tipReads = (GAME.tipReads or 0) + 1
     return { lines = lines }
   end
+  -- The tooltips of spells and talents: GAME.spellTips[spell] and GAME.talentTips[node][rank], lines as GAME.tips. A spell in
+  -- GAME.unloaded is one the game has not loaded yet: its tooltip comes without its last line (the description), until it
+  -- is asked for (C_Spell.RequestLoadSpellData), which loads it.
+  local function linesOf(list, spell)
+    local lines = {}
+    for i, l in ipairs(list or {}) do
+      if not (spell and GAME.unloaded and GAME.unloaded[spell] and i == #list) then
+        local function colour(hex) if hex and #hex == 6 then return { r = tonumber(hex:sub(1, 2), 16) / 255, g = tonumber(hex:sub(3, 4), 16) / 255, b = tonumber(hex:sub(5, 6), 16) / 255 } end end
+        lines[#lines + 1] = { leftText = l[1], leftColor = colour(l[2]) or { r = 1, g = 1, b = 1 }, rightText = l[3], rightColor = colour(l[4]) }
+      end
+    end
+    GAME.spellReads = (GAME.spellReads or 0) + 1
+    return { lines = lines }
+  end
   C_TooltipInfo = {
     GetBagItem = function(bag, slot) local c = GAME.bags and GAME.bags[bag] local it = c and c.items[slot] return it and tipOf(it[1]) end,
     GetInventoryItem = function(_, slot) local w = GAME.worn and GAME.worn[slot] return w and tipOf(w[1]) end,
+    GetSpellByID = function(spell) return linesOf(GAME.spellTips and GAME.spellTips[spell], spell) end,
+    GetTraitEntry = function(entry, rank)
+      local node = entry // 10
+      return linesOf(GAME.talentTips and GAME.talentTips[node] and GAME.talentTips[node][rank], GAME.talents[node] and GAME.talents[node][2])
+    end,
+  }
+  C_Spell = {
+    IsSpellDataCached = function(spell) return not (GAME.unloaded and GAME.unloaded[spell]) end,
+    RequestLoadSpellData = function(spell) if GAME.unloaded then GAME.unloaded[spell] = nil end end,
   }
   function GetInventoryItemLink(_, slot) local w = GAME.worn and GAME.worn[slot] return w and (w[4] or ("|cffffffff|Hitem:" .. w[1] .. "::::::::" .. (GAME.level or 1) .. ":::::|h[x]|h|r")) end
   -- Skills, spells, talents and recipes, as Forever has them. GAME.skills = { { skill, rank, most, header } },
-  -- GAME.spells = { { spell, notYet } }, GAME.talents = { [node] = { rank, spell } } with GAME.free points,
+  -- GAME.spells = { { spell, notYet, passive } } in one tab, General, GAME.pet = { { name, words, picture, passive } } the pet's,
+  -- GAME.talents = { [node] = { rank, spell, most } } with GAME.free points,
   -- GAME.trade = { profession = n, recipes = { [spell] = learned }, linked = true }: the window of a profession.
-  Enum = { SpellBookSpellBank = { Player = 0 }, SpellBookItemType = { Spell = 1, FutureSpell = 2 } }
+  Enum = { SpellBookSpellBank = { Player = 0, Pet = 1 }, SpellBookItemType = { Spell = 1, FutureSpell = 2 } }
   C_SkillInfo = {
     GetNumSkillLines = function() return GAME.skills and #GAME.skills or 0 end,
     GetSkillLineInfo = function(i) local l = GAME.skills[i] return l and { skillID = l[1], rank = l[2], maxRank = l[3], isHeader = l[4] == true } end,
   }
   C_SpellBook = {
     GetNumSpellBookSkillLines = function() return GAME.spells and 1 or 0 end,
-    GetSpellBookSkillLineInfo = function() return { itemIndexOffset = 0, numSpellBookItems = #GAME.spells } end,
-    GetSpellBookItemInfo = function(i) local sp = GAME.spells[i] return sp and { spellID = sp[1], itemType = sp[2] and 2 or 1 } end,
+    GetSpellBookSkillLineInfo = function() return { name = "General", iconID = 136830, itemIndexOffset = 0, numSpellBookItems = #GAME.spells } end,
+    GetSpellBookItemInfo = function(i, bank)
+      if bank == 1 then local p = GAME.pet and GAME.pet[i] return p and { name = p[1], subName = p[2], iconID = p[3], isPassive = p[4] == true, itemType = 3 } end
+      local sp = GAME.spells[i] return sp and { spellID = sp[1], itemType = sp[2] and 2 or 1, isPassive = sp[3] == true }
+    end,
+    HasPetSpells = function() return GAME.pet and #GAME.pet or nil end,
   }
   C_ClassTalents = { GetActiveConfigID = function() return GAME.talents and 7 end }
   C_Traits = {
     GetConfigInfo = function() return { treeIDs = { 1 } } end,
     GetTreeNodes = function() local out = {} for node in pairs(GAME.talents) do out[#out + 1] = node end table.sort(out) return out end,
-    GetNodeInfo = function(_, node) return { currentRank = GAME.talents[node][1], entryIDs = { node * 10 } } end,
+    GetNodeInfo = function(_, node) return { currentRank = GAME.talents[node][1], maxRanks = GAME.talents[node][3], entryIDs = { node * 10 } } end,
     GetEntryInfo = function(_, entry) return { definitionID = entry } end,
     GetDefinitionInfo = function(definition) local t = GAME.talents[definition // 10] return { spellID = t and t[2] } end,
     GetTreeCurrencyInfo = function() return { { quantity = GAME.free or 0 } } end,
@@ -177,7 +205,8 @@ const STUB = `
   function GetQuestID() return GAME.quest or 0 end
   C_TradeSkillUI = {
     GetAllRecipeIDs = function() local out = {} for id in pairs(GAME.trade and GAME.trade.recipes or {}) do out[#out + 1] = id end table.sort(out) return out end,
-    GetRecipeInfo = function(id) return { learned = GAME.trade.recipes[id] } end,
+    GetRecipeInfo = function(id) return { learned = GAME.trade.recipes[id], categoryID = GAME.trade.cats and GAME.trade.cats[id] } end,
+    GetCategoryInfo = function(id) local c = GAME.trade and GAME.trade.names and GAME.trade.names[id] if c then return { categoryID = id, name = c[1], uiOrder = c[2] } end end,
     IsTradeSkillLinked = function() return GAME.trade and GAME.trade.linked == true end,
     GetBaseProfessionInfo = function() return { professionID = GAME.trade and GAME.trade.profession } end,
   }

@@ -3,7 +3,14 @@ export default {
   top: {
     sections: '分区',
     now: '当前',
-    items: '物品',
+    map: '地图',
+    character: '角色',
+    inventory: '物品栏',
+    professions: '专业',
+    spellbook: '法术书',
+    talents: '天赋',
+    auctionSearch: '拍卖行搜索',
+    item: '物品',
     auctionHouse: '拍卖行',
     auctionHouseShort: '拍卖',
     pause: '暂停Twinmap',
@@ -13,6 +20,29 @@ export default {
     feedback: '反馈',
     feedbackHint: '报告Bug或提出建议',
     settings: '设置',
+  },
+
+  layout: {
+    edit: '编辑布局（{ctrl}+E）',
+    editKey: '编辑布局',
+    hint: '把标签拖到面板边缘可并排放置，拖到中间可合为一组。',
+    addPanel: '添加面板',
+    pull: '拖到面板上即可取出，或点击放到“当前”下方',
+    reset: '重置此工作区',
+    restore: '恢复默认工作区',
+    restoreSure: '要把所有工作区恢复到最初的样子吗？',
+    restoreYes: '恢复',
+    restoreNo: '取消',
+    done: '完成',
+    hintSpaces: '顶部：拖动工作区可调整顺序，双击可重命名。',
+    newSpace: '新建工作区',
+    spacesMost: '最多 {most} 个工作区',
+    unnamed: '工作区',
+    rename: '工作区名称',
+    deleteSpace: '删除工作区',
+    deleteSure: '要删除工作区“{name}”吗？它的布局会丢失，面板仍在其他工作区中。',
+    deleteYes: '删除',
+    deleteNo: '保留',
   },
 
   link: {
@@ -83,7 +113,8 @@ export default {
     // As the game (GS EXPERIENCE_COLON "经验值：", GS XP_TEXT "%s / %s").
     xp: '经验值：{xp} / {max}',
     experience: '经验值',
-    width: '面板宽度',
+    emptyExperience: '开启Twinmap Forever插件游玩后，你的等级会显示在这里。',
+    emptyItem: '在背包、银行、物品栏或拍卖行搜索中点击一件物品，即可在这里查看它的价格。',
     widthHint: '拖动以调整大小。双击以重置。',
   },
 
@@ -115,6 +146,11 @@ export default {
     // "行程" is Shortest Path's journey; "路线" stays Twinmap's own Route (l10n.md).
     finding: '正在规划行程',
     updateHint: '更新Shortest Path和Twinmap Forever插件，即可在这里看到完整行程',
+    emptyAttention: '现在没有需要处理的事。死亡或达成条件的拍卖行提醒会显示在这里。',
+    emptyPins: '还没有保存的标记。点击地图上的地点并保存，即可在这里保留。',
+    emptyQuests: '任务日志中没有任务。在游戏中接受一个任务，它就会显示在这里。',
+    emptyNearby: '附近没有人。继续前进，周围的商人、训练师和飞行管理员会显示在这里。',
+    allOut: '“当前”的每个区块都在各自的面板中。关闭面板即可把它的区块放回这里。',
   },
 
   journey: {

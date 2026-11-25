@@ -148,11 +148,7 @@ export default {
     noCharacter: 'Todavía no hay personajes. Activa el addon Twinmap Forever, juega con uno y sus bolsas aparecerán aquí, incluso con el juego cerrado.',
     filter: 'Filtrar por nombre o tipo',
     filterLabel: 'Filtrar objetos',
-    viewLabel: 'Vista',
     whereLabel: 'Lugar',
-    // A switch half, short: bag slots are "casillas" in the game (GS CONTAINER_SLOTS).
-    slots: 'Casillas',
-    table: 'Lista',
     all: 'Todo',
     // Each part as "label: amount", like the game's "Dinero:" (GS MONEY_COLON).
     worth: 'Venta al mercader: {money}',
@@ -175,13 +171,11 @@ export default {
   },
 
   held: {
-    label: 'Bolsas y banco',
     bags: 'Bolsas',
     bagsNow: 'en este momento',
     bagsAsOf: 'vistas {ago}',
     bank: 'Banco',
     bankSeen: 'visto {ago}',
-    bankUnseen: 'todavía sin ver: ábrelo una vez en el juego',
     // GS BAG_NAME_BACKPACK "Mochila"; ItemSubClass 1.11 "Bolsa de componentes".
     backpack: 'Mochila y bolsas',
     reagents: 'Bolsa de componentes',
@@ -191,6 +185,51 @@ export default {
     used: '{used} de {count} ocupadas',
     // "vacío/vacía" would agree with the grid's heading (Llavero, Mochila...).
     empty: { one: 'sin objetos · {count} casilla', many: 'sin objetos · {count} casillas', other: 'sin objetos · {count} casillas' },
+  },
+
+  bank: {
+    none: 'Todavía no se ha visto el banco',
+    open: 'Abre tu banco una vez en el juego: lo que contiene aparecerá aquí, incluso con el juego cerrado.',
+    where: 'Habla con un banquero en cualquier capital.',
+  },
+
+  professions: {
+    primary: 'Profesiones',
+    secondary: 'Habilidades secundarias',
+    filter: 'Filtrar recetas',
+    known: 'Conocidas',
+    unknown: 'Sin aprender',
+    unknownNote: 'El número: la habilidad a partir de la que cada una se vuelve amarilla.',
+    optimal: 'Naranja: subida segura',
+    medium: 'Amarillo: probable',
+    easy: 'Verde: rara vez',
+    trivial: 'Gris: ninguna',
+    noMatch: 'Ninguna receta coincide.',
+    none: 'Todavía no tienes profesiones',
+    learn: 'Aprende una con un instructor de profesiones en cualquier ciudad: su nivel y sus recetas aparecerán aquí.',
+    also: 'Cocina, Primeros auxilios y Pesca también cuentan.',
+    unseen: 'Todavía no se han visto recetas',
+    open: 'Abre {profession} una vez en el juego: sus recetas aparecerán aquí, incluso con el juego cerrado.',
+    again: 'Abre {profession} una vez más en el juego: sus categorías y las recetas sin aprender también aparecerán aquí.',
+    gathers: '{profession} no tiene recetas: solo se muestra su nivel.',
+  },
+
+  spellbook: {
+    filter: 'Filtrar hechizos',
+    passive: 'Pasivo',
+    noMatch: 'Ningún hechizo coincide.',
+    none: 'Todavía no hay libro de hechizos',
+    login: 'Entra al juego con el addon de Twinmap actualizado: los hechizos de tu libro aparecerán aquí, incluso con el juego cerrado.',
+  },
+
+  talents: {
+    spent: { one: '{count} punto gastado', many: '{count} de puntos gastados', other: '{count} puntos gastados' },
+    free: 'Talentos sin usar: {count}',
+    rank: 'Rango {rank}/{most}',
+    next: 'Siguiente rango:',
+    need: { one: 'Gasta {count} punto más en talentos de {tree}', many: 'Gasta {count} de puntos más en talentos de {tree}', other: 'Gasta {count} puntos más en talentos de {tree}' },
+    none: 'Aún no tienes talentos',
+    learn: 'Los talentos llegan en el nivel 10 y luego un punto por nivel. Gástalos en la ventana de talentos del juego: aparecerán aquí.',
   },
 
   table: {

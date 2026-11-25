@@ -153,11 +153,7 @@ export default {
     // GS TYPE "종류".
     filter: '이름 또는 종류로 필터',
     filterLabel: '아이템 필터',
-    viewLabel: '보기',
     whereLabel: '위치',
-    // Bag slots are "칸" in the game (GS CONTAINER_SLOTS "%d칸").
-    slots: '칸',
-    table: '목록',
     all: '전체',
     // Each part as "label: amount", like the game's "돈:" (GS MONEY_COLON) and GS SELL_PRICE.
     worth: '판매 가격: {money}',
@@ -181,13 +177,11 @@ export default {
   },
 
   held: {
-    label: '가방과 은행',
     bags: '가방',
     bagsNow: '현재 상태',
     bagsAsOf: '{ago} 기준',
     bank: '은행',
     bankSeen: '{ago} 확인',
-    bankUnseen: '아직 열어 보지 않음: 게임에서 한 번 여십시오',
     // GS BAG_NAME_BACKPACK "배낭"; ItemSubClass 1.11 "재료 가방"; GS KEYRING.
     backpack: '배낭과 가방',
     reagents: '재료 가방',
@@ -196,6 +190,51 @@ export default {
     used: '{count}칸 중 {used}칸 사용',
     // GS CONTAINER_SLOTS "%d칸".
     empty: { other: '비어 있음 · {count}칸' },
+  },
+
+  bank: {
+    none: '아직 은행을 열어 보지 않았습니다',
+    open: '게임에서 은행을 한 번 여십시오. 게임을 종료한 뒤에도 은행에 있는 물건이 여기에 표시됩니다.',
+    where: '아무 수도에서나 은행원에게 말을 거십시오.',
+  },
+
+  professions: {
+    primary: '전문 기술',
+    secondary: '보조 기술',
+    filter: '제조법 검색',
+    known: '배운 제조법',
+    unknown: '배우지 않은 제조법',
+    unknownNote: '숫자: 노란색이 되는 숙련도입니다.',
+    optimal: '주황색: 숙련도가 확실히 오름',
+    medium: '노란색: 오를 가능성 높음',
+    easy: '녹색: 거의 오르지 않음',
+    trivial: '회색: 오르지 않음',
+    noMatch: '일치하는 제조법이 없습니다.',
+    none: '아직 전문 기술이 없습니다',
+    learn: '아무 도시에서나 전문 기술 전문가에게 배우십시오. 숙련도와 제조법이 여기에 표시됩니다.',
+    also: '요리, 응급치료, 낚시도 포함됩니다.',
+    unseen: '아직 본 제조법이 없습니다',
+    open: '게임에서 {profession} 창을 한 번 여십시오. 게임을 종료한 뒤에도 제조법이 여기에 표시됩니다.',
+    again: '게임에서 {profession} 창을 한 번 더 여십시오. 분류와 배우지 않은 제조법도 여기에 표시됩니다.',
+    gathers: '{profession}에는 제조법이 없습니다. 숙련도만 표시됩니다.',
+  },
+
+  spellbook: {
+    filter: '주문 검색',
+    passive: '지속 효과',
+    noMatch: '일치하는 주문이 없습니다.',
+    none: '아직 마법책이 없습니다',
+    login: '최신 Twinmap 애드온으로 게임에 접속하십시오. 게임을 종료한 뒤에도 마법책의 주문이 여기에 표시됩니다.',
+  },
+
+  talents: {
+    spent: { other: '{count} 포인트 사용' },
+    free: '사용하지 않은 특성 포인트: {count}',
+    rank: '등급 {rank}/{most}',
+    next: '다음 등급:',
+    need: { other: '{tree} 특성에 {count}포인트를 더 사용해야 합니다' },
+    none: '아직 특성이 없습니다',
+    learn: '특성은 10레벨부터 레벨마다 1포인트씩 얻습니다. 게임의 특성 창에서 포인트를 사용하면 여기에 표시됩니다.',
   },
 
   table: {

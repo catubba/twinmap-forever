@@ -3,8 +3,14 @@ export default {
   top: {
     sections: 'Bereiche',
     now: 'Jetzt',
-    // "Inventar": Gegenstände is too long for a tab in a narrow window, where the character's name would vanish.
-    items: 'Inventar',
+    map: 'Karte',
+    character: 'Charakter',
+    inventory: 'Inventar',
+    professions: 'Berufe',
+    spellbook: 'Zauberbuch',
+    talents: 'Talente',
+    auctionSearch: 'AH-Suche',
+    item: 'Gegenstand',
     auctionHouse: 'Auktionshaus',
     // As German players write it.
     auctionHouseShort: 'AH',
@@ -15,6 +21,29 @@ export default {
     feedback: 'Feedback',
     feedbackHint: 'Fehler oder Idee melden',
     settings: 'Optionen',
+  },
+
+  layout: {
+    edit: 'Anordnung bearbeiten ({ctrl}+E)',
+    editKey: 'Anordnung bearbeiten',
+    hint: 'Zieht einen Reiter an den Rand eines Panels, um es daneben zu legen, oder in seine Mitte, um sie zu gruppieren.',
+    addPanel: 'Panel hinzufügen',
+    pull: 'Auf ein Panel ziehen, um ihn herauszunehmen, oder klicken, um ihn unter Jetzt zu legen',
+    reset: 'Diesen Arbeitsbereich zurücksetzen',
+    restore: 'Standard-Arbeitsbereiche wiederherstellen',
+    restoreSure: 'Alle Arbeitsbereiche wieder so einrichten wie am Anfang?',
+    restoreYes: 'Wiederherstellen',
+    restoreNo: 'Abbrechen',
+    done: 'Fertig',
+    hintSpaces: 'Oben: Zieht einen Arbeitsbereich, um ihn zu verschieben, doppelklickt ihn, um ihn umzubenennen.',
+    newSpace: 'Neuer Arbeitsbereich',
+    spacesMost: 'Höchstens {most} Arbeitsbereiche',
+    unnamed: 'Arbeitsbereich',
+    rename: 'Name des Arbeitsbereichs',
+    deleteSpace: 'Arbeitsbereich löschen',
+    deleteSure: 'Den Arbeitsbereich "{name}" löschen? Seine Anordnung geht verloren; die Panels bleiben in den anderen Arbeitsbereichen.',
+    deleteYes: 'Löschen',
+    deleteNo: 'Behalten',
   },
 
   link: {
@@ -80,7 +109,8 @@ export default {
     levelPercent: 'Stufe {level}, {percent} %',
     xp: '{xp} von {max} EP',
     experience: 'Erfahrung',
-    width: 'Breite der Seitenleiste',
+    emptyExperience: 'Eure Stufe erscheint hier, sobald Ihr mit aktivem Addon Twinmap Forever spielt.',
+    emptyItem: 'Klickt auf einen Gegenstand in Taschen, Bank, Inventar oder der AH-Suche, um hier seine Preise zu sehen.',
     widthHint: 'Ziehen, um die Größe zu ändern. Doppelklick zum Zurücksetzen.',
   },
 
@@ -109,6 +139,11 @@ export default {
     otherContinent: 'Auf dem anderen Kontinent',
     finding: 'Weg wird gesucht',
     updateHint: 'Aktualisiert Shortest Path und das Twinmap-Forever-Addon, um hier den ganzen Weg zu sehen',
+    emptyAttention: 'Gerade braucht Euch nichts. Ein Tod oder ein erreichter Alarm im Auktionshaus erscheint hier.',
+    emptyPins: 'Noch keine Markierung gespeichert. Klickt auf einen Ort der Karte und speichert ihn, um ihn hier zu behalten.',
+    emptyQuests: 'Keine Quest in Eurem Questlog. Nehmt im Spiel eine an, dann erscheint sie hier.',
+    emptyNearby: 'Niemand in der Nähe. Geht weiter: Händler, Lehrer und Flugmeister um Euch herum erscheinen hier.',
+    allOut: 'Jeder Block von Jetzt liegt in einem eigenen Panel. Schließt ein Panel, um seinen Block hierher zurückzuholen.',
   },
 
   journey: {

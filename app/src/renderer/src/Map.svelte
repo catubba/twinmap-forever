@@ -3,7 +3,7 @@
   // character as an arrow. It follows the character until the player drags the map away.
   // Inside a dungeon or a raid it shows that instead: its rooms, its bosses, its entrance.
   import { TILES } from './web'
-  import { layout as sides, setMapRight } from './layout.svelte'
+  import { layout as sides, setMapRight } from './frame.svelte'
   import type { Terrain } from './terrain3d'
   import type { Compass } from './compass'
   import { Arrow3d } from './arrow3d'
@@ -769,6 +769,7 @@
   const TOO_FAR = 100 // yards: beyond this it is a portal or a hearthstone, and the arrow jumps
   let trail: Fix[] = [], gliding = 0
   let tied = false // the map moves with the arrow, frame by frame
+  let seen = true // the map is on the page and in sight (onMount)
   let zooming = false // a zoom is running: the map is left alone until its end
   function frame(): void {
     const now = whereAt(trail, Date.now() - BEHIND), here = L.latLng(now.y, now.x)
@@ -780,7 +781,7 @@
   function glide(here: L.LatLng, jump: boolean): void {
     const fix = { at: readAt ?? Date.now(), x: here.lng, y: here.lat }, last = trail.at(-1)
     const yards = last ? Math.hypot(fix.x - last.x, fix.y - last.y) * YARDS_PER_UNIT : Infinity
-    if (jump || still() || !map?.hasLayer(arrow) || yards > TOO_FAR) {
+    if (jump || still() || !seen || !map?.hasLayer(arrow) || yards > TOO_FAR) {
       cancelAnimationFrame(gliding)
       gliding = 0
       trail = [fix]
@@ -1024,7 +1025,7 @@
       for (const layer of shown) layer.remove()
       terrain.show(folder!)
       lookAsTheMap(0, azimuth)
-      terrain.start()
+      if (seen) terrain.start()
       await terrain.turn(tilted, azimuth)
     } else if (terrain) {
       const left = terrain.looking()
@@ -1167,7 +1168,18 @@
     // The map is told when its box changes: the panel beside it opens and closes, a phone is turned.
     const sized = new ResizeObserver(() => made.invalidateSize())
     sized.observe(holder)
+    // Out of sight (a workspace without the map, a tab behind in a group of panels): the 3D view stops drawing and the
+    // arrow stops gliding, it jumps to each new place; on the way back both go on from where the character is.
+    const sight = new IntersectionObserver((seenNow) => {
+      seen = seenNow.at(-1)!.isIntersecting
+      cancelAnimationFrame(gliding)
+      gliding = seen && trail.length ? requestAnimationFrame(frame) : 0
+      if (threeD && seen) terrain?.start()
+      else if (threeD) terrain?.stop()
+    })
+    sight.observe(holder)
     return () => {
+      sight.disconnect()
       sized.disconnect()
       clearTimeout(laying)
       cancelAnimationFrame(gliding)
@@ -2102,9 +2114,9 @@
       0 0 2px #000;
   }
 
-  /* Layers stays open until it is closed. It ends above the zoom buttons; on a low window it scrolls. */
+  /* Layers stays open until it is closed. It ends above the zoom buttons; on a low map it scrolls. */
   .layers {
-    max-height: calc(100vh - 250px);
+    max-height: calc(100cqh - 250px);
     overflow-y: auto;
   }
   /* The kinds of ore or of herbs open beside it, as tall, scrolling on their own. */
@@ -2117,7 +2129,7 @@
     display: flex;
     flex-direction: column;
     min-width: 236px;
-    max-height: calc(100vh - 250px);
+    max-height: calc(100cqh - 250px);
   }
   .kindlist .scroll {
     overflow-y: auto;

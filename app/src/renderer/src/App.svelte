@@ -5,7 +5,7 @@
   import { deathFrom, type Place as DeathPlace } from '../../shared/death'
   import { feedbackDetails } from '../../shared/feedback'
   import { tilesHelp, tilesLine, type TilesStatus } from '../../shared/tiles-status'
-  import { onMount, tick } from 'svelte'
+  import { onMount, tick, untrack } from 'svelte'
   import { fade, fly } from 'svelte/transition'
   import type { LogQuest, QuestPin } from '../../shared/quests'
   import type { FixedPin } from '../../shared/services'
@@ -24,16 +24,21 @@
   import { newsFor, type Go } from '../../shared/news'
   import FirstRun from './FirstRun.svelte'
   import Glyph from './Glyph.svelte'
-  import { PANEL, layout, setMapRight, setWidth } from './layout.svelte'
+  import { add as addPanel, create as createSpace, edit, frame, layout, mount, move as moveSpace, nameOf, nowOver, open as openSpace, PART_DRAG, reach, remove as removeSpace, rename as renameSpace, reset as resetSpace, restore as restoreSpaces, section, setMapRight, titleOf, unmount } from './frame.svelte'
+  import { CHARACTER, MOST, NAME_MOST } from '../../shared/workspaces'
   import Logo from './Logo.svelte'
   import Map from './Map.svelte'
   import { drop, gone, opened, screen } from './motion'
   import Settings from './Settings.svelte'
   import Picker from './Picker.svelte'
   import Items from './Items.svelte'
+  import Professions from './Professions.svelte'
+  import Spellbook from './Spellbook.svelte'
+  import Talents from './Talents.svelte'
   import Auction from './Auction.svelte'
   import { homeOf, houseFrom, houseNumber, houseOf, type Alert, type Home, type House, type PricesTold } from '../../shared/ah'
   import ItemPopup from './ItemPopup.svelte'
+  import SpellPopup from './SpellPopup.svelte'
   import NpcPanel from './NpcPanel.svelte'
   import ShoppingList from './ShoppingList.svelte'
   import { addTo, shoppingFrom } from '../../shared/shopping'
@@ -89,10 +94,6 @@
   let onSetup = $state<boolean | null>(keptView === 'setup' ? true : null)
   // Settings lie over the map, which stays as it was underneath.
   let onSettings = $state(keptView === 'settings')
-  // Items lies over the map as Settings does, as wide as the window.
-  let onItems = $state(false)
-  // Auction House lies over the map as Items does.
-  let onAh = $state(false)
   // Feedback is a small window over whatever is on show.
   let onFeedback = $state(false)
   let answered = $state(false) // Help improve Twinmap was answered in this run: the setup may tell it a moment later
@@ -105,8 +106,7 @@
   const go = (to: Go): void => {
     if (to === 'settings') return void (onSettings = true)
     onSettings = false
-    onItems = to === 'items'
-    onAh = to === 'ah'
+    reach(to === 'items' ? 'character' : to === 'ah' ? 'search' : 'map')
     if (to === 'layers') void tick().then(() => mapView?.openLayers())
   }
   window.twinmap.onSetup((told) => {
@@ -259,6 +259,87 @@
   // larger one it starts as it was left.
   const SMALL = '(max-width: 760px), (max-height: 500px)'
   let panelOpen = $state(!matchMedia(SMALL).matches && localStorage.getItem('panel') !== 'closed')
+  let small = $state(matchMedia(SMALL).matches)
+  matchMedia(SMALL).addEventListener('change', (e) => (small = e.matches))
+  // The workspaces (M20, frame.svelte.ts): made once the frame and the stash of the sections are there, from what the
+  // app's window kept. Closed, or on a small screen, Now lies over the map, as it did before them.
+  let frameBox = $state<HTMLElement>()
+  let stashBox = $state<HTMLElement>()
+  const setupKnown = $derived(setup !== null)
+  $effect(() => {
+    if (!frameBox || !stashBox || !setupKnown) return
+    const [root, held] = [frameBox, stashBox]
+    untrack(() => mount(root, held, setup?.workspaces))
+    return unmount
+  })
+  $effect(() => {
+    const over = !panelOpen || small
+    untrack(() => nowOver(over))
+  })
+  // Now closes, and lies over the map, only beside it as the app was before the workspaces (frame.paired) and while the
+  // layout is locked; in any other layout it is a panel as the others, closed with Edit layout.
+  const nowShut = $derived(!panelOpen && frame.paired && !frame.editing)
+  const nowAbove = $derived((!panelOpen || small) && frame.paired && !frame.editing)
+  // Ctrl with 1 to 6: the workspaces by their place among the tabs. Ctrl and E: Edit layout, on and off.
+  function spaceKey(e: KeyboardEvent): void {
+    if (!e.ctrlKey || e.altKey || e.metaKey || e.shiftKey || onSetup !== false) return
+    if (e.key === 'e' || e.key === 'E') {
+      e.preventDefault()
+      onSettings = false
+      edit(!frame.editing)
+      return
+    }
+    const n = Number(e.key)
+    if (!Number.isInteger(n) || n < 1 || n > frame.spaces.length) return
+    e.preventDefault()
+    onSettings = false
+    openSpace(n - 1)
+  }
+  // The bar of Edit layout: the list of Add panel open, the question before Restore default workspaces.
+  let adding = $state(false)
+  let sure = $state(false)
+  // The workspaces at the top, while the layout is unlocked: the one whose name is a field, the one asked about before it
+  // is deleted, the one dragged and where it would land (before or after the tab under the pointer).
+  let naming = $state<string | null>(null)
+  let deleting = $state<string | null>(null)
+  let dragged = $state<number | null>(null)
+  let landing = $state<{ at: number; after: boolean } | null>(null)
+  // The glyph of a default workspace; one the player made has the first letter of its name.
+  const SPACE_GLYPHS: Record<string, 'pin' | 'bag' | 'coins'> = { map: 'pin', character: 'bag', ah: 'coins' }
+  const letterOf = (name: string): string => ([...name][0] ?? '').toLocaleUpperCase()
+  $effect(() => {
+    if (frame.editing) return
+    deleting = dragged = null
+    landing = null
+  })
+  function named(i: number, value: string | null): void {
+    if (naming === null) return
+    naming = null
+    if (value !== null) renameSpace(i, value)
+  }
+  function chosen(node: HTMLInputElement): void {
+    node.focus()
+    node.select()
+  }
+  function spaceDrag(e: DragEvent, i: number): void {
+    if (!frame.editing || !e.dataTransfer) return
+    e.dataTransfer.setData('application/x-twinmap-workspace', String(i))
+    e.dataTransfer.effectAllowed = 'move'
+    dragged = i
+  }
+  function spaceOver(e: DragEvent, i: number): void {
+    if (dragged === null) return
+    e.preventDefault()
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    landing = { at: i, after: e.clientX > r.left + r.width / 2 }
+  }
+  function spaceDrop(e: DragEvent): void {
+    if (dragged === null || !landing) return
+    e.preventDefault()
+    const to = landing.at + (landing.after ? 1 : 0)
+    moveSpace(dragged, to > dragged ? to - 1 : to)
+    dragged = landing = null
+  }
   function togglePanel(): void {
     panelOpen = !panelOpen
     if (!matchMedia(SMALL).matches) localStorage.setItem('panel', panelOpen ? 'open' : 'closed')
@@ -266,33 +347,8 @@
   let panelHeight = $state(0)
   let peek = $state(0)
   $effect(() => {
-    if (!panelOpen) peek = panelHeight
+    if (nowShut) peek = panelHeight
   })
-  // The edge between map and open panel: dragged with the pointer, moved with the arrows, put back
-  // with a double click. While it is dragged the width is not kept: only where it is let go.
-  let work = $state<HTMLElement>()
-  let dragging = $state(false)
-  let wide = $state(innerWidth)
-  function drag(e: PointerEvent): void {
-    if (e.button !== 0 || !work) return
-    e.preventDefault()
-    const edge = e.currentTarget as HTMLElement
-    const box = work.getBoundingClientRect()
-    edge.setPointerCapture(e.pointerId)
-    dragging = true
-    edge.onpointermove = (m) => setWidth(layout.mapRight ? m.clientX - box.left : box.right - m.clientX, false)
-    edge.onpointerup = edge.onpointercancel = () => {
-      edge.onpointermove = edge.onpointerup = edge.onpointercancel = null
-      dragging = false
-      setWidth(layout.width)
-    }
-  }
-  function nudge(e: KeyboardEvent): void {
-    const step = e.key === 'ArrowLeft' ? -16 : e.key === 'ArrowRight' ? 16 : 0
-    if (!step) return
-    e.preventDefault()
-    setWidth(layout.width + (layout.mapRight ? step : -step))
-  }
   async function choose(): Promise<void> {
     wrong = (await window.twinmap.chooseGameFolder()) ?? ''
   }
@@ -308,27 +364,66 @@
   }
 </script>
 
-<svelte:window bind:innerWidth={wide} onwheel={wheel} />
+<svelte:window onwheel={wheel} onkeydown={spaceKey} />
 
 {#if opening}
   <div class="opening" out:fade={opened}><Logo size={96} stacked /></div>
 {/if}
 
 <!-- The top row is the window's title bar too: it drags the window, a double click maximizes it. -->
-<header class="top">
+<header class="top" class:editing={frame.editing}>
   {#if onSetup === false}
     <Picker known={characters} {shown} {now} onpick={(key) => (picked = key)} onforget={(key) => void window.twinmap.forgetSheet(key)} />
   {/if}
   {#if !onSetup}
-    <nav aria-label={t('app.top.sections')}>
-      <button class="tab" title={t('app.top.now')} aria-label={t('app.top.now')} aria-current={onItems || onAh ? undefined : 'page'} onclick={() => ((onSettings = false), (onItems = false), (onAh = false))}><Glyph name="pin" size={18} /><span class="word">{t('app.top.now')}</span></button>
-      <button class="tab" title={t('app.top.items')} aria-label={t('app.top.items')} aria-current={onItems ? 'page' : undefined} onclick={() => ((onSettings = false), (onItems = true), (onAh = false))}><Glyph name="bag" size={18} /><span class="word">{t('app.top.items')}</span></button>
-      <!-- Its name gives first: Auction House, then AH, then the glyph alone with the others. -->
-      <button class="tab" title={t('app.top.auctionHouse')} aria-label={t('app.top.auctionHouse')} aria-current={onAh ? 'page' : undefined} onclick={() => ((onSettings = false), (onItems = false), (onAh = true))}><Glyph name="coins" size={18} /><span class="word long">{t('app.top.auctionHouse')}</span><span class="word short">{t('app.top.auctionHouseShort')}</span></button>
+    <nav aria-label={t('app.top.sections')} class:editing={frame.editing && frame.spaces.length > 1} class:many={frame.spaces.length > 3}>
+      {#each frame.spaces as space, i (space.id)}
+        {@const name = nameOf(space)}
+        {@const glyph = SPACE_GLYPHS[space.id]}
+        {#if naming === space.id}
+          <span class="tab naming" aria-current={frame.open === i ? 'page' : undefined}>
+            {#if glyph}<Glyph name={glyph} size={18} />{:else}<span class="letter" aria-hidden="true">{letterOf(name)}</span>{/if}
+            <input value={name} maxlength={NAME_MOST} aria-label={t('app.layout.rename')} use:chosen onblur={(e) => named(i, e.currentTarget.value)} onkeydown={(e) => (e.key === 'Enter' ? named(i, e.currentTarget.value) : e.key === 'Escape' ? named(i, null) : undefined)} />
+          </span>
+        {:else}
+          <!-- Its name gives first: Auction House, then AH, then the glyph alone with the others. A name the player wrote, or a
+               workspace they made, is the first letter of it alone. -->
+          <button
+            class="tab"
+            class:dragged={dragged === i}
+            class:before={landing?.at === i && !landing.after}
+            class:after={landing?.at === i && landing.after}
+            title={name}
+            aria-label={name}
+            aria-current={frame.open === i ? 'page' : undefined}
+            draggable={frame.editing}
+            ondragstart={(e) => spaceDrag(e, i)}
+            ondragover={(e) => spaceOver(e, i)}
+            ondragleave={() => landing?.at === i && (landing = null)}
+            ondrop={spaceDrop}
+            ondragend={() => (dragged = landing = null)}
+            ondblclick={() => frame.editing && (naming = space.id)}
+            onclick={() => ((onSettings = false), openSpace(i))}
+            >{#if glyph}<Glyph name={glyph} size={18} />{:else}<span class="letter" aria-hidden="true">{letterOf(name)}</span>{/if}{#if space.id === 'ah' && !space.name}<span class="word long">{t('app.top.auctionHouse')}</span><span class="word short">{t('app.top.auctionHouseShort')}</span>{:else}<span class="word">{name}</span>{/if}</button
+          >
+        {/if}
+        {#if frame.editing && frame.spaces.length > 1 && naming !== space.id}
+          <button class="unspace" title={t('app.layout.deleteSpace')} aria-label="{t('app.layout.deleteSpace')}: {name}" onclick={() => ((sure = adding = false), (deleting = space.id))}><Glyph name="close" size={12} /></button>
+        {/if}
+      {/each}
+      {#if frame.editing}
+        {@const most = frame.spaces.length >= MOST}
+        {@const say = most ? t('app.layout.spacesMost', { most: MOST }) : t('app.layout.newSpace')}
+        <button class="tab new" title={say} aria-label={say} disabled={most} onclick={() => ((onSettings = false), (naming = createSpace() ?? null))}><Glyph name="plus" size={16} /></button>
+      {/if}
     </nav>
+    {#if onSetup === false}
+      {@const editName = t('app.layout.edit', { ctrl: t('settings.keys.ctrl') })}
+      <button class="edit" title={editName} aria-label={editName} aria-pressed={frame.editing} onclick={() => ((onSettings = false), edit(!frame.editing))}><Glyph name="layout" size={18} /></button>
+    {/if}
   {/if}
   {#if onSetup === false && mapReady}
-    <Search ready={mapReady} {pos} side={char?.side} onadd={shown ? addToList : undefined} onpick={(place) => ((onItems = false), (onAh = false), mapView?.goTo(place))} />
+    <Search ready={mapReady} {pos} side={char?.side} onadd={shown ? addToList : undefined} onpick={(place) => (reach('map'), mapView?.goTo(place))} />
   {/if}
   {#if status}
     <!-- The state of the link is the Pause button too: two bars to pause, the arrow of play to resume. -->
@@ -375,19 +470,41 @@
 {#if onSettings && setup && onSetup === false}
   <Settings {setup} {tiles} onback={() => (onSettings = false)} onfeedback={() => (onFeedback = true)} onfirstrun={() => ((onSettings = false), (onSetup = true))} onnews={() => (newsAll = true)} />
 {/if}
-{#if onItems && onSetup === false}
-  <div class="over" in:fade={screen} out:fade={gone}>
-    <Items {sheets} {portraits} {shown} known={characters} {now} {listing} onpick={(key) => (picked = key)} />
-  </div>
-{/if}
-{#if onAh && onSetup === false}
-  <div class="over" in:fade={screen} out:fade={gone}>
-    <Auction {house} chosen={!!chosenHouse} hints={char ?? null} who={char?.name ?? null} {prices} {listing} {sheets} known={characters} {homes} {now} {alerts} {showAlerts} onchoose={chooseHouse} />
-  </div>
-{/if}
 {#if onSetup === false}
-<div class="work" class:shut={!panelOpen} class:map-right={layout.mapRight} in:fade={screen} inert={onItems || onAh} style:--peek="{peek}px" style:--panel-w="{layout.width}px" bind:this={work}>
-  <div class="mapbox" style:--readout="{readoutWidth}px">
+<!-- The workspaces; the sections made once, in the stash until a panel of the open workspace takes them (frame.svelte.ts). -->
+{#if frame.editing}
+  <!-- Edit layout: what can be done while the open workspace is unlocked. -->
+  <div class="editbar" role="toolbar" aria-label={t('app.layout.editKey')} in:fly={drop(8)}>
+    {#if deleting !== null}
+      {@const gone = frame.spaces.findIndex((s) => s.id === deleting)}
+      <span class="hint">{t('app.layout.deleteSure', { name: gone >= 0 ? nameOf(frame.spaces[gone]!) : '' })}</span>
+      <button class="btn" onclick={() => (removeSpace(gone), (deleting = null))}>{t('app.layout.deleteYes')}</button>
+      <button class="btn" onclick={() => (deleting = null)}>{t('app.layout.deleteNo')}</button>
+    {:else if sure}
+      <span class="hint">{t('app.layout.restoreSure')}</span>
+      <button class="btn" onclick={() => ((sure = false), restoreSpaces())}>{t('app.layout.restoreYes')}</button>
+      <button class="btn" onclick={() => (sure = false)}>{t('app.layout.restoreNo')}</button>
+    {:else}
+      <span class="hint">{t('app.layout.hint')} {t('app.layout.hintSpaces')}</span>
+      <span class="adding">
+        <button class="btn" title={t('app.layout.addPanel')} aria-expanded={adding} disabled={!frame.missing.length} onclick={() => (adding = !adding)}><Glyph name="plus" /><span>{t('app.layout.addPanel')}</span></button>
+        {#if adding && frame.missing.length}
+          <ul class="menu" in:fly={drop()}>
+            {#each frame.missing as id (id)}
+              <li><button class="item" onclick={() => ((adding = false), addPanel(id))}>{titleOf(id)}</button></li>
+            {/each}
+          </ul>
+        {/if}
+      </span>
+      <button class="btn" title={t('app.layout.reset')} onclick={() => ((adding = false), resetSpace())}><span>{t('app.layout.reset')}</span></button>
+      <button class="btn" title={t('app.layout.restore')} onclick={() => ((adding = false), (deleting = null), (sure = true))}><span>{t('app.layout.restore')}</span></button>
+    {/if}
+    <button class="btn done" onclick={() => ((adding = sure = false), (deleting = null), edit(false))}><Glyph name="check" />{t('app.layout.done')}</button>
+  </div>
+{/if}
+<div class="work" class:editing={frame.editing} class:shut={nowShut} class:map-right={layout.mapRight} in:fade={screen} style:--peek="{peek}px" bind:this={frameBox}></div>
+<div class="stash" inert bind:this={stashBox}>
+  <div class="mapbox" style:--readout="{readoutWidth}px" use:section={'map'}>
     {#if mapReady}
       <Map {pos} {group} {death} skills={char?.name ? sheets[char.name]?.pieces.skills : undefined} xpLevel={char ? (xp ? char.level : null) : undefined} bind:back kills={live ? link?.state.sections.kills : undefined} bind:looking at={link?.state.updatedAt.pos} bind:this={mapView} {insideReady} {quests} {fixed} side={char?.side} {live} {inbox} removed={live ? goneFrom(link?.state.sections.marks) : []} set={live ? setFrom(link?.state.sections.marks) : []} gameFollows={live ? followFrom(link?.state.sections.follow) : null} {journey} {route} onroute={(stop) => setRoute(addStop(route, stop))} onnpc={(pin) => (npc = pin)} />
     {:else if tiles}
@@ -425,15 +542,18 @@
     {/if}
   </div>
 
-  <aside class="panel surface" class:closed={!panelOpen} aria-label={t('app.top.now')} bind:clientHeight={panelHeight}>
-    <div class="head">
-      <button class="grip" aria-expanded={panelOpen} onclick={togglePanel}><Glyph name="menu" turn={panelOpen ? 0 : 180} />{panelOpen ? t('app.panel.close') : t('app.panel.open')}</button>
-      <!-- On the end of the bar next to the map: the map goes to the other side. -->
-      {#if panelOpen}
-        {@const to = layout.mapRight ? t('app.panel.mapLeft') : t('app.panel.mapRight')}
-        <button class="swap" title={to} aria-label={to} onclick={() => setMapRight(!layout.mapRight)}><Glyph name="swap" /></button>
-      {/if}
-    </div>
+  <aside class="panel surface" class:closed={nowShut} class:over={nowAbove} aria-label={t('app.top.now')} bind:clientHeight={panelHeight} use:section={'now'}>
+    <!-- Its bar only beside the map, locked: closed or open, and the map to the other side. -->
+    {#if frame.paired && !frame.editing}
+      <div class="head">
+        <button class="grip" aria-expanded={panelOpen} onclick={togglePanel}><Glyph name="menu" turn={panelOpen ? 0 : 180} />{panelOpen ? t('app.panel.close') : t('app.panel.open')}</button>
+        <!-- On the end of the bar next to the map: the map goes to the other side. -->
+        {#if panelOpen}
+          {@const to = layout.mapRight ? t('app.panel.mapLeft') : t('app.panel.mapRight')}
+          <button class="swap" title={to} aria-label={to} onclick={() => setMapRight(!layout.mapRight)}><Glyph name="swap" /></button>
+        {/if}
+      </div>
+    {/if}
     {#if inGame && shown && !shown.live}
       {@const showing = around('app.panel.showing', 'name')}
       <!-- Another character than the one in game: said where its bags and spells will show, with the way back. -->
@@ -460,7 +580,7 @@
       {journey}
       back={death ? back : null}
       met={alerts.filter((a) => a.met)}
-      onalerts={() => ((onSettings = false), (onItems = false), (onAh = true), showAlerts++)}
+      onalerts={() => ((onSettings = false), reach('alerts') || reach('search'), showAlerts++)}
       onsent={(t) => setRoute({ ...route, sent: true, t })}
       onskip={skip}
       onarrive={() => setRoute(advance(route))}
@@ -470,27 +590,37 @@
       onmove={(from, to) => setRoute(moveStop(route, from, to))}
       onstop={(stop) => mapView?.goTo({ continent: stop.continent, at: stop.at, title: stop.name })}
       onpick={(row) => mapView?.goTo({ continent: row.continent, at: row.at, title: row.name })} onpoint={(row) => mapView?.pointAt(row)} />
-    {#if char}
-      <footer>
-        <p>
-          <span>{xp ? t('app.panel.levelPercent', { level: char.level, percent: Math.floor(xp.percent) }) : t('app.panel.level', { level: char.level })}</span>
-          {#if xp}<span class="dim">{t('app.panel.xp', { xp: num(char.xp!), max: num(char.max!) })}</span>{/if}
-        </p>
-        {#if xp}
-          <div class="xp" role="progressbar" aria-label={t('app.panel.experience')} aria-valuenow={Math.floor(xp.percent)} style:--v="{xp.percent}%" style:--rest="{xp.rested}%"></div>
-        {/if}
-      </footer>
-    {/if}
+    <!-- Experience, a block of Now that is taken out into a panel of its own as the others are (Now.svelte). -->
+    <div class="block-home"><div class="block surface" use:section={'experience'}>
+      {#if frame.editing}{@const pull = t('app.layout.pull')}<button class="block-pull" draggable="true" title={pull} aria-label="{pull}: {titleOf('experience')}" ondragstart={(e) => e.dataTransfer?.setData(PART_DRAG, 'experience')} onclick={() => addPanel('experience')}><Glyph name="layout" size={14} /></button>{/if}
+      {#if char}
+        <footer>
+          <p>
+            <span>{xp ? t('app.panel.levelPercent', { level: char.level, percent: Math.floor(xp.percent) }) : t('app.panel.level', { level: char.level })}</span>
+            {#if xp}<span class="dim">{t('app.panel.xp', { xp: num(char.xp!), max: num(char.max!) })}</span>{/if}
+          </p>
+          {#if xp}
+            <div class="xp" role="progressbar" aria-label={t('app.panel.experience')} aria-valuenow={Math.floor(xp.percent)} style:--v="{xp.percent}%" style:--rest="{xp.rested}%"></div>
+          {/if}
+        </footer>
+      {:else}
+        <p class="block-empty"><b>{t('app.panel.experience')}</b> {t('app.panel.emptyExperience')}</p>
+      {/if}
+    </div></div>
   </aside>
-  {#if panelOpen}
-    <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
-    <div class="edge" class:dragging role="separator" tabindex="0" aria-orientation="vertical" aria-label={t('app.panel.width')} aria-valuemin={PANEL.least} aria-valuemax={Math.round(wide / 2)} aria-valuenow={layout.width} title={t('app.panel.widthHint')} onpointerdown={drag} onkeydown={nudge} ondblclick={() => setWidth(PANEL.start)}><i></i></div>
-  {/if}
+  {#each CHARACTER as part (part)}
+    <div class="sec" use:section={part}><Items {part} {sheets} {portraits} {shown} known={characters} {now} {listing} onpick={(key) => (picked = key)} /></div>
+  {/each}
+  <div class="sec" use:section={'professions'}><Professions {sheets} {shown} ready={mapReady} /></div>
+  <div class="sec" use:section={'spellbook'}><Spellbook {sheets} {shown} ready={mapReady} /></div>
+  <div class="sec" use:section={'talents'}><Talents {sheets} {shown} ready={mapReady} /></div>
+  <div class="sec" use:section={'search'}><Auction {house} chosen={!!chosenHouse} hints={char ?? null} who={char?.name ?? null} {prices} {listing} {sheets} known={characters} {homes} {now} {alerts} {showAlerts} onchoose={chooseHouse} /></div>
 </div>
 {/if}
 
 <!-- The popup of the item under the pointer, over everything (M10-F15). -->
 <ItemPopup {sheets} known={characters} side={char?.side} {pos} {listing} />
+<SpellPopup />
 
 <style>
   /* Over everything, the top row too; it drags the window as the top row does. */
@@ -558,15 +688,6 @@
     align-items: center;
     gap: 7px;
     height: 33px; /* the line of the entries, also when the glyph stands alone */
-  }
-  .over {
-    position: absolute;
-    inset: 0;
-    z-index: 2000;
-    pointer-events: none;
-  }
-  .over :global(main) {
-    pointer-events: auto;
   }
   /* The sections and the entries keep their width: the search and the name of the character give (Search, Picker). */
   nav,
@@ -645,23 +766,335 @@
     background: var(--text-off);
   }
 
+  /* The workspaces at the top while the layout is unlocked: a cross on each tab, a + after them, a tab dragged faint with a
+     gold line where it would land, and the name as a field. A workspace the player made has the first letter of its name. */
+  .letter {
+    display: inline-grid;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+    border: 1.5px solid currentColor;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .tab .word {
+    max-width: 14em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  nav.editing .tab {
+    padding-right: 32px;
+  }
+  .unspace {
+    flex: none;
+    align-self: center;
+    display: inline-grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    margin: 6px 6px 0 -26px;
+    padding: 0;
+    border: 0;
+    border-radius: 3px;
+    background: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    -webkit-app-region: no-drag;
+  }
+  .unspace:hover {
+    background: #0008;
+    color: var(--text);
+  }
+  .tab.new {
+    padding: 0 10px;
+    border: 1px dashed var(--bronze-600);
+    border-bottom: 0;
+    color: var(--text-dim);
+  }
+  .tab.new:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+  .tab.dragged {
+    opacity: 0.45;
+  }
+  .tab.before {
+    box-shadow: inset 3px 0 0 var(--gold);
+  }
+  .tab.after {
+    box-shadow: inset -3px 0 0 var(--gold);
+  }
+  .tab.naming input {
+    width: 7em;
+    height: 24px;
+    padding: 0 4px;
+    border: 1px solid var(--gold);
+    border-radius: 3px;
+    background: var(--stone-950);
+    font: var(--t-nav);
+    color: var(--gold);
+    outline: none;
+  }
+  /* More than three workspaces: where the row runs short, only the open one keeps its name, then none. While the layout
+     is unlocked the search leaves the row to the crosses and the +, and with more than three workspaces only the open
+     one keeps its name; where the row runs short, its cross too. */
+  @media (max-width: 1500px) {
+    :global(html:not(.web)) nav.many .tab:not([aria-current]) .word {
+      display: none;
+    }
+    nav.many.editing .tab:not([aria-current]) {
+      padding-right: 14px;
+    }
+    nav.many.editing .tab:not([aria-current]) + .unspace {
+      display: none;
+    }
+  }
+  .top.editing :global(.search) {
+    display: none;
+  }
+  nav.many.editing .tab:not([aria-current]) .word {
+    display: none;
+  }
+  @media (max-width: 1100px) {
+    :global(html:not(.web)) nav.many .tab .word {
+      display: none;
+    }
+  }
+
+  /* The workspaces under the top row (frame.svelte.ts): the open one seen, the others laid out and hidden. */
   .work {
     position: absolute;
     inset: 46px 0 0;
+  }
+  /* Edit layout: the button after the tabs, gold while on; the bar under the top row; every group with a gold edge. */
+  .edit {
+    flex: none;
+    display: inline-grid;
+    place-items: center;
+    width: 33px;
+    height: 29px;
+    margin: 0 0 2px -12px;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    background: none;
+    color: var(--nav-rest);
+    cursor: pointer;
+    -webkit-app-region: no-drag;
+  }
+  .edit:hover {
+    border-color: var(--bronze-500);
+    color: var(--text);
+  }
+  .edit[aria-pressed='true'] {
+    border-color: var(--gold);
+    background: #eacba426;
+    color: var(--gold);
+  }
+  .editbar {
+    position: absolute;
+    inset: 46px 0 auto;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 12px;
+    background: var(--stone-950);
+    box-shadow: inset 0 -2px 0 var(--gold);
+    white-space: nowrap;
+  }
+  .editbar .hint {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font: var(--t-body);
+    color: var(--text-dim);
+  }
+  /* Narrow, the hint goes first, then the buttons shorten their words; Done keeps its own. */
+  .editbar .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .editbar .btn > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .editbar > .btn,
+  .editbar .adding {
+    flex: 0 1 auto;
+    min-width: 48px;
+  }
+  .editbar .btn.done {
+    flex: none;
+  }
+  .editbar .adding {
+    position: relative;
+    display: flex;
+  }
+  @media (max-width: 1000px) {
+    .editbar .hint {
+      display: none;
+    }
+    .editbar .done {
+      margin-left: auto;
+    }
+  }
+  .editbar .menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    z-index: 2100;
+  }
+  .work.editing {
+    top: 86px;
+  }
+  .work.editing :global(.dv-groupview) {
+    position: relative;
+  }
+  .work.editing :global(.dv-groupview::after) {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 2000;
+    border: 2px solid var(--gold);
+    box-shadow: inset 0 0 24px #eacba470;
+    pointer-events: none;
+  }
+  /* The drop zones: a gold veil with a full gold edge (M20-F1, drop B). */
+  :global(.dockview-theme-twinmap .dv-drop-target-selection),
+  :global(.dockview-theme-twinmap .dv-drop-target-anchor) {
+    background-color: #eacba44d !important;
+    border: 2px solid var(--gold) !important;
+  }
+  /* The last panel of a workspace has no cross: a workspace is never empty. */
+  :global(.dockview-theme-twinmap .last .dv-default-tab-action) {
+    display: none !important;
+  }
+  .work :global(.space) {
+    position: absolute;
+    inset: 0;
+  }
+  /* Hidden all through: dockview shows the cross of a tab with a visibility of its own. */
+  .work :global(.space:not(.open)) {
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+  }
+  /* The sections no panel of the open workspace holds: out of sight, at the size they had. */
+  .stash {
+    position: fixed;
+    left: -20000px;
+    top: 0;
+    width: 1600px;
+    height: 900px;
+    visibility: hidden;
+  }
+  /* What dockview gives a panel; its own stacking context, so the z-indexes of the map stay inside it. */
+  :global(.dv-host) {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    isolation: isolate;
+  }
+  /* Items and the Auction House, made to lie under the top row, fill their panel. */
+  .sec {
+    position: absolute;
+    inset: 0;
+  }
+  .sec > :global(main) {
+    inset: 0;
+  }
+  :global(.dockview-theme-twinmap) {
+    --dv-group-view-background-color: var(--stone-900);
+    --dv-tabs-and-actions-container-background-color: var(--stone-950);
+    --dv-tabs-and-actions-container-height: 34px;
+    --dv-tabs-and-actions-container-font-size: 14px;
+    --dv-activegroup-visiblepanel-tab-color: var(--gold);
+    --dv-inactivegroup-visiblepanel-tab-color: var(--gold);
+    --dv-activegroup-hiddenpanel-tab-color: var(--nav-rest);
+    --dv-inactivegroup-hiddenpanel-tab-color: var(--nav-rest);
+    --dv-separator-border: transparent;
+    --dv-sash-color: transparent;
+    --dv-active-sash-color: transparent;
+    color-scheme: dark;
+  }
+  /* A group of more than one panel: its tabs as those of the top row (M20-F1, tabs C). */
+  :global(.dockview-theme-twinmap .dv-tabs-and-actions-container) {
+    padding: 0 6px;
+    box-shadow: inset 0 -1px 0 var(--bronze-600);
+  }
+  :global(.dockview-theme-twinmap .dv-tab) {
+    margin-top: 4px;
+    padding: 0 14px;
+    border: 1px solid transparent;
+    border-bottom: 0;
+    border-radius: 5px 5px 0 0;
+    background: none !important;
+    font: var(--t-label);
+    text-shadow: 0 1px 0 #000;
+  }
+  :global(.dockview-theme-twinmap .dv-tab.dv-active-tab) {
+    border-color: var(--bronze-500);
+    background: linear-gradient(var(--stone-500), var(--stone-700)) !important;
+    box-shadow: inset 0 1px 0 #fff4;
+  }
+  /* The edge between two panels side by side: a bronze stud with five dots on the seam, the seam gold while the pointer
+     is on it or drags it. A double click on the one beside Now puts the panel back to its first width. */
+  :global(.dockview-theme-twinmap .dv-split-view-container.dv-horizontal > .dv-sash-container > .dv-sash) {
     display: grid;
-    /* The panel as wide as it was dragged, never under 260 px nor over half the window. */
-    --panel-side: clamp(260px, var(--panel-w, 340px), 50%);
-    grid-template-columns: minmax(0, 1fr) var(--panel-side);
-    /* One row, as tall as the window and no taller: a panel with much to say scrolls, it does not push the map's foot out of sight. */
-    grid-template-rows: minmax(0, 1fr);
+    place-items: center;
+    overflow: visible;
+    z-index: 1250;
+  }
+  :global(.dockview-theme-twinmap .dv-split-view-container.dv-horizontal > .dv-sash-container > .dv-sash:not(.dv-disabled)::after) {
+    content: '';
+    width: 12px;
+    height: 56px;
+    border: 1px solid #000;
+    border-radius: 6px;
+    background:
+      radial-gradient(circle, var(--gold) 1.6px, transparent 2.2px) center 14px / 12px 9px repeat-y,
+      linear-gradient(90deg, var(--bronze-300), var(--bronze-600) 55%, var(--bronze-900));
+    box-shadow:
+      0 0 0 1px #0008,
+      0 2px 6px #000c;
+  }
+  :global(.dockview-theme-twinmap .dv-split-view-container.dv-horizontal > .dv-sash-container > .dv-sash:not(.dv-disabled):hover::after),
+  :global(.dockview-theme-twinmap .dv-split-view-container.dv-horizontal > .dv-sash-container > .dv-sash:not(.dv-disabled):active::after) {
+    background:
+      radial-gradient(circle, #fff6dc 1.8px, transparent 2.4px) center 14px / 12px 9px repeat-y,
+      linear-gradient(90deg, var(--gold-pale), var(--bronze-300) 55%, var(--bronze-600));
+    box-shadow:
+      0 0 0 1px #000,
+      0 0 10px var(--gold);
+  }
+  :global(.dockview-theme-twinmap .dv-split-view-container.dv-horizontal > .dv-sash-container > .dv-sash:not(.dv-disabled):hover::before),
+  :global(.dockview-theme-twinmap .dv-split-view-container.dv-horizontal > .dv-sash-container > .dv-sash:not(.dv-disabled):active::before) {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: calc(50% - 1px);
+    width: 2px;
+    background: var(--gold);
+    box-shadow:
+      0 0 10px var(--gold),
+      0 0 3px var(--gold-pale);
   }
 
   .mapbox {
     position: relative;
+    height: 100%;
     overflow: hidden;
     background: #000;
-    /* What lies over the map asks how wide it is: on a narrow one things move out of each other's way. */
-    container-type: inline-size;
+    /* What lies over the map asks how wide and how tall it is: on a narrow one things move out of each other's way, on a
+       low one the menus scroll inside it. */
+    container-type: size;
   }
   /* The bronze frame, 10 px all round, and a vignette that keeps the eye in the middle. */
   .mapbox::after {
@@ -770,6 +1203,10 @@
     display: flex;
     flex-direction: column;
   }
+  /* In its own panel, as tall as it; over the map (closed, or a small screen) as tall as it has to be. */
+  .panel:not(.over) {
+    height: 100%;
+  }
   footer {
     margin-top: auto;
     padding: 12px 16px;
@@ -861,23 +1298,17 @@
   .swap:hover {
     color: var(--gold-pale);
   }
-  .work:not(.map-right) .swap {
+  .work:not(.map-right) :global(.swap) {
     order: -1;
   }
-  .work.map-right .swap {
+  .work.map-right :global(.swap) {
     box-shadow:
       inset 0 -1px 0 #000,
       inset 1px 0 0 #000,
       inset 2px 0 0 #ffffff14;
   }
   /* The map on the right: the panel takes the left, and closed it lies over the map's left corner. */
-  .work.map-right {
-    grid-template-columns: var(--panel-side) minmax(0, 1fr);
-  }
-  .work.map-right .panel {
-    order: -1;
-  }
-  .work.map-right .panel.closed {
+  .work.map-right :global(.panel.closed) {
     right: auto;
     left: 0;
     box-shadow:
@@ -889,68 +1320,8 @@
       4px 0 0 #000,
       0 -10px 24px #000a;
   }
-  /* The edge between map and panel: a bronze stud with five dots on the seam, the seam gold while
-     the pointer is on it or drags it. */
-  .edge {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: calc(100% - var(--panel-side));
-    z-index: 1250;
-    display: grid;
-    place-items: center;
-    width: 14px;
-    margin-left: -7px;
-    cursor: col-resize;
-    touch-action: none;
-    outline: none;
-  }
-  .work.map-right .edge {
-    left: var(--panel-side);
-  }
-  .edge i {
-    position: relative;
-    z-index: 1;
-    width: 12px;
-    height: 56px;
-    border: 1px solid #000;
-    border-radius: 6px;
-    background:
-      radial-gradient(circle, var(--gold) 1.6px, transparent 2.2px) center 14px / 12px 9px repeat-y,
-      linear-gradient(90deg, var(--bronze-300), var(--bronze-600) 55%, var(--bronze-900));
-    box-shadow:
-      0 0 0 1px #0008,
-      0 2px 6px #000c;
-  }
-  .edge:hover i,
-  .edge.dragging i,
-  .edge:focus-visible i {
-    background:
-      radial-gradient(circle, #fff6dc 1.8px, transparent 2.4px) center 14px / 12px 9px repeat-y,
-      linear-gradient(90deg, var(--gold-pale), var(--bronze-300) 55%, var(--bronze-600));
-    box-shadow:
-      0 0 0 1px #000,
-      0 0 10px var(--gold);
-  }
-  .edge:hover::before,
-  .edge.dragging::before,
-  .edge:focus-visible::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 6px;
-    width: 2px;
-    background: var(--gold);
-    box-shadow:
-      0 0 10px var(--gold),
-      0 0 3px var(--gold-pale);
-  }
   /* Closed, at any size: the map takes the width, and the panel is a sign over its corner. */
-  .work.shut {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .work.shut .mapbox {
+  .work.shut :global(.mapbox) {
     --lift: var(--peek, 0px);
   }
   .panel.closed {
@@ -996,7 +1367,8 @@
   .panel.closed .viewing,
   .panel.closed :global(.npc),
   .panel.closed footer,
-  .panel.closed :global(.now > :not(.plate, .none)),
+  .panel.closed :global(.now [data-section]:not([data-section='next'])),
+  .panel.closed :global(.now [data-section='next'] > :not(.plate, .none)),
   .panel.closed :global(.plate > :not(h2, .sign, .sheen)) {
     display: none;
   }
@@ -1007,23 +1379,18 @@
   /* A small screen: a phone upright (narrow) or on its side (low). The map takes it all, and the
      panel lies over it open too, along the foot of the screen. */
   @media (max-width: 760px), (max-height: 500px) {
-    .work,
-    .work.map-right {
-      grid-template-columns: minmax(0, 1fr);
-    }
-    /* Over the map, the panel is not dragged wider nor sent to the other side. */
-    .edge,
+    /* Over the map, the panel is not sent to the other side. */
     .swap {
       display: none;
     }
-    .work.map-right .panel.closed {
+    .work.map-right :global(.panel.closed) {
       right: 0;
     }
-    .work .mapbox {
+    .work :global(.mapbox) {
       --lift: var(--peek, 0px);
     }
-    .panel,
-    .panel.closed {
+    /* Only over the map: as a panel of another layout it stays in its place. */
+    .panel.over {
       position: absolute;
       left: 0;
       right: 0;
@@ -1112,8 +1479,8 @@
   }
   /* A phone on its side: the panel stands on the left, as wide as on a desk, and nothing is lifted. */
   @media (max-height: 500px) and (min-width: 560px) {
-    .work .mapbox,
-    .work.shut .mapbox {
+    .work :global(.mapbox),
+    .work.shut :global(.mapbox) {
       --lift: 0px;
     }
     .panel,

@@ -3,7 +3,14 @@ export default {
   top: {
     sections: 'Secciones',
     now: 'Ahora',
-    items: 'Objetos',
+    map: 'Mapa',
+    character: 'Personaje',
+    inventory: 'Inventario',
+    professions: 'Profesiones',
+    spellbook: 'Libro de hechizos',
+    talents: 'Talentos',
+    auctionSearch: 'Buscar en subastas',
+    item: 'Objeto',
     auctionHouse: 'Casa de subastas',
     // The game has no short form of Casa de subastas: CS, as players write it.
     auctionHouseShort: 'CS',
@@ -14,6 +21,29 @@ export default {
     feedback: 'Comentarios',
     feedbackHint: 'Informar de un error o proponer una idea',
     settings: 'Opciones',
+  },
+
+  layout: {
+    edit: 'Editar disposición ({ctrl}+E)',
+    editKey: 'Editar disposición',
+    hint: 'Arrastra una pestaña al borde de un panel para ponerla al lado, o a su centro para agruparlas.',
+    addPanel: 'Añadir panel',
+    pull: 'Arrástralo a un panel para sacarlo, o haz clic para ponerlo bajo Ahora',
+    reset: 'Restablecer este espacio de trabajo',
+    restore: 'Restaurar los espacios de trabajo predeterminados',
+    restoreSure: '¿Dejar todos los espacios de trabajo como al principio?',
+    restoreYes: 'Restaurar',
+    restoreNo: 'Cancelar',
+    done: 'Listo',
+    hintSpaces: 'Arriba: arrastra un espacio de trabajo para moverlo, haz doble clic en él para cambiarle el nombre.',
+    newSpace: 'Nuevo espacio de trabajo',
+    spacesMost: 'Como máximo {most} espacios de trabajo',
+    unnamed: 'Espacio de trabajo',
+    rename: 'Nombre del espacio de trabajo',
+    deleteSpace: 'Eliminar espacio de trabajo',
+    deleteSure: '¿Eliminar el espacio de trabajo "{name}"? Se pierde su disposición; los paneles siguen en los demás espacios de trabajo.',
+    deleteYes: 'Eliminar',
+    deleteNo: 'Conservar',
   },
 
   link: {
@@ -81,7 +111,8 @@ export default {
     levelPercent: 'Nivel {level}, {percent} %',
     xp: '{xp} de {max} PE',
     experience: 'Experiencia',
-    width: 'Anchura del panel',
+    emptyExperience: 'Tu nivel aparece aquí en cuanto juegues con el addon Twinmap Forever activado.',
+    emptyItem: 'Haz clic en un objeto de Bolsas, Banco, Inventario o la búsqueda de subastas para ver aquí sus precios.',
     widthHint: 'Arrastra para cambiar el tamaño. Haz doble clic para reiniciar.',
   },
 
@@ -111,6 +142,11 @@ export default {
     otherContinent: 'En el otro continente',
     finding: 'Buscando el trayecto',
     updateHint: 'Actualiza Shortest Path y el addon Twinmap Forever para ver aquí todo el trayecto',
+    emptyAttention: 'Nada requiere tu atención ahora. Aquí aparecen una muerte o una alerta de la casa de subastas que se cumpla.',
+    emptyPins: 'Aún no has guardado ninguna marca. Haz clic en un lugar del mapa y guárdalo para tenerlo aquí.',
+    emptyQuests: 'No hay misiones en tu registro. Acepta una en el juego y aparecerá aquí.',
+    emptyNearby: 'No hay nadie cerca. Sigue andando: aquí aparecerán los mercaderes, instructores y maestros de vuelo de alrededor.',
+    allOut: 'Cada bloque de Ahora está en su propio panel. Cierra un panel para traer su bloque de vuelta aquí.',
   },
 
   journey: {

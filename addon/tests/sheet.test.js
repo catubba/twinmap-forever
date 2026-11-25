@@ -47,7 +47,8 @@ test('the whole sheet goes out at first, with who, money, bags with the reagent 
     gear: [[1, 4245, 30, 35], [5, 6097]],
     skills: [],
     spells: [],
-    recipes: { known: [], seen: [] },
+    book: [],
+    recipes: { known: [], seen: [], listed: [], cats: [] },
     trainers: [],
     tips: [],
   });
@@ -136,14 +137,14 @@ test('an app that holds another sheet gets this one whole; an app ahead of it ge
   appHolds(addon, 'deadbeef', 50);
   addon.lua('GAME.money = 1');
   addon.run(4);
-  assert.deepEqual(Object.keys(sheets(addon).at(-1).p).sort(), ['bags', 'gear', 'money', 'recipes', 'skills', 'spells', 'tips', 'trainers', 'who']);
+  assert.deepEqual(Object.keys(sheets(addon).at(-1).p).sort(), ['bags', 'book', 'gear', 'money', 'recipes', 'skills', 'spells', 'tips', 'trainers', 'who']);
 
   appHolds(addon, first.code, 50);
   addon.run(4);
   const again = sheets(addon).at(-1);
   assert.equal(again.code, first.code);
   assert.ok(again.rev > 50, `revision ${again.rev}`);
-  assert.deepEqual(Object.keys(again.p).sort(), ['bags', 'gear', 'money', 'recipes', 'skills', 'spells', 'tips', 'trainers', 'who']);
+  assert.deepEqual(Object.keys(again.p).sort(), ['bags', 'book', 'gear', 'money', 'recipes', 'skills', 'spells', 'tips', 'trainers', 'who']);
 });
 
 test('in a fight the sheet waits', () => {
@@ -162,7 +163,7 @@ test('in a fight the sheet waits', () => {
 // A warlock who knows two spells, has two skills, two talents, and Engineering: one recipe of two learned.
 const MORE = WORLD + `
   GAME.skills = { { 202, 168, 225 }, { 0, 0, 0, true }, { 95, 140, 145 } }
-  GAME.spells = { { 686 }, { 172 }, { 6229, true } }
+  GAME.spells = { { 686 }, { 172 }, { 6229, true }, { 20593, false, true } }
   GAME.talents = { [105874] = { 1, 412758 }, [105875] = { 3, 30288 } }
   GAME.free = 2`;
 
@@ -171,7 +172,9 @@ test("skills, spells and talents go out with the sheet, by the game's numbers; a
   addon.run(10);
   const { p } = sheets(addon).at(-1);
   assert.deepEqual(p.skills, [[95, 140, 145], [202, 168, 225]]);
-  assert.deepEqual(p.spells, [172, 686]);
+  assert.deepEqual(p.spells, [172, 686, 20593]);
+  // The book as the game shows it: the tab, its spells and then its passive ones, in its order.
+  assert.deepEqual(p.book, [['General', 136830, [686, 172], [20593]]]);
   assert.deepEqual(p.talents, { free: 2, t: [[105874, 1, 412758], [105875, 3, 30288]] });
 });
 
@@ -183,12 +186,21 @@ test('a spell learned sends the spells alone, and a skill gone up the skills alo
   addon.lua('table.insert(GAME.spells, { 1454 })');
   addon.fire('SPELLS_CHANGED');
   addon.run(4);
-  assert.deepEqual(sheets(addon).at(-1).p, { spells: [172, 686, 1454] });
+  assert.deepEqual(sheets(addon).at(-1).p, { book: [['General', 136830, [686, 172, 1454], [20593]]], spells: [172, 686, 1454, 20593] });
   appHolds(addon, first.code, sheets(addon).at(-1).rev);
   addon.lua('GAME.skills[1][2] = 169');
   addon.fire('CHAT_MSG_SKILL');
   addon.run(4);
   assert.deepEqual(sheets(addon).at(-1).p, { skills: [[95, 140, 145], [202, 169, 225]] });
+});
+
+test("the pet's tab, last in the book: each entry as the game words it", () => {
+  const addon = enterWorld(MORE + `
+  GAME.pet = { { "Attack", "Pet Command", 132152 }, { "Lash of Pain", "Rank 2", 136136 }, { "Avoidance", "", 132190, true } }`);
+  addon.run(10);
+  const { p } = sheets(addon).at(-1);
+  assert.deepEqual(p.book.at(-1), ['Pet', 0, [['Attack', 'Pet Command', 132152], ['Lash of Pain', 'Rank 2', 136136]], [['Avoidance', '', 132190]]]);
+  assert.deepEqual(p.spells, [172, 686, 20593]);
 });
 
 test('the recipes come from the window of a profession, and one learned since without it', () => {
@@ -197,15 +209,17 @@ test('the recipes come from the window of a profession, and one learned since wi
   const first = sheets(addon).at(-1);
   appHolds(addon, first.code, first.rev);
 
-  addon.lua('GAME.trade = { profession = 202, recipes = { [3930] = true, [3931] = false } }');
+  // Two headings: the game orders Parts after Explosives.
+  addon.lua('GAME.trade = { profession = 202, recipes = { [3930] = true, [3931] = false }, cats = { [3930] = 2515, [3931] = 2516 }, names = { [2515] = { "Parts", 2 }, [2516] = { "Explosives", 1 } } }');
   addon.fire('TRADE_SKILL_SHOW');
   addon.run(4);
-  assert.deepEqual(sheets(addon).at(-1).p, { recipes: { known: [3930], seen: [202] } });
+  const cats = [[2515, 'Parts', 2], [2516, 'Explosives', 1]];
+  assert.deepEqual(sheets(addon).at(-1).p, { recipes: { known: [3930], seen: [202], listed: [3930, 3931], cats } });
   appHolds(addon, first.code, sheets(addon).at(-1).rev);
 
   addon.lua('GAME.trade = nil; T_fire("NEW_RECIPE_LEARNED", 3931)');
   addon.run(4);
-  assert.deepEqual(sheets(addon).at(-1).p, { recipes: { known: [3930, 3931], seen: [202] } });
+  assert.deepEqual(sheets(addon).at(-1).p, { recipes: { known: [3930, 3931], seen: [202], listed: [3930, 3931], cats } });
 
   // Kept across a /reload: the window needs no opening again.
   addon.reload();
@@ -213,7 +227,7 @@ test('the recipes come from the window of a profession, and one learned since wi
   addon.fire('PLAYER_ENTERING_WORLD');
   addon.lua(`local ns = ...; ns.receivers.sheet({ ["${KEY}"] = { code = "${first.code}", rev = 0 } })`);
   addon.run(10);
-  assert.deepEqual(sheets(addon).at(-1).p.recipes, { known: [3930, 3931], seen: [202] });
+  assert.deepEqual(sheets(addon).at(-1).p.recipes, { known: [3930, 3931], seen: [202], listed: [3930, 3931], cats });
 });
 
 test("a recipe the window has not loaded yet, or a window of someone else's recipes, changes nothing", () => {
@@ -233,7 +247,7 @@ test("a recipe the window has not loaded yet, or a window of someone else's reci
   addon.lua('GAME.trade.linked = false');
   addon.fire('TRADE_SKILL_LIST_UPDATE');
   addon.run(4);
-  assert.deepEqual(sheets(addon).at(-1).p, { recipes: { known: [3930], seen: [202] } });
+  assert.deepEqual(sheets(addon).at(-1).p, { recipes: { known: [3930], seen: [202], listed: [3930], cats: [] } });
 });
 
 // Springspindle Fizzlegear: a rank, two recipes learned already or not yet within reach (hidden by the window), a header.
@@ -260,7 +274,7 @@ test('a trainer seen goes out with all it teaches, learned or not, and the windo
   addon.lua('GAME.trainer.lines[2][7] = "used"; table.insert(GAME.spells, { 4038 })');
   addon.fire('SPELLS_CHANGED');
   addon.run(4);
-  assert.deepEqual(Object.keys(sheets(addon).at(-1).p), ['spells']);
+  assert.deepEqual(Object.keys(sheets(addon).at(-1).p), ['book', 'spells']);
 });
 
 test('a class trainer goes out with the class, and is kept with the others across a /reload', () => {

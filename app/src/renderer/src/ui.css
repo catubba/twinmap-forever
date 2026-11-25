@@ -210,6 +210,82 @@ body {
     linear-gradient(var(--stone-800), var(--stone-900));
 }
 
+/* A block of Now (Now.svelte; Experience in App.svelte), a section of the frame of workspaces (M20-F7). In the column it
+   is its rows and nothing more, and an empty one takes no room; alone in a panel it fills it, scrolls, and says what to do
+   in the game while it has nothing to show. In Edit layout each block shows, empty or not, with the handle that takes it
+   out. */
+.block-home,
+.block {
+  display: contents;
+}
+.dv-host > .block {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow-y: auto;
+}
+.block-empty {
+  display: none;
+  margin: 0;
+  padding: 12px 16px;
+  color: var(--text-dim);
+  text-wrap: pretty;
+}
+.block-empty b {
+  display: block;
+  margin-bottom: 4px;
+  font: var(--t-title);
+  color: var(--gold-pale);
+}
+.dv-host > .block > .block-empty,
+.block-home:has(.block-pull) .block-empty {
+  display: block;
+}
+/* Alone in a panel, Experience stands at its top, and Next stop says its name with the line of no route. */
+.dv-host > .block > footer {
+  margin-top: 0;
+}
+.dv-host > .block > .none {
+  display: none;
+}
+.block-home:has(.block-pull) {
+  display: block;
+  position: relative;
+}
+/* In Edit layout the line of no route gives way to the block's title and line, and a block's first line makes room for
+   its handle. */
+.block-home:has(.block-pull) .none {
+  display: none;
+}
+.block-home:has(.block-pull) h2 {
+  padding-right: 44px;
+}
+/* The handle, at the right end of the block's first line, over it. */
+.block-pull {
+  position: absolute;
+  top: 2px;
+  right: 8px;
+  z-index: 2;
+  display: grid;
+  place-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--bronze-600);
+  border-radius: 3px;
+  background: var(--stone-900);
+  color: var(--gold);
+  cursor: grab;
+}
+.block-pull:hover {
+  background: var(--stone-800);
+}
+.block-pull:focus-visible {
+  outline: 2px solid var(--gold-pale);
+  outline-offset: -2px;
+}
+
 /* A line on the map, at its foot: what is going on and what to do about it. Never over the middle. */
 .map-note {
   position: absolute;

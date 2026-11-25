@@ -40,6 +40,7 @@ declare global {
       drawn: () => void
       setOnTop: (on: boolean) => Promise<void>
       setZoom: (zoom: number) => Promise<void>
+      setWorkspaces: (kept: import('../../shared/workspaces').Workspaces) => Promise<void>
       setGpu: (on: boolean) => Promise<void>
       restart: () => Promise<void>
       lang: () => Promise<string>

@@ -152,11 +152,7 @@ export default {
     noCharacter: 'Noch kein Charakter. Spielt einen mit aktiviertem Addon Twinmap Forever, dann erscheinen seine Taschen hier, auch bei geschlossenem Spiel.',
     filter: 'Nach Name oder Typ filtern',
     filterLabel: 'Gegenstände filtern',
-    viewLabel: 'Ansicht',
     whereLabel: 'Ort',
-    // A switch half, short: bag slots are "Plätze" in the game (GS CONTAINER_SLOTS).
-    slots: 'Plätze',
-    table: 'Liste',
     all: 'Alle',
     // Each part as "label: amount", like the game's "Geld:" (GS MONEY_COLON).
     worth: 'Verkaufswert: {money}',
@@ -179,13 +175,11 @@ export default {
   },
 
   held: {
-    label: 'Taschen und Bank',
     bags: 'Taschen',
     bagsNow: 'aktuell',
     bagsAsOf: 'Stand: {ago}',
     bank: 'Bank',
     bankSeen: '{ago} gesehen',
-    bankUnseen: 'noch nicht gesehen: öffnet sie einmal im Spiel',
     // GS BAG_NAME_BACKPACK "Rucksack"; ItemSubClass 1.11 "Reagenzientasche".
     backpack: 'Rucksack und Taschen',
     reagents: 'Reagenzientasche',
@@ -194,6 +188,51 @@ export default {
     used: '{used} von {count} belegt',
     // GS CONTAINER_SLOTS "Platz".
     empty: { one: 'leer · {count} Platz', other: 'leer · {count} Plätze' },
+  },
+
+  bank: {
+    none: 'Noch keine Bank gesehen',
+    open: 'Öffnet eure Bank einmal im Spiel: ihr Inhalt erscheint dann hier, auch bei geschlossenem Spiel.',
+    where: 'Sprecht in einer beliebigen Hauptstadt mit einem Bankier.',
+  },
+
+  professions: {
+    primary: 'Berufe',
+    secondary: 'Sekundäre Fertigkeiten',
+    filter: 'Rezepte filtern',
+    known: 'Bekannt',
+    unknown: 'Nicht erlernt',
+    unknownNote: 'Die Zahl: die Fertigkeit, ab der ein Rezept gelb wird.',
+    optimal: 'Orange: sicherer Anstieg',
+    medium: 'Gelb: wahrscheinlich',
+    easy: 'Grün: selten',
+    trivial: 'Grau: keiner',
+    noMatch: 'Kein Rezept passt.',
+    none: 'Noch keine Berufe',
+    learn: 'Erlernt einen bei einem Berufsausbilder in einer beliebigen Stadt: Stufe und Rezepte erscheinen dann hier.',
+    also: 'Kochkunst, Erste Hilfe und Angeln zählen auch.',
+    unseen: 'Noch keine Rezepte gesehen',
+    open: 'Öffnet {profession} einmal im Spiel: die Rezepte erscheinen dann hier, auch bei geschlossenem Spiel.',
+    again: 'Öffnet {profession} noch einmal im Spiel: dann erscheinen hier auch die Kategorien und die nicht erlernten Rezepte.',
+    gathers: '{profession} hat keine Rezepte: nur die Stufe wird angezeigt.',
+  },
+
+  spellbook: {
+    filter: 'Zauber filtern',
+    passive: 'Passiv',
+    noMatch: 'Kein Zauber passt.',
+    none: 'Noch kein Zauberbuch',
+    login: 'Loggt Euch mit dem aktuellen Twinmap-Addon ins Spiel ein: die Zauber Eures Zauberbuchs erscheinen dann hier, auch bei geschlossenem Spiel.',
+  },
+
+  talents: {
+    spent: { one: '{count} Punkt verteilt', other: '{count} Punkte verteilt' },
+    free: 'Unverteilte Talentpunkte: {count}',
+    rank: 'Rang {rank}/{most}',
+    next: 'Nächster Rang:',
+    need: { one: 'Verteilt noch {count} Punkt in {tree}-Talente', other: 'Verteilt noch {count} Punkte in {tree}-Talente' },
+    none: 'Noch keine Talente',
+    learn: 'Talente gibt es ab Stufe 10, danach einen Punkt pro Stufe. Verteilt sie im Talentfenster des Spiels: Sie erscheinen dann hier.',
   },
 
   table: {

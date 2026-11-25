@@ -31,6 +31,7 @@ import type { Answer, Asked, Placed, Sources } from './questie-worker'
 import startQuestieWorker from './questie-worker?nodeWorker'
 import { sendSamples, startSamples } from './samples'
 import { langFor, langNow, offerAll, offered, planned, setLang, t } from '../shared/i18n'
+import { workspacesOf } from '../shared/workspaces'
 import { addonHearsFonts, addonsFolder, askLangOf, newsSinceOf, readSettings, setupStatus, writeSettings } from './setup'
 import { hear, installChannel, removeSlots, send as sendSignal, sendOld, sentParts } from './signal'
 import { MAPS_FILE, servedFile } from './tiles'
@@ -71,9 +72,16 @@ function findGameFolder(picked: string | undefined): string | null {
 // Makes the map tiles from the game's files, once per build of the game, and keeps the latest word on it.
 // The folder: TWINMAP_DATA when set (for trials), or Twinmap under the local application data.
 type Picture = 'items' | 'pictures'
-function startTiles(gameFolder: string | null): { status: () => TilesStatus; item: (kind: Picture, id: number) => Promise<boolean>; stop: () => void } {
+function startTiles(gameFolder: string | null): { status: () => TilesStatus; item: (kind: Picture, id: number) => Promise<boolean>; settled: () => Promise<void>; stop: () => void } {
   let status: TilesStatus = { state: 'looking' }
-  if (!gameFolder) return { status: () => ({ state: 'no-game' }), item: () => Promise.resolve(false), stop: () => {} }
+  if (!gameFolder) return { status: () => ({ state: 'no-game' }), item: () => Promise.resolve(false), settled: () => Promise.resolve(), stop: () => {} }
+  // Whoever waits for the map to be ready, or to have failed.
+  let waiting: (() => void)[] = []
+  const settle = (): void => {
+    if (status.state === 'looking' || status.state === 'converting') return
+    for (const go of waiting) go()
+    waiting = []
+  }
   const base = process.env.TWINMAP_DATA ?? join(process.env.LOCALAPPDATA ?? app.getPath('userData'), 'Twinmap')
   const worker = startTilesWorker({ workerData: { gameFolder, base, nav: navFolder() } })
   // The picture of an item, or of a spell by its file, the folder does not have yet is made by the worker, which has the game's archive (item-icons.ts).
@@ -81,7 +89,8 @@ function startTiles(gameFolder: string | null): { status: () => TilesStatus; ite
   worker.on('message', (told: TilesStatus | { asked: string; made: boolean }) => {
     if (!('asked' in told)) {
       if (told.state === 'failed') fault(`map: ${told.message}`)
-      return void (status = told)
+      status = told
+      return settle()
     }
     for (const answer of items.get(told.asked) ?? []) answer(told.made)
     items.delete(told.asked)
@@ -89,6 +98,7 @@ function startTiles(gameFolder: string | null): { status: () => TilesStatus; ite
   worker.on('error', (e) => {
     fault(`map: worker stopped: ${describe(e)}`)
     status = { state: 'failed', message: e instanceof Error ? e.message : String(e) }
+    settle()
     for (const answers of items.values()) for (const answer of answers) answer(false)
     items.clear()
   })
@@ -99,7 +109,13 @@ function startTiles(gameFolder: string | null): { status: () => TilesStatus; ite
       items.set(asked, [answer])
       worker.postMessage({ kind, id })
     })
-  return { status: () => status, item, stop: () => void worker.terminate() }
+  const settled = (): Promise<void> => (status.state === 'looking' || status.state === 'converting' ? new Promise((go) => waiting.push(go)) : Promise.resolve())
+  const stop = (): void => {
+    void worker.terminate()
+    for (const go of waiting) go()
+    waiting = []
+  }
+  return { status: () => status, item, settled, stop }
 }
 
 // The quests on the map: the player's QuestieDB is opened once, and asked for the pins of what
@@ -421,11 +437,13 @@ function createWindow(): void {
       const bytes = key ? await readFile(portraitFile(key)).catch(() => null) : null
       return bytes ? { status: 200, type: 'image/png', bytes } : { status: 404 }
     }
+    // The picture of an item is made the first time it is asked for; one the game has none of is no picture at all. One asked
+    // before the map is ready (the Character panels, at the start) waits for it: answered missing, the page would drop it.
+    const item = /^\/(items|pictures)\/(\d+)\.png$/.exec(path)
+    if (item) await tiles.settled()
     const status = tiles.status()
     const file = status.state === 'ready' ? servedFile(status.folder, path) : null
     let bytes = file ? await readFile(file).catch(() => null) : null
-    // The picture of an item is made the first time it is asked for; one the game has none of is no picture at all.
-    const item = /^\/(items|pictures)\/(\d+)\.png$/.exec(path)
     if (item && file && !bytes) bytes = (await tiles.item(item[1] as Picture, Number(item[2]))) ? await readFile(file).catch(() => null) : null
     if (item && !bytes) return { status: 404 }
     // Where the game has no picture there is no file. That is the sea, not a fault: an empty picture for
@@ -554,7 +572,7 @@ function createWindow(): void {
   // turns it on in the settings. The same page, the same map files, and what a page may ask for above.
   let lan: Lan | null = null
   let lanWord: SetupStatus['lan'] = null
-  const lookSetup = (): SetupStatus => ({ ...setupStatus(gameFolder, settings, app.getVersion()), ...(process.platform === 'darwin' ? { mac: true, ...(!captureAllowed() ? { screenRecording: false } : {}) } : {}), lan: lanWord, zoom: settings.zoom ?? 1, gpu: { chosen: settings.noGpu !== true, running: GPU }, lang: langNow(), langs: planned(), gameLang: gameLang(), askLang, newsSince: newsSinceOf(settings, app.getVersion()) })
+  const lookSetup = (): SetupStatus => ({ ...setupStatus(gameFolder, settings, app.getVersion()), ...(process.platform === 'darwin' ? { mac: true, ...(!captureAllowed() ? { screenRecording: false } : {}) } : {}), lan: lanWord, zoom: settings.zoom ?? 1, gpu: { chosen: settings.noGpu !== true, running: GPU }, lang: langNow(), langs: planned(), gameLang: gameLang(), askLang, newsSince: newsSinceOf(settings, app.getVersion()), ...(settings.workspaces ? { workspaces: settings.workspaces } : {}) })
   const lanUrl = async (): Promise<void> => {
     const address = await homeAddress()
     if (lan) lanWord = address ? { url: `http://${address}:${LAN_PORT}/?k=${settings.lanCode}` } : { error: t('app.main.noNetwork') }
@@ -630,7 +648,8 @@ function createWindow(): void {
     }
     tellSheets()
   }
-  // The tooltips of the items (M10-F15): sent once each with the sheet, kept here for good, every character's together.
+  // The tooltips of the items (M10-F15), every character's together, and of the spells and talents (M20-F16), each its own:
+  // sent with the sheet, kept here for good.
   const tipsFile = join(app.getPath('userData'), 'tips.json')
   let tips: Tips = {}
   try {
@@ -643,8 +662,8 @@ function createWindow(): void {
     lan?.tell('tips', tips)
   }
   win.webContents.on('did-finish-load', tellTips)
-  const takeTips = (sent: unknown): void => {
-    const news = tipsFrom(sent)
+  const takeTips = (sent: unknown, who: string): void => {
+    const news = tipsFrom(sent, who)
     if (!Object.keys(news).some((key) => JSON.stringify(tips[key]) !== JSON.stringify(news[key]))) return
     tips = { ...tips, ...news }
     try {
@@ -655,11 +674,21 @@ function createWindow(): void {
     }
     tellTips()
   }
+  // What the app holds of each sheet, told to the addon. A character whose book is here without the tooltips of its spells
+  // (an app from before M20-F16 took them and left them out: the addon will not send them again) is told it is held at
+  // revision 0, so that the addon sends it all again; until a sheet with its book comes, once a run.
+  let again: Set<string> | null = null
+  const held = (): ReturnType<typeof heldOf> => {
+    again ??= new Set(Object.keys(sheets).filter((key) => Array.isArray(sheets[key]!.pieces.book) && !Object.keys(tips).some((k) => k.startsWith('spell:') && k.endsWith(`@${key}`))))
+    const out = heldOf(sheets)
+    for (const key of again) if (out[key]) out[key] = { ...out[key], rev: 0 }
+    return out
+  }
   const tellHeld = (): void => {
     if (!gameFolder) return
     try {
-      const addons = addonsFolder(gameFolder), held = heldOf(sheets)
-      if (JSON.stringify(sentParts(addons).sheet) !== JSON.stringify(held)) send(addons, { sheet: held }, addonHearsFonts(gameFolder))
+      const addons = addonsFolder(gameFolder), now = held()
+      if (JSON.stringify(sentParts(addons).sheet) !== JSON.stringify(now)) send(addons, { sheet: now }, addonHearsFonts(gameFolder))
     } catch {
       // the way to the game is not there yet: the addon sends again until it is
     }
@@ -673,7 +702,8 @@ function createWindow(): void {
     if (!sent) return
     // The tooltips go to their own file: the sheet keeps none of them.
     const { tips: sentTips, ...pieces } = sent.p
-    if (sentTips !== undefined) takeTips(sentTips)
+    if (sentTips !== undefined) takeTips(sentTips, sent.key)
+    if (sent.p.book !== undefined) again?.delete(sent.key)
     const news = { ...sent, p: pieces }
     const now = mergeSheet(sheets, news, Date.now())
     if (now !== sheets) {
@@ -803,7 +833,7 @@ function createWindow(): void {
     }
     channel = installChannel(addons, !fonts)
       // The pause is taken back too: one asked by a run of the app that closed while paused is not to stay.
-      .then(() => void send(addons, { sync: Date.now(), latest: app.getVersion(), sheet: heldOf(sheets), log: participates(), ...(fonts ? { pause: paused ? Date.now() : false } : {}) }, addonHearsFonts(gameFolder!)))
+      .then(() => void send(addons, { sync: Date.now(), latest: app.getVersion(), sheet: held(), log: participates(), ...(fonts ? { pause: paused ? Date.now() : false } : {}) }, addonHearsFonts(gameFolder!)))
       .then(() => (marksTimer ??= setTimeout(sendMarks, MARKS_WAIT)))
       .catch(() => {})
   }
@@ -871,6 +901,14 @@ function createWindow(): void {
   // The window after the update closed, never asked again: with Done the language shown is kept, with the cross the
   // app stays in English, as it was before the update.
   // What's new closed (WhatsNew.svelte): this version's news are seen, and show again only from Settings.
+  // The workspaces as the window laid them out (M20): kept as they are, for the next start. Not told back to the page,
+  // which has them already.
+  ipcMain.handle('set-workspaces', (_event, kept: unknown) => {
+    const spaces = workspacesOf(kept)
+    if (!spaces) return
+    settings.workspaces = spaces
+    writeSettings(settingsFile, settings)
+  })
   ipcMain.handle('news-seen', () => {
     settings.seenVersion = app.getVersion()
     writeSettings(settingsFile, settings)
