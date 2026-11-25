@@ -6,6 +6,8 @@ export default {
     map: 'Carte',
     character: 'Personnage',
     inventory: 'Inventaire',
+    auctionSearch: 'Recherche HV',
+    item: 'Objet',
     auctionHouse: 'Hôtel des ventes',
     auctionHouseShort: 'HV',
     pause: 'Mettre Twinmap en pause',
@@ -105,6 +107,7 @@ export default {
     xp: '{xp} sur {max} EXP',
     experience: 'Expérience',
     emptyExperience: 'Votre niveau s’affiche ici dès que vous jouez avec l’addon Twinmap Forever activé.',
+    emptyItem: 'Cliquez sur un objet dans Sacs, Banque, Inventaire ou la recherche HV pour voir ses prix ici.',
     widthHint: 'Faites glisser pour redimensionner. Double-cliquez pour réinitialiser.',
   },
 

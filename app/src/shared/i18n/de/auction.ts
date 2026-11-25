@@ -130,6 +130,7 @@ export default {
     // After a colon: "zu" would need "zur" or "zum" before some category names.
     back: 'Zurück: {place}',
     theSearch: 'Suche',
+    notOnSale: 'Derzeit in diesem Auktionshaus nicht im Angebot.',
     // GS ITEM_MIN_LEVEL, lowercase after the dot.
     requiresLevel: 'benötigt Stufe {level}',
     itemLevel: 'Gegenstandsstufe {level}',
@@ -278,6 +279,7 @@ export default {
     attribution: '{source}, über die Battle.net-API. Twinmap ist weder mit Blizzard verbunden noch von Blizzard unterstützt.',
     source: 'Auktionsdaten: Blizzard Entertainment',
     approximate: 'Mengen sind Näherungswerte',
+    hide: 'Diese Zeile ausblenden',
   },
 
   chart: {
