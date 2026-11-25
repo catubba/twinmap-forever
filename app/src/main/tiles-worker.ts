@@ -12,7 +12,7 @@ import { AH_NAMES_FILE, gameAhNames } from '../shared/ah'
 import { trainerFacts, TRAINERS_FILE, TRAINERS_FORMAT } from '../shared/trainers'
 import { gameMaps, UI_MAP_ASSIGNMENT_FILE, UI_MAP_FILE, type GameMap } from '../shared/maps'
 import { AREA_POI_FILE, AREA_TABLE_FILE, places, UI_MAP_X_MAP_ART_FILE, WORLD_MAP_OVERLAY_FILE } from '../shared/places'
-import { TAXI_NODES_FILE, TAXI_PATH_FILE, travel, TRAVEL_FORMAT, type Travel } from '../shared/services'
+import { TAXI_NODES_FILE, TAXI_PATH_FILE, TAXI_PATH_NODE_FILE, travel, TRAVEL_FORMAT, type Travel } from '../shared/services'
 import type { TilesStatus } from '../shared/tiles-status'
 import { readTable } from '../shared/wdc5'
 import { LIQUID_TYPE_FILE, liquidOfName, WATER } from '../shared/water'
@@ -142,8 +142,9 @@ try {
   if (!travelMade) {
     const files = open()
     const zones = JSON.parse(readFileSync(join(folder, MAPS_FILE), 'utf8')) as GameMap[]
-    const [maps, nodes, paths] = [MAP_FILE, TAXI_NODES_FILE, TAXI_PATH_FILE].map((id) => files.read(id, true))
-    writeFileSync(join(folder, TRAVEL_FILE), JSON.stringify(maps && nodes && paths ? travel(table(maps), table(nodes), table(paths), zones) : { format: TRAVEL_FORMAT, doors: [], nodes: [], routes: [] }))
+    const [maps, nodes, paths, points, areas] = [MAP_FILE, TAXI_NODES_FILE, TAXI_PATH_FILE, TAXI_PATH_NODE_FILE, AREA_TABLE_FILE].map((id) => files.read(id, true))
+    // Without the points of the ways or the names of the areas, no ships: the rest is there all the same.
+    writeFileSync(join(folder, TRAVEL_FILE), JSON.stringify(maps && nodes && paths ? travel(table(maps), table(nodes), table(paths), zones, points ? table(points) : undefined, areas ? table(areas) : undefined) : { format: TRAVEL_FORMAT, doors: [], nodes: [], routes: [] }))
   }
   // The pictures of the pins. A folder made before the app knew of them, or of some of them, gets them now.
   if (!existsSync(join(folder, ICONS_FOLDER, ICONS_MADE))) writeIcons(open(), folder)
