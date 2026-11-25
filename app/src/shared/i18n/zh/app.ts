@@ -5,6 +5,7 @@ export default {
     now: '当前',
     map: '地图',
     character: '角色',
+    inventory: '物品栏',
     auctionHouse: '拍卖行',
     auctionHouseShort: '拍卖',
     pause: '暂停Twinmap',

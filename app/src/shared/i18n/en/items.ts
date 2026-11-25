@@ -83,7 +83,7 @@ export default {
     },
   },
 
-  // The word inside an empty equipment slot of the Slots view, shown in capitals in a 44px square: very short.
+  // The word inside an empty equipment slot of the panel Character, shown in capitals in a 44px square: very short.
   slots: {
     head: 'Head',
     neck: 'Neck',
@@ -106,7 +106,7 @@ export default {
     ranged: 'Ranged',
   },
 
-  // Who a character is, under its name in the character list and on the Slots view.
+  // Who a character is, under its name in the character list and on the panel Character.
   character: {
     // {level}: a number; {race}: one of races; {class}: one of classes. "Level 24 Gnome Warlock".
     line: 'Level {level} {race} {class}',
@@ -156,11 +156,7 @@ export default {
     filter: 'Filter by name or type',
     // Read aloud only.
     filterLabel: 'Filter items',
-    viewLabel: 'View',
     whereLabel: 'Where',
-    // The two halves of a switch: short.
-    slots: 'Slots',
-    table: 'Table',
     // The first chip over the table, followed by how many.
     all: 'All',
     // The sum at the end of the tools row, its parts after one another with " · ". {money}: gold, silver and copper with their coins.
@@ -169,7 +165,7 @@ export default {
     money: 'Money {money}',
   },
 
-  // The Slots view: what the character wears around its picture, taken off the game's character window.
+  // The panel Character: what the character wears around its picture, taken off the game's character window.
   doll: {
     // Read aloud only.
     label: 'Worn',
@@ -189,17 +185,14 @@ export default {
     noneNote: 'Open the character window in game and it is taken by itself.',
   },
 
-  // The Slots view: the bags and the bank as grids, each heading followed by a smaller line.
+  // The panels Bags and Bank: their grids, each heading followed by a smaller line.
   held: {
-    // Read aloud only.
-    label: 'Bags and bank',
     bags: 'Bags',
     bagsNow: 'as they are now',
     // {ago}: one of ago.
     bagsAsOf: 'as of {ago}',
     bank: 'Bank',
     bankSeen: 'seen {ago}',
-    bankUnseen: 'not seen yet: open it in game once',
     // Headings of the grids, in capitals.
     backpack: 'Backpack and bags',
     reagents: 'Reagent bag',
@@ -211,7 +204,14 @@ export default {
     empty: { other: 'empty · {count} slots' },
   },
 
-  // The Table view: a row for each item.
+  // The panel Bank before the bank was ever seen: a title, what to do in the game, then where (smaller).
+  bank: {
+    none: 'No bank seen yet',
+    open: 'Open your bank once in the game: what is in it shows here, also when the game is closed.',
+    where: 'Talk to a banker in any capital.',
+  },
+
+  // The panel Inventory: a row for each item.
   table: {
     // Column headings, in capitals: short.
     columns: {

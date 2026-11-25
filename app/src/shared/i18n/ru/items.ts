@@ -155,11 +155,7 @@ export default {
     noCharacter: 'Персонажей пока нет. Играйте с включенным аддоном Twinmap Forever, и сумки персонажа появятся здесь, даже когда игра закрыта.',
     filter: 'Фильтр по названию или типу',
     filterLabel: 'Фильтр предметов',
-    viewLabel: 'Вид',
     whereLabel: 'Где',
-    // A switch half, short: bag slots are "ячейки" in the game (GS CONTAINER_SLOTS).
-    slots: 'Ячейки',
-    table: 'Список',
     all: 'Все',
     // Each part as "label: amount", like the game's "Деньги:" (GS MONEY_COLON); GS SELL_PRICE.
     worth: 'Цена продажи: {money}',
@@ -183,14 +179,12 @@ export default {
   },
 
   held: {
-    label: 'Сумки и банк',
     bags: 'Сумки',
     bagsNow: 'сейчас',
     bagsAsOf: 'обновлено {ago}',
     bank: 'Банк',
     // Impersonal plural: "when someone last opened it", no gender.
     bankSeen: 'открывали {ago}',
-    bankUnseen: 'еще не открывали: откройте его один раз в игре',
     // GS BAG_NAME_BACKPACK "Рюкзак"; ItemSubClass 1.11 "Сумка с реагентами"; GS KEYRING.
     backpack: 'Рюкзак и сумки',
     reagents: 'Сумка с реагентами',
@@ -199,6 +193,12 @@ export default {
     used: 'занято: {used} из {count}',
     // GS CONTAINER_SLOTS "ячейка:ячейки:ячеек".
     empty: { one: 'пусто · {count} ячейка', few: 'пусто · {count} ячейки', many: 'пусто · {count} ячеек', other: 'пусто · {count} ячейки' },
+  },
+
+  bank: {
+    none: 'Банк еще не открывали',
+    open: 'Откройте банк один раз в игре: его содержимое появится здесь, даже когда игра закрыта.',
+    where: 'Поговорите с банкиром в любой столице.',
   },
 
   table: {

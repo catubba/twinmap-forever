@@ -13,7 +13,7 @@ import type { DockviewComponent as Dock, DockviewGroupPanel, IContentRenderer, S
 // @ts-expect-error no declaration for the UMD build
 import * as built from 'dockview-core/dist/dockview-core.js'
 import { t } from '../../shared/i18n'
-import { MOST, NAME_MOST, PANELS, WORKSPACES_VERSION, type Workspaces } from '../../shared/workspaces'
+import { CHARACTER, MOST, NAME_MOST, PANELS, WORKSPACES_VERSION, type Workspaces } from '../../shared/workspaces'
 
 const { DockviewComponent, positionToDirection } = built as typeof import('dockview-core')
 
@@ -38,7 +38,10 @@ export const layout = $state({ mapRight: false, sided: true })
 const TITLES: Record<string, () => string> = {
   map: () => t('app.top.map'),
   now: () => t('app.top.now'),
-  items: () => t('app.top.character'),
+  character: () => t('app.top.character'),
+  bags: () => t('items.places.bags'),
+  bank: () => t('items.places.bank'),
+  inventory: () => t('app.top.inventory'),
   ah: () => t('app.top.auctionHouse'),
   next: () => t('map.nextStop.title'),
   attention: () => t('app.now.attention'),
@@ -54,7 +57,7 @@ export const titleOf = (id: string): string => TITLES[id]?.() ?? id
 export const PARTS = ['next', 'attention', 'pins', 'quests', 'nearby', 'experience'] as const
 /** What a block of Now carries while its handle is dragged: its id. */
 export const PART_DRAG = 'application/x-twinmap-part'
-const NAMES: Record<string, () => string> = { map: TITLES.map!, character: TITLES.items!, ah: TITLES.ah! }
+const NAMES: Record<string, () => string> = { map: TITLES.map!, character: TITLES.character!, ah: TITLES.ah! }
 
 /** The name a workspace has without one of the player's: the default ones' in the language spoken now. */
 export const nameFirst = (id: string): string => NAMES[id]?.() ?? t('app.layout.unnamed')
@@ -192,13 +195,34 @@ function write(): void {
 }
 const fit = (): void => made.forEach((m, i) => (dress(m.dock), hold(i)))
 
+// The Character workspace as it is at first (chosen on the preview of M20-F8): the Character panel on the left, Bags and
+// Bank side by side on its right, Inventory under them. Laid out in the place of a panel of an older layout (`at`, the
+// Items panel of before), and as tabs of one group where that place is narrower than CHARACTER_WIDE.
+const CHARACTER_WIDE = 1000
+function characters(dock: Dock, at?: string): void {
+  const put = (id: string, position?: Parameters<Dock['addPanel']>[0]['position']): void => void dock.addPanel({ id, component: id, title: TITLES[id]!(), ...(position && { position }) })
+  put('character', at ? { referencePanel: at, direction: 'within' } : undefined)
+  const old = at && dock.getGroupPanel(at)
+  if (old) dock.removePanel(old)
+  const group = groupOf(dock, 'character')!
+  if (group.api.width < CHARACTER_WIDE) {
+    for (const id of CHARACTER.slice(1)) put(id, { referencePanel: 'character', direction: 'within' })
+    dock.getGroupPanel('character')!.api.setActive()
+    return
+  }
+  put('bags', { referencePanel: 'character', direction: 'right' })
+  put('inventory', { referencePanel: 'bags', direction: 'below' })
+  put('bank', { referencePanel: 'bags', direction: 'right' })
+  group.api.setSize({ width: 500 })
+}
+
 // As the app was before the workspaces: the map with Now beside it, on the side and as wide as the 0.17.0 kept them;
-// Character and the Auction House each alone; a workspace the player made, the map alone. Gives the width of Now, where
-// there is one.
+// the Character panels; the Auction House alone; a workspace the player made, the map alone. Gives the width of Now,
+// where there is one.
 function lay0(dock: Dock, id: string, right = localStorage.getItem('map-side') === 'right', wide = Number(localStorage.getItem('panel-width'))): number | undefined {
-  if (id === 'character' || id === 'ah') {
-    const panel = id === 'character' ? 'items' : 'ah'
-    dock.addPanel({ id: panel, component: panel, title: TITLES[panel]!() })
+  if (id === 'character') return void characters(dock)
+  if (id === 'ah') {
+    dock.addPanel({ id: 'ah', component: 'ah', title: TITLES.ah!() })
     return undefined
   }
   dock.addPanel({ id: 'map', component: 'map', title: TITLES.map!() })
@@ -246,6 +270,8 @@ function make(space: Space, kept?: unknown, right?: boolean, wide?: number): voi
     const now = groupOf(dock, 'now')
     if (now) me.width = Math.round(now.api.width)
     dock.layout(root.clientWidth, root.clientHeight)
+    // Items, as it was before M20-F8: the Character panels in its place.
+    if (has(dock, 'items')) characters(dock, 'items')
     // A panel this version has not: out. Titles in the language spoken now.
     for (const panel of [...dock.panels]) if (!(PANELS as readonly string[]).includes(panel.id)) dock.removePanel(panel)
     if (!dock.panels.length) throw new Error('empty')

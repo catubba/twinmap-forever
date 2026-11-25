@@ -25,7 +25,7 @@
   import FirstRun from './FirstRun.svelte'
   import Glyph from './Glyph.svelte'
   import { add as addPanel, create as createSpace, edit, frame, layout, mount, move as moveSpace, nameOf, nowOver, open as openSpace, PART_DRAG, reach, remove as removeSpace, rename as renameSpace, reset as resetSpace, restore as restoreSpaces, section, setMapRight, titleOf, unmount } from './frame.svelte'
-  import { MOST, NAME_MOST } from '../../shared/workspaces'
+  import { CHARACTER, MOST, NAME_MOST } from '../../shared/workspaces'
   import Logo from './Logo.svelte'
   import Map from './Map.svelte'
   import { drop, gone, opened, screen } from './motion'
@@ -95,7 +95,7 @@
   const go = (to: Go): void => {
     if (to === 'settings') return void (onSettings = true)
     onSettings = false
-    reach(to === 'items' ? 'items' : to === 'ah' ? 'ah' : 'map')
+    reach(to === 'items' ? 'character' : to === 'ah' ? 'ah' : 'map')
     if (to === 'layers') void tick().then(() => mapView?.openLayers())
   }
   window.twinmap.onSetup((told) => {
@@ -596,7 +596,9 @@
       {/if}
     </div></div>
   </aside>
-  <div class="sec" use:section={'items'}><Items {sheets} {portraits} {shown} known={characters} {now} {listing} onpick={(key) => (picked = key)} /></div>
+  {#each CHARACTER as part (part)}
+    <div class="sec" use:section={part}><Items {part} {sheets} {portraits} {shown} known={characters} {now} {listing} onpick={(key) => (picked = key)} /></div>
+  {/each}
   <div class="sec" use:section={'ah'}><Auction {house} chosen={!!chosenHouse} hints={char ?? null} who={char?.name ?? null} {prices} {listing} {sheets} known={characters} {homes} {now} {alerts} {showAlerts} onchoose={chooseHouse} /></div>
 </div>
 {/if}

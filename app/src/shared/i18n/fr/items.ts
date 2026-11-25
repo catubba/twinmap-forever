@@ -147,11 +147,7 @@ export default {
     noCharacter: 'Aucun personnage pour l’instant. Jouez-en un avec l’addon Twinmap Forever activé et ses sacs s’affichent ici, même quand le jeu est fermé.',
     filter: 'Filtrer par nom ou type',
     filterLabel: 'Filtrer les objets',
-    viewLabel: 'Affichage',
     whereLabel: 'Lieu',
-    // A switch half, short: "Emplacements" is too long, "cases" is what players call bag slots.
-    slots: 'Cases',
-    table: 'Liste',
     all: 'Tous',
     // Each part as "label : amount", like the game's "Argent :" (GS MONEY_COLON).
     worth: 'Vente au marchand : {money}',
@@ -175,13 +171,11 @@ export default {
   },
 
   held: {
-    label: 'Sacs et banque',
     bags: 'Sacs',
     bagsNow: 'en ce moment',
     bagsAsOf: 'vus {ago}',
     bank: 'Banque',
     bankSeen: 'vue {ago}',
-    bankUnseen: 'pas encore vue : ouvrez-la une fois en jeu',
     backpack: 'Sac à dos et sacs',
     reagents: 'Sac de composants',
     keyring: 'Trousseau de clés',
@@ -189,6 +183,12 @@ export default {
     used: '{used} sur {count} utilisés',
     // GS CONTAINER_SLOTS "emplacements".
     empty: { one: 'vide · {count} emplacement', many: 'vide · {count} d’emplacements', other: 'vide · {count} emplacements' },
+  },
+
+  bank: {
+    none: 'Aucune banque vue pour l’instant',
+    open: 'Ouvrez votre banque une fois en jeu : son contenu s’affiche ici, même quand le jeu est fermé.',
+    where: 'Parlez à un banquier dans n’importe quelle capitale.',
   },
 
   table: {

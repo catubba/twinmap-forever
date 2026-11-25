@@ -153,11 +153,7 @@ export default {
     // GS TYPE "类型".
     filter: '按名称或类型过滤',
     filterLabel: '过滤物品',
-    viewLabel: '视图',
     whereLabel: '位置',
-    // GS BAGSLOTTEXT "背包栏位".
-    slots: '栏位',
-    table: '列表',
     all: '全部',
     // Each part as "label：amount", like GS SELL_PRICE "卖价" and GS MONEY_COLON "金钱：".
     worth: '卖价：{money}',
@@ -180,13 +176,11 @@ export default {
   },
 
   held: {
-    label: '背包和银行',
     bags: '背包',
     bagsNow: '当前状态',
     bagsAsOf: '{ago}的状态',
     bank: '银行',
     bankSeen: '{ago}查看',
-    bankUnseen: '尚未查看：在游戏中打开一次银行',
     // GS BAG_NAME_BACKPACK "行囊"; ItemSubClass 1.11 "材料包"; GS KEYRING.
     backpack: '行囊和背包',
     reagents: '材料包',
@@ -196,6 +190,12 @@ export default {
     used: '已用{used}/{count}格',
     // GS EMPTY "空".
     empty: { other: '空 · {count}格' },
+  },
+
+  bank: {
+    none: '尚未查看银行',
+    open: '在游戏中打开一次银行，其中的物品就会显示在这里，关闭游戏后也能查看。',
+    where: '与任意主城的银行职员交谈。',
   },
 
   table: {

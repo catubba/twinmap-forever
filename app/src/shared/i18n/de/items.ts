@@ -152,11 +152,7 @@ export default {
     noCharacter: 'Noch kein Charakter. Spielt einen mit aktiviertem Addon Twinmap Forever, dann erscheinen seine Taschen hier, auch bei geschlossenem Spiel.',
     filter: 'Nach Name oder Typ filtern',
     filterLabel: 'Gegenstände filtern',
-    viewLabel: 'Ansicht',
     whereLabel: 'Ort',
-    // A switch half, short: bag slots are "Plätze" in the game (GS CONTAINER_SLOTS).
-    slots: 'Plätze',
-    table: 'Liste',
     all: 'Alle',
     // Each part as "label: amount", like the game's "Geld:" (GS MONEY_COLON).
     worth: 'Verkaufswert: {money}',
@@ -179,13 +175,11 @@ export default {
   },
 
   held: {
-    label: 'Taschen und Bank',
     bags: 'Taschen',
     bagsNow: 'aktuell',
     bagsAsOf: 'Stand: {ago}',
     bank: 'Bank',
     bankSeen: '{ago} gesehen',
-    bankUnseen: 'noch nicht gesehen: öffnet sie einmal im Spiel',
     // GS BAG_NAME_BACKPACK "Rucksack"; ItemSubClass 1.11 "Reagenzientasche".
     backpack: 'Rucksack und Taschen',
     reagents: 'Reagenzientasche',
@@ -194,6 +188,12 @@ export default {
     used: '{used} von {count} belegt',
     // GS CONTAINER_SLOTS "Platz".
     empty: { one: 'leer · {count} Platz', other: 'leer · {count} Plätze' },
+  },
+
+  bank: {
+    none: 'Noch keine Bank gesehen',
+    open: 'Öffnet eure Bank einmal im Spiel: ihr Inhalt erscheint dann hier, auch bei geschlossenem Spiel.',
+    where: 'Sprecht in einer beliebigen Hauptstadt mit einem Bankier.',
   },
 
   table: {

@@ -5,6 +5,7 @@ export default {
     now: 'Ahora',
     map: 'Mapa',
     character: 'Personaje',
+    inventory: 'Inventario',
     auctionHouse: 'Casa de subastas',
     // The game has no short form of Casa de subastas: CS, as players write it.
     auctionHouseShort: 'CS',

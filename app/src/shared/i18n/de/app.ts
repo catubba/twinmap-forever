@@ -5,6 +5,7 @@ export default {
     now: 'Jetzt',
     map: 'Karte',
     character: 'Charakter',
+    inventory: 'Inventar',
     auctionHouse: 'Auktionshaus',
     // As German players write it.
     auctionHouseShort: 'AH',

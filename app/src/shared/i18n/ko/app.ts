@@ -5,6 +5,7 @@ export default {
     now: '현재',
     map: '지도',
     character: '캐릭터',
+    inventory: '소지품',
     auctionHouse: '경매장',
     // The game's own short name (GS BUTTON_LAG_AUCTIONHOUSE).
     auctionHouseShort: '경매',

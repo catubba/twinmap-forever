@@ -10,6 +10,8 @@ export default {
     // gear, bags, bank and stats, and what the other characters hold.
     map: 'Map',
     character: 'Character',
+    // A panel of the Character workspace: a row for each item the character holds, and what the others hold.
+    inventory: 'Inventory',
     auctionHouse: 'Auction House',
     // Shown in place of auctionHouse when the window is narrow: two or three letters.
     auctionHouseShort: 'AH',
