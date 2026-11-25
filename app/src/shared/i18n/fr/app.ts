@@ -27,6 +27,15 @@ export default {
     restoreYes: 'Rétablir',
     restoreNo: 'Annuler',
     done: 'Terminé',
+    hintSpaces: 'En haut : faites glisser un espace de travail pour le déplacer, double-cliquez dessus pour le renommer.',
+    newSpace: 'Nouvel espace de travail',
+    spacesMost: '{most} espaces de travail au maximum',
+    unnamed: 'Espace de travail',
+    rename: 'Nom de l’espace de travail',
+    deleteSpace: 'Supprimer l’espace de travail',
+    deleteSure: 'Supprimer l’espace de travail « {name} » ? Sa disposition est perdue ; les panneaux restent dans les autres espaces de travail.',
+    deleteYes: 'Supprimer',
+    deleteNo: 'Garder',
   },
 
   link: {

@@ -45,6 +45,22 @@ export default {
     restoreNo: 'Cancel',
     // Locks the layout again: short.
     done: 'Done',
+    // At the end of the hint, what is done with the tabs at the top, the workspaces.
+    hintSpaces: 'At the top: drag a workspace to move it, double-click it to rename it.',
+    // A button after the tabs at the top while the layout is unlocked, a + alone: read aloud and on hover.
+    newSpace: 'New workspace',
+    // The same button once there are as many workspaces as there can be. {most}: that number.
+    spacesMost: 'At most {most} workspaces',
+    // The name of a workspace the player made, until they give it one.
+    unnamed: 'Workspace',
+    // The field a tab at the top becomes on a double click, to rename its workspace: read aloud.
+    rename: 'Name of the workspace',
+    // A cross on each tab at the top while the layout is unlocked: read aloud and on hover.
+    deleteSpace: 'Delete workspace',
+    // In place of the bar's buttons after that cross, before anything is deleted: a question, then two buttons. {name}: the name of the workspace.
+    deleteSure: 'Delete the workspace "{name}"? Its layout is lost; the panels stay in the other workspaces.',
+    deleteYes: 'Delete',
+    deleteNo: 'Keep',
   },
 
   // The state of the link with the game, in the top row (word: short, beside a coloured dot), and the line

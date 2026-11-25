@@ -28,6 +28,15 @@ export default {
     restoreYes: 'Restaurar',
     restoreNo: 'Cancelar',
     done: 'Listo',
+    hintSpaces: 'Arriba: arrastra un espacio de trabajo para moverlo, haz doble clic en él para cambiarle el nombre.',
+    newSpace: 'Nuevo espacio de trabajo',
+    spacesMost: 'Como máximo {most} espacios de trabajo',
+    unnamed: 'Espacio de trabajo',
+    rename: 'Nombre del espacio de trabajo',
+    deleteSpace: 'Eliminar espacio de trabajo',
+    deleteSure: '¿Eliminar el espacio de trabajo "{name}"? Se pierde su disposición; los paneles siguen en los demás espacios de trabajo.',
+    deleteYes: 'Eliminar',
+    deleteNo: 'Conservar',
   },
 
   link: {

@@ -27,6 +27,15 @@ export default {
     restoreYes: '恢复',
     restoreNo: '取消',
     done: '完成',
+    hintSpaces: '顶部：拖动工作区可调整顺序，双击可重命名。',
+    newSpace: '新建工作区',
+    spacesMost: '最多 {most} 个工作区',
+    unnamed: '工作区',
+    rename: '工作区名称',
+    deleteSpace: '删除工作区',
+    deleteSure: '要删除工作区“{name}”吗？它的布局会丢失，面板仍在其他工作区中。',
+    deleteYes: '删除',
+    deleteNo: '保留',
   },
 
   link: {

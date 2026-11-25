@@ -25,6 +25,10 @@ describe('workspacesOf', () => {
     ])
       expect(workspacesOf(kept)).toBeUndefined()
   })
+  it('keeps the name the player gave, trimmed; an empty or wrong one is no name', () => {
+    const kept = { version: 1, open: 0, spaces: [{ id: 'map', name: ' Dungeon ', layout }, { id: 's1', name: '', layout }, { id: 's2', name: 7, layout }, { id: 's3', name: 'x'.repeat(50), layout }] }
+    expect(workspacesOf(kept)?.spaces.map((s) => s.name)).toEqual(['Dungeon', undefined, undefined, 'x'.repeat(32)])
+  })
   it('keeps nothing more than the id and the layout', () => {
     expect(workspacesOf({ version: 1, open: 0, spaces: [{ id: 'map', layout, more: 1 }], also: 2 })).toEqual({ version: 1, open: 0, spaces: [{ id: 'map', layout }] })
   })

@@ -24,7 +24,8 @@
   import { newsFor, type Go } from '../../shared/news'
   import FirstRun from './FirstRun.svelte'
   import Glyph from './Glyph.svelte'
-  import { SPACES, add as addPanel, edit, frame, layout, mount, nowOver, open as openSpace, reset as resetSpace, restore as restoreSpaces, section, setMapRight, unmount } from './frame.svelte'
+  import { add as addPanel, create as createSpace, edit, frame, layout, mount, move as moveSpace, nameOf, nowOver, open as openSpace, reach, remove as removeSpace, rename as renameSpace, reset as resetSpace, restore as restoreSpaces, section, setMapRight, unmount } from './frame.svelte'
+  import { MOST, NAME_MOST } from '../../shared/workspaces'
   import Logo from './Logo.svelte'
   import Map from './Map.svelte'
   import { drop, gone, opened, screen } from './motion'
@@ -94,7 +95,7 @@
   const go = (to: Go): void => {
     if (to === 'settings') return void (onSettings = true)
     onSettings = false
-    openSpace(to === 'items' ? SPACES.indexOf('character') : to === 'ah' ? SPACES.indexOf('ah') : SPACES.indexOf('map'))
+    reach(to === 'items' ? 'items' : to === 'ah' ? 'ah' : 'map')
     if (to === 'layers') void tick().then(() => mapView?.openLayers())
   }
   window.twinmap.onSetup((told) => {
@@ -268,7 +269,7 @@
   // layout is locked; in any other layout it is a panel as the others, closed with Edit layout.
   const nowShut = $derived(!panelOpen && frame.paired && !frame.editing)
   const nowAbove = $derived((!panelOpen || small) && frame.paired && !frame.editing)
-  // Ctrl with 1, 2, 3...: the workspaces by their place among the tabs. Ctrl and E: Edit layout, on and off.
+  // Ctrl with 1 to 6: the workspaces by their place among the tabs. Ctrl and E: Edit layout, on and off.
   function spaceKey(e: KeyboardEvent): void {
     if (!e.ctrlKey || e.altKey || e.metaKey || e.shiftKey || onSetup !== false) return
     if (e.key === 'e' || e.key === 'E') {
@@ -278,7 +279,7 @@
       return
     }
     const n = Number(e.key)
-    if (!Number.isInteger(n) || n < 1 || n > SPACES.length) return
+    if (!Number.isInteger(n) || n < 1 || n > frame.spaces.length) return
     e.preventDefault()
     onSettings = false
     openSpace(n - 1)
@@ -287,6 +288,48 @@
   let adding = $state(false)
   let sure = $state(false)
   const PANEL_NAMES: Record<string, () => string> = { map: () => t('app.top.map'), now: () => t('app.top.now'), items: () => t('app.top.character'), ah: () => t('app.top.auctionHouse') }
+  // The workspaces at the top, while the layout is unlocked: the one whose name is a field, the one asked about before it
+  // is deleted, the one dragged and where it would land (before or after the tab under the pointer).
+  let naming = $state<string | null>(null)
+  let deleting = $state<string | null>(null)
+  let dragged = $state<number | null>(null)
+  let landing = $state<{ at: number; after: boolean } | null>(null)
+  // The glyph of a default workspace; one the player made has the first letter of its name.
+  const SPACE_GLYPHS: Record<string, 'pin' | 'bag' | 'coins'> = { map: 'pin', character: 'bag', ah: 'coins' }
+  const letterOf = (name: string): string => ([...name][0] ?? '').toLocaleUpperCase()
+  $effect(() => {
+    if (frame.editing) return
+    deleting = dragged = null
+    landing = null
+  })
+  function named(i: number, value: string | null): void {
+    if (naming === null) return
+    naming = null
+    if (value !== null) renameSpace(i, value)
+  }
+  function chosen(node: HTMLInputElement): void {
+    node.focus()
+    node.select()
+  }
+  function spaceDrag(e: DragEvent, i: number): void {
+    if (!frame.editing || !e.dataTransfer) return
+    e.dataTransfer.setData('application/x-twinmap-workspace', String(i))
+    e.dataTransfer.effectAllowed = 'move'
+    dragged = i
+  }
+  function spaceOver(e: DragEvent, i: number): void {
+    if (dragged === null) return
+    e.preventDefault()
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    landing = { at: i, after: e.clientX > r.left + r.width / 2 }
+  }
+  function spaceDrop(e: DragEvent): void {
+    if (dragged === null || !landing) return
+    e.preventDefault()
+    const to = landing.at + (landing.after ? 1 : 0)
+    moveSpace(dragged, to > dragged ? to - 1 : to)
+    dragged = landing = null
+  }
   function togglePanel(): void {
     panelOpen = !panelOpen
     if (!matchMedia(SMALL).matches) localStorage.setItem('panel', panelOpen ? 'open' : 'closed')
@@ -318,16 +361,51 @@
 {/if}
 
 <!-- The top row is the window's title bar too: it drags the window, a double click maximizes it. -->
-<header class="top">
+<header class="top" class:editing={frame.editing}>
   {#if onSetup === false}
     <Picker known={characters} {shown} {now} onpick={(key) => (picked = key)} onforget={(key) => void window.twinmap.forgetSheet(key)} />
   {/if}
   {#if !onSetup}
-    <nav aria-label={t('app.top.sections')}>
-      <button class="tab" title={t('app.top.map')} aria-label={t('app.top.map')} aria-current={frame.open === SPACES.indexOf('map') ? 'page' : undefined} onclick={() => ((onSettings = false), openSpace(SPACES.indexOf('map')))}><Glyph name="pin" size={18} /><span class="word">{t('app.top.map')}</span></button>
-      <button class="tab" title={t('app.top.character')} aria-label={t('app.top.character')} aria-current={frame.open === SPACES.indexOf('character') ? 'page' : undefined} onclick={() => ((onSettings = false), openSpace(SPACES.indexOf('character')))}><Glyph name="bag" size={18} /><span class="word">{t('app.top.character')}</span></button>
-      <!-- Its name gives first: Auction House, then AH, then the glyph alone with the others. -->
-      <button class="tab" title={t('app.top.auctionHouse')} aria-label={t('app.top.auctionHouse')} aria-current={frame.open === SPACES.indexOf('ah') ? 'page' : undefined} onclick={() => ((onSettings = false), openSpace(SPACES.indexOf('ah')))}><Glyph name="coins" size={18} /><span class="word long">{t('app.top.auctionHouse')}</span><span class="word short">{t('app.top.auctionHouseShort')}</span></button>
+    <nav aria-label={t('app.top.sections')} class:editing={frame.editing && frame.spaces.length > 1} class:many={frame.spaces.length > 3}>
+      {#each frame.spaces as space, i (space.id)}
+        {@const name = nameOf(space)}
+        {@const glyph = SPACE_GLYPHS[space.id]}
+        {#if naming === space.id}
+          <span class="tab naming" aria-current={frame.open === i ? 'page' : undefined}>
+            {#if glyph}<Glyph name={glyph} size={18} />{:else}<span class="letter" aria-hidden="true">{letterOf(name)}</span>{/if}
+            <input value={name} maxlength={NAME_MOST} aria-label={t('app.layout.rename')} use:chosen onblur={(e) => named(i, e.currentTarget.value)} onkeydown={(e) => (e.key === 'Enter' ? named(i, e.currentTarget.value) : e.key === 'Escape' ? named(i, null) : undefined)} />
+          </span>
+        {:else}
+          <!-- Its name gives first: Auction House, then AH, then the glyph alone with the others. A name the player wrote, or a
+               workspace they made, is the first letter of it alone. -->
+          <button
+            class="tab"
+            class:dragged={dragged === i}
+            class:before={landing?.at === i && !landing.after}
+            class:after={landing?.at === i && landing.after}
+            title={name}
+            aria-label={name}
+            aria-current={frame.open === i ? 'page' : undefined}
+            draggable={frame.editing}
+            ondragstart={(e) => spaceDrag(e, i)}
+            ondragover={(e) => spaceOver(e, i)}
+            ondragleave={() => landing?.at === i && (landing = null)}
+            ondrop={spaceDrop}
+            ondragend={() => (dragged = landing = null)}
+            ondblclick={() => frame.editing && (naming = space.id)}
+            onclick={() => ((onSettings = false), openSpace(i))}
+            >{#if glyph}<Glyph name={glyph} size={18} />{:else}<span class="letter" aria-hidden="true">{letterOf(name)}</span>{/if}{#if space.id === 'ah' && !space.name}<span class="word long">{t('app.top.auctionHouse')}</span><span class="word short">{t('app.top.auctionHouseShort')}</span>{:else}<span class="word">{name}</span>{/if}</button
+          >
+        {/if}
+        {#if frame.editing && frame.spaces.length > 1 && naming !== space.id}
+          <button class="unspace" title={t('app.layout.deleteSpace')} aria-label="{t('app.layout.deleteSpace')}: {name}" onclick={() => ((sure = adding = false), (deleting = space.id))}><Glyph name="close" size={12} /></button>
+        {/if}
+      {/each}
+      {#if frame.editing}
+        {@const most = frame.spaces.length >= MOST}
+        {@const say = most ? t('app.layout.spacesMost', { most: MOST }) : t('app.layout.newSpace')}
+        <button class="tab new" title={say} aria-label={say} disabled={most} onclick={() => ((onSettings = false), (naming = createSpace() ?? null))}><Glyph name="plus" size={16} /></button>
+      {/if}
     </nav>
     {#if onSetup === false}
       {@const editName = t('app.layout.edit', { ctrl: t('settings.keys.ctrl') })}
@@ -335,7 +413,7 @@
     {/if}
   {/if}
   {#if onSetup === false && mapReady}
-    <Search ready={mapReady} {pos} side={char?.side} onpick={(place) => (openSpace(SPACES.indexOf('map')), mapView?.goTo(place))} />
+    <Search ready={mapReady} {pos} side={char?.side} onpick={(place) => (reach('map'), mapView?.goTo(place))} />
   {/if}
   {#if status}
     <!-- The state of the link is the Pause button too: two bars to pause, the arrow of play to resume. -->
@@ -387,12 +465,17 @@
 {#if frame.editing}
   <!-- Edit layout: what can be done while the open workspace is unlocked. -->
   <div class="editbar" role="toolbar" aria-label={t('app.layout.editKey')} in:fly={drop(8)}>
-    {#if sure}
+    {#if deleting !== null}
+      {@const gone = frame.spaces.findIndex((s) => s.id === deleting)}
+      <span class="hint">{t('app.layout.deleteSure', { name: gone >= 0 ? nameOf(frame.spaces[gone]!) : '' })}</span>
+      <button class="btn" onclick={() => (removeSpace(gone), (deleting = null))}>{t('app.layout.deleteYes')}</button>
+      <button class="btn" onclick={() => (deleting = null)}>{t('app.layout.deleteNo')}</button>
+    {:else if sure}
       <span class="hint">{t('app.layout.restoreSure')}</span>
       <button class="btn" onclick={() => ((sure = false), restoreSpaces())}>{t('app.layout.restoreYes')}</button>
       <button class="btn" onclick={() => (sure = false)}>{t('app.layout.restoreNo')}</button>
     {:else}
-      <span class="hint">{t('app.layout.hint')}</span>
+      <span class="hint">{t('app.layout.hint')} {t('app.layout.hintSpaces')}</span>
       <span class="adding">
         <button class="btn" title={t('app.layout.addPanel')} aria-expanded={adding} disabled={!frame.missing.length} onclick={() => (adding = !adding)}><Glyph name="plus" /><span>{t('app.layout.addPanel')}</span></button>
         {#if adding && frame.missing.length}
@@ -404,9 +487,9 @@
         {/if}
       </span>
       <button class="btn" title={t('app.layout.reset')} onclick={() => ((adding = false), resetSpace())}><span>{t('app.layout.reset')}</span></button>
-      <button class="btn" title={t('app.layout.restore')} onclick={() => ((adding = false), (sure = true))}><span>{t('app.layout.restore')}</span></button>
+      <button class="btn" title={t('app.layout.restore')} onclick={() => ((adding = false), (deleting = null), (sure = true))}><span>{t('app.layout.restore')}</span></button>
     {/if}
-    <button class="btn done" onclick={() => ((adding = sure = false), edit(false))}><Glyph name="check" />{t('app.layout.done')}</button>
+    <button class="btn done" onclick={() => ((adding = sure = false), (deleting = null), edit(false))}><Glyph name="check" />{t('app.layout.done')}</button>
   </div>
 {/if}
 <div class="work" class:editing={frame.editing} class:shut={nowShut} class:map-right={layout.mapRight} in:fade={screen} style:--peek="{peek}px" bind:this={frameBox}></div>
@@ -486,7 +569,7 @@
       {journey}
       back={death ? back : null}
       met={alerts.filter((a) => a.met)}
-      onalerts={() => ((onSettings = false), openSpace(SPACES.indexOf('ah')), showAlerts++)}
+      onalerts={() => ((onSettings = false), reach('ah'), showAlerts++)}
       onsent={(t) => setRoute({ ...route, sent: true, t })}
       onskip={skip}
       onarrive={() => setRoute(advance(route))}
@@ -658,6 +741,103 @@
   }
   .status .dim {
     background: var(--text-off);
+  }
+
+  /* The workspaces at the top while the layout is unlocked: a cross on each tab, a + after them, a tab dragged faint with a
+     gold line where it would land, and the name as a field. A workspace the player made has the first letter of its name. */
+  .letter {
+    display: inline-grid;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+    border: 1.5px solid currentColor;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .tab .word {
+    max-width: 14em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  nav.editing .tab {
+    padding-right: 32px;
+  }
+  .unspace {
+    flex: none;
+    align-self: center;
+    display: inline-grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    margin: 6px 6px 0 -26px;
+    padding: 0;
+    border: 0;
+    border-radius: 3px;
+    background: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    -webkit-app-region: no-drag;
+  }
+  .unspace:hover {
+    background: #0008;
+    color: var(--text);
+  }
+  .tab.new {
+    padding: 0 10px;
+    border: 1px dashed var(--bronze-600);
+    border-bottom: 0;
+    color: var(--text-dim);
+  }
+  .tab.new:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+  .tab.dragged {
+    opacity: 0.45;
+  }
+  .tab.before {
+    box-shadow: inset 3px 0 0 var(--gold);
+  }
+  .tab.after {
+    box-shadow: inset -3px 0 0 var(--gold);
+  }
+  .tab.naming input {
+    width: 7em;
+    height: 24px;
+    padding: 0 4px;
+    border: 1px solid var(--gold);
+    border-radius: 3px;
+    background: var(--stone-950);
+    font: var(--t-nav);
+    color: var(--gold);
+    outline: none;
+  }
+  /* More than three workspaces: where the row runs short, only the open one keeps its name, then none. While the layout
+     is unlocked the search leaves the row to the crosses and the +, and with more than three workspaces only the open
+     one keeps its name; where the row runs short, its cross too. */
+  @media (max-width: 1500px) {
+    :global(html:not(.web)) nav.many .tab:not([aria-current]) .word {
+      display: none;
+    }
+    nav.many.editing .tab:not([aria-current]) {
+      padding-right: 14px;
+    }
+    nav.many.editing .tab:not([aria-current]) + .unspace {
+      display: none;
+    }
+  }
+  .top.editing :global(.search) {
+    display: none;
+  }
+  nav.many.editing .tab:not([aria-current]) .word {
+    display: none;
+  }
+  @media (max-width: 1100px) {
+    :global(html:not(.web)) nav.many .tab .word {
+      display: none;
+    }
   }
 
   /* The workspaces under the top row (frame.svelte.ts): the open one seen, the others laid out and hidden. */
