@@ -90,6 +90,7 @@ export default {
     follow: '打开/关闭跟随',
     north: '地图随角色转向，或保持北方朝上',
     side: '地图移到面板另一侧',
+    spaces: '顶部的分区，从左到右',
     // GS VIDEO_OPTIONS_FULLSCREEN.
     fullScreen: '全屏幕',
     // Chinese keyboards print Ctrl (GS CTRL_KEY "CTRL键").

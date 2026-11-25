@@ -88,6 +88,7 @@ export default {
     follow: 'Следовать: вкл./выкл.',
     north: 'Карта поворачивается вместе с вашим персонажем или север вверху',
     side: 'Карта на другую сторону панели',
+    spaces: 'Разделы сверху, слева направо',
     fullScreen: 'Полноэкранный режим',
     // Russian keyboards print Ctrl (GS CTRL_KEY "CTRL").
     ctrl: 'Ctrl',

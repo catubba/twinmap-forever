@@ -3,8 +3,8 @@ export default {
   top: {
     sections: 'Bereiche',
     now: 'Jetzt',
-    // "Inventar": Gegenstände is too long for a tab in a narrow window, where the character's name would vanish.
-    items: 'Inventar',
+    map: 'Karte',
+    character: 'Charakter',
     auctionHouse: 'Auktionshaus',
     // As German players write it.
     auctionHouseShort: 'AH',
@@ -80,7 +80,6 @@ export default {
     levelPercent: 'Stufe {level}, {percent} %',
     xp: '{xp} von {max} EP',
     experience: 'Erfahrung',
-    width: 'Breite der Seitenleiste',
     widthHint: 'Ziehen, um die Größe zu ändern. Doppelklick zum Zurücksetzen.',
   },
 

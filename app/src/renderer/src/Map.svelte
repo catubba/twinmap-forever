@@ -3,7 +3,7 @@
   // character as an arrow. It follows the character until the player drags the map away.
   // Inside a dungeon or a raid it shows that instead: its rooms, its bosses, its entrance.
   import { TILES } from './web'
-  import { layout as sides, setMapRight } from './layout.svelte'
+  import { layout as sides, setMapRight } from './frame.svelte'
   import type { Terrain } from './terrain3d'
   import type { Compass } from './compass'
   import { Arrow3d } from './arrow3d'

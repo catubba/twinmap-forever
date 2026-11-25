@@ -3,7 +3,8 @@ export default {
   top: {
     sections: 'Secciones',
     now: 'Ahora',
-    items: 'Objetos',
+    map: 'Mapa',
+    character: 'Personaje',
     auctionHouse: 'Casa de subastas',
     // The game has no short form of Casa de subastas: CS, as players write it.
     auctionHouseShort: 'CS',
@@ -81,7 +82,6 @@ export default {
     levelPercent: 'Nivel {level}, {percent}%',
     xp: '{xp} de {max} PE',
     experience: 'Experiencia',
-    width: 'Ancho del panel',
     widthHint: 'Arrastra para cambiar el tamaño. Haz doble clic para restablecer.',
   },
 

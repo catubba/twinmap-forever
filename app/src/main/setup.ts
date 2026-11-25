@@ -4,6 +4,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { after, type SetupStatus } from '../shared/setup'
 import { ZOOMS } from '../shared/window'
+import { workspacesOf, type Workspaces } from '../shared/workspaces'
 import { questieFile } from './questie'
 import { shortestPathFolder } from './walk'
 
@@ -36,6 +37,8 @@ export interface Settings {
   langAsked?: boolean
   /** The version of the app whose news the player last saw (WhatsNew.svelte); missing for one who had Twinmap before that window. */
   seenVersion?: string
+  /** The workspaces of the window and the one open (M20), as the renderer laid them out; missing until it first did. */
+  workspaces?: Workspaces
 }
 
 /** The settings as they were saved; nothing where the file is missing or is not ours. */
@@ -43,7 +46,8 @@ export function readSettings(file: string): Settings {
   try {
     const read: unknown = JSON.parse(readFileSync(file, 'utf8'))
     if (typeof read !== 'object' || !read) return {}
-    const { gameFolder, setupDone, onTop, lan, lanCode, participate, zoom, noGpu, lang, langAsked, seenVersion } = read as Record<string, unknown>
+    const { gameFolder, setupDone, onTop, lan, lanCode, participate, zoom, noGpu, lang, langAsked, seenVersion, workspaces } = read as Record<string, unknown>
+    const spaces = workspacesOf(workspaces)
     return {
       ...(typeof gameFolder === 'string' ? { gameFolder } : {}),
       ...(setupDone === true ? { setupDone } : {}),
@@ -56,6 +60,7 @@ export function readSettings(file: string): Settings {
       ...(typeof lanCode === 'string' && /^[\w-]{8,64}$/.test(lanCode) ? { lanCode } : {}),
       ...(typeof lang === 'string' && /^([a-z]{2}[A-Z]{2}|pseudo(-[a-z]{2})?)$/.test(lang) ? { lang } : {}),
       ...(typeof seenVersion === 'string' && /^\d+\.\d+\.\d+$/.test(seenVersion) ? { seenVersion } : {}),
+      ...(spaces ? { workspaces: spaces } : {}),
     }
   } catch {
     return {}

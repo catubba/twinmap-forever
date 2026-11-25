@@ -3,7 +3,8 @@ export default {
   top: {
     sections: '分区',
     now: '当前',
-    items: '物品',
+    map: '地图',
+    character: '角色',
     auctionHouse: '拍卖行',
     auctionHouseShort: '拍卖',
     pause: '暂停Twinmap',
@@ -83,7 +84,6 @@ export default {
     // As the game (GS EXPERIENCE_COLON "经验值：", GS XP_TEXT "%s / %s").
     xp: '经验值：{xp} / {max}',
     experience: '经验值',
-    width: '面板宽度',
     widthHint: '拖动以调整大小。双击以重置。',
   },
 

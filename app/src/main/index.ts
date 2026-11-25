@@ -31,6 +31,7 @@ import type { Answer, Asked, Placed, Sources } from './questie-worker'
 import startQuestieWorker from './questie-worker?nodeWorker'
 import { sendSamples, startSamples } from './samples'
 import { langFor, langNow, offerAll, offered, planned, setLang, t } from '../shared/i18n'
+import { workspacesOf } from '../shared/workspaces'
 import { addonHearsFonts, addonsFolder, askLangOf, newsSinceOf, readSettings, setupStatus, writeSettings } from './setup'
 import { hear, installChannel, removeSlots, send as sendSignal, sendOld, sentParts } from './signal'
 import { MAPS_FILE, servedFile } from './tiles'
@@ -554,7 +555,7 @@ function createWindow(): void {
   // turns it on in the settings. The same page, the same map files, and what a page may ask for above.
   let lan: Lan | null = null
   let lanWord: SetupStatus['lan'] = null
-  const lookSetup = (): SetupStatus => ({ ...setupStatus(gameFolder, settings, app.getVersion()), ...(process.platform === 'darwin' ? { mac: true, ...(!captureAllowed() ? { screenRecording: false } : {}) } : {}), lan: lanWord, zoom: settings.zoom ?? 1, gpu: { chosen: settings.noGpu !== true, running: GPU }, lang: langNow(), langs: planned(), gameLang: gameLang(), askLang, newsSince: newsSinceOf(settings, app.getVersion()) })
+  const lookSetup = (): SetupStatus => ({ ...setupStatus(gameFolder, settings, app.getVersion()), ...(process.platform === 'darwin' ? { mac: true, ...(!captureAllowed() ? { screenRecording: false } : {}) } : {}), lan: lanWord, zoom: settings.zoom ?? 1, gpu: { chosen: settings.noGpu !== true, running: GPU }, lang: langNow(), langs: planned(), gameLang: gameLang(), askLang, newsSince: newsSinceOf(settings, app.getVersion()), ...(settings.workspaces ? { workspaces: settings.workspaces } : {}) })
   const lanUrl = async (): Promise<void> => {
     const address = await homeAddress()
     if (lan) lanWord = address ? { url: `http://${address}:${LAN_PORT}/?k=${settings.lanCode}` } : { error: t('app.main.noNetwork') }
@@ -871,6 +872,14 @@ function createWindow(): void {
   // The window after the update closed, never asked again: with Done the language shown is kept, with the cross the
   // app stays in English, as it was before the update.
   // What's new closed (WhatsNew.svelte): this version's news are seen, and show again only from Settings.
+  // The workspaces as the window laid them out (M20): kept as they are, for the next start. Not told back to the page,
+  // which has them already.
+  ipcMain.handle('set-workspaces', (_event, kept: unknown) => {
+    const spaces = workspacesOf(kept)
+    if (!spaces) return
+    settings.workspaces = spaces
+    writeSettings(settingsFile, settings)
+  })
   ipcMain.handle('news-seen', () => {
     settings.seenVersion = app.getVersion()
     writeSettings(settingsFile, settings)
