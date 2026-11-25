@@ -22,6 +22,7 @@ export default {
     editKey: 'Editar disposición',
     hint: 'Arrastra una pestaña al borde de un panel para ponerla al lado, o a su centro para agruparlas.',
     addPanel: 'Añadir panel',
+    pull: 'Arrástralo a un panel para sacarlo, o haz clic para ponerlo bajo Ahora',
     reset: 'Restablecer este espacio de trabajo',
     restore: 'Restaurar los espacios de trabajo predeterminados',
     restoreSure: '¿Dejar todos los espacios de trabajo como al principio?',
@@ -104,6 +105,7 @@ export default {
     levelPercent: 'Nivel {level}, {percent} %',
     xp: '{xp} de {max} PE',
     experience: 'Experiencia',
+    emptyExperience: 'Tu nivel aparece aquí en cuanto juegues con el addon Twinmap Forever activado.',
     widthHint: 'Arrastra para cambiar el tamaño. Haz doble clic para reiniciar.',
   },
 
@@ -133,6 +135,11 @@ export default {
     otherContinent: 'En el otro continente',
     finding: 'Buscando el trayecto',
     updateHint: 'Actualiza Shortest Path y el addon Twinmap Forever para ver aquí todo el trayecto',
+    emptyAttention: 'Nada requiere tu atención ahora. Aquí aparecen una muerte o una alerta de la casa de subastas que se cumpla.',
+    emptyPins: 'Aún no has guardado ninguna marca. Haz clic en un lugar del mapa y guárdalo para tenerlo aquí.',
+    emptyQuests: 'No hay misiones en tu registro. Acepta una en el juego y aparecerá aquí.',
+    emptyNearby: 'No hay nadie cerca. Sigue andando: aquí aparecerán los mercaderes, instructores y maestros de vuelo de alrededor.',
+    allOut: 'Cada bloque de Ahora está en su propio panel. Cierra un panel para traer su bloque de vuelta aquí.',
   },
 
   journey: {

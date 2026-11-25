@@ -21,6 +21,7 @@ export default {
     editKey: '编辑布局',
     hint: '把标签拖到面板边缘可并排放置，拖到中间可合为一组。',
     addPanel: '添加面板',
+    pull: '拖到面板上即可取出，或点击放到“当前”下方',
     reset: '重置此工作区',
     restore: '恢复默认工作区',
     restoreSure: '要把所有工作区恢复到最初的样子吗？',
@@ -106,6 +107,7 @@ export default {
     // As the game (GS EXPERIENCE_COLON "经验值：", GS XP_TEXT "%s / %s").
     xp: '经验值：{xp} / {max}',
     experience: '经验值',
+    emptyExperience: '开启Twinmap Forever插件游玩后，你的等级会显示在这里。',
     widthHint: '拖动以调整大小。双击以重置。',
   },
 
@@ -137,6 +139,11 @@ export default {
     // "行程" is Shortest Path's journey; "路线" stays Twinmap's own Route (l10n.md).
     finding: '正在规划行程',
     updateHint: '更新Shortest Path和Twinmap Forever插件，即可在这里看到完整行程',
+    emptyAttention: '现在没有需要处理的事。死亡或达成条件的拍卖行提醒会显示在这里。',
+    emptyPins: '还没有保存的标记。点击地图上的地点并保存，即可在这里保留。',
+    emptyQuests: '任务日志中没有任务。在游戏中接受一个任务，它就会显示在这里。',
+    emptyNearby: '附近没有人。继续前进，周围的商人、训练师和飞行管理员会显示在这里。',
+    allOut: '“当前”的每个区块都在各自的面板中。关闭面板即可把它的区块放回这里。',
   },
 
   journey: {
