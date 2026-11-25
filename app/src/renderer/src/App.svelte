@@ -1082,8 +1082,9 @@
     height: 100%;
     overflow: hidden;
     background: #000;
-    /* What lies over the map asks how wide it is: on a narrow one things move out of each other's way. */
-    container-type: inline-size;
+    /* What lies over the map asks how wide and how tall it is: on a narrow one things move out of each other's way, on a
+       low one the menus scroll inside it. */
+    container-type: size;
   }
   /* The bronze frame, 10 px all round, and a vignette that keeps the eye in the middle. */
   .mapbox::after {
