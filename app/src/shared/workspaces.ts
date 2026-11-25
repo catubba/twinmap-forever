@@ -5,7 +5,7 @@
 export const WORKSPACES_VERSION = 1
 
 /** The panels there are, by their id: a panel of a layout kept that is none of these is taken out. */
-export const PANELS = ['map', 'now', 'items', 'ah'] as const
+export const PANELS = ['map', 'now', 'items', 'ah', 'next', 'attention', 'pins', 'quests', 'nearby', 'experience'] as const
 
 /** A workspace by its id; the name the player gave it, if any (without, the default one in the language spoken, never
  * translated once written); its layout as dockview gives it (toJSON). */

@@ -22,6 +22,7 @@ export default {
     editKey: '배치 편집',
     hint: '탭을 패널 가장자리로 끌면 옆에 놓이고, 가운데로 끌면 함께 묶입니다.',
     addPanel: '패널 추가',
+    pull: '패널로 끌어 꺼내거나, 클릭하여 현재 아래에 놓으십시오',
     reset: '이 작업 공간 초기화',
     restore: '기본 작업 공간 복원',
     restoreSure: '모든 작업 공간을 처음 상태로 되돌리시겠습니까?',
@@ -108,6 +109,7 @@ export default {
     levelPercent: '레벨 {level}, {percent}%',
     xp: '경험치 {xp} / {max}',
     experience: '경험치',
+    emptyExperience: 'Twinmap Forever 애드온을 켜고 플레이하면 레벨이 여기에 표시됩니다.',
     widthHint: '끌어서 크기를 조절합니다. 두 번 클릭하면 초기화됩니다.',
   },
 
@@ -139,6 +141,11 @@ export default {
     finding: '이동 경로 찾는 중',
     // Rewritten so no particle follows Shortest Path.
     updateHint: 'Shortest Path, Twinmap Forever 애드온을 업데이트하면 전체 이동 경로가 여기에 표시됩니다',
+    emptyAttention: '지금은 확인할 것이 없습니다. 죽음이나 조건이 충족된 경매장 알림이 여기에 표시됩니다.',
+    emptyPins: '저장한 핀이 아직 없습니다. 지도에서 장소를 클릭하고 저장하면 여기에 표시됩니다.',
+    emptyQuests: '퀘스트 목록에 퀘스트가 없습니다. 게임에서 퀘스트를 수락하면 여기에 표시됩니다.',
+    emptyNearby: '주변에 아무도 없습니다. 이동하면 주변의 상인, 상급자, 비행 조련사가 여기에 표시됩니다.',
+    allOut: '현재의 모든 블록이 각자의 패널에 있습니다. 패널을 닫으면 그 블록이 여기로 돌아옵니다.',
   },
 
   journey: {

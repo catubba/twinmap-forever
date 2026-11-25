@@ -37,6 +37,8 @@ export default {
     hint: 'Drag a tab to the edge of a panel to put it beside, or to its middle to group them.',
     // The buttons of the bar: short. addPanel opens the list of the panels the tab open has not.
     addPanel: 'Add panel',
+    // On each block of Now while the layout is unlocked, a button with an icon: read aloud and on hover (M20-F7).
+    pull: 'Drag onto a panel to take it out, or click to put it under Now',
     reset: 'Reset this workspace',
     restore: 'Restore default workspaces',
     // In place of the bar's buttons after restore, before anything is changed: a question, then two buttons.
@@ -152,8 +154,10 @@ export default {
     levelPercent: 'Level {level}, {percent}%',
     // Under level, dim. {xp} and {max}: numbers of experience points.
     xp: '{xp} of {max} xp',
-    // The experience bar, read aloud only.
+    // The experience bar, read aloud only; the title of its panel too, once taken out of Now (M20-F7).
     experience: 'Experience',
+    // The panel Experience with no character known yet: what to do in the game.
+    emptyExperience: 'Your level shows here once you play with the Twinmap Forever addon on.',
     widthHint: 'Drag to resize. Double-click to reset.',
   },
 
@@ -190,6 +194,13 @@ export default {
     // The journey Shortest Path guides, while its first plan is still searched.
     finding: 'Finding the way',
     updateHint: 'Update Shortest Path and the Twinmap Forever addon to see the whole way here',
+    // A block of Now taken out into a panel of its own (M20-F7), with nothing to show: what to do in the game.
+    emptyAttention: 'Nothing needs you now. A death, or an auction alert that is met, shows here.',
+    emptyPins: 'No pin saved yet. Click a place on the map and Save it to keep it here.',
+    emptyQuests: 'No quest in your log. Accept one in the game and it shows here.',
+    emptyNearby: 'Nobody near. Walk on: the vendors, trainers and flight masters around you show here.',
+    // In the Now column once every block of it is in a panel of its own.
+    allOut: 'Every block of Now is in a panel of its own. Close a panel to bring its block back here.',
   },
 
   // Times of the journey of Shortest Path, at the right of its rows (shared/journey.ts): short.

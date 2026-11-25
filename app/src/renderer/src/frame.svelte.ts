@@ -6,6 +6,8 @@
 // Locked, the edges between panels move and nothing else; Edit layout unlocks the open workspace: its tabs are dragged
 // beside or into each other, a panel is closed or added, and a workspace or all of them go back to their defaults.
 // There too the workspaces themselves are made, renamed, moved and deleted, up to six (MOST).
+// The blocks of Now (PARTS) are sections too, whose home is their place in the column: a block a panel of the open
+// workspace holds is drawn there and not in the column; its panel closed, or another workspace opened, it goes back.
 import type { DockviewComponent as Dock, DockviewGroupPanel, IContentRenderer, SerializedDockview } from 'dockview-core'
 // The build with its styles in: the package's own entry has none, and there is no CSS file beside it.
 // @ts-expect-error no declaration for the UMD build
@@ -13,7 +15,7 @@ import * as built from 'dockview-core/dist/dockview-core.js'
 import { t } from '../../shared/i18n'
 import { MOST, NAME_MOST, PANELS, WORKSPACES_VERSION, type Workspaces } from '../../shared/workspaces'
 
-const { DockviewComponent } = built as typeof import('dockview-core')
+const { DockviewComponent, positionToDirection } = built as typeof import('dockview-core')
 
 /** The panel of Now beside the map: as wide as it was dragged, never under 260 px nor over half the window. */
 export const PANEL = { least: 260, start: 340 }
@@ -38,7 +40,20 @@ const TITLES: Record<string, () => string> = {
   now: () => t('app.top.now'),
   items: () => t('app.top.character'),
   ah: () => t('app.top.auctionHouse'),
+  next: () => t('map.nextStop.title'),
+  attention: () => t('app.now.attention'),
+  pins: () => t('app.now.pins'),
+  quests: () => t('app.now.quests'),
+  nearby: () => t('app.now.nearby'),
+  experience: () => t('app.panel.experience'),
 }
+/** The name of a panel, in the language spoken now (Add panel, its tab). */
+export const titleOf = (id: string): string => TITLES[id]?.() ?? id
+
+/** The blocks of Now, each a panel of its own once taken out of the column. */
+export const PARTS = ['next', 'attention', 'pins', 'quests', 'nearby', 'experience'] as const
+/** What a block of Now carries while its handle is dragged: its id. */
+export const PART_DRAG = 'application/x-twinmap-part'
 const NAMES: Record<string, () => string> = { map: TITLES.map!, character: TITLES.items!, ah: TITLES.ah! }
 
 /** The name a workspace has without one of the player's: the default ones' in the language spoken now. */
@@ -52,6 +67,8 @@ export const nameOf = (space: Space): string => space.name ?? nameFirst(space.id
 type Made = { dock: Dock; box: HTMLElement; seen: ResizeObserver; width?: number }
 const made: Made[] = []
 const sections = new Map<string, HTMLElement>()
+// Where a block of Now goes back to when no panel holds it: its place in the column.
+const homes = new Map<string, HTMLElement>()
 // The element dockview gives each panel, by workspace and panel.
 const hosts = new Map<string, HTMLElement>()
 const at = (space: string, id: string): string => `${space}:${id}`
@@ -65,12 +82,15 @@ let saving = 0
 export function section(node: HTMLElement, id: string): { destroy(): void } {
   sections.set(id, node)
   node.dataset.section = id
+  if ((PARTS as readonly string[]).includes(id) && node.parentElement) homes.set(id, node.parentElement)
   if (made.length) lay()
   return { destroy: () => sections.delete(id) }
 }
 
-// Into the stash, at the size it had: its ResizeObservers see no change.
+// Into the stash, at the size it had: its ResizeObservers see no change. A block of Now back into the column.
 function park(node: HTMLElement): void {
+  const home = homes.get(node.dataset.section ?? '')
+  if (home) return place(node, home)
   if (!stash || node.parentElement === stash) return
   const r = node.getBoundingClientRect()
   if (r.width && r.height) {
@@ -235,6 +255,19 @@ function make(space: Space, kept?: unknown, right?: boolean, wide?: number): voi
     me.width = lay0(dock, space.id, right, wide)
   }
   dress(dock)
+  // A block of Now dragged by its handle out of the column lands where it is dropped.
+  dock.onUnhandledDragOver((e) => {
+    if (frame.editing && (e.nativeEvent as DragEvent).dataTransfer?.types.includes(PART_DRAG)) e.accept()
+  })
+  dock.onDidDrop((e) => {
+    const id = (e.nativeEvent as DragEvent).dataTransfer?.getData(PART_DRAG)
+    if (!id || !TITLES[id] || has(dock, id)) return
+    const direction = positionToDirection(e.position)
+    dock.addPanel({ id, component: id, title: TITLES[id]!(), position: e.group ? { referenceGroup: e.group, direction } : { direction } })
+    dress(dock)
+    lay()
+    tell()
+  })
   dock.onDidLayoutChange(() => {
     side()
     if (made[frame.open] === me) tell()
@@ -318,11 +351,12 @@ export function edit(on: boolean): void {
   tell()
 }
 
-/** A panel the open workspace has not, on the right of it all, a third as wide. */
+/** A panel the open workspace has not, on the right of it all, a third as wide; a block of Now under the column. */
 export function add(id: string): void {
   const dock = made[frame.open]?.dock
   if (!dock || !TITLES[id] || has(dock, id)) return
-  dock.addPanel({ id, component: id, title: TITLES[id]!(), position: { direction: 'right' }, initialWidth: Math.round(dock.width / 3) })
+  if ((PARTS as readonly string[]).includes(id) && has(dock, 'now')) dock.addPanel({ id, component: id, title: TITLES[id]!(), position: { referencePanel: 'now', direction: 'below' } })
+  else dock.addPanel({ id, component: id, title: TITLES[id]!(), position: { direction: 'right' }, initialWidth: Math.round(dock.width / 3) })
   dress(dock)
   lay()
   tell()

@@ -21,6 +21,7 @@ export default {
     editKey: 'Modifier la disposition',
     hint: 'Faites glisser un onglet au bord d’un panneau pour le placer à côté, ou en son milieu pour les regrouper.',
     addPanel: 'Ajouter un panneau',
+    pull: 'Faites-le glisser sur un panneau pour le sortir, ou cliquez pour le placer sous Maintenant',
     reset: 'Réinitialiser cet espace de travail',
     restore: 'Rétablir les espaces de travail par défaut',
     restoreSure: 'Remettre chaque espace de travail comme au début ?',
@@ -102,6 +103,7 @@ export default {
     levelPercent: 'Niveau {level}, {percent} %',
     xp: '{xp} sur {max} EXP',
     experience: 'Expérience',
+    emptyExperience: 'Votre niveau s’affiche ici dès que vous jouez avec l’addon Twinmap Forever activé.',
     widthHint: 'Faites glisser pour redimensionner. Double-cliquez pour réinitialiser.',
   },
 
@@ -133,6 +135,11 @@ export default {
     otherContinent: 'Sur l’autre continent',
     finding: 'Recherche du trajet',
     updateHint: 'Mettez à jour Shortest Path et l’addon Twinmap Forever pour voir ici tout le trajet',
+    emptyAttention: 'Rien ne vous attend pour l’instant. Une mort, ou une alerte de l’Hôtel des ventes atteinte, s’affiche ici.',
+    emptyPins: 'Aucun repère enregistré pour l’instant. Cliquez sur un lieu de la carte et enregistrez-le pour le garder ici.',
+    emptyQuests: 'Aucune quête dans votre journal. Acceptez-en une en jeu et elle s’affichera ici.',
+    emptyNearby: 'Personne à proximité. Avancez : les marchands, maîtres et maîtres de vol autour de vous s’afficheront ici.',
+    allOut: 'Chaque bloc de Maintenant est dans son propre panneau. Fermez un panneau pour ramener son bloc ici.',
   },
 
   journey: {
