@@ -64,6 +64,8 @@ export default {
       // The doors of the dungeons on the world map.
       dungeons: 'Dungeons',
       routes: 'Flight routes',
+      // The ships and zeppelins between two docks, and their docks.
+      vessels: 'Ships and zeppelins',
       // The skulls of the bosses on the map of a dungeon.
       bosses: 'Bosses in a dungeon',
       // The other members of the character's group.
@@ -122,6 +124,9 @@ export default {
     rewardXp: '{xp} XP',
     // On the door of a dungeon, and on the entrance inside its map.
     entrance: 'Entrance',
+    // On a dock, where a ship or a zeppelin goes from there. {place}: the game's name of each place, with commas.
+    shipTo: 'Ship to {place}',
+    zeppelinTo: 'Zeppelin to {place}',
     // On the entrance inside the map of a dungeon of several wings. {name}: the wing.
     entranceOf: 'Entrance: {name}',
     // The name of a boss under its skull, on the map of a dungeon, when it is not there in every run. {name}: the boss.

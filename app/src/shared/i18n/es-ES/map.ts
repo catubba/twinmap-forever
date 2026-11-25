@@ -45,6 +45,7 @@ export default {
       caves: 'Cuevas',
       dungeons: 'Mazmorras',
       routes: 'Rutas de vuelo',
+      vessels: 'Barcos y zepelines',
       bosses: 'Jefes de mazmorra',
       companions: 'Grupo',
     },
@@ -83,6 +84,8 @@ export default {
   pins: {
     rewardXp: '{xp} PE',
     entrance: 'Entrada',
+    shipTo: 'Barco: {place}',
+    zeppelinTo: 'Zepelín: {place}',
     entranceOf: 'Entrada: {name}',
     // Rare as the game's map legend says it for creatures in esES.
     rareBoss: '{name} (poco común)',

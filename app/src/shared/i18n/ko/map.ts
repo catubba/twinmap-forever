@@ -50,6 +50,7 @@ export default {
       caves: '동굴',
       dungeons: '던전',
       routes: '비행 경로',
+      vessels: '배와 비행선',
       bosses: '던전 우두머리',
       companions: '파티',
     },
@@ -89,6 +90,8 @@ export default {
   pins: {
     rewardXp: '경험치 {xp}',
     entrance: '입구',
+    shipTo: '배: {place}',
+    zeppelinTo: '비행선: {place}',
     entranceOf: '입구: {name}',
     // Rare as the game's map legend says it for creatures (glossary).
     rareBoss: '{name} (희귀)',

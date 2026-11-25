@@ -46,6 +46,7 @@ export default {
       caves: 'Пещеры',
       dungeons: 'Подземелья',
       routes: 'Маршруты полетов',
+      vessels: 'Корабли и дирижабли',
       bosses: 'Боссы подземелий',
       companions: 'Группа',
     },
@@ -85,6 +86,8 @@ export default {
   pins: {
     rewardXp: '{xp} опыта',
     entrance: 'Вход',
+    shipTo: 'Корабль: {place}',
+    zeppelinTo: 'Дирижабль: {place}',
     entranceOf: 'Вход: {name}',
     // Rare as the game's map legend says it for creatures (glossary): neuter, so it does not agree with the boss's name.
     rareBoss: '{name} (редкое)',

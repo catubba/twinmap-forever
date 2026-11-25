@@ -45,6 +45,7 @@ export default {
       caves: 'Grottes',
       dungeons: 'Donjons',
       routes: 'Trajets aériens',
+      vessels: 'Bateaux et zeppelins',
       bosses: 'Boss des donjons',
       companions: 'Groupe',
     },
@@ -84,6 +85,8 @@ export default {
   pins: {
     rewardXp: '{xp} EXP',
     entrance: 'Entrée',
+    shipTo: 'Bateau : {place}',
+    zeppelinTo: 'Zeppelin : {place}',
     entranceOf: 'Entrée : {name}',
     rareBoss: '{name} (rare)',
     graveyard: 'Cimetière',
