@@ -271,7 +271,7 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
     }
     this.buildings = new Buildings(this.renderer)
     this.scene.add(this.buildings.group)
-    this.props = new Props(this.renderer)
+    this.props = new Props(this.renderer, (x, z) => this.buildings.cutAt(x, z))
     this.scene.add(this.props.group)
     this.controls = new MapControls(this.camera, this.renderer.domElement)
     this.controls.enableDamping = true

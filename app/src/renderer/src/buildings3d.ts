@@ -76,6 +76,15 @@ export class Buildings {
     return this.cuts.size > 0
   }
 
+  /**
+   * The height a building inside the ground standing at x, z (as buildings.json has it, to the yard) is cut at now, or
+   * null when it is not on show: its trees and objects are cut the same way (props3d.ts).
+   */
+  cutAt(x: number, z: number): number | null {
+    for (const c of this.cuts.values()) if (Math.abs(c.x - x) < 1 && Math.abs(c.z - z) < 1) return c.plane.constant
+    return null
+  }
+
   /** The continent shown, by its folder. */
   show(folder: string): void {
     if (folder === this.folder) return

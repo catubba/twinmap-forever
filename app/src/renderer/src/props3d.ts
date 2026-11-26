@@ -3,11 +3,13 @@
 // (one instanced mesh a piece). Turned on and off in Settings > Graphics (graphics.svelte.ts): trees, with how many of
 // them, and objects. The user's choices on the prototype design/props/ (design/ROADMAP.md, M23-F6): trees are scenery,
 // never in the way of the ground, the roads or the character, so the woods are thinned (main/props.ts) and no leaves are
-// drawn within LEAVES yards of the character.
+// drawn within LEAVES yards of the character. The copies of a building inside the ground (Ironforge, Undercity, a mine:
+// M23-F17) are drawn as their building is (buildings3d.ts): before the ground, cut at the height its plane is at, and
+// not at all while it is not on show.
 import * as THREE from 'three'
 import { decodeDxtCutout } from '../../shared/blp'
 import { DXT_KIND, type TexKind } from '../../shared/buildings'
-import { KEPT_BITS, type Density, type PropBlocks, type PropHead, type PropPiece } from '../../shared/props'
+import { COPY, KEPT_BITS, type Density, type PropBlocks, type PropHead, type PropPiece } from '../../shared/props'
 import { BLOCK_YARDS } from '../../shared/world'
 import { inflated } from './terrain3d'
 import { TILES } from './web'
@@ -32,9 +34,11 @@ interface Model {
   meshes?: THREE.InstancedMesh[]
   matrices?: THREE.InstancedBufferAttribute
   textures?: number[]
+  /** Its copies in buildings inside the ground: drawn apart, each cut at its building's height (cut), from where its building stands (at). */
+  under?: { meshes: THREE.InstancedMesh[]; matrices: THREE.InstancedBufferAttribute; cut: THREE.InstancedBufferAttribute; at: number[] }
   used: number
 }
-/** The copies of a block: of each model, 13 floats a copy (main/props.ts). */
+/** The copies of a block: of each model, COPY floats a copy (main/props.ts). */
 type Block = Map<number, Float32Array> | 'loading' | 'none'
 
 export class Props {
@@ -57,7 +61,11 @@ export class Props {
   private from = new THREE.Vector3(Infinity, 0, 0)
   private readonly center = { value: new THREE.Vector3() }
 
-  constructor(private renderer: THREE.WebGLRenderer) {}
+  /** cutAt: the height a building inside the ground is cut at now, null when it is not on show (Buildings.cutAt). */
+  constructor(
+    private renderer: THREE.WebGLRenderer,
+    private cutAt: (x: number, z: number) => number | null,
+  ) {}
 
   /** The continent shown, by its folder. */
   show(folder: string): void {
@@ -128,7 +136,28 @@ export class Props {
       this.choose()
       changed = true
     }
-    return changed
+    return this.cut() || changed
+  }
+
+  // The copies inside the ground cut where their buildings are; true when one has moved.
+  private cut(): boolean {
+    let moved = false
+    for (const m of this.models.values()) {
+      const u = m.under
+      if (!u || !u.meshes[0]!.count) continue
+      const a = u.cut.array as Float32Array
+      let shown = false
+      for (let i = 0; i < u.meshes[0]!.count; i++) {
+        const h = this.cutAt(u.at[i * 2]!, u.at[i * 2 + 1]!) ?? -1e9
+        shown ||= h > -1e9
+        if (Math.abs(a[i]! - h) < 0.05) continue
+        a[i] = h
+        moved = true
+      }
+      if (moved) u.cut.needsUpdate = true
+      for (const mesh of u.meshes) mesh.visible = shown
+    }
+    return moved
   }
 
   // A block's copies, a few at a time.
@@ -144,8 +173,8 @@ export class Props {
         const view = new DataView(b.buffer, b.byteOffset, b.byteLength), byModel = new Map<number, Float32Array>()
         for (let k = 0, at = 4; k < view.getUint32(0, true); k++) {
           const file = view.getUint32(at, true), count = view.getUint32(at + 4, true)
-          byModel.set(file, new Float32Array(b.buffer.slice(b.byteOffset + at + 8, b.byteOffset + at + 8 + count * 52)))
-          at += 8 + count * 52
+          byModel.set(file, new Float32Array(b.buffer.slice(b.byteOffset + at + 8, b.byteOffset + at + 8 + count * COPY * 4)))
+          at += 8 + count * COPY * 4
         }
         this.blocks.set(key, byModel)
       })
@@ -168,32 +197,78 @@ export class Props {
       if (m.state !== 'in') continue
       const lists = copies.get(file) ?? []
       const show = m.tree ? this.trees : this.objects
-      let n = 0
-      for (const l of lists) for (let i = 0; i < l.length; i += 13) if (show && (!m.tree || (l[i + 12]! & bit))) n++
-      if (n > m.matrices!.count) {
-        m.matrices = new THREE.InstancedBufferAttribute(new Float32Array(Math.ceil(n * 1.25) * 16), 16)
-        for (const mesh of m.meshes!) mesh.instanceMatrix = m.matrices
+      // in the open, and in buildings inside the ground (their x not a number when not)
+      const open: number[] = [], under: number[] = []
+      if (show) for (const l of lists) for (let i = 0; i < l.length; i += COPY) if (!m.tree || (l[i + 12]! & bit)) (Number.isNaN(l[i + 13]!) ? open : under).push(i, lists.indexOf(l))
+      m.matrices = this.fill(m.meshes!, m.matrices!, lists, open)
+      if (under.length) m.under ??= this.underOf(m)
+      if (m.under) {
+        m.under.matrices = this.fill(m.under.meshes, m.under.matrices, lists, under)
+        m.under.at = []
+        for (let k = 0; k < under.length; k += 2) m.under.at.push(lists[under[k + 1]!]![under[k]! + 13]!, lists[under[k + 1]!]![under[k]! + 14]!)
+        if (m.under.cut.count < under.length / 2) {
+          m.under.cut = new THREE.InstancedBufferAttribute(new Float32Array(m.under.matrices.count), 1)
+          for (const mesh of m.under.meshes) mesh.geometry.setAttribute('cut', m.under.cut)
+        }
+        ;(m.under.cut.array as Float32Array).fill(-1e9)
+        m.under.cut.needsUpdate = true
       }
-      const a = m.matrices!.array as Float32Array
-      let k = 0
-      if (n)
-        for (const l of lists)
-          for (let i = 0; i < l.length; i += 13) {
-            if (m.tree && !(l[i + 12]! & bit)) continue
-            // a 3 x 4 matrix column by column into a 4 x 4 one
-            a.set([l[i]!, l[i + 1]!, l[i + 2]!, 0, l[i + 3]!, l[i + 4]!, l[i + 5]!, 0, l[i + 6]!, l[i + 7]!, l[i + 8]!, 0, l[i + 9]!, l[i + 10]!, l[i + 11]!, 1], k * 16)
-            k++
-          }
-      m.matrices!.needsUpdate = true
-      for (const mesh of m.meshes!) {
-        mesh.count = n
-        mesh.visible = n > 0
-        mesh.boundingSphere = null
-        if (n) mesh.computeBoundingSphere()
-      }
-      if (n) m.used = this.frame
+      if (open.length || under.length) m.used = this.frame
     }
     this.evict()
+  }
+
+  // The copies given (their start and list, two numbers each) into the matrices of the meshes, grown when they do not fit: the matrices then.
+  private fill(meshes: THREE.InstancedMesh[], matrices: THREE.InstancedBufferAttribute, lists: Float32Array[], copies: number[]): THREE.InstancedBufferAttribute {
+    const n = copies.length / 2
+    if (n > matrices.count) {
+      matrices = new THREE.InstancedBufferAttribute(new Float32Array(Math.ceil(n * 1.25) * 16), 16)
+      for (const mesh of meshes) mesh.instanceMatrix = matrices
+    }
+    const a = matrices.array as Float32Array
+    for (let k = 0; k < n; k++) {
+      const l = lists[copies[k * 2 + 1]!]!, i = copies[k * 2]!
+      // a 3 x 4 matrix column by column into a 4 x 4 one
+      a.set([l[i]!, l[i + 1]!, l[i + 2]!, 0, l[i + 3]!, l[i + 4]!, l[i + 5]!, 0, l[i + 6]!, l[i + 7]!, l[i + 8]!, 0, l[i + 9]!, l[i + 10]!, l[i + 11]!, 1], k * 16)
+    }
+    matrices.needsUpdate = true
+    for (const mesh of meshes) {
+      mesh.count = n
+      mesh.visible = n > 0
+      mesh.boundingSphere = null
+      if (n) mesh.computeBoundingSphere()
+    }
+    return matrices
+  }
+
+  // A model's meshes for its copies inside the ground: its geometries with a height to cut at by copy, its materials
+  // cutting there, drawn before the ground as the buildings inside it.
+  private underOf(m: Model): NonNullable<Model['under']> {
+    const matrices = new THREE.InstancedBufferAttribute(new Float32Array(16), 16), cut = new THREE.InstancedBufferAttribute(new Float32Array(1), 1)
+    const meshes = m.meshes!.map((mesh) => {
+      const g = new THREE.BufferGeometry()
+      for (const [name, a] of Object.entries(mesh.geometry.attributes)) g.setAttribute(name, a)
+      g.setIndex(mesh.geometry.index)
+      g.setAttribute('cut', cut)
+      const material = (mesh.material as THREE.Material).clone()
+      const before = material.onBeforeCompile
+      material.onBeforeCompile = (shader, r) => {
+        before.call(material, shader, r)
+        shader.vertexShader = shader.vertexShader
+          .replace('#include <common>', '#include <common>\nattribute float cut;\nvarying float vCut;\nvarying float vHigh;')
+          .replace('#include <project_vertex>', '#include <project_vertex>\nvCut = cut;\nvHigh = (modelMatrix * instanceMatrix * vec4(transformed, 1.0)).y;')
+        shader.fragmentShader = shader.fragmentShader
+          .replace('#include <common>', '#include <common>\nvarying float vCut;\nvarying float vHigh;')
+          .replace('void main() {', 'void main() {\n  if (vHigh > vCut) discard;')
+      }
+      material.customProgramCacheKey = () => 'cut ' + (m.tree ? 'tree' : '')
+      const under = new THREE.InstancedMesh(g, material, 0)
+      under.instanceMatrix = matrices
+      under.renderOrder = -2
+      this.group.add(under)
+      return under
+    })
+    return { meshes, matrices, cut, at: [] }
   }
 
   // A model wanted: read when it is not, a few at a time.
@@ -228,7 +303,11 @@ export class Props {
     }
   }
 
-  private dispose(m: Pick<Required<Model>, 'meshes' | 'textures'>): void {
+  private dispose(m: Pick<Required<Model>, 'meshes' | 'textures'> & Pick<Model, 'under'>): void {
+    for (const mesh of m.under?.meshes ?? []) {
+      this.group.remove(mesh)
+      ;(mesh.material as THREE.Material).dispose()
+    }
     for (const mesh of m.meshes) {
       this.group.remove(mesh)
       mesh.geometry.dispose()
