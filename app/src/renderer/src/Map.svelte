@@ -26,7 +26,7 @@
   import { addFix, BEHIND, PERIOD, TURN, turnAt, whereAt, type Fix, type Turn } from '../../shared/glide'
   import { boxOf, buildingsAt, killedIn, nameOfBoss, piecesIn, RARE_BOSSES, roomPixels, yardsInside, YARDS_PER_UNIT, type Box, type InteriorMap, type Interiors, type Piece, type UnderRoom, type Yards } from '../../shared/inside'
   import type { Continent, GameMap } from '../../shared/maps'
-  import { objectiveGroups, questXp, type QuestPin, type QuestReward } from '../../shared/quests'
+  import { objectiveAreas, objectiveGroups, questXp, xpDrop, type QuestPin, type QuestReward } from '../../shared/quests'
   import { coins } from '../../shared/items'
   import { gatherColour, GATHER_SKILL, HERBS, iconOf, ORES, panelFor, serves, type FixedLayer, type FixedPin, type Travel } from '../../shared/services'
   import { pictureOfBlock, tileOfPicture } from '../../shared/pixels'
@@ -47,12 +47,13 @@
   import { kept as keptByApp } from './kept.svelte'
   import { ARRIVE, pinOfMark, removePin, renamePin, savedAt, savedFrom, savePin, yardsBetween, type SavedPin } from '../../shared/saved'
   import { markPart, sendState, type GameMark, type Inbox, type Pin } from '../../shared/send'
-  import { companionPin, pin, pinSize, playerPin, type PinName } from './marks'
+  import { companionPin, pin, pinSize, playerPin } from './marks'
+  import { objectives, questPin } from './packs.svelte'
   import { COLOURS } from './look'
 
   // at: when the position was read off the game, in milliseconds.
   // insideReady: the rooms of the buildings are converted, and their list can be asked for.
-  let { pos, group = [], at: readAt, insideReady, quests = [], fixed = [], side, live = false, inbox = null, removed = [], set = [], gameFollows = null, journey = null, route = noRoute(), onroute, onnpc, kills, death = null, skills, xpLevel, back = $bindable(null), looking = $bindable(null) }: { kills?: unknown; skills?: unknown; xpLevel?: number | null; death?: Death | null; back?: (DeathPlace & { name: string; door: boolean }) | null; looking?: { zone: string; where: string } | null; journey?: Journey | null; pos: Position | undefined; at: number | undefined; insideReady: boolean; quests?: QuestPin[]; fixed?: FixedPin[]; side?: string; live?: boolean; inbox?: Inbox | null; removed?: string[]; set?: GameMark[]; gameFollows?: Pin | null; route?: Route; onroute?: (stop: Stop) => void; onnpc?: (pin: FixedPin | null) => void; group?: Companion[] } = $props()
+  let { pos, group = [], at: readAt, insideReady, quests = [], fixed = [], side, live = false, inbox = null, removed = [], set = [], gameFollows = null, journey = null, route = noRoute(), marked = [], onroute, onnpc, kills, death = null, skills, xpLevel, back = $bindable(null), looking = $bindable(null) }: { kills?: unknown; skills?: unknown; xpLevel?: number | null; death?: Death | null; back?: (DeathPlace & { name: string; door: boolean }) | null; looking?: { zone: string; where: string } | null; journey?: Journey | null; pos: Position | undefined; at: number | undefined; insideReady: boolean; quests?: QuestPin[]; fixed?: FixedPin[]; side?: string; live?: boolean; inbox?: Inbox | null; removed?: string[]; set?: GameMark[]; gameFollows?: Pin | null; route?: Route; marked?: number[]; onroute?: (stop: Stop) => void; onnpc?: (pin: FixedPin | null) => void; group?: Companion[] } = $props()
 
   const TOP_ZOOM = 7 // the detail of the game itself: the picture of a block is four tiles
   const BLANK = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=='
@@ -64,6 +65,9 @@
   const ALWAYS_INSIDE = [1455]
   const ROOFED = new Set([1458])
   const CITY_UNDER = 3e6 // square yards: a zone map smaller than this is a city
+  const AREA_REACH = 0.49 // map units (65 yards): an objective's area is the ground this near one of its places, which come
+  // at least 4% of a zone apart (SPREAD in main/questie.ts); chosen by the player on the preview, over 93 and 47 yards
+  const AREA_CELL = 0.1 // traced on cells of 13 yards
   const PIN_ZOOM = 3.5 // under this zoom the pins of a zone lie on each other: they are not shown
   const GATHER = 26 // pixels: from far, the quests to take (or to hand in) nearer than this to each other are one pin
   const QUEST_ZOOM = 2 // the quests to take and to hand in are few: they are shown from farther, as the doors of the dungeons are
@@ -1243,6 +1247,9 @@
     if (!r || (!xp && !r.copper)) return null
     const line = Object.assign(document.createElement('span'), { className: 'reward' })
     if (xp) line.append(t('map.pins.rewardXp', { xp: num(xp) }))
+    // In the purple of the XP bar, after the XP: from which level it drops, or that it has.
+    const drop = xp && xpLevel ? xpDrop(r.level!, xpLevel) : null
+    if (drop !== null) line.append(Object.assign(document.createElement('span'), { className: 'drop', textContent: ` · ${drop === 'less' ? t('map.pins.lessXp') : t('map.pins.lessXpFrom', { level: drop })}` }))
     if (r.copper) {
       if (xp) line.append(' \u00b7 ')
       for (const [n, coin] of coins(r.copper)) line.append(num(n), Object.assign(document.createElement('i'), { className: `coin ${coin}` }))
@@ -1259,6 +1266,12 @@
   }
   const QUEST_PINS = { available: ['quest', 'available', 500], turnin: ['turnin', 'turnin', 1000], objective: ['objective', 'objectives', 0] } as const
   const DIM = 0.25 // the opacity of a pin that is not of the quest in front
+  // The objectives' areas, when they are drawn as areas: traced again only when the quests or the continent change.
+  const areas = $derived.by(() => {
+    if (objectives.look !== 'areas') return []
+    const zones = new Map(maps.filter((m) => m.level === 'zone' && m.rect && m.area && m.continent === continent).map((m) => [m.area, m]))
+    return objectiveAreas(quests.flatMap((p) => (p.type === 'objective' && zones.get(p.area)?.rect ? [{ p, ...unitsOfPlace(zones.get(p.area)!.rect!, p.x, p.y) }] : [])), AREA_REACH, AREA_CELL)
+  })
   let front = $state<string | null>(null) // the quest picked, or pointed at, in the Now column: its pins in front of the rest
   $effect(() => {
     for (const group of Object.values(questLayers)) group.clearLayers()
@@ -1266,7 +1279,13 @@
     const lit = (quests: string[]): number => (front === null || quests.includes(front) ? 1 : DIM)
     // From far the pins to take, and those to hand in, that would lie on each other are one, in their middle: it names them all, and a click goes near enough to tell them apart.
     const far = zoom < PIN_ZOOM ? zoom : null
-    const placed = quests.flatMap((p) => {
+    // Low-level off: of the quests to take, those that already give less XP are left out, and a pin left with none.
+    const low = (p: QuestPin, quest: string): boolean => {
+      const r = p.rewards?.[quest]
+      return !!(r?.level && r.xp && xpLevel && xpDrop(r.level, xpLevel) === 'less')
+    }
+    const shown = layers.lowlevel ? quests : quests.flatMap((p) => (p.type !== 'available' ? [p] : p.quests.some((q) => !low(p, q)) ? [{ ...p, quests: p.quests.filter((q) => !low(p, q)) }] : []))
+    const placed = shown.flatMap((p) => {
       const zone = zones.get(p.area)
       return zone?.rect ? [{ p, zone, ...unitsOfPlace(zone.rect, p.x, p.y) }] : []
     })
@@ -1277,7 +1296,7 @@
       // Such a pin says "around here": it stands a little aside rather than on another pin or on the character's arrow.
       const taken: Point[] = [...[...alone].filter((q) => q.p.type !== 'objective'), ...(me && me.continent === continent ? [me.units] : [])]
       for (const group of groups) {
-        const [drawing, layer, above] = QUEST_PINS[group.type], size = pinSize(drawing), units = clearOf(group, taken, (size + 4) / 2 ** far)
+        const [drawing, layer, above] = QUEST_PINS[group.type], [size, html] = questPin(drawing), units = clearOf(group, taken, (size + 4) / 2 ** far)
         taken.push(units)
         const tip = document.createElement('span')
         group.of.forEach((q, i) => {
@@ -1285,7 +1304,7 @@
           tip.append(Object.assign(document.createElement('b'), { textContent: q.p.name }))
           questLines(tip, q.p)
         })
-        L.marker(at(units), { keyboard: false, zIndexOffset: above, opacity: lit(group.of.flatMap((q) => q.p.quests)), icon: L.divIcon({ className: 'door', iconSize: [size, size], html: pin(drawing) }) })
+        L.marker(at(units), { keyboard: false, zIndexOffset: above, opacity: lit(group.of.flatMap((q) => q.p.quests)), icon: L.divIcon({ className: 'door', iconSize: [size, size], html }) })
           .bindTooltip(tip, { direction: 'top', offset: [0, -size / 2], className: 'tip' })
           .on('click', () => map?.setView(at(units), PIN_ZOOM + 1.5))
           .addTo(questLayers[layer])
@@ -1302,8 +1321,8 @@
       const tip = document.createElement('span')
       tip.append(Object.assign(document.createElement('b'), { textContent: p.name }))
       questLines(tip, p)
-      const size = pinSize(drawing)
-      L.marker(at(unitsOfPlace(zone.rect, p.x, p.y)), { keyboard: false, zIndexOffset: above, opacity: lit(p.quests), icon: L.divIcon({ className: 'door', iconSize: [size, size], html: pin(drawing) }) })
+      const [size, html] = questPin(drawing)
+      L.marker(at(unitsOfPlace(zone.rect, p.x, p.y)), { keyboard: false, zIndexOffset: above, opacity: lit(p.quests), icon: L.divIcon({ className: 'door', iconSize: [size, size], html }) })
         .bindTooltip(tip, { direction: 'top', offset: [0, -size / 2], className: 'tip' })
         .on('click', () => label(p, zone))
         .addTo(questLayers[layer])
@@ -1311,8 +1330,24 @@
     // The objectives are many: those near each other that ask for the same thing are one pin, drawn by what they ask for,
     // with the number of quests it is for when more than one. A click on it goes nearer, where they part; on one alone, its label.
     if (far !== null) return
+    if (objectives.look === 'areas') {
+      // Areas in the style of the game's map: the quest in front over the rest, which are dim. Its name on the area.
+      for (const a of [...areas].sort((a, b) => Number(lit([a.quest])) - Number(lit([b.quest])))) {
+        const on = lit([a.quest]) === 1, reward = rewardLine(placed.find((q) => q.p.rewards?.[a.quest])?.p.rewards?.[a.quest])
+        const tip = document.createElement('span')
+        tip.append(Object.assign(document.createElement('b'), { textContent: a.quest }))
+        if (reward) tip.append(document.createElement('br'), reward)
+        // Each quest its own colour, in the order of the quests (no two alike up to eight). With a quest in front its area is drawn strong and the rest faint; with none, all alike, the rim thin where they overlap.
+        const strong = on && front !== null
+        const colour = COLOURS.areas[areas.indexOf(a) % COLOURS.areas.length]!
+        L.polygon(a.rings.map((ring) => ring.map((p) => at(p))), { color: colour, weight: strong ? 2.5 : 1, opacity: strong ? 0.95 : on ? 0.8 : 0.15, fillColor: colour, fillOpacity: strong ? 0.4 : on ? 0.2 : 0.06 })
+          .bindTooltip(tip, { sticky: true, direction: 'top', className: 'tip' })
+          .addTo(questLayers.objectives)
+      }
+      return
+    }
     for (const g of objectiveGroups([...alone].filter((q) => q.p.type === 'objective'), GATHER / 2 ** zoom, front)) {
-      const drawing: PinName = g.kind ?? 'objective', size = pinSize(drawing), one = g.of.length === 1 ? g.of[0]! : null
+      const [size, html] = questPin(g.kind ?? 'objective'), one = g.of.length === 1 ? g.of[0]! : null
       const tip = document.createElement('span')
       if (one) {
         tip.append(Object.assign(document.createElement('b'), { textContent: one.p.name }))
@@ -1325,7 +1360,7 @@
           if (reward) tip.append(document.createElement('br'), reward)
         })
       const count = g.quests.length > 1 ? `<b class="count">${g.quests.length}</b>` : ''
-      L.marker(at(g), { keyboard: false, zIndexOffset: g.lit ? 0 : -100, opacity: g.lit ? 1 : DIM, icon: L.divIcon({ className: 'door', iconSize: [size, size], html: pin(drawing) + count }) })
+      L.marker(at(g), { keyboard: false, zIndexOffset: g.lit ? 0 : -100, opacity: g.lit ? 1 : DIM, icon: L.divIcon({ className: 'door', iconSize: [size, size], html: html + count }) })
         .bindTooltip(tip, { direction: 'top', offset: [0, -size / 2], className: 'tip' })
         .on('click', () => {
           if (one) label(one.p, one.zone)
@@ -1439,7 +1474,10 @@
     for (const service of [false, true]) {
       for (const { pin: p, at: where, zone } of laid) {
         const shown = (layer: FixedLayer): boolean => layers[layer] && far >= FIXED_ZOOM[layer]
-        if ((p.side !== undefined) !== service || !((p.layers.some(shown) && kindShown(p)) || labelledAt(where)) || !view.contains(where)) continue
+        // The vendors of the shopping list (M10-F19, marked) too, at any zoom, in the ring of a row pointed at in Now.
+        const listed = p.npc !== undefined && marked.includes(p.npc)
+        if ((p.side !== undefined) !== service || !((p.layers.some(shown) && kindShown(p)) || labelledAt(where) || listed) || !view.contains(where)) continue
+        if (listed) L.marker(where, { interactive: false, keyboard: false, icon: L.divIcon({ className: 'ring', iconSize: [34, 34] }) }).addTo(fixedGroup)
         // The radius is what the pointer feels, smaller than the picture: two people a few yards apart both answer.
         new FixedPinMark(where, { renderer: fixedCanvas, radius: 7, lozenge: !service, fillColor: service ? COLOURS.service : COLOURS.resource, picture: pictureOf(iconOf(p, shown)), bubblingMouseEvents: false })
           // Made when the pointer comes over the pin, not for every pin. Names come from the
@@ -1471,7 +1509,7 @@
     drawFixed()
   })
   $effect(() => {
-    void [inside, ...Object.values(layers), kindsOff, hideGrey, skills]
+    void [inside, ...Object.values(layers), kindsOff, hideGrey, skills, marked]
     drawFixed()
   })
 
@@ -2537,5 +2575,8 @@
   }
   .map :global(.tip .reward) {
     color: var(--text-dim);
+  }
+  .map :global(.tip .drop) {
+    color: var(--xp-top);
   }
 </style>

@@ -2,7 +2,7 @@
   // The Professions panel of the Character workspace (M20-F10), from the sheet the app keeps for the character shown: on the
   // left each profession with its level, the main ones first; on the right the recipes of the one chosen, those known in the
   // colours of the game's window, the most useful first, then dimmed those its window lists and the character has not
-  // learned (shared/professions.ts). It reads the same with the game closed.
+  // learned (shared/professions.ts). It reads the same with the game closed. A + on a recipe puts it on the shopping list (M10-F19).
   import type { Known } from '../../shared/characters'
   import { t } from '../../shared/i18n'
   import { professionsOf, type Recipe } from '../../shared/professions'
@@ -11,7 +11,7 @@
   import { askSpellFacts, spellFacts } from './spell-facts.svelte'
   import { TILES } from './web'
 
-  let { sheets, shown, ready }: { sheets: Sheets; shown: Known | null; ready: boolean } = $props()
+  let { sheets, shown, ready, onadd }: { sheets: Sheets; shown: Known | null; ready: boolean; onadd?: (item: number, spell: number) => void } = $props()
 
   $effect(() => {
     if (ready) askSpellFacts()
@@ -42,6 +42,10 @@
     <img src={picture(r)} alt="" onerror={(e) => e.currentTarget.setAttribute('style', 'visibility: hidden')} />
     <span class={no ? '' : r.difficulty}>{r.name}</span>
     {#if no}<em>{r.yellow}</em>{/if}
+    {#if onadd && r.item}
+      {@const add = t('items.shopping.add', { item: r.name })}
+      <button class="plus" aria-label={add} title={add} onclick={() => onadd(r.item, r.spell)}>+</button>
+    {/if}
   </li>
 {/snippet}
 
@@ -303,6 +307,23 @@
   }
   li span {
     min-width: 0;
+  }
+  /* The + of the shopping list, as on a trainer's recipes: shown under the pointer. */
+  li .plus {
+    margin-left: auto;
+    opacity: 0;
+  }
+  li em + .plus {
+    margin-left: 0;
+  }
+  li:hover .plus,
+  li .plus:focus-visible {
+    opacity: 1;
+  }
+  @media (hover: none) {
+    li .plus {
+      opacity: 1;
+    }
   }
   li em {
     margin-left: auto;

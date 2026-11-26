@@ -35,6 +35,7 @@ export default {
       // The game's map legend for quests to hand in.
       turnin: '완료',
       objectives: '임무',
+      lowlevel: '저레벨 퀘스트',
       flight: '비행 조련사',
       inn: '여관주인',
       vendors: '상인',
@@ -89,6 +90,8 @@ export default {
 
   pins: {
     rewardXp: '경험치 {xp}',
+    lessXpFrom: '{level}레벨부터 감소',
+    lessXp: '감소됨',
     entrance: '입구',
     shipTo: '배: {place}',
     zeppelinTo: '비행선: {place}',

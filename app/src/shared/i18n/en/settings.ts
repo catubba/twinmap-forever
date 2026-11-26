@@ -61,6 +61,25 @@ export default {
     default: 'Default',
   },
 
+  // In Appearance, under the arrow: a dropdown of the icons of the quest pins on the map. Its other two choices are the
+  // names Twinmap and Questie, never translated.
+  icons: {
+    label: 'Map icons',
+    // The choice of the game's own icons.
+    game: 'Game',
+    // Under the dropdown.
+    hint: "For quests to take, quests to hand in and objectives. Where the chosen icons have none, Twinmap's is shown.",
+  },
+
+  // Under the map icons: a dropdown, the objectives of quests drawn as icons or as areas, as the game's map draws them.
+  objectives: {
+    label: 'Objectives',
+    icons: 'Icons',
+    areas: 'Areas',
+    // Under the dropdown. Questie is a name, never translated.
+    hint: "Areas, as on the game's map, are drawn round the places where Questie puts each objective.",
+  },
+
   // In Graphics: what the 3D view draws, each a switch, and the hardware acceleration (window.gpu) under its own subtitle.
   graphics: {
     // A subtitle over the switches of what the 3D view draws.

@@ -184,6 +184,10 @@ export default {
     nearby: 'Nearby',
     // The word of a row, in its second cell: short.
     handIn: 'Hand in',
+    // After the name of a quest in its row, small and purple, never cut: the level from which it gives less XP (the next or the one after). {level}: a number.
+    lessXpAt: 'less XP at {level}',
+    // The same where it gives less XP already.
+    lessXp: 'less XP',
     objective: 'Objective',
     quest: 'Quest',
     // Dead: the way back to life, to the door of a dungeon or to the corpse.

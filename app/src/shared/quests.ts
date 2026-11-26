@@ -72,6 +72,87 @@ export function objectiveGroups<T extends { x: number; y: number; p: QuestPin }>
   )
 }
 
+type Spot = { x: number; y: number }
+/** Where a quest's objectives are, as the game's map draws an area: rings of points (an area may be in pieces, and have holes). */
+export interface ObjectiveArea {
+  quest: string
+  rings: Spot[][]
+}
+/**
+ * The objectives as areas (M21-F5); the game's own are the server's and never told to an addon. For each quest, all
+ * the ground within reach of one of its places, traced on a grid of cells (marching squares): places near each other
+ * make one area that follows them, a place alone a round one.
+ */
+export function objectiveAreas(placed: { x: number; y: number; p: QuestPin }[], reach: number, cell: number): ObjectiveArea[] {
+  const quests = [...new Set(placed.flatMap((q) => q.p.quests))]
+  // Each group of places that may touch on its own grid: a grid over all of a quest's places would cover the ground
+  // between places far apart, up to a whole continent.
+  return quests.map((quest) => ({ quest, rings: touching(placed.filter((q) => q.p.quests.includes(quest)), 2 * (reach + cell)).flatMap((g) => outline(g, reach, cell)) }))
+}
+/** The points in groups: two nearer than within to each other are in one group, and so is a third near either. */
+function touching<T extends Spot>(points: T[], within: number): T[][] {
+  let groups: T[][] = []
+  for (const p of points) {
+    const near = groups.filter((g) => g.some((q) => Math.hypot(q.x - p.x, q.y - p.y) <= within))
+    groups = [...groups.filter((g) => !near.includes(g)), [p, ...near.flat()]]
+  }
+  return groups
+}
+/** The edge of the ground within reach of some of the points, as closed rings. */
+function outline(points: Spot[], reach: number, cell: number): Spot[][] {
+  const margin = reach + 2 * cell
+  const x0 = Math.min(...points.map((p) => p.x)) - margin, y0 = Math.min(...points.map((p) => p.y)) - margin
+  const nx = Math.ceil((Math.max(...points.map((p) => p.x)) + margin - x0) / cell) + 1, ny = Math.ceil((Math.max(...points.map((p) => p.y)) + margin - y0) / cell) + 1
+  // How far inside each corner of the grid is: reach less the way to the nearest point, under 0 outside.
+  const inside = new Float64Array(nx * ny).fill(-reach)
+  const span = Math.ceil(reach / cell) + 1
+  for (const p of points) {
+    const ci = Math.round((p.x - x0) / cell), cj = Math.round((p.y - y0) / cell)
+    for (let j = Math.max(0, cj - span); j <= Math.min(ny - 1, cj + span); j++)
+      for (let i = Math.max(0, ci - span); i <= Math.min(nx - 1, ci + span); i++) {
+        const v = reach - Math.hypot(x0 + i * cell - p.x, y0 + j * cell - p.y)
+        if (v > inside[j * nx + i]!) inside[j * nx + i] = v
+      }
+  }
+  const at = (i: number, j: number): number => inside[j * nx + i]!
+  // Where the edge crosses the side of a cell between two corners, as a key and a point: h from (i, j) east, v south.
+  const cross = (i: number, j: number, side: 'h' | 'v'): [string, Spot] => {
+    const [a, b] = side === 'h' ? [at(i, j), at(i + 1, j)] : [at(i, j), at(i, j + 1)], t = a / (a - b)
+    return [`${i},${j}${side}`, side === 'h' ? { x: x0 + (i + t) * cell, y: y0 + j * cell } : { x: x0 + i * cell, y: y0 + (j + t) * cell }]
+  }
+  const ends = new Map<string, string[]>(), spots = new Map<string, Spot>()
+  const join = (a: [string, Spot], b: [string, Spot]): void => {
+    for (const [k, s] of [a, b]) spots.set(k, s)
+    ends.set(a[0], [...(ends.get(a[0]) ?? []), b[0]])
+    ends.set(b[0], [...(ends.get(b[0]) ?? []), a[0]])
+  }
+  for (let j = 0; j < ny - 1; j++)
+    for (let i = 0; i < nx - 1; i++) {
+      const corners = [at(i, j), at(i + 1, j), at(i + 1, j + 1), at(i, j + 1)].map((v) => v > 0)
+      if (corners.every((c) => c === corners[0])) continue // no edge here, as in most cells
+      const top = cross(i, j, 'h'), bottom = cross(i, j + 1, 'h'), left = cross(i, j, 'v'), right = cross(i + 1, j, 'v')
+      // The sides the edge crosses, in order round the cell: top, right, bottom, left.
+      const crossed = [top, right, bottom, left].filter((_, k) => corners[k] !== corners[(k + 1) % 4])
+      if (crossed.length === 2) join(crossed[0]!, crossed[1]!)
+      // Two corners inside across from each other: kept apart (the top left one joined to its two sides).
+      else if (crossed.length === 4) {
+        join(crossed[corners[0] ? 3 : 0]!, crossed[corners[0] ? 0 : 1]!)
+        join(crossed[corners[0] ? 1 : 2]!, crossed[corners[0] ? 2 : 3]!)
+      }
+    }
+  const rings: Spot[][] = [], walked = new Set<string>()
+  for (const start of ends.keys()) {
+    if (walked.has(start)) continue
+    const ring: Spot[] = []
+    for (let k: string | undefined = start; k && !walked.has(k); k = ends.get(k)!.find((n) => !walked.has(n))) {
+      walked.add(k)
+      ring.push(spots.get(k)!)
+    }
+    rings.push(ring)
+  }
+  return rings
+}
+
 /** What a quest gives: its XP at the level QuestieDB has it for, and the money the game's cache tells (copper). */
 export interface QuestReward {
   level?: number
@@ -85,6 +166,15 @@ export interface QuestReward {
 export function questXp(base: number, questLevel: number, level: number): number {
   const v = (base * Math.min(10, Math.max(1, 2 * (questLevel - level) + 20))) / 10
   return v <= 100 ? 5 * Math.floor((v + 2) / 5) : v <= 500 ? 10 * Math.floor((v + 5) / 10) : v <= 1000 ? 25 * Math.floor((v + 12) / 25) : 50 * Math.floor((v + 25) / 50)
+}
+
+/**
+ * Whether a quest's XP drops soon for a character (questXp: whole while the quest is at most five levels under it):
+ * 'less' when it gives less already, the level it drops at when that is the next level or the one after, else null.
+ */
+export function xpDrop(questLevel: number, level: number): 'less' | number | null {
+  const at = questLevel + 6
+  return level >= at ? 'less' : at - level <= 2 ? at : null
 }
 
 /** A quest of the log, by the name its pins carry. */

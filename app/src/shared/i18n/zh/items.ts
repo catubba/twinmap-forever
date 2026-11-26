@@ -359,6 +359,8 @@ export default {
     fewer: '减少一个',
     more: '增加一个',
     add: '加入购物清单：{item}',
+    onMap: '在地图上显示商人',
+    toRoute: '加入路线',
   },
 
   picker: {

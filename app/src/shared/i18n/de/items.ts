@@ -356,6 +356,8 @@ export default {
     fewer: 'Eins weniger',
     more: 'Eins mehr',
     add: '{item} zur Einkaufsliste hinzufügen',
+    onMap: 'Händler auf der Karte',
+    toRoute: 'Als Wegpunkte setzen',
   },
 
   picker: {

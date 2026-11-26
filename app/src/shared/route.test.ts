@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest'
 import type { GameMap } from './maps'
-import { addStop, advance, bandOf, followed, gameRouteFrom, inRoute, MAX_STOPS, moveStop, noRoute, removeStop, routeFrom, routeNews, type Route, type Stop } from './route'
+import { addStop, advance, bandOf, followed, gameRouteFrom, inRoute, inWalkOrder, MAX_STOPS, moveStop, noRoute, removeStop, routeFrom, routeNews, type Route, type Stop } from './route'
 
 const stop = (name: string, x: number, y = 0, continent: 0 | 1 = 0): Stop => ({ name, continent, at: { x, y }, pin: { m: 1432, x: 10, y: 20 } })
 const five = (): Route => ['a', 'b', 'c', 'd', 'e'].reduce((route, name, i) => addStop(route, stop(name, i)), noRoute())
@@ -85,4 +85,14 @@ test('the app follows the game along the route it sent, only forwards', () => {
   expect(followed({ ...sent, sent: false }, { t: 5, at: 4 }).next, 'changed since it was sent').toBe(1)
   expect(followed(sent, { t: 5, at: 9 }).next, 'done in the game').toBe(5)
   expect(followed(sent, null)).toBe(sent)
+})
+
+test('stops go in the order to walk them, each time the nearest on foot of those left', async () => {
+  const a = stop('a', 10), b = stop('b', 20), c = stop('c', 30), far = stop('far', 1, 0, 1)
+  // As the crow flies a, b, c; on foot c is nearer than b from a (a wall between a and b).
+  const foot = async (from: { x: number }, to: { x: number }[]): Promise<(number | null)[]> => to.map((p) => (from.x === 10 && p.x === 20 ? 999 : Math.abs(p.x - from.x)))
+  expect((await inWalkOrder({ continent: 0, at: { x: 0, y: 0 } }, [far, c, b, a], foot)).map((s) => s.name).join(' ')).toBe('a c b far')
+  // No way known at all: as the crow flies. The character nowhere known: as given.
+  expect((await inWalkOrder({ continent: 0, at: { x: 0, y: 0 } }, [c, a, b], async (_, to) => to.map(() => null))).map((s) => s.name).join('')).toBe('abc')
+  expect((await inWalkOrder(null, [c, a], foot)).map((s) => s.name).join('')).toBe('ca')
 })

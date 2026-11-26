@@ -40,6 +40,19 @@ export default {
     default: 'Standard',
   },
 
+  icons: {
+    label: 'Kartensymbole',
+    game: 'Spiel',
+    hint: 'Für verfügbare Quests, Quests zum Abgeben und Questziele. Wo die gewählten Symbole keines haben, erscheint das von Twinmap.',
+  },
+
+  objectives: {
+    label: 'Questziele',
+    icons: 'Symbole',
+    areas: 'Bereiche',
+    hint: 'Die Bereiche werden wie auf der Spielkarte um die Orte gezeichnet, an denen Questie jedes Questziel zeigt.',
+  },
+
   graphics: {
     view3d: '3D-Ansicht',
     buildings: 'Gebäude',

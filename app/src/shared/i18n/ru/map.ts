@@ -31,6 +31,7 @@ export default {
       // The game's map legend for quests to hand in.
       turnin: 'Готово к сдаче',
       objectives: 'Задачи',
+      lowlevel: 'Низкого уровня',
       flight: 'Распорядитель полетов',
       inn: 'Хозяин таверны',
       vendors: 'Торговцы',
@@ -85,6 +86,8 @@ export default {
 
   pins: {
     rewardXp: '{xp} опыта',
+    lessXpFrom: 'меньше с {level}-го уровня',
+    lessXp: 'снижен',
     entrance: 'Вход',
     shipTo: 'Корабль: {place}',
     zeppelinTo: 'Дирижабль: {place}',

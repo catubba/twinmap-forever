@@ -128,6 +128,8 @@ export default {
     nearby: '주변',
     // As the game (GS MAP_LEGEND_TURNIN, GS OBJECTIVES_LABEL).
     handIn: '완료',
+    lessXpAt: '{level}레벨부터 경험치 감소',
+    lessXp: '경험치 감소',
     objective: '임무',
     quest: '퀘스트',
     entrance: '입구',

@@ -15,6 +15,7 @@
   import { frame, layout, setMapRight } from './frame.svelte'
   import { arrow, setArrow } from './arrow.svelte'
   import { ARROW, ARROW_SIZES } from './look'
+  import { objectiveLooks, objectives, packs, questieHere, setObjectiveLook, setPack } from './packs.svelte'
   import { graphics, setGraphics } from './graphics.svelte'
   import { langNow, metresOn, metricOffered, num, t, type Key } from '../../shared/i18n'
 
@@ -122,6 +123,16 @@
           {#if arrow.colour !== ARROW.colour}<button class="btn" onclick={() => setArrow({ colour: ARROW.colour })}>{t('settings.arrow.default')}</button>{/if}
         </div>
         <label class="choice">{t('settings.arrow.size')} <select class="field size" value={arrow.size} onchange={(e) => setArrow({ size: Number(e.currentTarget.value) })}>{#each ARROW_SIZES as z (z)}<option value={z}>{num(z, { style: 'percent' })}</option>{/each}</select></label>
+      </div>
+      <!-- The icons of the quest pins (M21-F4): Twinmap's, the game's, or Questie's where Questie is installed. Twinmap and Questie are names: never translated. -->
+      <div class="setting">
+        <label class="choice">{t('settings.icons.label')} <select class="field size" value={packs.chosen === 'questie' && !questieHere() ? 'twinmap' : packs.chosen} onchange={(e) => setPack(e.currentTarget.value as typeof packs.chosen)}><option value="twinmap">Twinmap</option><option value="game">{t('settings.icons.game')}</option>{#if questieHere()}<option value="questie">Questie</option>{/if}</select></label>
+        <p class="hint">{t('settings.icons.hint')}</p>
+      </div>
+      <!-- The objectives of quests (M21-F5): as icons, or as areas in the style of the game's map. -->
+      <div class="setting">
+        <label class="choice">{t('settings.objectives.label')} <select class="field size" value={objectives.look} onchange={(e) => setObjectiveLook(e.currentTarget.value as typeof objectives.look)}>{#each objectiveLooks as look (look)}<option value={look}>{t(`settings.objectives.${look}`)}</option>{/each}</select></label>
+        <p class="hint">{t('settings.objectives.hint')}</p>
       </div>
     {:else if cat === 'graphics'}
       <!-- What the 3D view draws (M23, design/ui.md section 6): a switch each, kept by this window (graphics.svelte.ts). -->

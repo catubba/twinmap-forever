@@ -363,6 +363,8 @@ export default {
     fewer: '하나 줄이기',
     more: '하나 늘리기',
     add: '구매 목록에 추가: {item}',
+    onMap: '지도에 상인 표시',
+    toRoute: '경로에 추가',
   },
 
   picker: {

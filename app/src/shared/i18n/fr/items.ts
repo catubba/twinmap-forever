@@ -348,6 +348,8 @@ export default {
     fewer: 'Un de moins',
     more: 'Un de plus',
     add: 'Ajouter à la liste de courses : {item}',
+    onMap: 'Marchands sur la carte',
+    toRoute: 'Ajouter à l’itinéraire',
   },
 
   picker: {

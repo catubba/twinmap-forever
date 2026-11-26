@@ -8,7 +8,7 @@
   import type { Position } from '../../shared/game'
   import type { GameMap } from '../../shared/maps'
   import { nearbyRows, nearest, questRows, steady, wayOf, whereIs, type NowRow, type PlacelessRow } from '../../shared/now'
-  import type { LogQuest, QuestPin } from '../../shared/quests'
+  import { xpDrop, type LogQuest, type QuestPin } from '../../shared/quests'
   import { bandOf, routeNews, type Route, type Stop } from '../../shared/route'
   import { sendState, type Inbox } from '../../shared/send'
   import type { FixedPin } from '../../shared/services'
@@ -35,6 +35,7 @@
     log,
     fixed,
     side,
+    xpLevel, // the character's level, for XP: null at the level cap, undefined while it is not known
     ready,
     live,
     inbox,
@@ -60,6 +61,7 @@
     log: LogQuest[]
     fixed: FixedPin[]
     side?: string
+    xpLevel?: number | null
     ready: boolean
     live: boolean
     inbox: Inbox | null
@@ -103,6 +105,12 @@
   // Inside a dungeon the character has no place on a continent: the column is empty there.
   const me = $derived(pos?.inst ? null : whereIs(maps, pos))
   const around = $derived(nearbyRows(maps, quests, fixed, side))
+  // The level each quest's XP is reckoned at, from its pins: a quest row says when its XP drops (xpDrop).
+  const xpLevels = $derived(new Map(quests.flatMap((p) => Object.entries(p.rewards ?? {}).flatMap(([q, r]) => (r.level && r.xp ? [[q, r.level] as const] : [])))))
+  const dropOf = (row: NowRow): 'less' | number | null => {
+    const level = row.key.startsWith('q:') && xpLevel ? xpLevels.get(row.name) : undefined
+    return level === undefined ? null : xpDrop(level, xpLevel!)
+  }
 
   // The rows are ordered by the way on foot, and tell its yards: asked for all of them at once,
   // the quests of this continent and the nearest around as the crow flies.
@@ -209,8 +217,10 @@
       <!-- A place on the other continent has no distance to walk: the row still takes the map there. -->
       <!-- The yards are those on foot where a way is known; the arrow points at the place itself. -->
       {@const way = row.continent === me!.continent ? { ...wayOf(me!.at, row.at), ...(walked.yards(row.at) === undefined ? {} : { yards: walked.yards(row.at)! }) } : null}
+      {@const drop = dropOf(row)}
       <button class="row" title={way ? undefined : t('app.now.otherContinent')} aria-current={row.key === chosen} onclick={() => pick(row)} onpointerenter={() => (over = row)} onpointerleave={() => (over = null)} onfocus={() => (over = row)} onblur={() => (over = null)}>
-        <span>{row.name}</span>
+        <!-- A quest whose XP drops soon, or has: said after its name in the purple of the XP bar, never cut by the dots of a long name. -->
+        {#if drop === null}<span>{row.name}</span>{:else}<span class="named"><span>{row.name}</span><span class="drop">{drop === 'less' ? t('app.now.lessXp') : t('app.now.lessXpAt', { level: drop })}</span></span>{/if}
         <span class="t-{row.tone}">{row.kind}</span>
         <span class="num">{way ? distance(way.yards) : ''}</span>
         {#if way}<Glyph name="direction" size={12} turn={way.turn} />{/if}
@@ -343,6 +353,20 @@
   }
   .places > .row > :first-child {
     grid-column: 2;
+  }
+  .named {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+  }
+  .named > :first-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .drop {
+    flex: none;
+    font: var(--t-small);
+    color: var(--xp-top);
   }
   /* The rows with no place follow the others as one list, and are not for clicking. */
   .rows:has(+ .placeless) {

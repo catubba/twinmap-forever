@@ -4,7 +4,8 @@ import { endianness } from 'node:os'
 import { app } from 'electron'
 import koffi, { type LibraryHandle } from 'koffi'
 import type { Edge, WindowHandle } from './capture'
-import { clientPidFrom, commandLine, inWindow, isGame, parseSetup, programFrom, rgbFrom, stateOf, edgeRect, wineProgramPath } from './capture-linux-frame'
+import type { Rect } from '../shared/window'
+import { clientPidFrom, commandLine, inWindow, isGame, monitorsFrom, coveredMonitorEdgeRect, parseSetup, programFrom, rgbFrom, stateOf, wineProgramPath } from './capture-linux-frame'
 
 type NativeFunction = ReturnType<LibraryHandle['func']>
 // Keep Koffi's pointer value for native calls/free; only addresses support arithmetic.
@@ -17,6 +18,16 @@ function bindRes() {
     versionReply: res.func('void * xcb_res_query_version_reply(void *c, uint32_t cookie, _Out_ TwinmapXcbError **error)'),
     ids: res.func('uint32_t xcb_res_query_client_ids(void *c, uint32_t count, const void *specs)'),
     idsReply: res.func('void * xcb_res_query_client_ids_reply(void *c, uint32_t cookie, _Out_ TwinmapXcbError **error)'),
+  }
+}
+
+function bindRandr() {
+  const randr = koffi.load('libxcb-randr.so.0')
+  return {
+    version: randr.func('uint32_t xcb_randr_query_version(void *c, uint32_t major, uint32_t minor)'),
+    versionReply: randr.func('void * xcb_randr_query_version_reply(void *c, uint32_t cookie, _Out_ TwinmapXcbError **error)'),
+    monitors: randr.func('uint32_t xcb_randr_get_monitors(void *c, uint32_t window, uint8_t get_active)'),
+    monitorsReply: randr.func('void * xcb_randr_get_monitors_reply(void *c, uint32_t cookie, _Out_ TwinmapXcbError **error)'),
   }
 }
 
@@ -54,15 +65,18 @@ function bind() {
     copy: libc.func('void * memcpy(void *destination, uintptr_t source, size_t length)'),
     connection: null as NativePointer | null, root: 0,
     res: undefined as boolean | undefined,
+    randr: undefined as boolean | undefined,
     formatsByDepth: new Map<number, { bits: number; pad: number }>(),
     visualsById: new Map<number, { depth: number; trueColor: boolean }>(),
     atoms: new Map<string, number>(),
   }
 }
 type Native = ReturnType<typeof bind>
-type WindowInfo = { id: number; width: number; height: number; x: number; y: number; depth: number; visual: number; state: 'minimized' | 'open'; edges: ReturnType<typeof edgeRect> }
+type WindowInfo = { id: number; width: number; height: number; x: number; y: number; depth: number; visual: number; state: 'minimized' | 'open'; edges: ReturnType<typeof coveredMonitorEdgeRect> }
 let native: Native | undefined, bindings: Native | undefined, tried = false
 let resBindings: ReturnType<typeof bindRes> | null | undefined
+let randrBindings: ReturnType<typeof bindRandr> | null | undefined
+let monitorCache: { until: number; width: number; height: number; monitors: Rect[] } | undefined
 let checked: { id: number; until: number; info: WindowInfo | null } | undefined
 const problems = new Set<string>()
 
@@ -117,6 +131,7 @@ function connection(): Native | undefined {
     if (endianness() !== 'LE') throw new Error('only little-endian X11 clients are supported')
     n = bindings ??= bind()
     n.res = undefined
+    n.randr = undefined
     n.atoms.clear()
     n.formatsByDepth.clear()
     n.visualsById.clear()
@@ -194,6 +209,36 @@ function clientPid(n: Native, id: number): number | null {
     }
   } catch {}
   return null
+}
+
+function monitors(n: Native, width: number, height: number): Rect[] {
+  const now = performance.now()
+  if (monitorCache && monitorCache.until > now && monitorCache.width === width && monitorCache.height === height) return monitorCache.monitors
+  let rects: Rect[] = []
+  try {
+    if (n.randr === undefined) {
+      // Check the core protocol first: unsupported extension requests close XCB.
+      const present = reply(n, n.extensionReply, n.extension(n.connection, 5, 'RANDR'))
+      if (present && !present[8]) n.randr = false
+      else if (present) {
+        if (randrBindings === undefined) {
+          randrBindings = null // Remember a load failure across connections.
+          try { randrBindings = bindRandr() } catch {}
+        }
+        if (randrBindings) {
+          const version = reply(n, randrBindings.versionReply, randrBindings.version(n.connection, 1, 5))
+          if (version) n.randr = version.readUInt32LE(8) > 1 || (version.readUInt32LE(8) === 1 && version.readUInt32LE(12) >= 5)
+        } else n.randr = false
+      }
+    }
+    if (n.randr && randrBindings) {
+      const value = reply(n, randrBindings.monitorsReply, randrBindings.monitors(n.connection, n.root, 1))
+      if (value) rects = monitorsFrom(value)
+    }
+  } catch {}
+  if (n.randr === false) problem('RandR 1.5 monitors are not available; fullscreen edges use the X11 root bounds')
+  monitorCache = { until: now + 1000, width, height, monitors: rects }
+  return rects
 }
 
 function processOf(n: Native, id: number): { pid: number; args: string[]; executable: string | null } {
@@ -292,9 +337,10 @@ function windowInfo(n: Native, id: number): WindowInfo | null {
   const bounds = geometry && origin && {
     width: geometry.readUInt16LE(16), height: geometry.readUInt16LE(18), x: origin.readInt16LE(12), y: origin.readInt16LE(14),
   }
+  const rootWidth = root?.readUInt16LE(16) ?? 0, rootHeight = root?.readUInt16LE(18) ?? 0
   const info: WindowInfo | null = bounds && state !== 'gone' ? {
     ...bounds, id, depth: geometry![1]!, visual: attributes!.readUInt32LE(8), state,
-    edges: root ? edgeRect(bounds, root.readUInt16LE(16), root.readUInt16LE(18)) : null,
+    edges: root ? coveredMonitorEdgeRect(bounds, monitors(n, rootWidth, rootHeight), rootWidth, rootHeight) : null,
   } : null
   checked = { id, until: now + 100, info }
   return info
@@ -366,7 +412,7 @@ export function showsOnly(window: WindowHandle, x: number, y: number, size: numb
 export function readRow(window: WindowHandle, edge: Edge = 'top'): Buffer | null {
   const n = connection(), info = n && windowInfo(n, Number(window))
   if (!n || !info?.edges) return null
-  // Fullscreen Wine adds a black row below the screen, so take the edge from the part that fits the screen.
+  // Fullscreen Wine adds a black row; read the edge bounded by fully covered monitors (or the root).
   const { x, y, width, height } = info.edges
   const side = edge === 'left' || edge === 'right'
   return pixels(n, info, edge === 'right' ? x + width - 1 : x, edge === 'bottom' ? y + height - 1 : y, side ? 1 : width, side ? height : 1)
@@ -376,8 +422,10 @@ export function stopCapture(): void {
   if (native) {
     native.disconnect(native.connection)
     native.connection = null
+    native.randr = undefined
     native = undefined
   }
   checked = undefined
+  monitorCache = undefined
   tried = false
 }

@@ -122,6 +122,8 @@ export default {
     nearby: 'À proximité',
     // The game's "Rendre la quête", cut to its verb: the row already names the quest and the word must stay short.
     handIn: 'Rendre',
+    lessXpAt: 'moins d’EXP au niveau {level}',
+    lessXp: 'moins d’EXP',
     objective: 'Objectif',
     quest: 'Quête',
     entrance: 'Entrée',

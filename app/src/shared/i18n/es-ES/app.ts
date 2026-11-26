@@ -123,6 +123,8 @@ export default {
     quests: 'Misiones',
     nearby: 'Alrededores',
     handIn: 'Entregar',
+    lessXpAt: 'menos PE en nivel {level}',
+    lessXp: 'menos PE',
     objective: 'Objetivo',
     quest: 'Misión',
     entrance: 'Entrada',
