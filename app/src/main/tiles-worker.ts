@@ -21,6 +21,7 @@ import { LIQUID_TYPE_FILE, liquidOfName, WATER } from '../shared/water'
 import { WORLDS } from '../shared/world'
 import { gameLocale, installedBuild, openClientFiles, type ClientFiles } from './client-files'
 import { buildingsMade, buriedKey, makeBuildings } from './buildings'
+import { makeProps, propsMade } from './props'
 import { EncryptedFileError } from './client-files'
 import { convertInteriors, ENCOUNTERS_FILE, finishedInteriors, INTERIORS_FILE, MAP_FILE, mapEntries, placedIn, ROOM_PICTURES_FILE, roomPictures } from './interiors'
 import { sentKeys } from './keys'
@@ -334,6 +335,25 @@ try {
   } catch (e) {
     // The 3D view goes without them; tried again at the next start.
     parentPort?.postMessage({ buildings: { problem: e instanceof Error ? e.message : String(e) } })
+  }
+  // The trees and objects of the continents (props.ts), after the buildings, whose textures they share.
+  const propsStarted = Date.now()
+  try {
+    if (!propsMade(folder, WORLDS.map((w) => w.name))) {
+      const files = open()
+      const read = (id: number): Buffer | null => {
+        try {
+          return files.read(id)
+        } catch (e) {
+          if (e instanceof EncryptedFileError) return null
+          throw e
+        }
+      }
+      const made = makeProps(WORLDS.map((w) => ({ name: w.name, wdt: read(w.file)! })), read, folder)
+      parentPort?.postMessage({ buildings: { props: made, seconds: (Date.now() - propsStarted) / 1000 } })
+    }
+  } catch (e) {
+    parentPort?.postMessage({ buildings: { problem: `props: ${e instanceof Error ? e.message : String(e)}` } })
   }
 } catch (e) {
   tell({ state: 'failed', message: e instanceof Error ? e.message : String(e) })
