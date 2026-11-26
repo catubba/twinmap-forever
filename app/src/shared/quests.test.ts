@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { objectiveGroups, questXp, xpDrop, type ObjectiveKind } from './quests'
+import { objectiveAreas, objectiveGroups, questXp, xpDrop, type ObjectiveKind } from './quests'
 
 test('objectives near each other that ask for the same thing are one pin; a quest in front is gathered on its own', () => {
   const at = (x: number, kind: ObjectiveKind | undefined, quest: string) => ({ x, y: 0, p: { type: 'objective' as const, area: 1, x: 0, y: 0, kind, name: 'Tar Beast', quests: [quest] } })
@@ -27,4 +27,18 @@ test('a quest whose XP drops at the next level or the one after says from which;
   expect([16, 15, 14, 17, 18, 24].map((q) => xpDrop(q, 20)), 'at level 20').toEqual([22, 21, 'less', null, null, null])
   expect(questXp(1000, 16, 21), 'still whole the level before').toBe(1000)
   expect(questXp(1000, 16, 22), 'less from the level told').toBe(800)
+})
+
+test("objectives as areas: a quest's places near each other are one area round them, one far off another; a place for two quests is in both", () => {
+  const at = (x: number, y: number, quests: string[]) => ({ x, y, p: { type: 'objective' as const, area: 1, x: 0, y: 0, name: 'Murloc', quests } })
+  const areas = objectiveAreas([at(0, 0, ['Murlocs']), at(1, 0, ['Murlocs', 'Fish']), at(10, 10, ['Murlocs'])], 0.75, 0.05)
+  const murlocs = areas.find((a) => a.quest === 'Murlocs')!, fish = areas.find((a) => a.quest === 'Fish')!
+  expect(murlocs.rings.length, 'two places 1 apart, within twice 0.75, are one area; the one far off is another').toBe(2)
+  expect(fish.rings.length, 'the shared place is an area of the other quest too').toBe(1)
+  // Every point of a ring lies on the edge: as far as reach from the nearest place, within a cell.
+  const places = [[0, 0], [1, 0], [10, 10]]
+  for (const p of murlocs.rings.flat()) expect(Math.abs(Math.min(...places.map(([x, y]) => Math.hypot(p.x - x!, p.y - y!))) - 0.75)).toBeLessThan(0.05)
+  // A place alone: a ring round it, its area that of the circle.
+  const ring = fish.rings[0]!, area = Math.abs(ring.reduce((s, p, i) => s + p.x * ring[(i + 1) % ring.length]!.y - ring[(i + 1) % ring.length]!.x * p.y, 0)) / 2
+  expect(area).toBeCloseTo(Math.PI * 0.75 ** 2, 1)
 })

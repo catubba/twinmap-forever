@@ -7,6 +7,7 @@ export const COLOURS = {
   text: '#f3ead9', // what is drawn on a pin: a skull, a flag
   quest: '#ffd100',
   objective: '#ff5a4d',
+  areas: ['#ffd166', '#ef476f', '#06d6a0', '#4cc9f0', '#f78c6b', '#c77dff', '#8ac926', '#ff9f1c'], // objectives as areas: a colour each quest (M21-F5)
   service: '#7fc8ff',
   resource: '#d9a066',
   boss: '#a3201a',

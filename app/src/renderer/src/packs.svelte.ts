@@ -13,6 +13,14 @@ export function setPack(to: Pack): void {
   localStorage.setItem('icon-pack', to)
 }
 
+// The objectives as icons, or as areas in the style of the game's map (M21-F5): kept by this window, as the pack is.
+export const objectiveLooks = ['icons', 'areas'] as const
+export const objectives = $state({ look: localStorage.getItem('objective-look') === 'areas' ? 'areas' : ('icons' as (typeof objectiveLooks)[number]) })
+export function setObjectiveLook(to: (typeof objectiveLooks)[number]): void {
+  objectives.look = to
+  localStorage.setItem('objective-look', to)
+}
+
 const asked = new Set<string>()
 /** Whether the picture at this address came; the first time, it is asked for. */
 function came(url: string): boolean {

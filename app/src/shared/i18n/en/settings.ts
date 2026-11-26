@@ -69,6 +69,15 @@ export default {
     hint: "For quests to take, quests to hand in and objectives. Where the chosen icons have none, Twinmap's is shown.",
   },
 
+  // Under the map icons: a dropdown, the objectives of quests drawn as icons or as areas, as the game's map draws them.
+  objectives: {
+    label: 'Objectives',
+    icons: 'Icons',
+    areas: 'Areas',
+    // Under the dropdown. Questie is a name, never translated.
+    hint: "Areas, as on the game's map, are drawn round the places where Questie puts each objective.",
+  },
+
   // In General: the app's window, switches, the text size and the hardware acceleration.
   window: {
     onTop: 'Keep Twinmap on top of other windows',

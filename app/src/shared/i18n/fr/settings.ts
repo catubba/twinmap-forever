@@ -45,6 +45,13 @@ export default {
     hint: 'Pour les quêtes disponibles, les quêtes à rendre et les objectifs. Quand les icônes choisies n’en ont pas, celle de Twinmap s’affiche.',
   },
 
+  objectives: {
+    label: 'Objectifs',
+    icons: 'Icônes',
+    areas: 'Zones',
+    hint: 'Les zones, comme sur la carte du jeu, sont tracées autour des lieux où Questie place chaque objectif.',
+  },
+
   window: {
     onTop: 'Garder Twinmap au-dessus des autres fenêtres',
     textSize: 'Taille du texte',

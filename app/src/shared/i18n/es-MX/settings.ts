@@ -45,6 +45,13 @@ export default {
     hint: 'Para misiones disponibles, misiones para entregar y objetivos. Donde los íconos elegidos no tienen uno, se muestra el de Twinmap.',
   },
 
+  objectives: {
+    label: 'Objetivos',
+    icons: 'Íconos',
+    areas: 'Áreas',
+    hint: 'Las áreas, como en el mapa del juego, se dibujan alrededor de los lugares donde Questie ubica cada objetivo.',
+  },
+
   window: {
     onTop: 'Mantener Twinmap sobre las demás ventanas',
     textSize: 'Tamaño del texto',

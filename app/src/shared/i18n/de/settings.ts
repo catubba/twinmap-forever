@@ -45,6 +45,13 @@ export default {
     hint: 'Für verfügbare Quests, Quests zum Abgeben und Questziele. Wo die gewählten Symbole keines haben, erscheint das von Twinmap.',
   },
 
+  objectives: {
+    label: 'Questziele',
+    icons: 'Symbole',
+    areas: 'Bereiche',
+    hint: 'Die Bereiche werden wie auf der Spielkarte um die Orte gezeichnet, an denen Questie jedes Questziel zeigt.',
+  },
+
   window: {
     // "Immer im Vordergrund" is how Windows and German apps name it.
     onTop: 'Twinmap immer im Vordergrund',

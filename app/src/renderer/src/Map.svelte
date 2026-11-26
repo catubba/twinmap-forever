@@ -25,7 +25,7 @@
   import { addFix, BEHIND, PERIOD, TURN, turnAt, whereAt, type Fix, type Turn } from '../../shared/glide'
   import { boxOf, buildingsAt, killedIn, nameOfBoss, piecesIn, RARE_BOSSES, roomPixels, yardsInside, YARDS_PER_UNIT, type Box, type InteriorMap, type Interiors, type Piece, type UnderRoom, type Yards } from '../../shared/inside'
   import type { Continent, GameMap } from '../../shared/maps'
-  import { objectiveGroups, questXp, xpDrop, type QuestPin, type QuestReward } from '../../shared/quests'
+  import { objectiveAreas, objectiveGroups, questXp, xpDrop, type QuestPin, type QuestReward } from '../../shared/quests'
   import { coins } from '../../shared/items'
   import { gatherColour, GATHER_SKILL, HERBS, iconOf, ORES, panelFor, serves, type FixedLayer, type FixedPin, type Travel } from '../../shared/services'
   import { pictureOfBlock, tileOfPicture } from '../../shared/pixels'
@@ -47,7 +47,7 @@
   import { ARRIVE, pinOfMark, removePin, renamePin, savedAt, savedFrom, savePin, yardsBetween, type SavedPin } from '../../shared/saved'
   import { markPart, sendState, type GameMark, type Inbox, type Pin } from '../../shared/send'
   import { companionPin, pin, pinSize, playerPin } from './marks'
-  import { questPin } from './packs.svelte'
+  import { objectives, questPin } from './packs.svelte'
   import { COLOURS } from './look'
 
   // at: when the position was read off the game, in milliseconds.
@@ -64,6 +64,9 @@
   const ALWAYS_INSIDE = [1455]
   const ROOFED = new Set([1458])
   const CITY_UNDER = 3e6 // square yards: a zone map smaller than this is a city
+  const AREA_REACH = 0.49 // map units (65 yards): an objective's area is the ground this near one of its places, which come
+  // at least 4% of a zone apart (SPREAD in main/questie.ts); chosen by the player on the preview, over 93 and 47 yards
+  const AREA_CELL = 0.1 // traced on cells of 13 yards
   const PIN_ZOOM = 3.5 // under this zoom the pins of a zone lie on each other: they are not shown
   const GATHER = 26 // pixels: from far, the quests to take (or to hand in) nearer than this to each other are one pin
   const QUEST_ZOOM = 2 // the quests to take and to hand in are few: they are shown from farther, as the doors of the dungeons are
@@ -1254,6 +1257,12 @@
   }
   const QUEST_PINS = { available: ['quest', 'available', 500], turnin: ['turnin', 'turnin', 1000], objective: ['objective', 'objectives', 0] } as const
   const DIM = 0.25 // the opacity of a pin that is not of the quest in front
+  // The objectives' areas, when they are drawn as areas: traced again only when the quests or the continent change.
+  const areas = $derived.by(() => {
+    if (objectives.look !== 'areas') return []
+    const zones = new Map(maps.filter((m) => m.level === 'zone' && m.rect && m.area && m.continent === continent).map((m) => [m.area, m]))
+    return objectiveAreas(quests.flatMap((p) => (p.type === 'objective' && zones.get(p.area)?.rect ? [{ p, ...unitsOfPlace(zones.get(p.area)!.rect!, p.x, p.y) }] : [])), AREA_REACH, AREA_CELL)
+  })
   let front = $state<string | null>(null) // the quest picked, or pointed at, in the Now column: its pins in front of the rest
   $effect(() => {
     for (const group of Object.values(questLayers)) group.clearLayers()
@@ -1312,6 +1321,22 @@
     // The objectives are many: those near each other that ask for the same thing are one pin, drawn by what they ask for,
     // with the number of quests it is for when more than one. A click on it goes nearer, where they part; on one alone, its label.
     if (far !== null) return
+    if (objectives.look === 'areas') {
+      // Areas in the style of the game's map: the quest in front over the rest, which are dim. Its name on the area.
+      for (const a of [...areas].sort((a, b) => Number(lit([a.quest])) - Number(lit([b.quest])))) {
+        const on = lit([a.quest]) === 1, reward = rewardLine(placed.find((q) => q.p.rewards?.[a.quest])?.p.rewards?.[a.quest])
+        const tip = document.createElement('span')
+        tip.append(Object.assign(document.createElement('b'), { textContent: a.quest }))
+        if (reward) tip.append(document.createElement('br'), reward)
+        // Each quest its own colour, in the order of the quests (no two alike up to eight). With a quest in front its area is drawn strong and the rest faint; with none, all alike, the rim thin where they overlap.
+        const strong = on && front !== null
+        const colour = COLOURS.areas[areas.indexOf(a) % COLOURS.areas.length]!
+        L.polygon(a.rings.map((ring) => ring.map((p) => at(p))), { color: colour, weight: strong ? 2.5 : 1, opacity: strong ? 0.95 : on ? 0.8 : 0.15, fillColor: colour, fillOpacity: strong ? 0.4 : on ? 0.2 : 0.06 })
+          .bindTooltip(tip, { sticky: true, direction: 'top', className: 'tip' })
+          .addTo(questLayers.objectives)
+      }
+      return
+    }
     for (const g of objectiveGroups([...alone].filter((q) => q.p.type === 'objective'), GATHER / 2 ** zoom, front)) {
       const [size, html] = questPin(g.kind ?? 'objective'), one = g.of.length === 1 ? g.of[0]! : null
       const tip = document.createElement('span')

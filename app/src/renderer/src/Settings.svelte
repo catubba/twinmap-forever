@@ -15,7 +15,7 @@
   import { frame, layout, setMapRight } from './frame.svelte'
   import { arrow, setArrow } from './arrow.svelte'
   import { ARROW, ARROW_SIZES } from './look'
-  import { packs, questieHere, setPack } from './packs.svelte'
+  import { objectiveLooks, objectives, packs, questieHere, setObjectiveLook, setPack } from './packs.svelte'
   import { langNow, metresOn, metricOffered, num, t, type Key } from '../../shared/i18n'
 
   let { setup, tiles, onback, onfirstrun, onfeedback, onnews }: { setup: SetupStatus; tiles: TilesStatus | null; onback: () => void; onfirstrun: () => void; onfeedback: () => void; onnews: () => void } = $props()
@@ -133,6 +133,11 @@
       <div class="setting">
         <label class="choice">{t('settings.icons.label')} <select class="field size" value={packs.chosen === 'questie' && !questieHere() ? 'twinmap' : packs.chosen} onchange={(e) => setPack(e.currentTarget.value as typeof packs.chosen)}><option value="twinmap">Twinmap</option><option value="game">{t('settings.icons.game')}</option>{#if questieHere()}<option value="questie">Questie</option>{/if}</select></label>
         <p class="hint">{t('settings.icons.hint')}</p>
+      </div>
+      <!-- The objectives of quests (M21-F5): as icons, or as areas in the style of the game's map. -->
+      <div class="setting">
+        <label class="choice">{t('settings.objectives.label')} <select class="field size" value={objectives.look} onchange={(e) => setObjectiveLook(e.currentTarget.value as typeof objectives.look)}>{#each objectiveLooks as look (look)}<option value={look}>{t(`settings.objectives.${look}`)}</option>{/each}</select></label>
+        <p class="hint">{t('settings.objectives.hint')}</p>
       </div>
     {:else if cat === 'game'}
       <div class="setting">

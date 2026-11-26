@@ -45,6 +45,13 @@ export default {
     hint: '수락 가능한 퀘스트, 완료할 퀘스트, 임무에 쓰입니다. 선택한 아이콘에 없는 것은 Twinmap 아이콘으로 표시됩니다.',
   },
 
+  objectives: {
+    label: '임무',
+    icons: '아이콘',
+    areas: '영역',
+    hint: '영역은 게임 지도처럼 Questie가 각 임무를 표시하는 곳을 둘러싸 그려집니다.',
+  },
+
   window: {
     // Twinmap is read 트윈맵: the particles after it follow the final ㅂ.
     onTop: 'Twinmap을 항상 다른 창 위에 표시',

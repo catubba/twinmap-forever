@@ -46,6 +46,13 @@ export default {
     hint: '用于可接任务、可交任务和任务目标。所选图标中没有的，显示 Twinmap 的图标。',
   },
 
+  objectives: {
+    label: '任务目标',
+    icons: '图标',
+    areas: '区域',
+    hint: '区域与游戏地图一样，围绕 Questie 标出每个任务目标的位置绘制。',
+  },
+
   window: {
     onTop: '让Twinmap始终显示在其他窗口上方',
     // GS FONT_SIZE.
