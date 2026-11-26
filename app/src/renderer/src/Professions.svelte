@@ -351,17 +351,28 @@
   li.no img {
     filter: grayscale(1) brightness(0.6);
   }
+  /* The professions on top as tall as they are, at most 40% of the place (a max-height in % here would be taken on the row
+     and leave a gap under the list): the rest to the recipes. Smaller, three to a row, so the recipes keep the most. */
   @container professions (width < 620px) {
     .profs {
-      grid-template: auto minmax(0, 1fr) / minmax(0, 1fr);
+      grid-template: fit-content(40%) minmax(0, 1fr) / minmax(0, 1fr);
     }
     .list {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
       column-gap: 10px;
-      max-height: 45%;
+      padding: 8px 10px;
       border-right: 0;
       border-bottom: 1px solid var(--bronze-700);
+    }
+    .prof {
+      grid-template-columns: 24px minmax(0, 1fr);
+      column-gap: 8px;
+      padding: 4px;
+    }
+    .prof img {
+      width: 24px;
+      height: 24px;
     }
     .list h2 {
       grid-column: 1 / -1;

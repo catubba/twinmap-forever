@@ -279,23 +279,19 @@ export class Pins3d {
     const c = this.terrain.camera.position,
       reach = this.terrain.reach,
       points = [this.onGround(run[0]!)]
-    const height = (x: number, z: number): number => {
-      const g = this.terrain.groundAt(x, z)
-      return Number.isFinite(g) ? g : 0
-    }
     for (let i = 1; i < run.length; i++) {
       const ax = run[i - 1]!.lng * YARDS_PER_UNIT,
         az = -run[i - 1]!.lat * YARDS_PER_UNIT,
         dx = run[i]!.lng * YARDS_PER_UNIT - ax,
         dz = -run[i]!.lat * YARDS_PER_UNIT - az,
         length = Math.hypot(dx, dz)
-      // An arc: from the ground at one end to the ground at the other, over the straight line between
-      // them by its rise, and never under the ground it crosses (a mountain on the way).
-      const from = arc ? height(ax, az) : 0,
-        to = arc ? height(ax + dx, az + dz) : 0,
-        top = Math.min(ARC_MOST, ARC_RISE * length),
-        high = run[i - 1]!.alt,
-        higher = run[i]!.alt ?? high
+      // An arc: from one end to the other as they stand, over the straight line between them by its
+      // rise. Only its ends and its length make it: what it crosses (a mountain, a city) does not.
+      const high = run[i - 1]!.alt,
+        higher = run[i]!.alt ?? high,
+        from = arc ? this.terrain.heightAt(ax, az, high !== undefined && this.terrain.overRoom(ax, az, high)) : 0,
+        to = arc ? this.terrain.heightAt(ax + dx, az + dz, higher !== undefined && this.terrain.overRoom(ax + dx, az + dz, higher)) : 0,
+        top = Math.min(ARC_MOST, ARC_RISE * length)
       for (let d = 0; ; ) {
         const far = Math.hypot(ax + (dx * d) / length - c.x, az + (dz * d) / length - c.z)
         d += Math.min(arc ? length / ARC_POINTS : Infinity, Math.max(step, far / FARTHER, far - reach))
@@ -304,7 +300,7 @@ export class Pins3d {
           z = az + (dz * d) / length,
           t = d / length,
           bow = 4 * t * (1 - t)
-        points.push(this.terrain.spot(x, z, arc ? Math.max(from + (to - from) * t + top * bow - height(x, z), top * bow * 0.1) : 0, !arc && high !== undefined && this.terrain.overRoom(x, z, high + (higher! - high) * t)))
+        points.push(arc ? this.terrain.spot(x, z, 0, false, from + (to - from) * t + top * bow) : this.terrain.spot(x, z, 0, high !== undefined && this.terrain.overRoom(x, z, high + (higher! - high) * t)))
       }
       points.push(this.onGround(run[i]!))
     }

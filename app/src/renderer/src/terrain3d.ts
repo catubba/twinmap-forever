@@ -413,14 +413,15 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
    * shows: 1 in plain sight, less in the fog, HIDDEN behind a hill, 0 behind the camera or past the
    * fog; and how far it is from the camera, in distances of the point looked at. lift: yards over
    * the ground, for what is written above its point (names3d.ts); above: over the ground also where a
-   * room under it is open, as the name of a city in a mountain is.
+   * room under it is open, as the name of a city in a mountain is. high: a height of its own, in
+   * yards, whatever the ground there (a flight's arc, pins3d.ts).
    */
-  spot(x: number, z: number, lift = 0, above = false): { x: number; y: number; shows: number; away: number } {
+  spot(x: number, z: number, lift = 0, above = false, high?: number): { x: number; y: number; shows: number; away: number } {
     const fog = this.scene.fog as THREE.Fog,
       out = Math.hypot(x - this.camera.position.x, z - this.camera.position.z) >= fog.far, // past the fog: the ground is not looked for
-      ground = out ? NaN : above ? this.groundAt(x, z) : this.standAt(x, z),
-      inRoom = !out && !above && (this.inside?.floorAt(x, z)?.open ?? 0) > 0.5,
-      p = new THREE.Vector3(x, (Number.isFinite(ground) ? ground : 0) + lift, z),
+      ground = out || high !== undefined ? NaN : above ? this.groundAt(x, z) : this.standAt(x, z),
+      inRoom = !out && high === undefined && !above && (this.inside?.floorAt(x, z)?.open ?? 0) > 0.5,
+      p = new THREE.Vector3(x, high ?? (Number.isFinite(ground) ? ground : 0) + lift, z),
       far = out ? Infinity : p.distanceTo(this.camera.position)
     const on = p.clone().project(this.camera),
       at = { x: ((on.x + 1) / 2) * this.width, y: ((1 - on.y) / 2) * this.height }
@@ -429,6 +430,12 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
     const clear = Math.min(1, (fog.far - far) / (fog.far - fog.near)),
       off = at.x < -OFF || at.y < -OFF || at.x > this.width + OFF || at.y > this.height + OFF // off the view: no hill looked for
     return { ...at, shows: off || inRoom || !this.behindHill(p) ? clear : clear * HIDDEN, away }
+  }
+
+  /** The height spot() puts a point of the ground at, in yards (0 where there is no ground). */
+  heightAt(x: number, z: number, above = false): number {
+    const ground = above ? this.groundAt(x, z) : this.standAt(x, z)
+    return Number.isFinite(ground) ? ground : 0
   }
 
   /** The point of the ground under a pixel of the view, in yards; null where the ray meets none before the fog. The sea is at 0. */
