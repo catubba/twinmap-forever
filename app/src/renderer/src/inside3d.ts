@@ -86,6 +86,7 @@ export class Inside3d {
   private group = new THREE.Group()
   private s3tc: boolean
   private shown = ''
+  private hidden = false
 
   constructor(private terrain: Terrain) {
     this.s3tc = terrain.s3tc
@@ -190,6 +191,13 @@ export class Inside3d {
   /** For the picture the ground asks, and back: each room and wall tells its roof instead of showing itself. */
   seenPass(on: boolean): void {
     for (const b of this.buildings) b.group?.children.forEach((c, i) => ((c as THREE.Mesh).material = (on ? b.seen! : b.shown!)[i]!))
+    // the pictures left out of the view still tell the ground where to open; the walls of earth round them stay
+    for (const b of this.buildings) b.group?.children.forEach((c) => c.userData.picture && (c.visible = on || !this.hidden))
+  }
+
+  /** Whether the pictures are left out of the view: the buildings are drawn whole (buildings3d.ts). */
+  hidePictures(on: boolean): void {
+    this.hidden = on
   }
 
   private async load(b: Building): Promise<void> {
@@ -237,6 +245,7 @@ export class Inside3d {
       geo.setIndex([0, 2, 1, 1, 2, 3])
       const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map, transparent: true, alphaTest: 0.4, side: THREE.DoubleSide, fog: false, opacity: 0 }))
       mesh.position.set(p.u, r.y + 0.2, p.v)
+      mesh.userData.picture = true
       mesh.rotation.y = p.angle
       group.add(mesh)
       shown.push(mesh.material)

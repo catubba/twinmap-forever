@@ -1,6 +1,12 @@
 // The buildings of the continent on show in the 3D view (M23-F2), as main/buildings.ts makes them from the game's
 // files: each file read once and drawn at every place it stands, with the game's own textures. Those near the point
 // looked at are loaded, the others go. Turned on and off in Settings > Graphics (graphics.svelte.ts).
+//
+// A building inside the ground (Ironforge, Undercity, a mine; M23-F16) is drawn before the ground, which is see-through
+// where it is the roof of the rooms inside3d.ts opens: it is drawn without the ceilings of its rooms, and as the camera
+// comes near, a level plane cuts away all of it higher than CUT yards over its main floor, or over the character's floor
+// while the character is in it and followed (the user's choice on the prototype design/underground/, ROADMAP.md M23-F15
+// and F16: the plane opens the cities, the ceilings left out open the mines, whose tunnels go up and down).
 import * as THREE from 'three'
 import { decodeDxtCutout } from '../../shared/blp'
 import { DXT_KIND, type BuildingHead, type Draw, type Placed } from '../../shared/buildings'
@@ -19,6 +25,10 @@ const KEPT = 40
 const STONE = 0x9a8f80
 /** Seconds before the list of a continent is asked again, while the app is still making it. */
 const RETRY = 30
+/** Yards over the floor a building inside the ground is cut at. */
+const CUT = 30
+/** Yards from the camera to a building inside the ground within which it is cut, as inside3d.ts opens its rooms; the cut comes down over a quarter more. */
+const OPEN = 700
 
 const FORMATS = { dxt1: THREE.RGB_S3TC_DXT1_Format, dxt1a: THREE.RGBA_S3TC_DXT1_Format, dxt3: THREE.RGBA_S3TC_DXT3_Format, dxt5: THREE.RGBA_S3TC_DXT5_Format } as const
 
@@ -27,7 +37,20 @@ interface File {
   geometry?: THREE.BufferGeometry
   materials?: THREE.Material[]
   textures?: THREE.Texture[]
+  floor?: number
+  ceilings?: boolean[] // of each draw, whether it is the ceilings'
   used: number
+}
+
+// A building inside the ground as it stands: its plane, its own materials that the plane cuts, where it is, its main floor and its top.
+interface Cut {
+  plane: THREE.Plane
+  materials: THREE.Material[]
+  x: number
+  z: number
+  reach: number
+  floor: number
+  top: number
 }
 
 export class Buildings {
@@ -37,13 +60,21 @@ export class Buildings {
   private asked = 0 // when the list was last asked for, in seconds
   private files = new Map<string, File>() // by its name in the folder (shared/buildings.ts)
   private shown = new Map<number, THREE.Mesh>() // by the building's place in the list
+  private cuts = new Map<number, Cut>() // the ones inside the ground, the same way
   private loading = 0
   private frame = 0
   private on = true
   private changed = false
   private from = new THREE.Vector3(Infinity, 0, 0) // where the choice was last made
 
-  constructor(private renderer: THREE.WebGLRenderer) {}
+  constructor(private renderer: THREE.WebGLRenderer) {
+    renderer.localClippingEnabled = true
+  }
+
+  /** Whether a building inside the ground is on show: its rooms are drawn whole, not as the pictures of inside3d.ts. */
+  get under(): boolean {
+    return this.cuts.size > 0
+  }
 
   /** The continent shown, by its folder. */
   show(folder: string): void {
@@ -63,8 +94,11 @@ export class Buildings {
     this.changed = true
   }
 
-  /** At each frame, with the point looked at and the camera's distance from it: true when the view must be drawn again. */
-  step(target: THREE.Vector3, distance: number): boolean {
+  /**
+   * At each frame, with the point looked at, the camera's distance from it, the camera, and where the character stands
+   * while it is followed: true when the view must be drawn again.
+   */
+  step(target: THREE.Vector3, distance: number, camera: THREE.Vector3, character: THREE.Vector3 | null): boolean {
     this.frame++
     const changed = this.changed
     this.changed = false
@@ -87,7 +121,7 @@ export class Buildings {
     }
     // chosen again once the point looked at has moved a little, or the view has widened
     const reach = distance > FAR_VIEW ? 0 : Math.max(NEAR, distance * 1.5)
-    if (Math.hypot(this.from.x - target.x, this.from.z - target.z) < 40 && Math.abs(this.from.y - reach) < 1) return changed
+    if (Math.hypot(this.from.x - target.x, this.from.z - target.z) < 40 && Math.abs(this.from.y - reach) < 1) return this.cut(camera, character) || changed
     this.from.set(target.x, reach, target.z)
     const wanted = new Set<number>()
     if (reach)
@@ -95,20 +129,42 @@ export class Buildings {
         if (Math.hypot(x - target.x, z - target.z) - (this.list!.radius[file] ?? 0) * scale < reach) wanted.add(i)
       })
     let gone = false
-    for (const [i, mesh] of this.shown)
+    for (const i of this.shown.keys())
       if (!wanted.has(i)) {
-        this.group.remove(mesh)
-        this.shown.delete(i)
+        this.remove(i)
         gone = true
       }
     for (const i of wanted) if (!this.shown.has(i)) this.want(this.list.placed[i]![0])
     this.evict()
-    return this.place() || gone || changed
+    const placed = this.place()
+    return this.cut(camera, character) || placed || gone || changed
+  }
+
+  private remove(i: number): void {
+    this.group.remove(this.shown.get(i)!)
+    this.shown.delete(i)
+    for (const m of this.cuts.get(i)?.materials ?? []) m.dispose()
+    this.cuts.delete(i)
+  }
+
+  // Each building inside the ground cut as the camera is near it: from over its top, far, down to CUT over its main
+  // floor, or over the character's while it is in there. True when a plane has moved.
+  private cut(camera: THREE.Vector3, character: THREE.Vector3 | null): boolean {
+    let moved = false
+    for (const c of this.cuts.values()) {
+      const far = Math.max(0, Math.hypot(camera.x - c.x, camera.z - c.z) - c.reach),
+        open = 1 - Math.min(1, Math.max(0, (far - OPEN) / (OPEN * 0.25))),
+        inside = character && Math.hypot(character.x - c.x, character.z - c.z) < c.reach && character.y < c.top,
+        to = c.top + ((inside ? character.y : c.floor) + CUT - c.top) * open
+      if (Math.abs(c.plane.constant - to) < 0.05) continue
+      c.plane.constant = to
+      moved = true
+    }
+    return moved
   }
 
   private clear(): void {
-    for (const mesh of this.shown.values()) this.group.remove(mesh)
-    this.shown.clear()
+    for (const i of [...this.shown.keys()]) this.remove(i)
     for (const [id, f] of this.files) if (f.state === 'in') this.drop(id, f)
     this.files.clear()
     this.from.set(Infinity, 0, 0)
@@ -143,12 +199,21 @@ export class Buildings {
     let added = false
     const target = this.from
     if (!Number.isFinite(target.x)) return false
-    this.list.placed.forEach(([id, x, y, z, turn, scale], i) => {
+    this.list.placed.forEach(([id, x, y, z, turn, scale, buried], i) => {
       if (this.shown.has(i) || !(Math.hypot(x - target.x, z - target.z) - (this.list!.radius[id] ?? 0) * scale < target.y)) return
       const f = this.files.get(id)
       if (f?.state !== 'in') return
       f.used = this.frame
-      const mesh = new THREE.Mesh(f.geometry, f.materials)
+      let materials = f.materials!
+      if (buried) {
+        // its own materials, for its own plane; drawn before the ground, which may be see-through over it
+        const plane = new THREE.Plane(new THREE.Vector3(0, -1, 0), 1e6),
+          reach = (this.list!.radius[id] ?? 0) * scale
+        materials = materials.map((m, k) => Object.assign(m.clone(), { clippingPlanes: [plane], visible: !f.ceilings?.[k], onBeforeCompile: m.onBeforeCompile, customProgramCacheKey: m.customProgramCacheKey }))
+        this.cuts.set(i, { plane, materials, x, z, reach, floor: y + (f.floor ?? 0) * scale, top: y + reach + 10 })
+      }
+      const mesh = new THREE.Mesh(f.geometry, materials)
+      if (buried) mesh.renderOrder = -2
       mesh.position.set(x, y, z)
       mesh.rotation.y = turn
       mesh.scale.setScalar(scale)
@@ -176,7 +241,7 @@ export class Buildings {
   }
 
   // A building's file: its geometry, a material a draw, and the textures they use.
-  private async load(id: string): Promise<{ parts: Pick<File, 'geometry' | 'materials' | 'textures'>; dispose: () => void } | null> {
+  private async load(id: string): Promise<{ parts: Pick<File, 'geometry' | 'materials' | 'textures' | 'floor' | 'ceilings'>; dispose: () => void } | null> {
     const b = await inflated(`${TILES}/buildings/${id}.bin`)
     if (!b) return null
     const view = new DataView(b.buffer, b.byteOffset, b.byteLength), length = view.getUint32(0, true)
@@ -214,7 +279,7 @@ export class Buildings {
         ;(this as { array: unknown }).array = null
       })
     return {
-      parts: { geometry, materials, textures },
+      parts: { geometry, materials, textures, floor: head.floor, ceilings: head.draws.map((d) => !!d.ceiling) },
       dispose: () => {
         geometry.dispose()
         for (const m of materials) m.dispose()

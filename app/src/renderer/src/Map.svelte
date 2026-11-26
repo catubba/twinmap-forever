@@ -1043,6 +1043,8 @@
           // Heading up: the view turns as the arrow does, so the arrow stays pointing up. Clockwise from north there,
           // anticlockwise for OrbitControls.
           terrain!.heading = turning && body.pointing !== null ? (-body.pointing * Math.PI) / 180 : null
+          // a city inside the ground is cut over the floor of the character followed in it
+          terrain!.character = following ? body.at() : null
           return moved
         }
         pins3d ??= new Pins3d(map, terrain, pinsHost, terrainHost, arrow, () => turned, body, () => floorAt)
