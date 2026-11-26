@@ -338,6 +338,7 @@ export default {
     youKnow: '{profession} · ya la conoces',
     needs: '{profession}: hace falta {skill}, tienes {have}',
     notKnown: '{profession} · no aprendida',
+    unread: '{profession} · abre su ventana una vez en el juego',
     takes: '{items} cada vez',
     takesFor: '{items} por {count}',
     amount: '{count} {item}',

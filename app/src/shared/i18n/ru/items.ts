@@ -354,6 +354,7 @@ export default {
     youKnow: '{profession} · рецепт известен',
     needs: '{profession}: нужно {skill}, у вас {have}',
     notKnown: '{profession} · не изучено',
+    unread: '{profession} · откройте окно профессии в игре',
     takes: '{items} за раз',
     takesFor: '{items} за {count} шт.',
     amount: '{item} ({count} шт.)',

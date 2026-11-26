@@ -341,6 +341,7 @@ export default {
     youKnow: '{profession} · Rezept bekannt',
     needs: '{profession} {skill} nötig, Ihr habt {have}',
     notKnown: '{profession} · nicht erlernt',
+    unread: '{profession} · öffnet das Fenster einmal im Spiel',
     takes: '{items} pro Herstellung',
     takesFor: '{items} für {count}',
     amount: '{count} {item}',

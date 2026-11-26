@@ -407,6 +407,7 @@ export default {
     youKnow: '{profession} · you know it',
     needs: '{profession} {skill} needed, you have {have}',
     notKnown: '{profession} · not learned',
+    unread: '{profession} · open its window once in game',
     // Small, under a part to make or an item a recipe makes: what one go takes. {items}: amounts, one after another with ", ".
     takes: '{items} each',
     // The same for a recipe that makes more than one at a go. {count}: how many it makes.

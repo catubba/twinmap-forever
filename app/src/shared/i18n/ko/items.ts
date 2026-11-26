@@ -348,6 +348,7 @@ export default {
     youKnow: '{profession} · 배운 제조법',
     needs: '{profession} {skill} 필요, 현재 {have}',
     notKnown: '{profession} · 배우지 않음',
+    unread: '{profession} · 게임에서 창을 한 번 여십시오',
     takes: '1회당 {items}',
     takesFor: '{count}개당 {items}',
     amount: '{item} {count}개',

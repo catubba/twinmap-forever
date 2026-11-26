@@ -49,10 +49,17 @@
     const r = (sheet?.pieces.recipes ?? {}) as { known?: unknown }
     return new Set(Array.isArray(r.known) ? (r.known as number[]) : [])
   })
+  // The professions whose window was open once: before that, the recipes known of it are not read (shared/npc-panel.ts, craftOf).
+  const read = $derived.by(() => {
+    const r = (sheet?.pieces.recipes ?? {}) as { seen?: unknown }
+    return new Set(Array.isArray(r.seen) ? (r.seen as number[]) : [])
+  })
   const skillOf = (line: number): number => {
     const skills = Array.isArray(sheet?.pieces.skills) ? (sheet.pieces.skills as unknown[][]) : []
     return Number(skills.find((s) => Array.isArray(s) && s[0] === line)?.[1]) || 0
   }
+  // A profession the character has, its window not open yet: whether a recipe of it is known is not known.
+  const unread = (line: number): boolean => skillOf(line) > 0 && !read.has(line)
   const holders = (item: number): ReturnType<typeof holdersOf> => holdersOf(sheets, item)
   const plan = $derived(planOf(goals, crafts, known, (item) => heldBy(holders(item), key)))
   const byItem = $derived(recipesByItem(crafts))
@@ -93,6 +100,7 @@
     if (!r) return null
     const profession = lines[r.line] ?? ''
     if (known.has(r.spell)) return { text: t('items.shopping.youKnow', { profession }), short: false }
+    if (unread(r.line)) return { text: t('items.shopping.unread', { profession }), short: false }
     const skill = skillFor(r), have = skillOf(r.line)
     return { text: skill > have ? t('items.shopping.needs', { profession, skill, have }) : t('items.shopping.notKnown', { profession }), short: true }
   }
@@ -128,7 +136,7 @@
       {@const by = zoneName(seller.area) ? around('items.popup.soldByIn', 'npc', { zone: zoneName(seller.area) }) : around('items.popup.soldBy', 'npc')}
       {by[0]}<span class="v">{seller.name}</span>{by[1]}{#if f && f[5] > 0}{' · '}{#if f[6] > 1}{@const pack = around('items.popup.perPack', 'price', { count: f[6] })}{pack[0]}{@render money(f[5])}{pack[1]}{:else}{@render money(f[5])}{/if}{/if}
     {:else if recipe}
-      {t('items.shopping.toLearn', { profession: lines[recipe.line] ?? '', skill: skillFor(recipe) || '?' })} · {amounts(recipe)}
+      {unread(recipe.line) ? t('items.shopping.unread', { profession: lines[recipe.line] ?? '' }) : t('items.shopping.toLearn', { profession: lines[recipe.line] ?? '', skill: skillFor(recipe) || '?' })} · {amounts(recipe)}
     {:else if drop}
       {zoneName(drop.area) ? t('items.popup.dropsFromIn', { npc: drop.name, zone: zoneName(drop.area) }) : t('items.popup.dropsFrom', { npc: drop.name })}
     {/if}

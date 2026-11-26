@@ -31,6 +31,22 @@ test('what is held counts before anything is made, and a recipe that makes two n
   expect(planOf([{ item: 4305, n: 3 }], CRAFTS, KNOWN, held)).toMatchObject({ first: [{ item: 4305, make: 3 }], ready: [{ item: 4306, need: 12 }] })
 })
 
+// Enchanting's essences, made out of each other: Greater Magic Essence (13361) from 3 Lesser, Lesser Magic Essence (13362)
+// 3 from 1 Greater; a rod (7421) that takes 2 Greater.
+const ESSENCES: Record<string, number[]> = { 13361: [333, 10939, 1, 10938, 3], 13362: [333, 10938, 3, 10939, 1], 7421: [333, 6218, 1, 10939, 2] }
+const ENCHANTER = new Set([13361, 13362, 7421])
+
+test('items made out of each other: the loop is broken once, what it takes in the end is missing or ready', () => {
+  const none = (): { bags: number; bank: number } => ({ bags: 0, bank: 0 })
+  const plan = planOf([{ item: 6218, n: 1, spell: 7421 }], ESSENCES, ENCHANTER, none)
+  expect(plan.first.map((p) => [p.item, p.make])).toEqual([[10939, 2]])
+  expect(plan.missing.map((m) => [m.item, m.need])).toEqual([[10938, 6]])
+  const lesser = (item: number): { bags: number; bank: number } => (item === 10938 ? { bags: 6, bank: 0 } : none())
+  expect(planOf([{ item: 6218, n: 1, spell: 7421 }], ESSENCES, ENCHANTER, lesser)).toMatchObject({ first: [{ item: 10939, make: 2 }], missing: [], ready: [{ item: 10938, need: 6 }] })
+  // Both wanted as they are: the one first on the list is made, the other is not made out of it.
+  expect(planOf([{ item: 10939, n: 1 }, { item: 10938, n: 3 }], ESSENCES, ENCHANTER, none).first.map((p) => p.item)).toEqual([10939])
+})
+
 test('a goal comes once and grows by one; at 0 it leaves, and an empty list with it', () => {
   let lists = addTo({}, 'Staliot Falsaperla', 4324, 3859)
   lists = addTo(lists, 'Staliot Falsaperla', 4324, 3859)

@@ -110,6 +110,19 @@ export function planOf(goals: Goal[], crafts: Record<string, number[]>, known: S
     const h = held(item)
     return h.bags + h.bank
   }
+  // An item made, through recipes the character knows, out of itself: Lesser and Greater essences, the transmutes. Such
+  // an item is made only while none of what it takes is being made already, so the loop is broken once and stays so.
+  const loops = (item: number): boolean => {
+    const seen = new Set<number>(), stack = (knownFor(item)?.takes ?? []).map(([i]) => i)
+    while (stack.length) {
+      const at = stack.pop()!
+      if (at === item) return true
+      if (seen.has(at)) continue
+      seen.add(at)
+      for (const [i] of knownFor(at)?.takes ?? []) stack.push(i)
+    }
+    return false
+  }
   const takes = (need: Map<number, number>, recipe: Recipe, times: number): void => {
     for (const [item, n] of recipe.takes) need.set(item, (need.get(item) ?? 0) + n * times)
   }
@@ -124,7 +137,10 @@ export function planOf(goals: Goal[], crafts: Record<string, number[]>, known: S
     }
     for (const [item, n] of make) takes(need, knownFor(item)!, Math.ceil(n / knownFor(item)!.makes))
     const next = new Map<number, number>()
-    for (const [item, n] of need) if (n > have(item) && knownFor(item)) next.set(item, n - have(item))
+    for (const [item, n] of need) {
+      const recipe = knownFor(item)
+      if (n > have(item) && recipe && !(loops(item) && recipe.takes.some(([i]) => next.has(i)))) next.set(item, n - have(item))
+    }
     if (JSON.stringify([...next]) === JSON.stringify([...make])) break
     make = next
   }

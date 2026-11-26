@@ -344,6 +344,7 @@ export default {
     youKnow: '{profession} · 已学会',
     needs: '需要{profession} {skill}，当前 {have}',
     notKnown: '{profession} · 未学会',
+    unread: '{profession} · 在游戏中打开一次该窗口',
     takes: '每次{items}',
     takesFor: '每{count}个需{items}',
     amount: '{item}×{count}',

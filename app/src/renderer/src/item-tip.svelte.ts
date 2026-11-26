@@ -34,7 +34,10 @@ export function itemTip(node: HTMLElement, given: Omit<Hovered, 'box'>): { updat
   const leave = (): void => {
     if (hover.now?.item === params.item) hover.now = null
   }
-  const click = (): void => {
+  // A button inside the row (a + of the shopping list, of a trainer's recipe) does its own thing, not this.
+  const click = (e: MouseEvent): void => {
+    const control = (e.target as Element | null)?.closest?.('button, a, input, select')
+    if (control && control !== node && node.contains(control)) return
     if (params.item > 0 && choosable()) Object.assign(chosen, { item: params.item, key: params.key, n: chosen.n + 1 })
   }
   node.addEventListener('pointerenter', enter)
