@@ -11,6 +11,9 @@
 // macOS itself (Squirrel.Mac) puts it in place and starts it, only if it is signed by the same
 // developer. It cannot replace an app outside the Applications folder: one opened from Downloads runs
 // from a copy that cannot be written. That app opens as it is and offers to move there.
+//
+// On Linux the new app is the AppImage of the release (latest-linux.yml, written by release.yml), put
+// over the old file under the same name, so shortcuts to it keep working.
 import { app, BrowserWindow, dialog } from 'electron'
 import { autoUpdater } from 'electron-updater'
 import { join } from 'node:path'
@@ -101,9 +104,13 @@ export function updateFirst(open: () => void, say: (line: string) => void): void
   }
 }
 
-/** Whether this app can put a newer version in its own place: on Windows always, on macOS only from the Applications folder. */
+/**
+ * Whether this app can put a newer version in its own place: on Windows always, on Linux as an AppImage
+ * (its launcher names the file in APPIMAGE), on macOS only from the Applications folder.
+ */
 export function updatesItself(): boolean {
   if (process.platform === 'win32') return true
+  if (process.platform === 'linux') return !!process.env.APPIMAGE
   return process.platform === 'darwin' && app.isInApplicationsFolder()
 }
 
