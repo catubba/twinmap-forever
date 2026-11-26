@@ -6,6 +6,7 @@
   "license": "GPL-3.0-only",
   "author": "Twinmap contributors",
   "homepage": "https://twinmap.app",
+  "desktopName": "twinmap.desktop",
   "main": "out/main/index.js",
   "scripts": {
     "predev": "node scripts/mac-build.cjs",
@@ -19,7 +20,7 @@
     "postdist:mac": "node scripts/mac-build.cjs sign",
     "probe:mac": "node scripts/mac-build.cjs && electron scripts/capture-mac.cjs",
     "probe:linux": "electron scripts/capture-linux.cjs",
-    "dist:linux": "electron-vite build && electron-builder --linux dir --x64 --publish never"
+    "dist:linux": "electron-vite build && electron-builder --linux AppImage --x64 --publish never"
   },
   "build": {
     "appId": "app.twinmap",
@@ -41,7 +42,10 @@
       "target": "nsis"
     },
     "linux": {
-      "target": [{ "target": "dir", "arch": ["x64"] }]
+      "target": [{ "target": "AppImage", "arch": ["x64"] }],
+      "icon": "build/icon.png",
+      "category": "Game",
+      "syncDesktopName": true
     },
     "mac": {
       "category": "public.app-category.games",
@@ -66,6 +70,9 @@
     },
     "nsis": {
       "artifactName": "Twinmap-Setup-${version}.${ext}"
+    },
+    "appImage": {
+      "artifactName": "Twinmap-${version}.${ext}"
     },
     "publish": {
       "provider": "github",
