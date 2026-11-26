@@ -67,12 +67,14 @@ jobs:
       - run: npm run build
       - run: npm run dist:mac
       # Hosted runners cannot get Screen Recording without writing the protected permission database, so this job builds and checks the app but does not capture.
-      - name: Verify macOS bundle and capture helper
+      - name: Verify macOS bundle, capture helper and update file
         run: |
           codesign --verify --deep --strict dist/mac-arm64/Twinmap.app
           helper=dist/mac-arm64/Twinmap.app/Contents/Helpers/twinmap-capture
           test -f "$helper"
           test "$(lipo -archs "$helper")" = arm64
+          # What the app reads to update itself (build/app-update-mac.yml).
+          grep -qx 'repo: twinmap-forever' dist/mac-arm64/Twinmap.app/Contents/Resources/app-update.yml
 
   server:
     runs-on: ubuntu-latest

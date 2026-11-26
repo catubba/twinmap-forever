@@ -1,0 +1,6 @@
+# What electron-updater reads to find a newer version (main/update.ts), put in the Mac app as Resources/app-update.yml.
+# electron-builder writes this file itself only for a dmg or zip target, and the Mac app is built as a folder.
+provider: github
+owner: catubba
+repo: twinmap-forever
+updaterCacheDirName: twinmap-updater

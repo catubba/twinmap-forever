@@ -4,7 +4,8 @@ name: Mac app
 # account of its own (M19-F4). His fork builds Twinmap.app from the public source of our tag and publishes it as its
 # release mac-<tag>. This workflow fetches it, checks it as a player's Mac will, checks that it holds our code and
 # nothing else (its app.asar the same as the one built here from the same tag), and attaches it to our release as
-# Twinmap-mac-arm64.zip: the one name the download buttons point to, as Twinmap-Setup.exe is for Windows.
+# Twinmap-mac-arm64.zip: the one name the download buttons point to, as Twinmap-Setup.exe is for Windows. Then
+# latest-mac.yml, from which the Mac apps already installed update themselves.
 # release.yml starts it as soon as a release is published, and it waits for the fork (a release made with the
 # workflow's own token starts no `release` event, so that trigger would never fire). The schedule is the fallback:
 # GitHub runs it seldom, sometimes hours apart.
@@ -158,3 +159,11 @@ jobs:
           cp "$RUNNER_TEMP/fork/Twinmap-$VERSION-arm64.zip" "$ZIP"
           shasum -a 256 "$ZIP" > "$ZIP.sha256"
           gh release upload "$TAG" "$ZIP" "$ZIP.sha256" -R "$GITHUB_REPOSITORY"
+          # What an app already on a Mac reads to update itself (main/update.ts), the way latest.yml is for Windows.
+          # Attached after the zip, so it never names a zip that is not there yet.
+          sha512=$(openssl dgst -sha512 -binary "$ZIP" | base64)
+          size=$(stat -f %z "$ZIP")
+          printf '%s\n' "version: $VERSION" "files:" "  - url: $ZIP" "    sha512: $sha512" "    size: $size" \
+            "path: $ZIP" "sha512: $sha512" "releaseDate: '$(date -u +%Y-%m-%dT%H:%M:%S.000Z)'" > latest-mac.yml
+          cat latest-mac.yml
+          gh release upload "$TAG" latest-mac.yml -R "$GITHUB_REPOSITORY"

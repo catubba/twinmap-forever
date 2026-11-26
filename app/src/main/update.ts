@@ -6,9 +6,15 @@
 // This app has to close for the new one to be put in its place, and its small window with it. So
 // the window says what comes next before it goes, the installer shows its own while it works, and
 // the new app, told by the installer that it was just put there, opens without looking again.
-import { app, BrowserWindow } from 'electron'
+//
+// On macOS the new app comes as the zip of the release (latest-mac.yml, written by mac-app.yml), and
+// macOS itself (Squirrel.Mac) puts it in place and starts it, only if it is signed by the same
+// developer. It cannot replace an app outside the Applications folder: one opened from Downloads runs
+// from a copy that cannot be written. That app opens as it is and offers to move there.
+import { app, BrowserWindow, dialog } from 'electron'
 import { autoUpdater } from 'electron-updater'
 import { join } from 'node:path'
+import { t } from '../shared/i18n'
 import { WINDOW } from '../shared/window'
 
 const ANSWER_WITHIN = 4000 // ms the look for a newer version may take before the app opens without it
@@ -24,7 +30,11 @@ export type Updating = { version: string; percent: number; installing?: boolean 
  */
 export function updateFirst(open: () => void, say: (line: string) => void): void {
   // Started by the installer after an update: it says so, and there is nothing newer to look for.
-  if (process.platform !== 'win32' || !app.isPackaged || process.argv.includes('--updated')) return open()
+  if (!updatesItself() || !app.isPackaged || process.argv.includes('--updated')) {
+    open()
+    if (process.platform === 'darwin' && app.isPackaged) offerApplications(say)
+    return
+  }
   let opened = false
   let win: BrowserWindow | null = null
   // Whatever goes wrong, at any point, the app opens as it is: an update is never a reason not to start.
@@ -41,6 +51,8 @@ export function updateFirst(open: () => void, say: (line: string) => void): void
   try {
     if (process.env.TWINMAP_UPDATES) autoUpdater.setFeedURL({ provider: 'generic', url: process.env.TWINMAP_UPDATES })
     autoUpdater.autoDownload = false
+    // A Mac release has no blockmap for its zip: the whole zip comes down, and no copy of it is kept for the next time.
+    autoUpdater.disableDifferentialDownload = process.platform === 'darwin'
     autoUpdater.on('error', (e) => {
       say(`failed, ${e.message.split('\n')[0]}`)
       go()
@@ -87,4 +99,30 @@ export function updateFirst(open: () => void, say: (line: string) => void): void
   } catch {
     go()
   }
+}
+
+/** Whether this app can put a newer version in its own place: on Windows always, on macOS only from the Applications folder. */
+export function updatesItself(): boolean {
+  if (process.platform === 'win32') return true
+  return process.platform === 'darwin' && app.isInApplicationsFolder()
+}
+
+/** Asked as the app opens, each time it is outside the Applications folder: moved there, it starts again from there. */
+function offerApplications(say: (line: string) => void): void {
+  if (app.isInApplicationsFolder()) return
+  void dialog
+    .showMessageBox({
+      type: 'question',
+      message: t('app.main.moveApp'),
+      detail: t('app.main.moveAppWhy'),
+      buttons: [t('app.main.moveAppYes'), t('app.main.moveAppNo')],
+      defaultId: 0,
+      cancelId: 1,
+    })
+    .then(({ response }) => {
+      if (response !== 0) return say('outside Applications, left there')
+      say('moved to Applications')
+      app.moveToApplicationsFolder()
+    })
+    .catch((e: Error) => say(`could not move to Applications, ${e.message.split('\n')[0]}`))
 }

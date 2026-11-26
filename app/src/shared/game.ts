@@ -88,7 +88,7 @@ const MISMATCH_AFTER = 3
 
 export function protocolMismatch(addon: number, automaticUpdates = true): ProtocolMismatch {
   const update = addon > PROTOCOL ? 'app' : 'addon'
-  const newer = automaticUpdates ? 'app.link.newerAddon' : 'app.link.newerAddonMac'
+  const newer = automaticUpdates ? 'app.link.newerAddon' : 'app.link.newerAddonMove'
   const message = t(update === 'app' ? newer : 'app.link.olderAddon', { addon, app: PROTOCOL })
   return { addon, app: PROTOCOL, update, message }
 }

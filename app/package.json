@@ -51,6 +51,12 @@
           "from": "dist-native/twinmap-capture",
           "to": "Helpers/twinmap-capture"
         }
+      ],
+      "extraResources": [
+        {
+          "from": "build/app-update-mac.yml",
+          "to": "app-update.yml"
+        }
       ]
     },
     "nsis": {

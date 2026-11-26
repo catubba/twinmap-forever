@@ -89,9 +89,9 @@ export default {
     // The line under "Update the app" or "Update the addon" (shared/game.ts): {addon} and {app} are the numbers of the
     // protocol the addon and the app speak.
     newerAddon: 'The Twinmap Forever addon is newer than this app (protocol {addon}, this app speaks {app}). Close Twinmap and open it again: it updates itself when it starts.',
-    // macOS only: download the update by hand instead of restarting for an automatic update, then allow its first launch.
-    // {addon} and {app}: protocol numbers. Use the names of System Settings and Open Anyway as macOS shows them in this language.
-    newerAddonMac: 'The Twinmap Forever addon is newer than this app (protocol {addon}, this app speaks {app}). Download the newest Twinmap for macOS. If macOS does not open it, choose Open Anyway under System Settings > Privacy & Security.',
+    // macOS only, when Twinmap is outside the Applications folder and so cannot update itself: moving it there is the way.
+    // {addon} and {app}: protocol numbers. Name the Applications folder as Finder shows it in this language.
+    newerAddonMove: 'The Twinmap Forever addon is newer than this app (protocol {addon}, this app speaks {app}). Move Twinmap to the Applications folder and open it again: it updates itself when it starts.',
     olderAddon: 'The Twinmap Forever addon is older than this app (protocol {addon}, this app speaks {app}). Update the addon from CurseForge, then restart the game.',
     connecting: 'Connecting',
     lost: 'Link lost',
@@ -346,6 +346,12 @@ export default {
     savePicture: 'Save the picture of {name}',
     // Instead of the address a phone opens.
     noNetwork: 'This computer is on no home network.',
+    // macOS only (update.ts): asked as Twinmap opens from outside the Applications folder. moveApp is the question, moveAppWhy
+    // the line under it, moveAppYes and moveAppNo the two buttons (short). Name the Applications folder as Finder shows it.
+    moveApp: 'Move Twinmap to the Applications folder?',
+    moveAppWhy: 'Twinmap can update itself only from there. It then opens again from the Applications folder.',
+    moveAppYes: 'Move',
+    moveAppNo: 'Not now',
     // {port}: a number.
     portTaken: 'Port {port} is taken by another program.',
     // A whole page in a phone's browser, alone.

@@ -36,7 +36,7 @@ import { addonHearsFonts, addonsFolder, askLangOf, newsSinceOf, readSettings, se
 import { hear, installChannel, removeSlots, send as sendSignal, sendOld, sentParts } from './signal'
 import { MAPS_FILE, servedFile } from './tiles'
 import startTilesWorker from './tiles-worker?nodeWorker'
-import { updateFirst } from './update'
+import { updateFirst, updatesItself } from './update'
 import startWalkWorker from './walk-worker?nodeWorker'
 import { navFolder } from './nav'
 import { encodePng } from './png'
@@ -368,6 +368,7 @@ function createWindow(): void {
     () => {
       if (paused && Date.now() - pauseToldAt > PAUSE_AGAIN) tellPause()
     },
+    updatesItself(),
   )
   // The Pause button: the app stops reading the strip and asks the addon to stop drawing it, for this run
   // of the app and that session of the game's interface alone. The part "pause" is a number new at every

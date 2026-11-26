@@ -59,8 +59,10 @@ export function startLink(
   looked: (report: InsideReport | null, seen: Box | null, own: () => boolean, now: number) => void = () => {},
   // Paused, a strip was seen on the game's window: the addon draws again (a /reload, a login) and is to be asked once more.
   drawnWhilePaused: () => void = () => {},
+  // Whether a newer app comes by itself at the next start (update.ts): else the player is told how to get it.
+  automaticUpdates = process.platform === 'win32',
 ): { snapshot: () => LinkSnapshot; inside: () => ReturnType<ReturnType<typeof startInside>['report']>; cut: (x: number, y: number, width: number, height: number) => ReturnType<typeof readRect>; pause: (on: boolean) => void; stop: () => void } {
-  const game = createGame(process.platform === 'win32')
+  const game = createGame(automaticUpdates)
   // Inside a dungeon the game tells addons no place: there, and only there, it is found from the minimap on the screen.
   const inside = startInside(tilesFolder)
   let found: (Inside & { at: number }) | null = null
