@@ -124,6 +124,8 @@ export default {
     nearby: 'Alrededores',
     // The game's "Para entregar", cut to its verb: the row already names the quest and the word must stay short.
     handIn: 'Entregar',
+    lessXpAt: 'menos PE en nivel {level}',
+    lessXp: 'menos PE',
     objective: 'Objetivo',
     quest: 'Misión',
     entrance: 'Entrada',

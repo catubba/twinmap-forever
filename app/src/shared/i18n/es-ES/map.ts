@@ -30,6 +30,7 @@ export default {
       available: 'Disponibles',
       turnin: 'Entregar',
       objectives: 'Objetivos',
+      lowlevel: 'De nivel bajo',
       flight: 'Maestro de vuelo',
       inn: 'Tabernero',
       vendors: 'Mercaderes',
@@ -83,6 +84,8 @@ export default {
 
   pins: {
     rewardXp: '{xp} PE',
+    lessXpFrom: 'menos desde el nivel {level}',
+    lessXp: 'reducidos',
     entrance: 'Entrada',
     shipTo: 'Barco: {place}',
     zeppelinTo: 'Zepelín: {place}',

@@ -126,6 +126,8 @@ export default {
     nearby: '附近',
     // As the game (GS MAP_LEGEND_TURNIN, GS OBJECTIVES_LABEL).
     handIn: '可完成',
+    lessXpAt: '等级 {level} 起经验值减少',
+    lessXp: '经验值减少',
     objective: '任务目标',
     quest: '任务',
     entrance: '入口',

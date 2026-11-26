@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { objectiveGroups, questXp, type ObjectiveKind } from './quests'
+import { objectiveGroups, questXp, xpDrop, type ObjectiveKind } from './quests'
 
 test('objectives near each other that ask for the same thing are one pin; a quest in front is gathered on its own', () => {
   const at = (x: number, kind: ObjectiveKind | undefined, quest: string) => ({ x, y: 0, p: { type: 'objective' as const, area: 1, x: 0, y: 0, kind, name: 'Tar Beast', quests: [quest] } })
@@ -21,4 +21,10 @@ test("a quest's XP for a character: whole up to five levels under it, less below
   expect(questXp(1000, 14, 20), 'six under: 80%').toBe(800)
   expect(questXp(2450, 30, 40), 'ten under: a tenth').toBe(250)
   expect(questXp(170, 2, 60), 'never less than a tenth').toBe(15)
+})
+
+test('a quest whose XP drops at the next level or the one after says from which; one that dropped says so', () => {
+  expect([16, 15, 14, 17, 18, 24].map((q) => xpDrop(q, 20)), 'at level 20').toEqual([22, 21, 'less', null, null, null])
+  expect(questXp(1000, 16, 21), 'still whole the level before').toBe(1000)
+  expect(questXp(1000, 16, 22), 'less from the level told').toBe(800)
 })

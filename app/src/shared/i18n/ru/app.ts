@@ -134,6 +134,8 @@ export default {
     quests: 'Задания',
     nearby: 'Рядом',
     handIn: 'Сдать',
+    lessXpAt: 'меньше опыта с Ур. {level}',
+    lessXp: 'меньше опыта',
     objective: 'Задача',
     quest: 'Задание',
     entrance: 'Вход',

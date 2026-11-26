@@ -121,6 +121,8 @@ export default {
     quests: 'Quests',
     nearby: 'In der Nähe',
     handIn: 'Abgeben',
+    lessXpAt: 'weniger EP ab St. {level}',
+    lessXp: 'weniger EP',
     objective: 'Questziel',
     quest: 'Quest',
     entrance: 'Eingang',

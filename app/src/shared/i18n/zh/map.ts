@@ -34,6 +34,7 @@ export default {
       // The game's map legend MAP_LEGEND_TURNIN.
       turnin: '可完成',
       objectives: '任务目标',
+      lowlevel: '低等级任务',
       flight: '飞行管理员',
       inn: '旅店老板',
       vendors: '商人',
@@ -88,6 +89,8 @@ export default {
 
   pins: {
     rewardXp: '{xp} 经验值',
+    lessXpFrom: '等级 {level} 起减少',
+    lessXp: '已减少',
     entrance: '入口',
     shipTo: '船：{place}',
     zeppelinTo: '飞艇：{place}',

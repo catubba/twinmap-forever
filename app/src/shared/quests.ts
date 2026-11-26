@@ -87,6 +87,15 @@ export function questXp(base: number, questLevel: number, level: number): number
   return v <= 100 ? 5 * Math.floor((v + 2) / 5) : v <= 500 ? 10 * Math.floor((v + 5) / 10) : v <= 1000 ? 25 * Math.floor((v + 12) / 25) : 50 * Math.floor((v + 25) / 50)
 }
 
+/**
+ * Whether a quest's XP drops soon for a character (questXp: whole while the quest is at most five levels under it):
+ * 'less' when it gives less already, the level it drops at when that is the next level or the one after, else null.
+ */
+export function xpDrop(questLevel: number, level: number): 'less' | number | null {
+  const at = questLevel + 6
+  return level >= at ? 'less' : at - level <= 2 ? at : null
+}
+
 /** A quest of the log, by the name its pins carry. */
 export interface LogQuest {
   name: string

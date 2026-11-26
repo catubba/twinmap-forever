@@ -25,7 +25,7 @@
   import { addFix, BEHIND, PERIOD, TURN, turnAt, whereAt, type Fix, type Turn } from '../../shared/glide'
   import { boxOf, buildingsAt, killedIn, nameOfBoss, piecesIn, RARE_BOSSES, roomPixels, yardsInside, YARDS_PER_UNIT, type Box, type InteriorMap, type Interiors, type Piece, type UnderRoom, type Yards } from '../../shared/inside'
   import type { Continent, GameMap } from '../../shared/maps'
-  import { objectiveGroups, questXp, type QuestPin, type QuestReward } from '../../shared/quests'
+  import { objectiveGroups, questXp, xpDrop, type QuestPin, type QuestReward } from '../../shared/quests'
   import { coins } from '../../shared/items'
   import { gatherColour, GATHER_SKILL, HERBS, iconOf, ORES, panelFor, serves, type FixedLayer, type FixedPin, type Travel } from '../../shared/services'
   import { pictureOfBlock, tileOfPicture } from '../../shared/pixels'
@@ -1234,6 +1234,9 @@
     if (!r || (!xp && !r.copper)) return null
     const line = Object.assign(document.createElement('span'), { className: 'reward' })
     if (xp) line.append(t('map.pins.rewardXp', { xp: num(xp) }))
+    // In the purple of the XP bar, after the XP: from which level it drops, or that it has.
+    const drop = xp && xpLevel ? xpDrop(r.level!, xpLevel) : null
+    if (drop !== null) line.append(Object.assign(document.createElement('span'), { className: 'drop', textContent: ` · ${drop === 'less' ? t('map.pins.lessXp') : t('map.pins.lessXpFrom', { level: drop })}` }))
     if (r.copper) {
       if (xp) line.append(' \u00b7 ')
       for (const [n, coin] of coins(r.copper)) line.append(num(n), Object.assign(document.createElement('i'), { className: `coin ${coin}` }))
@@ -1257,7 +1260,13 @@
     const lit = (quests: string[]): number => (front === null || quests.includes(front) ? 1 : DIM)
     // From far the pins to take, and those to hand in, that would lie on each other are one, in their middle: it names them all, and a click goes near enough to tell them apart.
     const far = zoom < PIN_ZOOM ? zoom : null
-    const placed = quests.flatMap((p) => {
+    // Low-level off: of the quests to take, those that already give less XP are left out, and a pin left with none.
+    const low = (p: QuestPin, quest: string): boolean => {
+      const r = p.rewards?.[quest]
+      return !!(r?.level && r.xp && xpLevel && xpDrop(r.level, xpLevel) === 'less')
+    }
+    const shown = layers.lowlevel ? quests : quests.flatMap((p) => (p.type !== 'available' ? [p] : p.quests.some((q) => !low(p, q)) ? [{ ...p, quests: p.quests.filter((q) => !low(p, q)) }] : []))
+    const placed = shown.flatMap((p) => {
       const zone = zones.get(p.area)
       return zone?.rect ? [{ p, zone, ...unitsOfPlace(zone.rect, p.x, p.y) }] : []
     })
@@ -2528,5 +2537,8 @@
   }
   .map :global(.tip .reward) {
     color: var(--text-dim);
+  }
+  .map :global(.tip .drop) {
+    color: var(--xp-top);
   }
 </style>

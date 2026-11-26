@@ -30,6 +30,7 @@ export default {
       available: 'Disponibles',
       turnin: 'Rendre la quête',
       objectives: 'Objectifs',
+      lowlevel: 'Bas niveau',
       flight: 'Maître de vol',
       inn: 'Aubergiste',
       vendors: 'Marchands',
@@ -84,6 +85,8 @@ export default {
 
   pins: {
     rewardXp: '{xp} EXP',
+    lessXpFrom: 'moins à partir du niveau {level}',
+    lessXp: 'réduite',
     entrance: 'Entrée',
     shipTo: 'Bateau : {place}',
     zeppelinTo: 'Zeppelin : {place}',

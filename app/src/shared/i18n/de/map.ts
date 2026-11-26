@@ -31,6 +31,7 @@ export default {
       available: 'Verfügbar',
       turnin: 'Abgeben',
       objectives: 'Questziele',
+      lowlevel: 'Niedrigstufige',
       flight: 'Flugmeister',
       inn: 'Gastwirt',
       vendors: 'Händler',
@@ -84,6 +85,8 @@ export default {
 
   pins: {
     rewardXp: '{xp} EP',
+    lessXpFrom: 'weniger ab Stufe {level}',
+    lessXp: 'verringert',
     entrance: 'Eingang',
     shipTo: 'Schiff: {place}',
     zeppelinTo: 'Zeppelin: {place}',
