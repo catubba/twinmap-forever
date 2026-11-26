@@ -90,6 +90,11 @@ test('the bosses the pins lacked are marked killed by the name the game gives th
   const fights = (map: number, fight: string): Set<string> => killedIn({ map, list: [fight] }, map)
   expect(fights(289, 'Kirtonos').has(nameOfBoss('Kirtonos the Herald'))).toBe(true)
   expect(fights(289, 'Ras Frostwhisperer').has(nameOfBoss('Ras Frostwhisper'))).toBe(true)
+  // Those placed by the players' kills, by the number of their fight, in every language.
+  for (const [map, id] of [[109, 3587], [109, 3588], [129, 2781], [230, 230], [230, 2791], [2959, 3301], [2959, 3310], [2959, 3311]]) {
+    const pin = MORE_BOSS_PINS.find(([m, name]) => m === map && killedIn({ map, list: [], ids: [id] }, map).has(nameOfBoss(name)))
+    expect(pin, `fight ${id}`).toBeDefined()
+  }
   // And none of them is a pin twice.
   const pinned = new Set(DUNGEON_PINS.flatMap((d) => d.bosses.map(([name]) => `${d.map} ${nameOfBoss(name)}`)))
   expect(MORE_BOSS_PINS.filter(([map, name]) => pinned.has(`${map} ${nameOfBoss(name)}`))).toEqual([])
