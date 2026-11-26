@@ -6,9 +6,11 @@
 // room); a room has its triangles ("MOVT", "MOVI"), texture coordinates and normals ("MOTV", "MONR"), and its runs of
 // triangles of one material ("MOBA"); the building lists the materials ("MOMT": texture, blending, lit or not).
 //
-// What is kept: every room at full detail, outdoors and indoors (the user's choice of 26 November 2026), only the
-// triangles the sky sees (skySeen), each building file once; its materials gathered by what can share a texture array
-// (same kind, size, levels, blending, light), as the prototype's 31 draws for Stormwind instead of 357.
+// What is kept: every room at full detail, outdoors and indoors (the user's choice of 26 November 2026), each building
+// file once; its materials gathered by what can share a texture array (same kind, size, levels, blending, light), as the
+// prototype's 31 draws for Stormwind instead of 357. Not cut to what the sky sees, as the prototype was: that cut took
+// ten minutes of a processor for the whole world, the triangles it saved (four in ten) the graphics card throws away
+// behind the walls anyway (the user's choice of 26 November 2026, design/ROADMAP.md, M23-F2).
 //   buildings/format.json         the format the folder was made in: another one is made again from nothing
 //   buildings/<file>.bin          a building, deflated (Building below)
 //   buildings/tex/<id>.bin        a texture as the game keeps it (DXT blocks), its levels from the first at most 512
@@ -29,15 +31,9 @@ import { keep } from './tiles'
 
 export const BUILDINGS_FOLDER = 'buildings'
 export const PLACED_FILE = 'buildings.json'
-const FORMAT = 1
+const FORMAT = 2 // 1 drew the halls of a city inside a mountain over the pictures of its rooms, cut to what the sky sees
 /** Pixels of a texture's widest level kept. */
 const TEX = 512
-/** The directions the sky looks from (M16-F8): 16 round, at these heights over the horizon, in degrees. */
-const AZIMUTHS = 16
-const ELEVATIONS = [15, 20, 25, 30, 40, 55, 70, 85]
-/** Pixels a yard of the pictures the sky takes, and their widest side. */
-const SKY_DETAIL = 3
-const SKY_SIDE = 4096
 
 // A file of the game is a run of chunks: a four letter tag written backwards, a size, the data.
 function* chunks(b: Buffer, from = 0): Generator<{ tag: string; data: Buffer }> {
@@ -80,6 +76,8 @@ interface Room {
   normal: Float32Array
   tris: Uint16Array
   batches: { start: number; count: number; material: number }[]
+  /** Marked outdoors, or lit as outdoors (the streets of Stormwind's districts): what stands out of a mountain. */
+  outdoor: boolean
 }
 /** A room of a building from its file: its points turned into the view's axes (x east = -y of the file, y up = z, z south = -x). */
 export function roomOf(f: Buffer): Room | null {
@@ -105,84 +103,20 @@ export function roomOf(f: Buffer): Room | null {
     pos.set([-verts[i * 3 + 1]!, verts[i * 3 + 2]!, -verts[i * 3]!], i * 3)
     normal.set(normals ? [-normals[i * 3 + 1]!, normals[i * 3 + 2]!, -normals[i * 3]!] : [0, 1, 0], i * 3)
   }
-  return { pos, uv: uvs && uvs.length >= n * 2 ? uvs.subarray(0, n * 2) : new Float32Array(n * 2), normal, tris, batches }
-}
-
-/**
- * Which triangles the sky sees, one byte each: the building drawn from many directions (AZIMUTHS x ELEVATIONS) with
- * no perspective, nearest triangle at each pixel; a triangle is seen when it has a pixel, or when no pixel's centre
- * falls in it (thin, or seen aslant: the sides of window frames) and its middle is not behind what is drawn there.
- * pos: x y z a point, y up; tris: three points a triangle.
- */
-export function skySeen(pos: Float32Array, tris: Uint32Array, detail = SKY_DETAIL, widest = SKY_SIDE): Uint8Array {
-  const n = tris.length / 3, seen = new Uint8Array(n)
-  if (!n) return seen
-  const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity]
-  for (let i = 0; i < pos.length; i++) ((lo[i % 3] = Math.min(lo[i % 3]!, pos[i]!)), (hi[i % 3] = Math.max(hi[i % 3]!, pos[i]!)))
-  const c = lo.map((l, k) => (l + hi[k]!) / 2)
-  let radius = 0.5
-  for (let i = 0; i < pos.length; i += 3) radius = Math.max(radius, Math.hypot(pos[i]! - c[0]!, pos[i + 1]! - c[1]!, pos[i + 2]! - c[2]!))
-  const scale = Math.min(detail, (widest - 2) / (2 * radius)), side = Math.ceil(2 * radius * scale) + 2
-  const depth = new Float32Array(side * side), id = new Int32Array(side * side)
-  const points = pos.length / 3, sx = new Float32Array(points), sy = new Float32Array(points), sz = new Float32Array(points)
-  const near = 0.25 // yards a middle may lie behind what is drawn and still count as seen
-  for (const elevation of ELEVATIONS) {
-    for (let a = 0; a < AZIMUTHS; a++) {
-      const e = (elevation * Math.PI) / 180, az = (a / AZIMUTHS) * Math.PI * 2
-      // the look, from the sky down; across and up the picture
-      const d = [-Math.cos(e) * Math.sin(az), -Math.sin(e), -Math.cos(e) * Math.cos(az)], r = [Math.cos(az), 0, -Math.sin(az)]
-      const u = [r[1]! * d[2]! - r[2]! * d[1]!, r[2]! * d[0]! - r[0]! * d[2]!, r[0]! * d[1]! - r[1]! * d[0]!]
-      for (let i = 0; i < points; i++) {
-        const x = pos[i * 3]! - c[0]!, y = pos[i * 3 + 1]! - c[1]!, z = pos[i * 3 + 2]! - c[2]!
-        sx[i] = (x * r[0]! + z * r[2]! + radius) * scale + 1
-        sy[i] = (x * u[0]! + y * u[1]! + z * u[2]! + radius) * scale + 1
-        sz[i] = x * d[0]! + y * d[1]! + z * d[2]!
-      }
-      depth.fill(Infinity)
-      id.fill(0)
-      for (let t = 0; t < n; t++) {
-        const p0 = tris[t * 3]!, p1 = tris[t * 3 + 1]!, p2 = tris[t * 3 + 2]!
-        const x0 = sx[p0]!, y0 = sy[p0]!, x1 = sx[p1]!, y1 = sy[p1]!, x2 = sx[p2]!, y2 = sy[p2]!
-        const area = (x1 - x0) * (y2 - y0) - (y1 - y0) * (x2 - x0)
-        if (Math.abs(area) < 1e-9) continue
-        const z0 = sz[p0]! / area, z1 = sz[p1]! / area, z2 = sz[p2]! / area
-        const minX = Math.max(0, Math.ceil(Math.min(x0, x1, x2) - 0.5)), maxX = Math.min(side - 1, Math.floor(Math.max(x0, x1, x2) - 0.5))
-        const minY = Math.max(0, Math.ceil(Math.min(y0, y1, y2) - 0.5)), maxY = Math.min(side - 1, Math.floor(Math.max(y0, y1, y2) - 0.5))
-        for (let py = minY; py <= maxY; py++) {
-          const cy = py + 0.5
-          for (let px = minX; px <= maxX; px++) {
-            const cx = px + 0.5
-            // the weights of the three corners at the pixel's centre, all of the sign of the area inside
-            const w0 = (x2 - x1) * (cy - y1) - (y2 - y1) * (cx - x1)
-            const w1 = (x0 - x2) * (cy - y2) - (y0 - y2) * (cx - x2)
-            const w2 = (x1 - x0) * (cy - y0) - (y1 - y0) * (cx - x0)
-            if (area > 0 ? w0 < 0 || w1 < 0 || w2 < 0 : w0 > 0 || w1 > 0 || w2 > 0) continue
-            const k = py * side + px, zz = w0 * z0 + w1 * z1 + w2 * z2
-            if (zz < depth[k]!) ((depth[k] = zz), (id[k] = t + 1))
-          }
-        }
-      }
-      for (let k = 0; k < id.length; k++) if (id[k]) seen[id[k]! - 1] = 1
-      for (let t = 0; t < n; t++) {
-        if (seen[t]) continue
-        const p0 = tris[t * 3]!, p1 = tris[t * 3 + 1]!, p2 = tris[t * 3 + 2]!
-        const px = Math.floor((sx[p0]! + sx[p1]! + sx[p2]!) / 3), py = Math.floor((sy[p0]! + sy[p1]! + sy[p2]!) / 3)
-        if (px >= 0 && py >= 0 && px < side && py < side && (sz[p0]! + sz[p1]! + sz[p2]!) / 3 <= depth[py * side + px]! + near) seen[t] = 1
-      }
-    }
-  }
-  return seen
+  return { pos, uv: uvs && uvs.length >= n * 2 ? uvs.subarray(0, n * 2) : new Float32Array(n * 2), normal, tris, batches, outdoor: (g.readUInt32LE(8) & 0x48) !== 0 }
 }
 
 interface Material { texture: number; blend: number; unlit: boolean }
 interface Texture { kind: TexKind; width: number; height: number; levels: number }
 
 /**
- * A building's file made from the game's: its rooms at full detail, the triangles the sky does not see left out, the
- * draws gathered by what can share a texture array. read: a game file by number; texture: what a texture is (written
- * once by makeTexture). Null for a file that is not a building or has nothing to draw.
+ * A building's file made from the game's: its rooms at full detail, the draws gathered by what can share a texture
+ * array. read: a game file by number; texture: what a texture is (written
+ * once by makeTexture). outside: only its rooms seen from outside, for a building inside the ground (Ironforge): its
+ * halls are the pictures of the rooms under the ground (inside3d.ts), and their ceilings would cover them. Null for a
+ * file that is not a building or has nothing to draw.
  */
-export function makeBuilding(file: Buffer, read: (id: number) => Buffer | null, texture: (id: number) => Texture | null): { head: BuildingHead; body: Buffer } | null {
+export function makeBuilding(file: Buffer, read: (id: number) => Buffer | null, texture: (id: number) => Texture | null, outside = false): { head: BuildingHead; body: Buffer } | null {
   const head = chunk(file, 'DHOM'), gfid = chunk(file, 'DIFG'), momt = chunk(file, 'TMOM')
   if (!head || !gfid) return null
   const rooms = head.readUInt32LE(4)
@@ -192,7 +126,7 @@ export function makeBuilding(file: Buffer, read: (id: number) => Buffer | null, 
   const pos: number[] = [], uv: number[] = [], normal: number[] = [], byMaterial = new Map<number, number[]>()
   for (let i = 0; i < rooms && i * 4 < gfid.length; i++) {
     const id = gfid.readUInt32LE(i * 4), b = id ? read(id) : null, room = b && roomOf(b)
-    if (!room) continue
+    if (!room || (outside && !room.outdoor)) continue
     const first = pos.length / 3
     for (const v of room.pos) pos.push(v)
     for (const v of room.uv) uv.push(v)
@@ -202,12 +136,8 @@ export function makeBuilding(file: Buffer, read: (id: number) => Buffer | null, 
       for (let t = batch.start; t < batch.start + batch.count && t < room.tris.length; t++) list.push(first + room.tris[t]!)
     }
   }
-  const all = new Uint32Array([...byMaterial.values()].flat())
-  if (!all.length) return null
-  const seen = skySeen(new Float32Array(pos), all)
   // the draws: materials of one look, their textures as layers
   const looks = new Map<string, { kind: TexKind; blend: number; unlit: boolean; textures: number[]; tris: number[] }>()
-  let t = 0
   for (const [m, list] of byMaterial) {
     const mat = materials[m] ?? { texture: 0, blend: 0, unlit: false }, tex = mat.texture ? texture(mat.texture) : null
     const blend = mat.blend === 1 ? 1 : mat.blend >= 2 ? 2 : 0, kind: TexKind = tex?.kind ?? 'none'
@@ -216,7 +146,7 @@ export function makeBuilding(file: Buffer, read: (id: number) => Buffer | null, 
     const look = looks.get(key) ?? looks.set(key, { kind, blend, unlit: mat.unlit, textures: [], tris: [] }).get(key)!
     let layer = look.textures.indexOf(mat.texture)
     if (layer < 0 && kind !== 'none') layer = look.textures.push(mat.texture) - 1
-    for (let k = 0; k < list.length; k += 3, t++) if (seen[t]) look.tris.push(list[k]!, list[k + 1]!, list[k + 2]!, Math.max(0, layer))
+    for (let k = 0; k < list.length; k += 3) look.tris.push(list[k]!, list[k + 1]!, list[k + 2]!, Math.max(0, layer))
   }
   // only the points still used, each with the layer of its texture (a point is in one room, so of one material)
   const remap = new Int32Array(pos.length / 3).fill(-1), used: number[] = [], layers: number[] = [], index: number[] = [], draws: Draw[] = []
@@ -286,6 +216,9 @@ export function makeTexture(f: Buffer): { texture: Texture; bytes: Buffer; png: 
   return { texture: { kind: 'png', width, height, levels: 1 }, bytes: encodePng(rgba, width, height, 4), png: true }
 }
 
+/** How a building inside the ground is told: its file and where it stands, to the yard (u east and v south, as interiors.ts and caves.json have it). */
+export const buriedKey = (file: number, u: number, v: number): string => `${file} ${Math.round(u)} ${Math.round(v)}`
+
 // The format the buildings of a folder were made in; 0 for none.
 function formatOf(folder: string): number {
   try {
@@ -303,10 +236,11 @@ export function buildingsMade(folder: string, worlds: string[]): boolean {
 /**
  * Makes the buildings of the continents given, in the folder of the build: each file and texture once, kept as it is
  * made (an interrupted run resumes), each continent's list last. read: a game file by number, null when there is none
- * or the server has not sent its key. Gives what was made.
+ * or the server has not sent its key. buried: of each continent, the buildings inside the ground (caves.json) by
+ * buriedKey; of those only the rooms seen from outside are kept, in a file of their own (<file>-out.bin). Gives what was made.
  */
 export function makeBuildings(
-  worlds: { name: string; wdt: Buffer }[],
+  worlds: { name: string; wdt: Buffer; buried?: Set<string> }[],
   read: (id: number) => Buffer | null,
   folder: string,
   onProgress?: (done: number, total: number) => void,
@@ -337,36 +271,37 @@ export function makeBuildings(
     }
     return textures.get(id)!
   }
-  const all = worlds.map((w) => standing(w.wdt, read))
-  const files = [...new Set(all.flat().map((p) => p.file))]
+  // each standing building with the name of its file: <file>, or <file>-out for one inside the ground
+  const all = worlds.map((w) => standing(w.wdt, read).map((p) => ({ ...p, name: w.buried?.has(buriedKey(p.file, p.x, p.z)) ? `${p.file}-out` : String(p.file) })))
+  const files = [...new Set(all.flat().map((p) => p.name))]
   // each file's radius, or 0 for one with nothing to draw
-  const radius = new Map<number, number>()
+  const radius = new Map<string, number>()
   let made = 0
-  files.forEach((id, i) => {
+  files.forEach((name, i) => {
     onProgress?.(i, files.length)
-    const out = join(dir, `${id}.bin`), none = join(dir, `${id}.none`)
-    if (existsSync(none)) return void radius.set(id, 0)
+    const out = join(dir, `${name}.bin`), none = join(dir, `${name}.none`)
+    if (existsSync(none)) return void radius.set(name, 0)
     if (existsSync(out)) {
-      radius.set(id, (JSON.parse(readFileSync(out + '.json', 'utf8')) as { radius: number }).radius)
+      radius.set(name, (JSON.parse(readFileSync(out + '.json', 'utf8')) as { radius: number }).radius)
       return
     }
-    const f = read(id), b = f && makeBuilding(f, read, texture)
+    const f = read(parseInt(name)), b = f && makeBuilding(f, read, texture, name.endsWith('-out'))
     if (!b) return void keep(none, () => Buffer.alloc(0))
     // the radius beside it first, so a building kept is never without one
     writeFileSync(out + '.json', JSON.stringify({ radius: b.head.radius }))
     keep(out, () => deflateSync(b.body))
-    radius.set(id, b.head.radius)
+    radius.set(name, b.head.radius)
     made++
   })
   onProgress?.(files.length, files.length)
   let placed = 0
   worlds.forEach((w, k) => {
-    const list = all[k]!.filter((p) => radius.get(p.file))
+    const list = all[k]!.filter((p) => radius.get(p.name))
     const round = (v: number, digits: number): number => Number(v.toFixed(digits))
     const out: Placed = {
       format: FORMAT,
-      placed: list.map((p) => [p.file, round(p.x, 2), round(p.y, 2), round(p.z, 2), round(p.turn, 5), round(p.scale, 4)]),
-      radius: Object.fromEntries([...new Set(list.map((p) => p.file))].map((f) => [f, radius.get(f)!])),
+      placed: list.map((p) => [p.name, round(p.x, 2), round(p.y, 2), round(p.z, 2), round(p.turn, 5), round(p.scale, 4)]),
+      radius: Object.fromEntries([...new Set(list.map((p) => p.name))].map((f) => [f, radius.get(f)!])),
     }
     mkdirSync(join(folder, w.name), { recursive: true })
     writeFileSync(lists[k]! + '.part', JSON.stringify(out))

@@ -35,7 +35,7 @@ export class Buildings {
   private folder = ''
   private list: Placed | null = null
   private asked = 0 // when the list was last asked for, in seconds
-  private files = new Map<number, File>()
+  private files = new Map<string, File>() // by its name in the folder (shared/buildings.ts)
   private shown = new Map<number, THREE.Mesh>() // by the building's place in the list
   private loading = 0
   private frame = 0
@@ -75,7 +75,7 @@ export class Buildings {
         this.asked = now
         const folder = this.folder
         void fetch(`${TILES}/${folder}/buildings.json`)
-          .then((a) => (a.ok ? (a.json() as Promise<Placed>) : null))
+          .then((a) => (a.status === 200 ? (a.json() as Promise<Placed>) : null))
           .catch(() => null)
           .then((list) => {
             if (folder !== this.folder || !list) return
@@ -115,7 +115,7 @@ export class Buildings {
   }
 
   // A file wanted: read when it is not, a few at a time.
-  private want(id: number): void {
+  private want(id: string): void {
     const f = this.files.get(id)
     if (f) return void (f.used = this.frame)
     if (this.loading >= LOADING) return
@@ -168,7 +168,7 @@ export class Buildings {
     for (const [id, f] of idle.slice(0, Math.max(0, idle.length - KEPT))) this.drop(id, f)
   }
 
-  private drop(id: number, f: File): void {
+  private drop(id: string, f: File): void {
     f.geometry?.dispose()
     for (const m of f.materials ?? []) m.dispose()
     for (const t of f.textures ?? []) t.dispose()
@@ -176,7 +176,7 @@ export class Buildings {
   }
 
   // A building's file: its geometry, a material a draw, and the textures they use.
-  private async load(id: number): Promise<{ parts: Pick<File, 'geometry' | 'materials' | 'textures'>; dispose: () => void } | null> {
+  private async load(id: string): Promise<{ parts: Pick<File, 'geometry' | 'materials' | 'textures'>; dispose: () => void } | null> {
     const b = await inflated(`${TILES}/buildings/${id}.bin`)
     if (!b) return null
     const view = new DataView(b.buffer, b.byteOffset, b.byteLength), length = view.getUint32(0, true)

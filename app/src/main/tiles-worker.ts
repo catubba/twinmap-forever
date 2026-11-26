@@ -20,12 +20,12 @@ import { readTable } from '../shared/wdc5'
 import { LIQUID_TYPE_FILE, liquidOfName, WATER } from '../shared/water'
 import { WORLDS } from '../shared/world'
 import { gameLocale, installedBuild, openClientFiles, type ClientFiles } from './client-files'
-import { buildingsMade, makeBuildings } from './buildings'
+import { buildingsMade, buriedKey, makeBuildings } from './buildings'
 import { EncryptedFileError } from './client-files'
-import { convertInteriors, ENCOUNTERS_FILE, finishedInteriors, INTERIORS_FILE, MAP_FILE, mapEntries, ROOM_PICTURES_FILE, roomPictures } from './interiors'
+import { convertInteriors, ENCOUNTERS_FILE, finishedInteriors, INTERIORS_FILE, MAP_FILE, mapEntries, placedIn, ROOM_PICTURES_FILE, roomPictures } from './interiors'
 import { sentKeys } from './keys'
 import { convertHeights, heightsDone } from './heights'
-import { makeCaves, makeUnder } from './caves'
+import { CAVES_FILE, makeCaves, makeUnder } from './caves'
 import { navFrom } from '../shared/nav-data'
 import { walker, type Walker } from './walk'
 import { MIDDLE_YARDS } from '../shared/inside'
@@ -314,7 +314,21 @@ try {
           throw e
         }
       }
-      const made = makeBuildings(WORLDS.map((w) => ({ name: w.name, wdt: read(w.file)! })), read, folder)
+      // the buildings inside the ground (caves.json, by their place in the list of interiors.ts): their halls are the pictures of the rooms
+      let caves: Record<string, number[]> = {}
+      try {
+        caves = (JSON.parse(readFileSync(join(folder, CAVES_FILE), 'utf8')) as { worlds: Record<string, number[]> }).worlds
+      } catch {
+        // none known: all drawn whole
+      }
+      const made = makeBuildings(
+        WORLDS.map((w) => {
+          const wdt = read(w.file)!, list = placedIn(wdt, read)
+          return { name: w.name, wdt, buried: new Set((caves[w.continent] ?? []).flatMap((n) => (list[n] ? [buriedKey(list[n].file, list[n].u, list[n].v)] : []))) }
+        }),
+        read,
+        folder,
+      )
       parentPort?.postMessage({ buildings: { ...made, seconds: (Date.now() - buildingsStarted) / 1000 } })
     }
   } catch (e) {

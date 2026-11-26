@@ -28,10 +28,14 @@ export interface BuildingHead {
   draws: Draw[]
 }
 
-/** Where the buildings of a continent stand: file, x, y, z (yards, as the 3D view), turn (radians round y), scale. */
+/**
+ * Where the buildings of a continent stand: file, x, y, z (yards, as the 3D view), turn (radians round y), scale. The
+ * file is its name in the folder: the game's number, and "-out" for a building inside the ground drawn by its rooms seen
+ * from outside alone (Ironforge's gate).
+ */
 export interface Placed {
   format: number
-  placed: [number, number, number, number, number, number][]
+  placed: [string, number, number, number, number, number][]
   /** Each file's radius, by file. */
   radius: Record<string, number>
 }
