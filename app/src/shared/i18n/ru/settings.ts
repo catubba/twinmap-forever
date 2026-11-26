@@ -6,6 +6,7 @@ export default {
     label: 'Разделы',
     general: 'Общие',
     appearance: 'Внешний вид',
+    graphics: 'Графика',
     game: 'Игра и аддоны',
     privacy: 'Конфиденциальность',
     about: 'О Twinmap',
@@ -38,6 +39,13 @@ export default {
     colour: 'Цвет',
     size: 'Размер',
     default: 'По умолчанию',
+  },
+
+  graphics: {
+    view3d: '3D-вид',
+    buildings: 'Здания',
+    cost: 'Каждый параметр расходует память и время видеокарты. Сохраняется для этого окна: у телефона или планшета свой выбор.',
+    card: 'Видеокарта',
   },
 
   window: {

@@ -100,6 +100,8 @@ export const GLYPHS = {
   // The categories of Settings.
   sliders: 'M2 4h12M2 8h12M2 12h12M5 2.5v3M10 6.5v3M6.5 10.5v3',
   palette: 'M8 2a6 6 0 1 0 0 12c1.2 0 1.6-.8 1.2-1.6-.4-.9.2-1.7 1.2-1.7H12a2 2 0 0 0 2-2A6 6 0 0 0 8 2zM5 7.5h.01M8 5h.01M11 7h.01',
+  // Graphics: a cube.
+  cube: 'M8 1.5 14 5v6l-6 3.5L2 11V5zM2 5l6 3.5L14 5M8 8.5v6',
   folder: 'M2 4.5h4l1.5 1.5H14v6.5H2z',
   phone: 'M5 1.5h6v13H5zM7.5 12.5h1',
   shield: 'M8 1.5l5 2v4c0 3.5-2.2 5.8-5 7-2.8-1.2-5-3.5-5-7v-4z',

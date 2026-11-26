@@ -20,6 +20,8 @@ import { readTable } from '../shared/wdc5'
 import { LIQUID_TYPE_FILE, liquidOfName, WATER } from '../shared/water'
 import { WORLDS } from '../shared/world'
 import { gameLocale, installedBuild, openClientFiles, type ClientFiles } from './client-files'
+import { buildingsMade, makeBuildings } from './buildings'
+import { EncryptedFileError } from './client-files'
 import { convertInteriors, ENCOUNTERS_FILE, finishedInteriors, INTERIORS_FILE, MAP_FILE, mapEntries, ROOM_PICTURES_FILE, roomPictures } from './interiors'
 import { sentKeys } from './keys'
 import { convertHeights, heightsDone } from './heights'
@@ -296,6 +298,28 @@ try {
   } catch (e) {
     // The map of the continents is there all the same.
     interiors({ maps: 0, pieces: 0, dropped: 0, converted: false, problem: e instanceof Error ? e.message : String(e) })
+  }
+  // The buildings of the continents for the 3D view (buildings.ts): minutes the first time, after all the rest. The view
+  // asks for them until they are there.
+  const buildingsStarted = Date.now()
+  try {
+    if (!buildingsMade(folder, WORLDS.map((w) => w.name))) {
+      const files = open()
+      // a file the server has sent no key for is a building the view does without
+      const read = (id: number): Buffer | null => {
+        try {
+          return files.read(id)
+        } catch (e) {
+          if (e instanceof EncryptedFileError) return null
+          throw e
+        }
+      }
+      const made = makeBuildings(WORLDS.map((w) => ({ name: w.name, wdt: read(w.file)! })), read, folder)
+      parentPort?.postMessage({ buildings: { ...made, seconds: (Date.now() - buildingsStarted) / 1000 } })
+    }
+  } catch (e) {
+    // The 3D view goes without them; tried again at the next start.
+    parentPort?.postMessage({ buildings: { problem: e instanceof Error ? e.message : String(e) } })
   }
 } catch (e) {
   tell({ state: 'failed', message: e instanceof Error ? e.message : String(e) })

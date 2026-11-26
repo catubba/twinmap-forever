@@ -86,7 +86,9 @@ function startTiles(gameFolder: string | null): { status: () => TilesStatus; ite
   const worker = startTilesWorker({ workerData: { gameFolder, base, nav: navFolder() } })
   // The picture of an item, or of a spell by its file, the folder does not have yet is made by the worker, which has the game's archive (item-icons.ts).
   const items = new Map<string, ((made: boolean) => void)[]>()
-  worker.on('message', (told: TilesStatus | { asked: string; made: boolean }) => {
+  worker.on('message', (told: TilesStatus | { asked: string; made: boolean } | { buildings: { problem?: string } }) => {
+    // the buildings of the 3D view, made after the rest (buildings.ts): the view asks for them by itself
+    if ('buildings' in told) return void (told.buildings.problem && fault(`buildings: ${told.buildings.problem}`))
     if (!('asked' in told)) {
       if (told.state === 'failed') fault(`map: ${told.message}`)
       status = told

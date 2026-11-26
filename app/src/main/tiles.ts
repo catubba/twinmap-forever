@@ -71,6 +71,11 @@ export function servedFile(base: string, path: string): string | null {
   // The ground of the 3D view (heights.ts), a continent's only.
   const levels = /^\/([a-z]+)\/levels\/(\d)\/(\d{1,2})\/(\d{1,2})\.bin$/.exec(path)
   if (levels) return joinPath(base, levels[1]!, 'levels', levels[2]!, levels[3]!, `${levels[4]}.bin`)
+  // The buildings of the 3D view (buildings.ts): a building's file, a texture, a continent's list.
+  const building = /^\/buildings\/(?:(\d{1,9})\.bin|tex\/(\d{1,9})\.(bin|png))$/.exec(path)
+  if (building) return building[1] ? joinPath(base, 'buildings', `${building[1]}.bin`) : joinPath(base, 'buildings', 'tex', `${building[2]}.${building[3]}`)
+  const placed = /^\/([a-z]+)\/buildings\.json$/.exec(path)
+  if (placed) return joinPath(base, placed[1]!, 'buildings.json')
   const item = /^\/(items|pictures)\/(\d{1,7})\.png$/.exec(path)
   if (item) return joinPath(base, item[1]!, `${item[2]}.png`)
   const m = /^\/(?:(maps|places|travel|interiors|caves|under|items|trainers|spells|talents|ah-names|game-names)\.json|rooms\/(\d{1,9})\.dxt|([a-z]+|i\d{1,5})\/(?:blocks\/(\d{1,2})\/(\d{1,2})\.dxt|(shade\/)?(\d)\/(\d{1,3})\/(\d{1,3})\.png))$/.exec(path)

@@ -6,6 +6,7 @@ export default {
     label: '분류',
     general: '일반',
     appearance: '모양',
+    graphics: '그래픽',
     game: '게임 및 애드온',
     privacy: '개인정보',
     about: 'Twinmap 정보',
@@ -37,6 +38,13 @@ export default {
     colour: '색상',
     size: '크기',
     default: '기본값',
+  },
+
+  graphics: {
+    view3d: '3D 보기',
+    buildings: '건물',
+    cost: '각 항목은 메모리와 그래픽 카드 시간을 사용합니다. 이 창에만 저장되며, 휴대폰이나 태블릿은 따로 저장합니다.',
+    card: '그래픽 카드',
   },
 
   window: {

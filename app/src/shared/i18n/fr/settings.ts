@@ -6,6 +6,7 @@ export default {
     label: 'Catégories',
     general: 'Général',
     appearance: 'Apparence',
+    graphics: 'Graphismes',
     game: 'Jeu et addons',
     privacy: 'Confidentialité',
     about: 'À propos de Twinmap',
@@ -37,6 +38,13 @@ export default {
     colour: 'Couleur',
     size: 'Taille',
     default: 'Par défaut',
+  },
+
+  graphics: {
+    view3d: 'Vue 3D',
+    buildings: 'Bâtiments',
+    cost: 'Chaque option coûte de la mémoire et du temps à la carte graphique. Propre à cette fenêtre : un téléphone ou une tablette garde son propre choix.',
+    card: 'Carte graphique',
   },
 
   window: {
