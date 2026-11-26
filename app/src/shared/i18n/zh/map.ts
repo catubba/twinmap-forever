@@ -49,6 +49,7 @@ export default {
       caves: '洞穴',
       dungeons: '地下城',
       routes: '飞行路线',
+      vessels: '船只和飞艇',
       bosses: '地下城首领',
       companions: '小队',
     },
@@ -88,6 +89,8 @@ export default {
   pins: {
     rewardXp: '{xp} 经验值',
     entrance: '入口',
+    shipTo: '船：{place}',
+    zeppelinTo: '飞艇：{place}',
     entranceOf: '入口：{name}',
     // Rare as the game's map legend says it for creatures (MAP_LEGEND_RARE).
     rareBoss: '{name}（稀有）',

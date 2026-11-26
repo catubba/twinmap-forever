@@ -48,6 +48,17 @@ export default {
     custom: 'Your layout places the map: move it with {edit}.',
   },
 
+  // In Appearance, under the map's side: the character's arrow on the 2D map and on the 3D view (the Arrow of map.layers.names).
+  arrow: {
+    // Its subtitle, short.
+    title: 'Arrow',
+    // Two rows under it: a colour box, and a dropdown of sizes in percent.
+    colour: 'Colour',
+    size: 'Size',
+    // A button beside the colour box, once another colour is chosen: back to the gold. Short.
+    default: 'Default',
+  },
+
   // In General: the app's window, switches, the text size and the hardware acceleration.
   window: {
     onTop: 'Keep Twinmap on top of other windows',

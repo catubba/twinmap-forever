@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest'
 import { unitsOfPlace, unitsOfWorld } from './geo'
 import type { GameMap } from './maps'
-import { gatherColour, iconOf, panelFor, resourceOf, serves, servicesOf, travel, TRAVEL_FORMAT, type FixedLayer, type FixedPin } from './services'
+import { gatherColour, iconOf, panelFor, resourceOf, serves, servicesOf, travel, TRAVEL_FORMAT, VESSELS, type FixedLayer, type FixedPin } from './services'
 import type { Row, Table } from './wdc5'
 
 // A table of the game, as far as these readers look at one: rows of columns, a column a value or a list.
@@ -110,6 +110,55 @@ test('doors and flights come from the tables of the maps and of the flight paths
   expect(told.nodes.map((n) => `${n.continent} ${n.name} ${n.side}`)).toEqual(['0 Stormwind, Elwynn A', '0 Sentinel Hill, Westfall A', '0 Undercity, Tirisfal H', '1 Orgrimmar, Durotar H'])
   expect(told.nodes[0]).toMatchObject(unitsOfWorld(-8833, 479))
   expect(told.routes).toEqual([[0, 1]])
+})
+
+test('ships and zeppelins come from the points of their ways, each stop named as the game names its area', () => {
+  const areas = table([
+    { id: 392, cols: { 1: 'Ratchet' } },
+    { id: 35, cols: { 1: 'Bahía del Botín' } }, // in the game's language
+    { id: 1116, cols: { 1: 'Feathermoon Stronghold' } },
+    { id: 1108, cols: { 1: 'The Forgotten Coast' } },
+    { id: 279, cols: { 1: 'Dalaran' } },
+    { id: 16593, cols: { 1: 'Zephras Isle' } },
+  ])
+  let id = 0
+  const point = (path: number, world: number, x: number, y: number, flags = 0) => ({ id: ++id, parent: path, cols: { 0: [x, y, 0], 3: id, 4: world, 5: flags } })
+  const points = table([
+    // Ratchet to Booty Bay across the sea: out of Kalimdor, into the Eastern Kingdoms, and back.
+    point(241, 1, -1000, -3900), point(241, 1, -1006, -3842, 2), point(241, 1, -1100, -3700),
+    point(241, 0, -14200, 500), point(241, 0, -14278, 583, 2), point(241, 0, -14200, 450),
+    point(241, 1, -1050, -3950),
+    // The ferry of Feathermoon stops where it began, again: one stop.
+    point(303, 1, -4197, 3287, 2), point(303, 1, -4348, 2444, 2), point(303, 1, -4197, 3287, 2),
+    // Dalaran to Zephras Isle, a world the map does not draw: its stop has a name and no place.
+    point(11398, 0, 466, 64), point(11398, 0, 545, 424, 2), point(11398, 0, 488, 559), point(11398, 2991, 1848, 569, 2), point(11398, 2991, 1800, 600),
+    // A way whose stops are not as many as the list names: the game changed it, left out.
+    point(285, 0, -12464, 232, 2),
+  ])
+  const told = travel(table([]), table([]), table([]), [], points, areas).vessels!
+  const at = (x: number, y: number): [number, number] => { const u = unitsOfWorld(x, y); return [u.x, u.y] }
+  expect(told.map((v) => `${v.kind} ${v.side}: ${v.stops.map((s) => `${s.name} (${s.continent})`).join(', ')}`)).toEqual([
+    'ship AH: Ratchet (1), Bahía del Botín (0)',
+    'ship A: Feathermoon Stronghold (1), The Forgotten Coast (1)',
+    'zeppelin A: Dalaran (0), Zephras Isle (null)',
+  ])
+  expect(told[0]!.way).toEqual([
+    { continent: 1, points: [at(-1000, -3900), at(-1006, -3842), at(-1100, -3700)] },
+    { continent: 0, points: [at(-14200, 500), at(-14278, 583), at(-14200, 450)] },
+  ])
+  expect(told[0]!.stops[1]).toEqual({ continent: 0, ...unitsOfWorld(-14278, 583), name: 'Bahía del Botín' })
+  expect(told[2]!.way).toEqual([{ continent: 0, points: [at(466, 64), at(545, 424), at(488, 559)] }])
+  // Without the two tables there are no ships, and the rest is there all the same.
+  expect(travel(table([]), table([]), table([])).vessels).toEqual([])
+})
+
+test('the list of ships and zeppelins: ten crossings between the continents, as design/ships/elenco.md counts them', () => {
+  // Zephras Isle (16593) is a world of its own. Each leg between two stops on two of them is one crossing.
+  const WORLD: Record<number, number> = { 150: 0, 513: 1, 271: 0, 442: 1, 17203: 0, 392: 1, 35: 0, 977: 1, 16727: 0, 702: 1, 1116: 1, 1108: 1, 1637: 1, 1497: 0, 117: 0, 279: 0, 16593: 2, 17045: 1 }
+  const legs = VESSELS.flatMap((v) => v.stops.map((a, i) => [a, v.stops[(i + 1) % v.stops.length]!] as const).slice(0, v.stops.length === 2 ? 1 : undefined))
+  expect(legs.filter(([a, b]) => WORLD[a] !== WORLD[b])).toHaveLength(10)
+  expect(new Set(VESSELS.map((v) => v.path)).size).toBe(VESSELS.length)
+  for (const v of VESSELS) expect(v.stops.every((s) => s in WORLD) && ['A', 'H', 'AH'].includes(v.side)).toBe(true)
 })
 
 test('a pin takes the picture of what it is', () => {

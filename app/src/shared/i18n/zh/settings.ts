@@ -33,6 +33,13 @@ export default {
     custom: '地图的位置由你的布局决定：用{edit}来移动它。',
   },
 
+  arrow: {
+    title: '箭头',
+    colour: '颜色',
+    size: '大小',
+    default: '默认',
+  },
+
   window: {
     onTop: '让Twinmap始终显示在其他窗口上方',
     // GS FONT_SIZE.

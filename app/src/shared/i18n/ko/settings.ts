@@ -32,6 +32,13 @@ export default {
     custom: '지도 위치는 직접 만든 배치를 따릅니다. {edit}에서 옮기십시오.',
   },
 
+  arrow: {
+    title: '화살표',
+    colour: '색상',
+    size: '크기',
+    default: '기본값',
+  },
+
   window: {
     // Twinmap is read 트윈맵: the particles after it follow the final ㅂ.
     onTop: 'Twinmap을 항상 다른 창 위에 표시',

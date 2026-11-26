@@ -7,6 +7,7 @@
 import L from 'leaflet'
 import { YARDS_PER_UNIT } from '../../shared/inside'
 import type { Arrow3d } from './arrow3d'
+import { COLOURS } from './look'
 import type { Terrain } from './terrain3d'
 
 type Spot = { x: number; y: number; shows: number; away: number }
@@ -51,7 +52,7 @@ export function paintFixed(ctx: CanvasRenderingContext2D, x: number, y: number, 
   ctx.fill()
   ctx.lineWidth = 1.5
   ctx.lineJoin = 'round'
-  ctx.strokeStyle = '#000'
+  ctx.strokeStyle = COLOURS.edge
   ctx.stroke()
 }
 

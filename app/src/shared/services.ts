@@ -1,6 +1,7 @@
 // What stands on the map whatever the character does: who offers a service, where ore and herbs
-// grow (both from the player's QuestieDB), the doors of the dungeons and the flight routes (both
-// from the game's own tables; the doors the tables do not give are in dungeon-doors.ts).
+// grow (both from the player's QuestieDB), the doors of the dungeons, the flight routes and the ships
+// and zeppelins (all from the game's own tables; the doors the tables do not give are in dungeon-doors.ts,
+// which of the game's ways are ships and zeppelins in VESSELS).
 import { DUNGEON_DOORS } from './dungeon-doors'
 import { unitsOfPlace, unitsOfWorld } from './geo'
 import type { Continent, GameMap } from './maps'
@@ -86,11 +87,34 @@ export const serves = (pin: { side?: string }, side: string | undefined): boolea
 
 export const TAXI_NODES_FILE = 1068100
 export const TAXI_PATH_FILE = 1067802
+export const TAXI_PATH_NODE_FILE = 1000437
+
+/**
+ * The ships and zeppelins of Forever (the list is design/ships/elenco.md): the game's way of each, the table of its
+ * points (TaxiPathNode), what it is, whom it carries, and the area each of its stops is named by, in the order it
+ * stops there. The game's tables give the way and the stops, not which ways players ride: 295, Menethil Harbor to
+ * Auberdine, is the ship of Classic that Forever sends by Southshore (11167), and stays in the tables.
+ */
+export const VESSELS: { path: number; kind: 'ship' | 'zeppelin'; side: string; stops: number[] }[] = [
+  { path: 292, kind: 'ship', side: 'A', stops: [150, 513] }, // Menethil Harbor, Theramore Isle
+  { path: 11167, kind: 'ship', side: 'A', stops: [150, 271, 442] }, // Menethil Harbor, Southshore, Auberdine
+  { path: 11616, kind: 'ship', side: 'A', stops: [442, 17203] }, // Auberdine, Stormwind Harbor
+  { path: 241, kind: 'ship', side: 'AH', stops: [392, 35] }, // Ratchet, Booty Bay
+  { path: 11391, kind: 'ship', side: 'AH', stops: [977, 16727] }, // Steamwheedle Port, Powderfuse Port
+  { path: 293, kind: 'ship', side: 'A', stops: [702, 442] }, // Rut'theran Village, Auberdine
+  { path: 303, kind: 'ship', side: 'A', stops: [1116, 1108] }, // Feathermoon Stronghold, The Forgotten Coast
+  { path: 302, kind: 'zeppelin', side: 'H', stops: [1637, 1497] }, // Orgrimmar, Undercity
+  { path: 285, kind: 'zeppelin', side: 'H', stops: [117, 1637] }, // Grom'gol Base Camp, Orgrimmar
+  { path: 301, kind: 'zeppelin', side: 'H', stops: [117, 1497] }, // Grom'gol Base Camp, Undercity
+  // ponytail: Alliance as MapUtils has it; OneForAll says both sides. Make it AH if a Horde player is seen riding it.
+  { path: 11398, kind: 'zeppelin', side: 'A', stops: [279, 16593] }, // Dalaran, Zephras Isle (an airship)
+  { path: 11457, kind: 'zeppelin', side: 'H', stops: [17045, 16593] }, // Skywatcher Plateau, Zephras Isle
+]
 
 /** A place on a continent, in map units (geo.ts). */
 interface Spot { continent: Continent; x: number; y: number }
-/** Told in the file of what travel() gives: one made by an older travel() is made again. 2: the doors of the dungeons Forever added. 3: which doors are of raids. 4: the maps behind each door. */
-export const TRAVEL_FORMAT = 4
+/** Told in the file of what travel() gives: one made by an older travel() is made again. 2: the doors of the dungeons Forever added. 3: which doors are of raids. 4: the maps behind each door. 5: the ships and zeppelins. */
+export const TRAVEL_FORMAT = 5
 export interface Travel {
   format?: number
   /** Where one walks into a dungeon or a raid; several share a door. maps: the game's numbers of their maps, as names. raid: all behind it are raids. */
@@ -99,7 +123,14 @@ export interface Travel {
   nodes: (Spot & { name: string; side: string })[]
   /** Flights, each a pair of places in `nodes`. */
   routes: [number, number][]
+  /**
+   * Ships and zeppelins. way: where it goes, in runs on one continent each (a ship that crosses the sea leaves one
+   * and comes out on the other), as [x, y] in map units. stops: where it stops, in order, named as the game names the
+   * place; one off the two continents (Zephras Isle) has no continent.
+   */
+  vessels?: { kind: 'ship' | 'zeppelin'; side: string; way: { continent: Continent; points: [number, number][] }[]; stops: VesselStop[] }[]
 }
+export type VesselStop = (Spot | { continent: null }) & { name: string }
 
 // Which column is what, found by reading the real tables (build 1.60.1.70862).
 const MAP_NAME = 1, MAP_DOOR = 6, MAP_KIND = 8, MAP_DOOR_WORLD = 17
@@ -115,7 +146,7 @@ const continentOf = (world: number | undefined): Continent | null => (world === 
  * another has none. The dungeons Forever added have none in the table either: theirs come from
  * dungeon-doors.ts, each placed on the map of its zone (zones: the game's maps, as gameMaps gives them).
  */
-export function travel(maps: Table, taxiNodes: Table, taxiPaths: Table, zones: GameMap[] = []): Travel {
+export function travel(maps: Table, taxiNodes: Table, taxiPaths: Table, zones: GameMap[] = [], pathNodes?: Table, areas?: Table): Travel {
   const doors: (Spot & { names: string[]; maps: number[]; at: [number, number]; raid: boolean })[] = []
   const given = new Set<number>()
   for (const row of maps.rows) {
@@ -156,7 +187,37 @@ export function travel(maps: Table, taxiNodes: Table, taxiPaths: Table, zones: G
     if (a === undefined || b === undefined || a === b || nodes[a]!.continent !== nodes[b]!.continent) continue
     routes.set(`${Math.min(a, b)}-${Math.max(a, b)}`, [Math.min(a, b), Math.max(a, b)])
   }
-  return { format: TRAVEL_FORMAT, doors: doors.map(({ at: _at, raid, ...door }) => (raid ? { ...door, raid } : door)), nodes, routes: [...routes.values()] }
+  return { format: TRAVEL_FORMAT, doors: doors.map(({ at: _at, raid, ...door }) => (raid ? { ...door, raid } : door)), nodes, routes: [...routes.values()], vessels: pathNodes && areas ? vessels(pathNodes, areas) : [] }
+}
+
+// Which column is what in the table of the points of the ways (build 1.60.1.70862): the row's parent is its way.
+const POINT_AT = 0, POINT_ORDER = 3, POINT_WORLD = 4, POINT_FLAGS = 5, STOPS_HERE = 2
+const AREA_NAME = 1
+
+/** The ships and zeppelins of VESSELS, from the points of their ways and the names of the areas. A way the game no longer has is left out. */
+function vessels(pathNodes: Table, areas: Table): NonNullable<Travel['vessels']> {
+  const names = new Map(areas.rows.map((r) => [r.id, r.text(AREA_NAME)]))
+  return VESSELS.flatMap(({ path, kind, side, stops: named }) => {
+    const points = pathNodes.rows.filter((r) => r.parent === path).sort((a, b) => a.int(POINT_ORDER) - b.int(POINT_ORDER))
+    const way: { continent: Continent | null; points: [number, number][] }[] = []
+    const stops: { continent: Continent | null; x: number; y: number; at: [number, number] }[] = []
+    for (const r of points) {
+      const x = r.float(POINT_AT, 0), y = r.float(POINT_AT, 1), continent = continentOf(r.int(POINT_WORLD)), u = unitsOfWorld(x, y)
+      const run = way.at(-1)
+      if (run?.continent === continent) run.points.push([u.x, u.y])
+      else way.push({ continent, points: [[u.x, u.y]] })
+      // A way back to where it began stops there again: the same stop.
+      if (r.int(POINT_FLAGS) & STOPS_HERE && !stops.some((s) => s.continent === continent && Math.hypot(s.at[0] - x, s.at[1] - y) < SAME_DOOR)) stops.push({ continent, ...u, at: [x, y] })
+    }
+    const name = (i: number): string => names.get(named[i]!) ?? ''
+    if (stops.length !== named.length || named.some((_, i) => !name(i))) return []
+    return [{
+      kind,
+      side,
+      way: way.filter((run): run is { continent: Continent; points: [number, number][] } => run.continent !== null && run.points.length > 1),
+      stops: stops.map(({ continent, x, y }, i): VesselStop => (continent === null ? { continent, name: name(i) } : { continent, x, y, name: name(i) })),
+    }]
+  })
 }
 
 const ICON_ORDER = ['flight', 'inn', 'bank', 'auction', 'stable', 'repair', 'trainers', 'vendors', 'ore', 'herbs'] as const satisfies readonly FixedLayer[]

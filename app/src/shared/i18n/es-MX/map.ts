@@ -45,6 +45,7 @@ export default {
       caves: 'Cuevas',
       dungeons: 'Calabozos',
       routes: 'Rutas de vuelo',
+      vessels: 'Barcos y zepelines',
       bosses: 'Jefes de calabozo',
       companions: 'Grupo',
     },
@@ -83,6 +84,8 @@ export default {
   pins: {
     rewardXp: '{xp} PE',
     entrance: 'Entrada',
+    shipTo: 'Barco: {place}',
+    zeppelinTo: 'Zepelín: {place}',
     entranceOf: 'Entrada: {name}',
     rareBoss: '{name} (raro)',
     graveyard: 'Cementerio',

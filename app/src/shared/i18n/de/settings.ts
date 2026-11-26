@@ -32,6 +32,13 @@ export default {
     custom: 'Eure Anordnung legt die Karte fest: Verschiebt sie mit {edit}.',
   },
 
+  arrow: {
+    title: 'Pfeil',
+    colour: 'Farbe',
+    size: 'Größe',
+    default: 'Standard',
+  },
+
   window: {
     // "Immer im Vordergrund" is how Windows and German apps name it.
     onTop: 'Twinmap immer im Vordergrund',

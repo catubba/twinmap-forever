@@ -32,6 +32,13 @@ export default {
     custom: 'Votre disposition place la carte : déplacez-la avec {edit}.',
   },
 
+  arrow: {
+    title: 'Flèche',
+    colour: 'Couleur',
+    size: 'Taille',
+    default: 'Par défaut',
+  },
+
   window: {
     onTop: 'Garder Twinmap au-dessus des autres fenêtres',
     textSize: 'Taille du texte',

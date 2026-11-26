@@ -32,6 +32,13 @@ export default {
     custom: 'Tu disposición coloca el mapa: muévelo con {edit}.',
   },
 
+  arrow: {
+    title: 'Flecha',
+    colour: 'Color',
+    size: 'Tamaño',
+    default: 'Predeterminado',
+  },
+
   window: {
     onTop: 'Mantener Twinmap sobre las demás ventanas',
     textSize: 'Tamaño del texto',
