@@ -1048,13 +1048,15 @@
           // anticlockwise for OrbitControls.
           terrain!.heading = turning && body.pointing !== null ? (-body.pointing * Math.PI) / 180 : null
           // a city inside the ground is cut over the floor of the character followed in it
-          terrain!.character = following ? body.at() : null
+          terrain!.arrow = body.at()
+          terrain!.character = following ? terrain!.arrow : null
           return moved
         }
         pins3d ??= new Pins3d(map, terrain, pinsHost, terrainHost, arrow, () => turned, body, () => floorAt)
         names3d ??= new Names3d(terrain, pinsHost)
         inside3d ??= new (await import('./inside3d')).Inside3d(terrain)
         terrain.showBuildings(graphics.buildings)
+        terrain.showProps(graphics.trees, graphics.density, graphics.objects)
         inside3dSet()
         names3dSet()
         terrain.onFrame = onFrame
@@ -1094,6 +1096,10 @@
   $effect(() => {
     const on = graphics.buildings
     untrack(() => terrain?.showBuildings(on))
+  })
+  $effect(() => {
+    const { trees, density, objects } = graphics
+    untrack(() => terrain?.showProps(trees, density, objects))
   })
   // Inside a dungeon there is no ground to show: back to 2D.
   $effect(() => {

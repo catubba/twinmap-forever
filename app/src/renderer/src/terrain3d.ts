@@ -16,6 +16,8 @@ import { pictureOfBlock } from '../../shared/pixels'
 import { DRY, TAR } from '../../shared/water'
 import { BLOCK_YARDS } from '../../shared/world'
 import { Buildings } from './buildings3d'
+import { Props } from './props3d'
+import type { Density } from '../../shared/props'
 import { ROOF_STEP } from './inside3d'
 import { inApp, TILES } from './web'
 
@@ -178,6 +180,8 @@ export class Terrain {
   private inside: Under | null = null
   // The buildings of the continent (buildings3d.ts), in the scene with the ground.
   private buildings: Buildings
+  // The trees and objects (props3d.ts), the same way.
+  private props: Props
   private seen = new THREE.WebGLRenderTarget(2, 2, { depthTexture: new THREE.DepthTexture(2, 2) })
   private seenClear = false // not yet: a picture never drawn on reads as solid
   private roofs = {
@@ -267,6 +271,8 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
     }
     this.buildings = new Buildings(this.renderer)
     this.scene.add(this.buildings.group)
+    this.props = new Props(this.renderer)
+    this.scene.add(this.props.group)
     this.controls = new MapControls(this.camera, this.renderer.domElement)
     this.controls.enableDamping = true
     this.controls.zoomToCursor = true
@@ -325,12 +331,19 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
     this.drop()
     this.folder = folder
     this.buildings.show(folder)
+    this.props.show(folder)
     this.dirty = true
   }
 
   /** Whether the buildings are drawn (Settings > Graphics). */
   showBuildings(on: boolean): void {
     this.buildings.turn(on)
+    this.dirty = true
+  }
+
+  /** Which trees and objects are drawn (Settings > Graphics). */
+  showProps(trees: boolean, density: Density, objects: boolean): void {
+    this.props.turn(trees, density, objects)
     this.dirty = true
   }
 
@@ -390,6 +403,8 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
   onFrame: () => void = () => {}
   /** Where the character stands while it is followed, in yards: a city inside the ground is cut over its floor (buildings3d.ts). */
   character: THREE.Vector3 | null = null
+  /** Where the character's arrow stands, followed or not: no leaves round it (props3d.ts). */
+  arrow: THREE.Vector3 | null = null
   /** The azimuth the view keeps to by itself (the arrow's, heading up); null: left to the hand. */
   heading: number | null = null
 
@@ -549,6 +564,7 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
     this.observer.disconnect()
     this.drop()
     this.buildings.turn(false)
+    this.props.turn(false, 'some', false)
     this.controls.dispose()
     this.seen.dispose()
     this.renderer.dispose()
@@ -646,6 +662,7 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
     if (this.heading !== null && !this.turning) this.steer()
     if (this.inside?.step(this.camera.position, Math.min(0.1, FRAME_MS / 1000 + 0.004))) this.dirty = true
     if (this.buildings.step(this.controls.target, distance, this.camera.position, this.character)) this.dirty = true
+    if (this.props.step(this.controls.target, distance, this.arrow)) this.dirty = true
     this.inside?.hidePictures(this.buildings.under)
     if (this.dirty) {
       this.dirty = false

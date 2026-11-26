@@ -16,7 +16,7 @@
   import { arrow, setArrow } from './arrow.svelte'
   import { ARROW, ARROW_SIZES } from './look'
   import { objectiveLooks, objectives, packs, questieHere, setObjectiveLook, setPack } from './packs.svelte'
-  import { graphics, setGraphics } from './graphics.svelte'
+  import { DENSITY_NAMES, graphics, setGraphics } from './graphics.svelte'
   import { langNow, metresOn, metricOffered, num, t, type Key } from '../../shared/i18n'
 
   let { setup, tiles, onback, onfirstrun, onfeedback, onnews }: { setup: SetupStatus; tiles: TilesStatus | null; onback: () => void; onfirstrun: () => void; onfeedback: () => void; onnews: () => void } = $props()
@@ -139,6 +139,14 @@
       <div class="setting">
         <h3 class="sub">{t('settings.graphics.view3d')}</h3>
         <label class="choice"><input type="checkbox" class="check" checked={graphics.buildings} onchange={(e) => setGraphics({ buildings: e.currentTarget.checked })} />{t('settings.graphics.buildings')}</label>
+        <!-- Trees and objects (M23-F7): trees thinned and without leaves round the character, as many as chosen. -->
+        <div class="line">
+          <label class="choice"><input type="checkbox" class="check" checked={graphics.trees} onchange={(e) => setGraphics({ trees: e.currentTarget.checked })} />{t('settings.graphics.trees')}</label>
+          <select class="field size" aria-label={t('settings.graphics.density')} value={graphics.density} disabled={!graphics.trees} onchange={(e) => setGraphics({ density: e.currentTarget.value as typeof graphics.density })}>{#each DENSITY_NAMES as d (d)}<option value={d}>{t(`settings.graphics.${d}`)}</option>{/each}</select>
+        </div>
+        <p class="hint">{t('settings.graphics.treesHint')}</p>
+        <label class="choice"><input type="checkbox" class="check" checked={graphics.objects} onchange={(e) => setGraphics({ objects: e.currentTarget.checked })} />{t('settings.graphics.objects')}</label>
+        <p class="hint">{t('settings.graphics.objectsHint')}</p>
         <p class="hint">{t('settings.graphics.cost')}</p>
       </div>
       <!-- The graphics card is the computer's: a phone on the home network has none to set. -->

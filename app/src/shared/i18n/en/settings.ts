@@ -88,6 +88,18 @@ export default {
     buildings: 'Buildings',
     // Under the switches of the 3D view.
     cost: 'Each one costs memory and graphics card time. Kept by this window: a phone or tablet keeps its own.',
+    // A switch: the trees of the game in the 3D view. Beside it a dropdown of how many (few, some, many).
+    trees: 'Trees',
+    // The name of that dropdown, read aloud only.
+    density: 'How many trees',
+    few: 'Few',
+    some: 'Some',
+    many: 'Many',
+    // Under the trees.
+    treesHint: 'Thick woods are thinned and no leaves are drawn round the character, so the ground and the roads show.',
+    // A switch: the other things the game places in the world, as listed under it.
+    objects: 'Objects',
+    objectsHint: 'Fences, carts, lamps, tents, braziers.',
     // A subtitle over the switch window.gpu.
     card: 'Graphics card',
   },

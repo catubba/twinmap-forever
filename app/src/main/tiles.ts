@@ -76,6 +76,11 @@ export function servedFile(base: string, path: string): string | null {
   if (building) return building[1] ? joinPath(base, 'buildings', `${building[1]}.bin`) : joinPath(base, 'buildings', 'tex', `${building[2]}.${building[3]}`)
   const placed = /^\/([a-z]+)\/buildings\.json$/.exec(path)
   if (placed) return joinPath(base, placed[1]!, 'buildings.json')
+  // The trees and objects of the 3D view (props.ts): a model, a continent's list of blocks, the copies of a block.
+  const model = /^\/buildings\/m2\/(\d{1,9})\.bin$/.exec(path)
+  if (model) return joinPath(base, 'buildings', 'm2', `${model[1]}.bin`)
+  const props = /^\/([a-z]+)\/props(?:\.json|\/(\d{1,2})-(\d{1,2})\.bin)$/.exec(path)
+  if (props) return props[2] ? joinPath(base, props[1]!, 'props', `${props[2]}-${props[3]}.bin`) : joinPath(base, props[1]!, 'props.json')
   const item = /^\/(items|pictures)\/(\d{1,7})\.png$/.exec(path)
   if (item) return joinPath(base, item[1]!, `${item[2]}.png`)
   const m = /^\/(?:(maps|places|travel|interiors|caves|under|items|trainers|spells|talents|ah-names|game-names)\.json|rooms\/(\d{1,9})\.dxt|([a-z]+|i\d{1,5})\/(?:blocks\/(\d{1,2})\/(\d{1,2})\.dxt|(shade\/)?(\d)\/(\d{1,3})\/(\d{1,3})\.png))$/.exec(path)

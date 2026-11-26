@@ -107,7 +107,7 @@ export function roomOf(f: Buffer): Room | null {
 }
 
 interface Material { texture: number; blend: number; unlit: boolean }
-interface Texture { kind: TexKind; width: number; height: number; levels: number }
+export interface Texture { kind: TexKind; width: number; height: number; levels: number }
 
 /**
  * A building's file made from the game's: its rooms at full detail, the draws gathered by what can share a texture
@@ -228,6 +228,31 @@ export function makeTexture(f: Buffer): { texture: Texture; bytes: Buffer; png: 
   return { texture: { kind: 'png', width, height, levels: 1 }, bytes: encodePng(rgba, width, height, 4), png: true }
 }
 
+/**
+ * The textures of the folder dir (buildings/tex), each made once from the game's and kept, also for the M2 models
+ * (props.ts): what a texture is, by its number, or null when there is none. read: a game file by number.
+ */
+export function textureKeeper(dir: string, read: (id: number) => Buffer | null): (id: number) => Texture | null {
+  const textures = new Map<number, Texture | null>()
+  return (id) => {
+    if (!textures.has(id)) {
+      let made: Texture | null = null
+      const info = join(dir, 'tex', `${id}.json`)
+      if (existsSync(info)) made = JSON.parse(readFileSync(info, 'utf8')) as Texture
+      else {
+        const f = read(id), t = f && makeTexture(f)
+        if (t) {
+          keep(join(dir, 'tex', `${id}.${t.png ? 'png' : 'bin'}`), () => (t.png ? t.bytes : deflateSync(t.bytes)))
+          keep(info, () => Buffer.from(JSON.stringify(t.texture)))
+          made = t.texture
+        }
+      }
+      textures.set(id, made)
+    }
+    return textures.get(id)!
+  }
+}
+
 /** How a building inside the ground is told: its file and where it stands, to the yard (u east and v south, as interiors.ts and caves.json have it). */
 export const buriedKey = (file: number, u: number, v: number): string => `${file} ${Math.round(u)} ${Math.round(v)}`
 
@@ -265,24 +290,7 @@ export function makeBuildings(
     mkdirSync(dir, { recursive: true })
     writeFileSync(formatFile, JSON.stringify({ format: FORMAT }))
   }
-  const textures = new Map<number, Texture | null>()
-  const texture = (id: number): Texture | null => {
-    if (!textures.has(id)) {
-      let made: Texture | null = null
-      const info = join(dir, 'tex', `${id}.json`)
-      if (existsSync(info)) made = JSON.parse(readFileSync(info, 'utf8')) as Texture
-      else {
-        const f = read(id), t = f && makeTexture(f)
-        if (t) {
-          keep(join(dir, 'tex', `${id}.${t.png ? 'png' : 'bin'}`), () => (t.png ? t.bytes : deflateSync(t.bytes)))
-          keep(info, () => Buffer.from(JSON.stringify(t.texture)))
-          made = t.texture
-        }
-      }
-      textures.set(id, made)
-    }
-    return textures.get(id)!
-  }
+  const texture = textureKeeper(dir, read)
   // each standing building with the name of its file, and whether it is inside the ground
   const all = worlds.map((w) => standing(w.wdt, read).map((p) => ({ ...p, name: String(p.file), buried: w.buried?.has(buriedKey(p.file, p.x, p.z)) ? 1 : 0 })))
   const files = [...new Set(all.flat().map((p) => p.name))]
