@@ -55,12 +55,13 @@ const TITLES: Record<string, () => string> = {
   quests: () => t('app.now.quests'),
   nearby: () => t('app.now.nearby'),
   experience: () => t('app.panel.experience'),
+  shopping: () => t('items.shopping.title'),
 }
 /** The name of a panel, in the language spoken now (Add panel, its tab). */
 export const titleOf = (id: string): string => TITLES[id]?.() ?? id
 
 /** The blocks of Now, each a panel of its own once taken out of the column. */
-export const PARTS = ['next', 'attention', 'pins', 'quests', 'nearby', 'experience'] as const
+export const PARTS = ['next', 'attention', 'pins', 'quests', 'nearby', 'experience', 'shopping'] as const
 /** What a block of Now carries while its handle is dragged: its id. */
 export const PART_DRAG = 'application/x-twinmap-part'
 const NAMES: Record<string, () => string> = { map: TITLES.map!, character: TITLES.character!, ah: () => t('app.top.auctionHouse') }

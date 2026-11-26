@@ -324,6 +324,7 @@ export default {
   // The shopping list (M10-F4): en/items.ts says where each text shows.
   shopping: {
     title: 'Liste de courses',
+    empty: 'Rien pour l’instant. Ajoutez une recette avec le + chez un maître de métier, ou un objet avec le + de la recherche.',
     forWho: 'Pour {name}',
     making: 'À fabriquer · {count}',
     makeFirst: 'À fabriquer d’abord · {count}',

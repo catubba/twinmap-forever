@@ -330,6 +330,7 @@ export default {
   // The shopping list (M10-F4): en/items.ts says where each text shows.
   shopping: {
     title: 'Lista de compras',
+    empty: 'Todavía no hay nada. Agrega una receta con el + en un instructor de profesiones, o un objeto con el + de la búsqueda.',
     forWho: 'Para {name}',
     making: 'Por fabricar · {count}',
     makeFirst: 'Fabricar primero · {count}',

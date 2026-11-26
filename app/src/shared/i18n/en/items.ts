@@ -394,6 +394,8 @@ export default {
   shopping: {
     // On the band at its top.
     title: 'Shopping list',
+    // Alone in a panel, or in Edit layout, while the list is empty.
+    empty: 'Nothing on it yet. Add a recipe with the + at a profession trainer, or an item with the + of the search.',
     // Under the band, at the left, the money at the right. {name}: the character's first name.
     forWho: 'For {name}',
     // Headings of the groups, in capitals (written normally here: the page raises them). {count}: how many lines.

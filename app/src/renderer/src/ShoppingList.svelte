@@ -227,6 +227,13 @@
     margin-bottom: 8px;
     font-variant-numeric: tabular-nums;
   }
+  /* Alone in a panel (a block of Now taken out, App.svelte) it is as tall as the panel. */
+  :global(.dv-host > .block) > .shopping {
+    flex: 1;
+    min-height: 0;
+    max-height: none;
+    margin-bottom: 0;
+  }
   .band {
     flex: none;
     padding-right: 0;

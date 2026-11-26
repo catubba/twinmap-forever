@@ -345,6 +345,7 @@ export default {
   // The shopping list (M10-F4): en/items.ts says where each text shows.
   shopping: {
     title: 'Список покупок',
+    empty: 'Пока пусто. Добавьте рецепт кнопкой + у учителя профессии или предмет кнопкой + в поиске.',
     forWho: 'Персонаж: {name}',
     making: 'Изготовить · {count}',
     makeFirst: 'Сначала изготовить · {count}',

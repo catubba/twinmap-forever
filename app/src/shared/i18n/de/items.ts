@@ -332,6 +332,7 @@ export default {
   // The shopping list (M10-F4): en/items.ts says where each text shows.
   shopping: {
     title: 'Einkaufsliste',
+    empty: 'Noch nichts darauf. Fügt ein Rezept mit dem + beim Berufsausbilder hinzu oder einen Gegenstand mit dem + der Suche.',
     forWho: 'Für {name}',
     making: 'Herstellen · {count}',
     makeFirst: 'Zuerst herstellen · {count}',

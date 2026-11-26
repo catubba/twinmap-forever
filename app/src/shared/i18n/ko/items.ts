@@ -339,6 +339,7 @@ export default {
   // The shopping list (M10-F4): en/items.ts says where each text shows.
   shopping: {
     title: '구매 목록',
+    empty: '아직 비어 있습니다. 기술 전문가에게서 제조법을, 검색에서 아이템을 + 버튼으로 추가하십시오.',
     forWho: '{name}의 목록',
     making: '제작 · {count}',
     makeFirst: '먼저 제작 · {count}',

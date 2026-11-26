@@ -335,6 +335,7 @@ export default {
   // The shopping list (M10-F4): en/items.ts says where each text shows.
   shopping: {
     title: '购物清单',
+    empty: '还没有内容。在专业训练师处用 + 添加配方，或在搜索结果中用 + 添加物品。',
     forWho: '{name}的清单',
     making: '制作 · {count}',
     makeFirst: '先制作 · {count}',

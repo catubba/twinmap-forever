@@ -565,7 +565,12 @@
     {#if npc}
       {#key npc}<NpcPanel pin={npc} {sheets} {shown} {now} {listing} onclose={() => (npc = null)} onadd={addToList} />{/key}
     {/if}
-    <ShoppingList lists={keptShopping.value} onchange={(to) => (keptShopping.value = to)} {sheets} {shown} side={char?.side} {pos} {now} />
+    <!-- The shopping list (M10-F4), above Now: a block taken out into a panel of its own as the others are. -->
+    <div class="block-home"><div class="block surface" use:section={'shopping'}>
+      {#if frame.editing}{@const pull = t('app.layout.pull')}<button class="block-pull" draggable="true" title={pull} aria-label="{pull}: {titleOf('shopping')}" ondragstart={(e) => e.dataTransfer?.setData(PART_DRAG, 'shopping')} onclick={() => addPanel('shopping')}><Glyph name="layout" size={14} /></button>{/if}
+      <ShoppingList lists={keptShopping.value} onchange={(to) => (keptShopping.value = to)} {sheets} {shown} side={char?.side} {pos} {now} />
+      {#if !keptShopping.value[shown?.key ?? '']?.length}<p class="block-empty"><b>{t('items.shopping.title')}</b> {t('items.shopping.empty')}</p>{/if}
+    </div></div>
     <Now
       {pos}
       {quests}
