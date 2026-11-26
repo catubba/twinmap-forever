@@ -6,6 +6,7 @@ export default {
     label: '类别',
     general: '常规',
     appearance: '外观',
+    graphics: '图形',
     game: '游戏和插件',
     privacy: '隐私',
     about: '关于 Twinmap',
@@ -38,6 +39,13 @@ export default {
     colour: '颜色',
     size: '大小',
     default: '默认',
+  },
+
+  graphics: {
+    view3d: '3D视图',
+    buildings: '建筑',
+    cost: '每一项都会占用内存和显卡时间。只保存在此窗口：手机或平板各自保存自己的选择。',
+    card: '显卡',
   },
 
   window: {

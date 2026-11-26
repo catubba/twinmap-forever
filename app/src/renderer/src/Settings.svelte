@@ -15,6 +15,7 @@
   import { frame, layout, setMapRight } from './frame.svelte'
   import { arrow, setArrow } from './arrow.svelte'
   import { ARROW, ARROW_SIZES } from './look'
+  import { graphics, setGraphics } from './graphics.svelte'
   import { langNow, metresOn, metricOffered, num, t, type Key } from '../../shared/i18n'
 
   let { setup, tiles, onback, onfirstrun, onfeedback, onnews }: { setup: SetupStatus; tiles: TilesStatus | null; onback: () => void; onfirstrun: () => void; onfeedback: () => void; onnews: () => void } = $props()
@@ -25,10 +26,11 @@
   // The categories. What only the computer sets (the window, a phone, the programme) is not on a phone's page, and the keys
   // are not on a screen that is touched.
   const touch = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches
-  type Cat = 'general' | 'appearance' | 'game' | 'phone' | 'privacy' | 'keys' | 'about'
+  type Cat = 'general' | 'appearance' | 'graphics' | 'game' | 'phone' | 'privacy' | 'keys' | 'about'
   const CATS: { key: Cat; name: Key; glyph: GlyphName }[] = [
     { key: 'general', name: 'settings.categories.general', glyph: 'sliders' },
     { key: 'appearance', name: 'settings.categories.appearance', glyph: 'palette' },
+    { key: 'graphics', name: 'settings.categories.graphics', glyph: 'cube' },
     { key: 'game', name: 'settings.categories.game', glyph: 'folder' },
     ...(inApp
       ? [
@@ -104,13 +106,6 @@
       {#if inApp}
         <label class="choice">{t('settings.window.textSize')} <select class="field size" value={setup.zoom ?? 1} onchange={(e) => window.twinmap.setZoom(Number(e.currentTarget.value))}>{#each ZOOMS as z (z)}<option value={z}>{num(z, { style: 'percent' })}</option>{/each}</select></label>
         <label class="choice"><input type="checkbox" class="check" checked={setup.onTop} onchange={(e) => window.twinmap.setOnTop(e.currentTarget.checked)} />{t('settings.window.onTop')}</label>
-        <div class="setting">
-          <label class="choice"><input type="checkbox" class="check" checked={setup.gpu?.chosen ?? true} onchange={(e) => window.twinmap.setGpu(e.currentTarget.checked)} />{t('settings.window.gpu')}</label>
-          <p class="hint">{t('settings.window.gpuHint')}</p>
-          {#if setup.gpu && setup.gpu.chosen !== setup.gpu.running}
-            <div class="line"><span class="hint">{t('settings.window.restartNeeded')}</span><button class="btn" onclick={() => window.twinmap.restart()}>{t('settings.window.restartNow')}</button></div>
-          {/if}
-        </div>
       {/if}
     {:else if cat === 'appearance'}
       <!-- The side of the map holds only where a workspace lays the map and Now side by side as at first (frame.svelte.ts). -->
@@ -128,6 +123,24 @@
         </div>
         <label class="choice">{t('settings.arrow.size')} <select class="field size" value={arrow.size} onchange={(e) => setArrow({ size: Number(e.currentTarget.value) })}>{#each ARROW_SIZES as z (z)}<option value={z}>{num(z, { style: 'percent' })}</option>{/each}</select></label>
       </div>
+    {:else if cat === 'graphics'}
+      <!-- What the 3D view draws (M23, design/ui.md section 6): a switch each, kept by this window (graphics.svelte.ts). -->
+      <div class="setting">
+        <h3 class="sub">{t('settings.graphics.view3d')}</h3>
+        <label class="choice"><input type="checkbox" class="check" checked={graphics.buildings} onchange={(e) => setGraphics({ buildings: e.currentTarget.checked })} />{t('settings.graphics.buildings')}</label>
+        <p class="hint">{t('settings.graphics.cost')}</p>
+      </div>
+      <!-- The graphics card is the computer's: a phone on the home network has none to set. -->
+      {#if inApp}
+        <div class="setting">
+          <h3 class="sub">{t('settings.graphics.card')}</h3>
+          <label class="choice"><input type="checkbox" class="check" checked={setup.gpu?.chosen ?? true} onchange={(e) => window.twinmap.setGpu(e.currentTarget.checked)} />{t('settings.window.gpu')}</label>
+          <p class="hint">{t('settings.window.gpuHint')}</p>
+          {#if setup.gpu && setup.gpu.chosen !== setup.gpu.running}
+            <div class="line"><span class="hint">{t('settings.window.restartNeeded')}</span><button class="btn" onclick={() => window.twinmap.restart()}>{t('settings.window.restartNow')}</button></div>
+          {/if}
+        </div>
+      {/if}
     {:else if cat === 'game'}
       <div class="setting">
         <h3 class="sub">{t('settings.gameFolder.title')}</h3>

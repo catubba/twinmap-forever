@@ -11,6 +11,8 @@ export default {
     general: 'General',
     // How the app looks: the layout of the map today; themes and icons later.
     appearance: 'Appearance',
+    // How much drawing costs: the switches of the 3D view, and the graphics card.
+    graphics: 'Graphics',
     // The game folder and what Twinmap found of the game and its addons.
     game: 'Game and addons',
     // Help improve Twinmap.
@@ -59,7 +61,19 @@ export default {
     default: 'Default',
   },
 
-  // In General: the app's window, switches, the text size and the hardware acceleration.
+  // In Graphics: what the 3D view draws, each a switch, and the hardware acceleration (window.gpu) under its own subtitle.
+  graphics: {
+    // A subtitle over the switches of what the 3D view draws.
+    view3d: '3D view',
+    // A switch: the towns, houses, towers and bridges of the game in the 3D view.
+    buildings: 'Buildings',
+    // Under the switches of the 3D view.
+    cost: 'Each one costs memory and graphics card time. Kept by this window: a phone or tablet keeps its own.',
+    // A subtitle over the switch window.gpu.
+    card: 'Graphics card',
+  },
+
+  // In General: the app's window, switches and the text size; the hardware acceleration (gpu) is in Graphics.
   window: {
     onTop: 'Keep Twinmap on top of other windows',
     // Followed by a list of sizes: 80%, 90%, 100%...

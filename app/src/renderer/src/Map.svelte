@@ -5,6 +5,7 @@
   import { TILES } from './web'
   import { layout as sides, setMapRight } from './frame.svelte'
   import { arrow as arrowLook } from './arrow.svelte'
+  import { graphics } from './graphics.svelte'
   import type { Terrain } from './terrain3d'
   import type { Compass } from './compass'
   import { Arrow3d } from './arrow3d'
@@ -1047,6 +1048,7 @@
         pins3d ??= new Pins3d(map, terrain, pinsHost, terrainHost, arrow, () => turned, body, () => floorAt)
         names3d ??= new Names3d(terrain, pinsHost)
         inside3d ??= new (await import('./inside3d')).Inside3d(terrain)
+        terrain.showBuildings(graphics.buildings)
         inside3dSet()
         names3dSet()
         terrain.onFrame = onFrame
@@ -1082,6 +1084,11 @@
     names3d?.clear()
     spinSoon()
   }
+  // The buildings of the 3D view, as Settings > Graphics has them: at once.
+  $effect(() => {
+    const on = graphics.buildings
+    untrack(() => terrain?.showBuildings(on))
+  })
   // Inside a dungeon there is no ground to show: back to 2D.
   $effect(() => {
     if (inside && untrack(() => threeD)) back2d()

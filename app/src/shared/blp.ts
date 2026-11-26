@@ -101,22 +101,41 @@ export function decodeBlpCutout(f: Buffer): Cutout {
     for (let i = 0; i < pixels && alphaBits; i++) rgba[i * 4 + 3] = alphaBits === 8 ? f[at + pixels + i]! : alphaBits === 1 ? ((f[at + pixels + (i >> 3)]! >> (i & 7)) & 1) * 255 : 255
     return { width, height, rgba }
   }
+  dxtAlpha(f.subarray(at), width, height, alphaKind, alphaBits > 0, rgba)
+  return { width, height, rgba }
+}
+
+/**
+ * The pixels of DXT blocks with their transparency, four bytes each, as the window needs them where the graphics card
+ * does not read DXT (a phone): kind as BLP says it (0 DXT1, 1 DXT3, 7 DXT5); holes: a DXT1 that has see-through pixels.
+ */
+export function decodeDxtCutout(data: Uint8Array, width: number, height: number, kind: number, holes: boolean): Uint8Array {
+  const rgb = decodeDxt(data, width, height, kind === 0 ? 0 : 8), rgba = new Uint8Array(width * height * 4)
+  for (let i = 0; i < width * height; i++) rgba.set([rgb[i * 3]!, rgb[i * 3 + 1]!, rgb[i * 3 + 2]!, 255], i * 4)
+  dxtAlpha(data, width, height, kind, holes, rgba)
+  return rgba
+}
+
+// The transparency of DXT blocks, laid into the fourth byte of each pixel of rgba.
+function dxtAlpha(d: Uint8Array, width: number, height: number, alphaKind: number, holes: boolean, rgba: Uint8Array): void {
+  const view = new DataView(d.buffer, d.byteOffset, d.byteLength)
   const step = alphaKind === 0 ? 8 : 16
-  for (let by = 0, p = at; by < height; by += 4) {
+  for (let by = 0, p = 0; by < height; by += 4) {
     for (let bx = 0; bx < width; bx += 4, p += step) {
+      if (p + step > d.length) return
       const alpha = new Array<number>(16).fill(255)
       if (alphaKind === 0) {
         // DXT1: with the first color not above the second, the fourth choice is a hole.
-        const holes = alphaBits > 0 && f.readUInt16LE(p) <= f.readUInt16LE(p + 2), choice = f.readUInt32LE(p + 4)
-        for (let i = 0; i < 16 && holes; i++) if (((choice >>> (i * 2)) & 3) === 3) alpha[i] = 0
+        const cut = holes && view.getUint16(p, true) <= view.getUint16(p + 2, true), choice = view.getUint32(p + 4, true)
+        for (let i = 0; i < 16 && cut; i++) if (((choice >>> (i * 2)) & 3) === 3) alpha[i] = 0
       } else if (alphaKind === 1) {
         // DXT3: four bits a pixel.
-        for (let i = 0; i < 16; i++) alpha[i] = ((f[p + (i >> 1)]! >> ((i & 1) * 4)) & 15) * 17
+        for (let i = 0; i < 16; i++) alpha[i] = ((d[p + (i >> 1)]! >> ((i & 1) * 4)) & 15) * 17
       } else {
         // DXT5: two levels, and three bits a pixel choosing among them and the steps between.
-        const a0 = f[p]!, a1 = f[p + 1]!, levels = [a0, a1]
+        const a0 = d[p]!, a1 = d[p + 1]!, levels = [a0, a1]
         for (let i = 1; i <= 6; i++) levels.push(a0 > a1 ? Math.round(((7 - i) * a0 + i * a1) / 7) : i <= 4 ? Math.round(((5 - i) * a0 + i * a1) / 5) : i === 5 ? 0 : 255)
-        const bits = f.readUIntLE(p + 2, 6)
+        const bits = view.getUint16(p + 2, true) + view.getUint32(p + 4, true) * 65536
         for (let i = 0; i < 16; i++) alpha[i] = levels[Math.floor(bits / 8 ** i) % 8]!
       }
       for (let i = 0; i < 16; i++) {
@@ -125,5 +144,4 @@ export function decodeBlpCutout(f: Buffer): Cutout {
       }
     }
   }
-  return { width, height, rgba }
 }

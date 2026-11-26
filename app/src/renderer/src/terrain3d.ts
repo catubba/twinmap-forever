@@ -15,6 +15,7 @@ import { BLOCK_ZOOM, HOLE, unpackLevels, type Levels } from '../../shared/levels
 import { pictureOfBlock } from '../../shared/pixels'
 import { DRY, TAR } from '../../shared/water'
 import { BLOCK_YARDS } from '../../shared/world'
+import { Buildings } from './buildings3d'
 import { ROOF_STEP } from './inside3d'
 import { inApp, TILES } from './web'
 
@@ -171,6 +172,8 @@ export class Terrain {
   private below = new THREE.Scene()
   private sunk = new THREE.Group()
   private inside: Under | null = null
+  // The buildings of the continent (buildings3d.ts), in the scene with the ground.
+  private buildings: Buildings
   private seen = new THREE.WebGLRenderTarget(2, 2, { depthTexture: new THREE.DepthTexture(2, 2) })
   private seenClear = false // not yet: a picture never drawn on reads as solid
   private roofs = {
@@ -257,6 +260,8 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
     ] as const) {
       this.scene.add(new THREE.Mesh(new THREE.PlaneGeometry(w, d).rotateX(-Math.PI / 2).translate(x + w / 2, 0, z + d / 2), this.materials.liquids[4]))
     }
+    this.buildings = new Buildings(this.renderer)
+    this.scene.add(this.buildings.group)
     this.controls = new MapControls(this.camera, this.renderer.domElement)
     this.controls.enableDamping = true
     this.controls.zoomToCursor = true
@@ -314,6 +319,13 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
     if (folder === this.folder) return
     this.drop()
     this.folder = folder
+    this.buildings.show(folder)
+    this.dirty = true
+  }
+
+  /** Whether the buildings are drawn (Settings > Graphics). */
+  showBuildings(on: boolean): void {
+    this.buildings.turn(on)
     this.dirty = true
   }
 
@@ -529,6 +541,7 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
     this.stop()
     this.observer.disconnect()
     this.drop()
+    this.buildings.turn(false)
     this.controls.dispose()
     this.seen.dispose()
     this.renderer.dispose()
@@ -625,6 +638,7 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
     // After the arrow is turned for this frame, so the view turns with it in the same frame, not one behind.
     if (this.heading !== null && !this.turning) this.steer()
     if (this.inside?.step(this.camera.position, Math.min(0.1, FRAME_MS / 1000 + 0.004))) this.dirty = true
+    if (this.buildings.step(this.controls.target, distance)) this.dirty = true
     if (this.dirty) {
       this.dirty = false
       this.choose()
