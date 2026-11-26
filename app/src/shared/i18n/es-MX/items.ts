@@ -354,6 +354,8 @@ export default {
     fewer: 'Uno menos',
     more: 'Uno más',
     add: 'Agregar a la lista de compras: {item}',
+    onMap: 'Mercaderes en el mapa',
+    toRoute: 'Agregar a la ruta',
   },
 
   picker: {

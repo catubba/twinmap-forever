@@ -4,6 +4,7 @@ import { UNITS_PER_BLOCK, unitsOfRect, type Point } from './geo'
 import type { Continent, GameMap } from './maps'
 import { wayOf } from './now'
 import { secondsFor, wayTo, type Pace } from './point-label'
+import { nearestOnFoot } from './walk'
 import { BLOCK_YARDS } from './world'
 
 export interface Stop {
@@ -63,6 +64,24 @@ export function addStop(route: Route, stop: Stop): Route {
   if (route.next >= route.stops.length) return { stops: [stop], next: 0, sent: false }
   if (route.stops.length >= MAX_STOPS || inRoute(route, stop.continent, stop.at)) return route
   return { stops: [...route.stops, stop], next: route.next, sent: false }
+}
+
+/**
+ * Stops in the order to walk them (M10-F19): from where the character is, each time the nearest of those left, on foot
+ * where a way is known (far: the yards on foot from a point to each end, null where none was found), as the crow flies
+ * after. Those on another continent, or all when the character is nowhere known, come after as they were given.
+ */
+export async function inWalkOrder(me: { continent: Continent; at: Point } | null, stops: Stop[], far: (from: Point, to: Point[]) => Promise<(number | null)[]>): Promise<Stop[]> {
+  const out: Stop[] = []
+  let left = me ? stops.filter((s) => s.continent === me.continent) : [], from = me?.at
+  while (from && left.length) {
+    const yards = await far(from, left.map((s) => s.at)).catch(() => [])
+    const at = from, next = nearestOnFoot(left, (s) => yards[left.indexOf(s)] ?? undefined, (s) => Math.hypot(s.at.x - at.x, s.at.y - at.y))[0]!
+    out.push(next)
+    left = left.filter((s) => s !== next)
+    from = next.at
+  }
+  return [...out, ...stops.filter((s) => !out.includes(s))]
 }
 
 /** Without one stop. The last one taken away leaves no route. */

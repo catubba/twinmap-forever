@@ -433,6 +433,10 @@ export default {
     more: 'One more',
     // The + on a recipe of a trainer's panel and on an item the search finds: read aloud and as the pointer rests. {item}: its name.
     add: 'Add {item} to the shopping list',
+    // Two buttons under the list, for the vendors of what is missing (the nearest of each). onMap shows their pins on the map
+    // whatever its filters, pressed while on; toRoute puts them at the end of the route, in the order to walk them.
+    onMap: 'Vendors on the map',
+    toRoute: 'Add to route',
   },
 
   // The character picker at the start of the top row (Picker.svelte).

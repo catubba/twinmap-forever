@@ -51,7 +51,7 @@
 
   // at: when the position was read off the game, in milliseconds.
   // insideReady: the rooms of the buildings are converted, and their list can be asked for.
-  let { pos, group = [], at: readAt, insideReady, quests = [], fixed = [], side, live = false, inbox = null, removed = [], set = [], gameFollows = null, journey = null, route = noRoute(), onroute, onnpc, kills, death = null, skills, xpLevel, back = $bindable(null), looking = $bindable(null) }: { kills?: unknown; skills?: unknown; xpLevel?: number | null; death?: Death | null; back?: (DeathPlace & { name: string; door: boolean }) | null; looking?: { zone: string; where: string } | null; journey?: Journey | null; pos: Position | undefined; at: number | undefined; insideReady: boolean; quests?: QuestPin[]; fixed?: FixedPin[]; side?: string; live?: boolean; inbox?: Inbox | null; removed?: string[]; set?: GameMark[]; gameFollows?: Pin | null; route?: Route; onroute?: (stop: Stop) => void; onnpc?: (pin: FixedPin | null) => void; group?: Companion[] } = $props()
+  let { pos, group = [], at: readAt, insideReady, quests = [], fixed = [], side, live = false, inbox = null, removed = [], set = [], gameFollows = null, journey = null, route = noRoute(), marked = [], onroute, onnpc, kills, death = null, skills, xpLevel, back = $bindable(null), looking = $bindable(null) }: { kills?: unknown; skills?: unknown; xpLevel?: number | null; death?: Death | null; back?: (DeathPlace & { name: string; door: boolean }) | null; looking?: { zone: string; where: string } | null; journey?: Journey | null; pos: Position | undefined; at: number | undefined; insideReady: boolean; quests?: QuestPin[]; fixed?: FixedPin[]; side?: string; live?: boolean; inbox?: Inbox | null; removed?: string[]; set?: GameMark[]; gameFollows?: Pin | null; route?: Route; marked?: number[]; onroute?: (stop: Stop) => void; onnpc?: (pin: FixedPin | null) => void; group?: Companion[] } = $props()
 
   const TOP_ZOOM = 7 // the detail of the game itself: the picture of a block is four tiles
   const BLANK = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=='
@@ -1430,7 +1430,10 @@
     for (const service of [false, true]) {
       for (const { pin: p, at: where, zone } of laid) {
         const shown = (layer: FixedLayer): boolean => layers[layer] && far >= FIXED_ZOOM[layer]
-        if ((p.side !== undefined) !== service || !((p.layers.some(shown) && kindShown(p)) || labelledAt(where)) || !view.contains(where)) continue
+        // The vendors of the shopping list (M10-F19, marked) too, at any zoom, in the ring of a row pointed at in Now.
+        const listed = p.npc !== undefined && marked.includes(p.npc)
+        if ((p.side !== undefined) !== service || !((p.layers.some(shown) && kindShown(p)) || labelledAt(where) || listed) || !view.contains(where)) continue
+        if (listed) L.marker(where, { interactive: false, keyboard: false, icon: L.divIcon({ className: 'ring', iconSize: [34, 34] }) }).addTo(fixedGroup)
         // The radius is what the pointer feels, smaller than the picture: two people a few yards apart both answer.
         new FixedPinMark(where, { renderer: fixedCanvas, radius: 7, lozenge: !service, fillColor: service ? COLOURS.service : COLOURS.resource, picture: pictureOf(iconOf(p, shown)), bubblingMouseEvents: false })
           // Made when the pointer comes over the pin, not for every pin. Names come from the
@@ -1462,7 +1465,7 @@
     drawFixed()
   })
   $effect(() => {
-    void [inside, ...Object.values(layers), kindsOff, hideGrey, skills]
+    void [inside, ...Object.values(layers), kindsOff, hideGrey, skills, marked]
     drawFixed()
   })
 

@@ -2,14 +2,18 @@
   // The shopping list of the character picked (M10-F4, preview design/vendors/mockup/shopping.html), in the side panel above
   // Now: what it is making, the parts to make first, what is missing with where to get it (another character, the nearest
   // vendor and its price, a recipe not learned, who drops it) and what is ready. Its band folds it. Empty, it is not shown.
-  // The logic is in shared/shopping.ts; the lists are kept for every screen (shared/kept.ts).
+  // The logic is in shared/shopping.ts; the lists are kept for every screen (shared/kept.ts). Under it (M10-F19), the vendors of
+  // what is missing, the nearest of each: their pins on the map, or the stops of the route in the order to walk them.
+  import { untrack } from 'svelte'
   import { ago, firstName, type Known } from '../../shared/characters'
   import type { Position } from '../../shared/game'
   import { around, t } from '../../shared/i18n'
+  import { unitsOfPlace } from '../../shared/geo'
   import { coins, ITEMS_FILE, QUALITY_COLORS, type ItemFacts } from '../../shared/items'
   import type { GameMap } from '../../shared/maps'
   import { whereIs } from '../../shared/now'
   import { PROFESSION_TRAINERS } from '../../shared/profession-trainers'
+  import { inWalkOrder, type Stop } from '../../shared/route'
   import type { Sheets } from '../../shared/sheet'
   import { heldBy, planOf, recipeOf, recipesByItem, setGoal, type Goal, type Need, type Recipe, type ShoppingLists } from '../../shared/shopping'
   import { holdersOf, sellersOf, type ItemSources } from '../../shared/tips'
@@ -18,7 +22,8 @@
   import { itemTip } from './item-tip.svelte'
   import { TILES } from './web'
 
-  let { lists, onchange, sheets, shown, side, pos, now }: { lists: ShoppingLists; onchange: (lists: ShoppingLists) => void; sheets: Sheets; shown: Known | null; side?: string; pos?: Position; now: number } = $props()
+  // onvendors: the NPCs whose pins the map shows whatever its filters (none: the button is off); onroute: stops for the route.
+  let { lists, onchange, sheets, shown, side, pos, now, onvendors, onroute }: { lists: ShoppingLists; onchange: (lists: ShoppingLists) => void; sheets: Sheets; shown: Known | null; side?: string; pos?: Position; now: number; onvendors?: (npcs: number[]) => void; onroute?: (stops: Stop[]) => void } = $props()
 
   // What the game says of the items, its recipes and its maps, made beside the map (tiles-worker.ts).
   let items = $state.raw<ItemFacts>({})
@@ -111,6 +116,29 @@
     localStorage.setItem('shoppingFolded', folded ? '1' : '')
   }
   let showReady = $state(false)
+
+  // The vendors the missing lines name (another character holding one comes first there, and then no vendor is named), once each.
+  const vendors = $derived.by(() => {
+    const out = new Map<number, ItemSources['sold'][number]>()
+    for (const m of plan.missing) {
+      const seller = !holders(m.item).some((h) => h.key !== key && (h.bags || h.bank)) && sellerOf(m.item)
+      if (seller && zones.get(seller.area)?.rect) out.set(seller.npc, seller)
+    }
+    return [...out.values()]
+  })
+  let onMap = $state(false)
+  // Untracked: what the app does with them is no reason to say them again.
+  $effect(() => {
+    const npcs = onMap ? vendors.map((v) => v.npc) : []
+    untrack(() => onvendors?.(npcs))
+  })
+  const toRoute = async (): Promise<void> => {
+    const stops = vendors.flatMap((v): Stop[] => {
+      const zone = zones.get(v.area)!
+      return zone.continent === null ? [] : [{ name: v.name, continent: zone.continent, at: unitsOfPlace(zone.rect!, v.x, v.y), pin: { m: zone.id, x: v.x, y: v.y } }]
+    })
+    onroute?.(await inWalkOrder(here, stops, (from, to) => window.twinmap.walkFar({ continent: here!.continent, from: { ...from }, to: to.map((p) => ({ ...p })), reach: 2500 })))
+  }
   const set = (g: Goal, n: number): void => onchange(setGoal(lists, key, g, n))
 </script>
 
@@ -213,6 +241,12 @@
           <span>{t('items.shopping.ready', { count: plan.ready.length })}{#if !showReady}&nbsp; <span class="off">{plan.ready.map((r) => `${name(r.item)} ${r.need}`).join(', ')}</span>{/if}</span>
           <b>{showReady ? t('items.npc.hide') : t('items.npc.show')}</b>
         </button>
+      {/if}
+      {#if vendors.length && (onvendors || onroute)}
+        <p class="go">
+          {#if onvendors}<button class="btn" aria-pressed={onMap} onclick={() => (onMap = !onMap)}>{t('items.shopping.onMap')}</button>{/if}
+          {#if onroute}<button class="btn" onclick={toRoute}>{t('items.shopping.toRoute')}</button>{/if}
+        </p>
       {/if}
       <p class="foot">{sheet?.at.bank ? t('items.npc.bankSeen', { ago: ago(sheet.at.bank, now), name: firstName(key) }) : t('items.npc.bankUnseen', { name: firstName(key) })}</p>
     {/if}
@@ -430,6 +464,15 @@
     flex: none;
     font-weight: 400;
     color: var(--gold);
+  }
+  .go {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    flex: none;
+    margin: 0;
+    padding: 8px 16px;
+    box-shadow: 0 -1px 0 #ffffff14;
   }
   .foot {
     flex: none;

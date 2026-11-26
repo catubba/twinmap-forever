@@ -81,6 +81,12 @@
   const addToList = (item: number, spell?: number): void => {
     if (shown) keptShopping.value = addTo(keptShopping.value, shown.key, item, spell)
   }
+  // The vendors of the list whose pins the map shows whatever its filters (M10-F19): turned on, the map comes in view.
+  let shopVendors = $state.raw<number[]>([])
+  const showVendors = (npcs: number[]): void => {
+    if (npcs.length && !shopVendors.length) reach('map')
+    shopVendors = npcs
+  }
   let tiles = $state<TilesStatus | null>(null)
   window.twinmap.onTiles((status) => {
     tiles = status
@@ -506,7 +512,7 @@
 <div class="stash" inert bind:this={stashBox}>
   <div class="mapbox" style:--readout="{readoutWidth}px" use:section={'map'}>
     {#if mapReady}
-      <Map {pos} {group} {death} skills={char?.name ? sheets[char.name]?.pieces.skills : undefined} xpLevel={char ? (xp ? char.level : null) : undefined} bind:back kills={live ? link?.state.sections.kills : undefined} bind:looking at={link?.state.updatedAt.pos} bind:this={mapView} {insideReady} {quests} {fixed} side={char?.side} {live} {inbox} removed={live ? goneFrom(link?.state.sections.marks) : []} set={live ? setFrom(link?.state.sections.marks) : []} gameFollows={live ? followFrom(link?.state.sections.follow) : null} {journey} {route} onroute={(stop) => setRoute(addStop(route, stop))} onnpc={(pin) => (npc = pin)} />
+      <Map {pos} {group} {death} skills={char?.name ? sheets[char.name]?.pieces.skills : undefined} xpLevel={char ? (xp ? char.level : null) : undefined} bind:back kills={live ? link?.state.sections.kills : undefined} bind:looking at={link?.state.updatedAt.pos} bind:this={mapView} {insideReady} {quests} {fixed} side={char?.side} {live} {inbox} removed={live ? goneFrom(link?.state.sections.marks) : []} set={live ? setFrom(link?.state.sections.marks) : []} gameFollows={live ? followFrom(link?.state.sections.follow) : null} {journey} {route} marked={shopVendors} onroute={(stop) => setRoute(addStop(route, stop))} onnpc={(pin) => (npc = pin)} />
     {:else if tiles}
       <div class="making" class:failed={tiles.state === 'failed' || tiles.state === 'no-game'}>
         <p>{tilesLine(tiles)}</p>
@@ -568,7 +574,7 @@
     <!-- The shopping list (M10-F4), above Now: a block taken out into a panel of its own as the others are. -->
     <div class="block-home"><div class="block surface" use:section={'shopping'}>
       {#if frame.editing}{@const pull = t('app.layout.pull')}<button class="block-pull" draggable="true" title={pull} aria-label="{pull}: {titleOf('shopping')}" ondragstart={(e) => e.dataTransfer?.setData(PART_DRAG, 'shopping')} onclick={() => addPanel('shopping')}><Glyph name="layout" size={14} /></button>{/if}
-      <ShoppingList lists={keptShopping.value} onchange={(to) => (keptShopping.value = to)} {sheets} {shown} side={char?.side} {pos} {now} />
+      <ShoppingList lists={keptShopping.value} onchange={(to) => (keptShopping.value = to)} {sheets} {shown} side={char?.side} {pos} {now} onvendors={showVendors} onroute={(stops) => setRoute(stops.reduce(addStop, route))} />
       {#if !keptShopping.value[shown?.key ?? '']?.length}<p class="block-empty"><b>{t('items.shopping.title')}</b> {t('items.shopping.empty')}</p>{/if}
     </div></div>
     <Now
@@ -616,7 +622,7 @@
   {#each CHARACTER as part (part)}
     <div class="sec" use:section={part}><Items {part} {sheets} {portraits} {shown} known={characters} {now} {listing} onpick={(key) => (picked = key)} /></div>
   {/each}
-  <div class="sec" use:section={'professions'}><Professions {sheets} {shown} ready={mapReady} /></div>
+  <div class="sec" use:section={'professions'}><Professions {sheets} {shown} ready={mapReady} onadd={shown ? addToList : undefined} /></div>
   <div class="sec" use:section={'spellbook'}><Spellbook {sheets} {shown} ready={mapReady} /></div>
   <div class="sec" use:section={'talents'}><Talents {sheets} {shown} ready={mapReady} /></div>
   <div class="sec" use:section={'search'}><Auction {house} chosen={!!chosenHouse} hints={char ?? null} who={char?.name ?? null} {prices} {listing} {sheets} known={characters} {homes} {now} {alerts} {showAlerts} onchoose={chooseHouse} /></div>
