@@ -158,22 +158,20 @@ export function edgeRect(window: Rect, rootWidth: number, rootHeight: number): R
   return clipEdges(window, { x: 0, y: 0, width: rootWidth, height: rootHeight })
 }
 
-export function monitorEdgeRect(window: Rect, monitors: Rect[], rootWidth: number, rootHeight: number): Rect | null {
-  let selected: Rect | undefined, largest = 0, containsCentre = false
-  const centreX = window.x + window.width / 2, centreY = window.y + window.height / 2
+// Clip oversized axes to the bounding box of fully covered monitors, or the root if none are covered.
+export function coveredMonitorEdgeRect(window: Rect, monitors: Rect[], rootWidth: number, rootHeight: number): Rect | null {
+  let bounds: Rect | undefined
   for (const monitor of monitors) {
-    const width = Math.max(0, Math.min(window.x + window.width, monitor.x + monitor.width) - Math.max(window.x, monitor.x))
-    const height = Math.max(0, Math.min(window.y + window.height, monitor.y + monitor.height) - Math.max(window.y, monitor.y))
-    const area = width * height
-    const centre = centreX >= monitor.x && centreX < monitor.x + monitor.width
-      && centreY >= monitor.y && centreY < monitor.y + monitor.height
-    if (area > largest || (area > 0 && area === largest && centre && !containsCentre)) {
-      selected = monitor
-      largest = area
-      containsCentre = centre
+    if (monitor.x < window.x || monitor.y < window.y || monitor.x + monitor.width > window.x + window.width
+      || monitor.y + monitor.height > window.y + window.height) continue
+    if (!bounds) bounds = { ...monitor }
+    else {
+      const x = Math.min(bounds.x, monitor.x), y = Math.min(bounds.y, monitor.y)
+      bounds = { x, y, width: Math.max(bounds.x + bounds.width, monitor.x + monitor.width) - x,
+        height: Math.max(bounds.y + bounds.height, monitor.y + monitor.height) - y }
     }
   }
-  return selected ? clipEdges(window, selected) : edgeRect(window, rootWidth, rootHeight)
+  return bounds ? clipEdges(window, bounds) : edgeRect(window, rootWidth, rootHeight)
 }
 
 export function rgbFrom(pixels: Buffer): Uint8Array {

@@ -1,6 +1,7 @@
 // Run from app/ with npm run probe:linux -- --no-sandbox under Xvfb or an X11 desktop.
 // With libxcb-res.so.0 and X-Resource 1.2, also verify lookup after replacing the reported PID.
-// For monitor clipping, define two RandR 1.5 monitors inside a larger Xvfb screen with xrandr --setmonitor.
+// Monitor lab: Xorg dummy driver (xserver-xorg-video-dummy 0.4), DUMMY0/DUMMY1 via xrandr --newmode/--addmode/--output.
+// Xvfb ignored --setmonitor in our lab; use two real RandR monitors with room for an extra row in the root.
 const { app, BrowserWindow } = require('electron')
 const { existsSync, mkdtempSync, realpathSync } = require('node:fs')
 const { registerHooks } = require('node:module')
@@ -22,7 +23,7 @@ registerHooks({
 })
 const capture = require('../src/main/capture-linux.ts')
 const { decodeRow } = require('../src/shared/strip.ts')
-const { monitorsFrom, parseSetup } = require('../src/main/capture-linux-frame.ts')
+const { coveredMonitorEdgeRect, monitorsFrom, parseSetup } = require('../src/main/capture-linux-frame.ts')
 const profile = mkdtempSync(join(tmpdir(), 'twinmap-probe-'))
 for (const key of ['userData', 'sessionData', 'logs']) app.setPath(key, profile)
 const title = 'Twinmap capture probe'
@@ -132,13 +133,15 @@ function monitorLayout() {
 
 async function probeMonitorEdge(expected) {
   const layout = monitorLayout()
-  const monitor = layout?.monitors.length >= 2 && layout.monitors.find((m) =>
-    m.x >= 0 && m.y >= 0 && m.x + m.width <= layout.width && m.y + m.height + 1 <= layout.height
-    && m.width >= narrow[0].length
-    && layout.monitors.every((other) => other === m || other.x >= m.x + m.width || other.x + other.width <= m.x
-      || other.y >= m.y + m.height || other.y + other.height <= m.y))
+  const monitor = layout?.monitors.length >= 2 && layout.monitors.find((m) => {
+    if (m.x < 0 || m.y < 0 || m.x + m.width > layout.width || m.y + m.height + 1 > layout.height
+      || m.width < narrow[0].length) return false
+    // An automatic whole-screen monitor may overlap this one without being fully covered.
+    const edges = coveredMonitorEdgeRect({ ...m, height: m.height + 1 }, layout.monitors, layout.width, layout.height)
+    return edges?.x === 0 && edges.y === 0 && edges.width === m.width && edges.height === m.height
+  })
   if (!monitor) {
-    console.log('two-monitor bottom edge: skipped (needs RandR 1.5 and two separate monitors, with room for an extra row inside the root)')
+    console.log('two-monitor bottom edge: skipped (needs RandR 1.5 and a monitor whose extra row clips inside the root)')
     return
   }
   const bounds = { x: monitor.x, y: monitor.y, width: monitor.width, height: monitor.height + 1 }

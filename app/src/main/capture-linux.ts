@@ -5,7 +5,7 @@ import { app } from 'electron'
 import koffi, { type LibraryHandle } from 'koffi'
 import type { Edge, WindowHandle } from './capture'
 import type { Rect } from '../shared/window'
-import { clientPidFrom, commandLine, inWindow, isGame, monitorsFrom, monitorEdgeRect, parseSetup, programFrom, rgbFrom, stateOf, wineProgramPath } from './capture-linux-frame'
+import { clientPidFrom, commandLine, inWindow, isGame, monitorsFrom, coveredMonitorEdgeRect, parseSetup, programFrom, rgbFrom, stateOf, wineProgramPath } from './capture-linux-frame'
 
 type NativeFunction = ReturnType<LibraryHandle['func']>
 // Keep Koffi's pointer value for native calls/free; only addresses support arithmetic.
@@ -72,7 +72,7 @@ function bind() {
   }
 }
 type Native = ReturnType<typeof bind>
-type WindowInfo = { id: number; width: number; height: number; x: number; y: number; depth: number; visual: number; state: 'minimized' | 'open'; edges: ReturnType<typeof monitorEdgeRect> }
+type WindowInfo = { id: number; width: number; height: number; x: number; y: number; depth: number; visual: number; state: 'minimized' | 'open'; edges: ReturnType<typeof coveredMonitorEdgeRect> }
 let native: Native | undefined, bindings: Native | undefined, tried = false
 let resBindings: ReturnType<typeof bindRes> | null | undefined
 let randrBindings: ReturnType<typeof bindRandr> | null | undefined
@@ -217,18 +217,18 @@ function monitors(n: Native, width: number, height: number): Rect[] {
   let rects: Rect[] = []
   try {
     if (n.randr === undefined) {
-      n.randr = false
       // Check the core protocol first: unsupported extension requests close XCB.
       const present = reply(n, n.extensionReply, n.extension(n.connection, 5, 'RANDR'))
-      if (present?.[8]) {
+      if (present && !present[8]) n.randr = false
+      else if (present) {
         if (randrBindings === undefined) {
           randrBindings = null // Remember a load failure across connections.
-          randrBindings = bindRandr()
+          try { randrBindings = bindRandr() } catch {}
         }
         if (randrBindings) {
           const version = reply(n, randrBindings.versionReply, randrBindings.version(n.connection, 1, 5))
-          n.randr = !!version && (version.readUInt32LE(8) > 1 || (version.readUInt32LE(8) === 1 && version.readUInt32LE(12) >= 5))
-        }
+          if (version) n.randr = version.readUInt32LE(8) > 1 || (version.readUInt32LE(8) === 1 && version.readUInt32LE(12) >= 5)
+        } else n.randr = false
       }
     }
     if (n.randr && randrBindings) {
@@ -236,7 +236,7 @@ function monitors(n: Native, width: number, height: number): Rect[] {
       if (value) rects = monitorsFrom(value)
     }
   } catch {}
-  if (!rects.length) problem('RandR 1.5 monitors are not available; fullscreen edges use the X11 root bounds')
+  if (n.randr === false) problem('RandR 1.5 monitors are not available; fullscreen edges use the X11 root bounds')
   monitorCache = { until: now + 1000, width, height, monitors: rects }
   return rects
 }
@@ -340,7 +340,7 @@ function windowInfo(n: Native, id: number): WindowInfo | null {
   const rootWidth = root?.readUInt16LE(16) ?? 0, rootHeight = root?.readUInt16LE(18) ?? 0
   const info: WindowInfo | null = bounds && state !== 'gone' ? {
     ...bounds, id, depth: geometry![1]!, visual: attributes!.readUInt32LE(8), state,
-    edges: root ? monitorEdgeRect(bounds, monitors(n, rootWidth, rootHeight), rootWidth, rootHeight) : null,
+    edges: root ? coveredMonitorEdgeRect(bounds, monitors(n, rootWidth, rootHeight), rootWidth, rootHeight) : null,
   } : null
   checked = { id, until: now + 100, info }
   return info
@@ -412,7 +412,7 @@ export function showsOnly(window: WindowHandle, x: number, y: number, size: numb
 export function readRow(window: WindowHandle, edge: Edge = 'top'): Buffer | null {
   const n = connection(), info = n && windowInfo(n, Number(window))
   if (!n || !info?.edges) return null
-  // Fullscreen Wine adds a black row below its monitor; read the edge that fits that monitor.
+  // Fullscreen Wine adds a black row; read the edge bounded by fully covered monitors (or the root).
   const { x, y, width, height } = info.edges
   const side = edge === 'left' || edge === 'right'
   return pixels(n, info, edge === 'right' ? x + width - 1 : x, edge === 'bottom' ? y + height - 1 : y, side ? 1 : width, side ? height : 1)

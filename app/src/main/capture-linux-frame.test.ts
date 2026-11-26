@@ -1,5 +1,5 @@
 import { expect, test, vi } from 'vitest'
-import { clientPidFrom, commandLine, inWindow, isGame, monitorsFrom, monitorEdgeRect, parseSetup, programFrom, rgbFrom, stateOf, edgeRect, wineProgramPath } from './capture-linux-frame'
+import { clientPidFrom, commandLine, inWindow, isGame, monitorsFrom, coveredMonitorEdgeRect, parseSetup, programFrom, rgbFrom, stateOf, edgeRect, wineProgramPath } from './capture-linux-frame'
 import type { Rect } from '../shared/window'
 
 function monitorReply(monitors: (Rect & { outputs?: number[] })[]): Buffer {
@@ -384,7 +384,7 @@ test('returns no edge rectangle when a larger window is fully outside the root',
   }
 })
 
-test('clips fullscreen edges against the game monitor in single, side-by-side and stacked layouts', () => {
+test('clips fullscreen edges to fully covered monitors in single, side-by-side and stacked layouts', () => {
   const large = { x: 0, y: 0, width: 3840, height: 2160 }
   for (const { monitors, window, root, expected } of [
     { monitors: [large], window: { ...large, height: 2161 }, root: [3840, 2160], expected: { x: 0, y: 0, width: 3840, height: 2160 } },
@@ -394,50 +394,85 @@ test('clips fullscreen edges against the game monitor in single, side-by-side an
     { monitors: [large, { x: 3840, y: 400, width: 1920, height: 1080 }], window: { x: 3840, y: 400, width: 1920, height: 1081 }, root: [5760, 2160], expected: { x: 0, y: 0, width: 1920, height: 1080 } },
     { monitors: [large, { x: 3840, y: 400, width: 1920, height: 1080 }], window: { x: 3840, y: 380, width: 1920, height: 1101 }, root: [5760, 2160], expected: { x: 0, y: 20, width: 1920, height: 1080 } },
   ]) {
-    const edges = monitorEdgeRect(window, monitors, root[0]!, root[1]!)
-    expect(edges).toEqual(expected)
-    expect(edges!.y + edges!.height - 1).toBe(expected.y + expected.height - 1)
+    expect(coveredMonitorEdgeRect(window, monitors, root[0]!, root[1]!)).toEqual(expected)
   }
 })
 
 test('keeps a fitting window whole, including when it straddles monitors', () => {
   const monitors = [{ x: 0, y: 0, width: 1920, height: 1080 }, { x: 1920, y: 0, width: 1080, height: 1200 }]
   for (const window of [{ x: 2000, y: 100, width: 640, height: 480 }, { x: 1700, y: 800, width: 640, height: 480 }]) {
-    expect(monitorEdgeRect(window, monitors, 3000, 1200)).toEqual({ x: 0, y: 0, width: 640, height: 480 })
+    expect(coveredMonitorEdgeRect(window, monitors, 3000, 1200)).toEqual({ x: 0, y: 0, width: 640, height: 480 })
   }
 })
 
-test('clips only the oversized x axis against an offset monitor', () => {
+test('clips a window oversized on both axes to the covered monitor', () => {
   const monitors = [{ x: 0, y: 0, width: 3840, height: 2160 }, { x: 3840, y: 400, width: 1920, height: 1080 }]
-  expect(monitorEdgeRect({ x: 3800, y: 300, width: 2000, height: 480 }, monitors, 5760, 2160))
-    .toEqual({ x: 40, y: 0, width: 1920, height: 480 })
+  expect(coveredMonitorEdgeRect({ x: 3800, y: 380, width: 2000, height: 1101 }, monitors, 5760, 2160))
+    .toEqual({ x: 40, y: 20, width: 1920, height: 1080 })
 })
 
-test('breaks equal intersections by centre containment, then monitor order', () => {
-  const window = { x: 50, y: 0, width: 200, height: 101 }
-  const monitors = [{ x: 0, y: 0, width: 150, height: 100 }, { x: 150, y: 0, width: 150, height: 100 }]
-  for (const order of [monitors, [...monitors].reverse()]) {
-    expect(monitorEdgeRect(window, order, 300, 200)).toEqual({ x: 100, y: 0, width: 100, height: 100 })
+test('keeps the full width when a window covers two or three monitors', () => {
+  const hd = { x: 0, y: 0, width: 1920, height: 1080 }
+  for (const monitors of [[hd, { ...hd, x: 1920 }], [hd, { ...hd, x: 1920 }, { ...hd, x: 3840 }]]) {
+    const width = monitors.length * hd.width
+    for (const height of [1080, 1081]) {
+      for (const order of [monitors, [...monitors].reverse()]) {
+        expect(coveredMonitorEdgeRect({ x: 0, y: 0, width, height }, order, width, 2160))
+          .toEqual({ x: 0, y: 0, width, height: 1080 })
+      }
+    }
   }
-  const separated = [{ x: 0, y: 0, width: 100, height: 100 }, { x: 200, y: 0, width: 100, height: 100 }]
-  expect(monitorEdgeRect({ x: 0, y: 0, width: 300, height: 101 }, separated, 300, 200))
-    .toEqual({ x: 0, y: 0, width: 100, height: 100 })
-  expect(monitorEdgeRect({ x: 0, y: 0, width: 300, height: 101 }, [...separated].reverse(), 300, 200))
-    .toEqual({ x: 200, y: 0, width: 100, height: 100 })
-  const overlapping = [{ x: 0, y: 0, width: 150, height: 100 }, { x: 50, y: 0, width: 150, height: 100 }]
-  expect(monitorEdgeRect({ x: 0, y: 0, width: 200, height: 101 }, overlapping, 300, 200))
-    .toEqual({ x: 0, y: 0, width: 150, height: 100 })
+  const monitors = [{ x: 0, y: 0, width: 2560, height: 1440 }, { x: 2560, y: 0, width: 2560, height: 1440 }]
+  expect(coveredMonitorEdgeRect({ x: 0, y: 0, width: 5120, height: 1441 }, monitors, 5120, 1440))
+    .toEqual({ x: 0, y: 0, width: 5120, height: 1440 })
 })
 
-test('uses the exact root fallback with no monitors or no intersecting monitor', () => {
+test('uses the bounding box of covered monitors including gaps and overlaps, independent of monitor order', () => {
+  for (const monitors of [
+    [{ x: 0, y: 0, width: 100, height: 100 }, { x: 200, y: 0, width: 100, height: 100 }],
+    [{ x: 0, y: 0, width: 200, height: 100 }, { x: 100, y: 0, width: 200, height: 100 }],
+  ]) {
+    for (const order of [monitors, [...monitors].reverse()]) {
+      expect(coveredMonitorEdgeRect({ x: 0, y: 0, width: 300, height: 101 }, order, 300, 200))
+        .toEqual({ x: 0, y: 0, width: 300, height: 100 })
+    }
+  }
+})
+
+test('ignores larger mirrored and automatic whole-screen monitors that the window does not fully cover', () => {
+  const hd = { x: 0, y: 0, width: 1920, height: 1080 }
+  for (const monitors of [
+    [hd, { x: 0, y: 0, width: 2560, height: 1440 }],
+    [hd, { ...hd, x: 1920 }, { x: 0, y: 0, width: 3840, height: 2160 }],
+  ]) {
+    for (const order of [monitors, [...monitors].reverse()]) {
+      expect(coveredMonitorEdgeRect({ ...hd, height: 1081 }, order, 3840, 2160))
+        .toEqual({ x: 0, y: 0, width: 1920, height: 1080 })
+    }
+  }
+})
+
+test('keeps a windowed 1600x1200 drawable whole beside a taller monitor', () => {
+  const monitors = [{ x: 0, y: 0, width: 1920, height: 1080 }, { x: 1920, y: 0, width: 2560, height: 1440 }]
+  expect(coveredMonitorEdgeRect({ x: 100, y: 0, width: 1600, height: 1200 }, monitors, 4480, 1440))
+    .toEqual({ x: 0, y: 0, width: 1600, height: 1200 })
+})
+
+test('uses the exact root fallback with no fully covered monitor, even with partial intersections', () => {
   for (const window of [
     { x: 0, y: 0, width: 3840, height: 2161 },
     { x: -100, y: -20, width: 4000, height: 480 },
     { x: 3800, y: 2100, width: 640, height: 480 },
     { x: 4000, y: 3000, width: 4000, height: 2200 },
   ]) {
-    for (const monitors of [[], [{ x: -10000, y: -10000, width: 100, height: 100 }]]) {
-      expect(monitorEdgeRect(window, monitors, 3840, 2160)).toEqual(edgeRect(window, 3840, 2160))
+    for (const monitors of [[], [{ x: -10000, y: -10000, width: 100, height: 100 }], [{ x: 0, y: 0, width: 7680, height: 4320 }]]) {
+      expect(coveredMonitorEdgeRect(window, monitors, 3840, 2160)).toEqual(edgeRect(window, 3840, 2160))
     }
   }
+  expect(coveredMonitorEdgeRect({ x: 50, y: 0, width: 200, height: 101 },
+    [{ x: 0, y: 0, width: 150, height: 100 }, { x: 150, y: 0, width: 150, height: 100 }], 300, 200))
+    .toEqual({ x: 0, y: 0, width: 200, height: 101 })
+  expect(coveredMonitorEdgeRect({ x: 3800, y: 300, width: 2000, height: 480 },
+    [{ x: 0, y: 0, width: 3840, height: 2160 }, { x: 3840, y: 400, width: 1920, height: 1080 }], 5760, 2160))
+    .toEqual({ x: 0, y: 0, width: 2000, height: 480 })
 })
