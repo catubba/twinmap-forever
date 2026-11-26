@@ -13,6 +13,8 @@ export interface Draw {
   blend: number
   /** Lit by itself, not by the sun. */
   unlit: boolean
+  /** Ceilings of rooms under a roof: left out of a building inside the ground. */
+  ceiling?: boolean
 }
 
 /**
@@ -25,17 +27,19 @@ export interface BuildingHead {
   indices: number
   /** From the file's own origin, the farthest of its points: what the view loads by. */
   radius: number
+  /** The height of its main floor under a roof, in the file's yards: where a building inside the ground is cut from. */
+  floor: number
   draws: Draw[]
 }
 
 /**
- * Where the buildings of a continent stand: file, x, y, z (yards, as the 3D view), turn (radians round y), scale. The
- * file is its name in the folder: the game's number, and "-out" for a building inside the ground drawn by its rooms seen
- * from outside alone (Ironforge's gate).
+ * Where the buildings of a continent stand: file (its name in the folder), x, y, z (yards, as the 3D view), turn
+ * (radians round y), scale, and 1 for a building inside the ground (Ironforge, Undercity, a mine), which the view cuts
+ * at a height.
  */
 export interface Placed {
   format: number
-  placed: [string, number, number, number, number, number][]
+  placed: [string, number, number, number, number, number, number][]
   /** Each file's radius, by file. */
   radius: Record<string, number>
 }

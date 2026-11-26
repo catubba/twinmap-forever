@@ -155,6 +155,11 @@ export class Arrow3d {
   /** Where the arrow is on the view, in pixels, and how far round it reaches: told when it changes, null when there is none. For what is drawn over the view to leave it in front. */
   onscreen: ((at: { x: number; y: number; r: number } | null) => void) | null = null
 
+  /** Where the arrow stands, in yards, while there is one. */
+  at(): THREE.Vector3 | null {
+    return this.want && this.y !== null ? new THREE.Vector3(this.want.x, this.y, this.want.z) : null
+  }
+
   hide(): void {
     this.onscreen?.(null)
     this.want = null

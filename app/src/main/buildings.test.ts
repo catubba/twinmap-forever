@@ -7,7 +7,7 @@ describe('the files of the buildings the window may ask for', () => {
     expect(servedFile('/b', '/buildings/tex/189077.bin')).toMatch(/buildings[\\/]tex[\\/]189077\.bin$/)
     expect(servedFile('/b', '/buildings/tex/189077.png')).toMatch(/tex[\\/]189077\.png$/)
     expect(servedFile('/b', '/azeroth/buildings.json')).toMatch(/azeroth[\\/]buildings\.json$/)
-    expect(servedFile('/b', '/buildings/7962574-out.bin')).toMatch(/7962574-out\.bin$/)
+    expect(servedFile('/b', '/buildings/7962574-out.bin')).toBeNull()
     expect(servedFile('/b', '/buildings/format.json')).toBeNull()
     expect(servedFile('/b', '/buildings/../x.bin')).toBeNull()
   })

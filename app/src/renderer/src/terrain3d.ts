@@ -69,6 +69,8 @@ export interface Under {
   floorAt(x: number, z: number): { y: number; open: number } | null
   step(camera: THREE.Vector3, dt: number): boolean
   seenPass(on: boolean): void
+  /** Whether its pictures are left out of the view, the buildings being drawn whole (buildings3d.ts): they still open the ground. */
+  hidePictures(on: boolean): void
   readonly any: boolean
 }
 
@@ -162,6 +164,8 @@ export class Terrain {
   private materials: {
     ground: THREE.MeshLambertMaterial
     pit: THREE.MeshBasicMaterial
+    // the same dark where the ground over a room opens: a building's floor that the cut of a city inside the ground (buildings3d.ts) shows
+    openPit: THREE.MeshLambertMaterial
     liquids: THREE.Material[]
   }
   private observer: ResizeObserver
@@ -220,6 +224,7 @@ export class Terrain {
     this.materials = {
       ground: new THREE.MeshLambertMaterial({ side: THREE.DoubleSide }),
       pit: new THREE.MeshBasicMaterial({ color: PIT }),
+      openPit: Object.assign(new THREE.MeshLambertMaterial({ color: 0x000000, emissive: PIT, transparent: true }), { onBeforeCompile: (shader: THREE.WebGLProgramParametersWithUniforms) => this.opening(shader) }),
       // Water, lava, fel, tar: in the order water.ts numbers them, from 1; then the open sea.
       liquids: [
         // Its colour a vertex, by how deep it is (meshes). The sun shines on shallow water only: deep water is the open sea, which has no shine.
@@ -383,6 +388,8 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
 
   /** Called at every frame while the view runs, once it is drawn: what lies over it follows. */
   onFrame: () => void = () => {}
+  /** Where the character stands while it is followed, in yards: a city inside the ground is cut over its floor (buildings3d.ts). */
+  character: THREE.Vector3 | null = null
   /** The azimuth the view keeps to by itself (the arrow's, heading up); null: left to the hand. */
   heading: number | null = null
 
@@ -638,7 +645,8 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
     // After the arrow is turned for this frame, so the view turns with it in the same frame, not one behind.
     if (this.heading !== null && !this.turning) this.steer()
     if (this.inside?.step(this.camera.position, Math.min(0.1, FRAME_MS / 1000 + 0.004))) this.dirty = true
-    if (this.buildings.step(this.controls.target, distance)) this.dirty = true
+    if (this.buildings.step(this.controls.target, distance, this.camera.position, this.character)) this.dirty = true
+    this.inside?.hidePictures(this.buildings.under)
     if (this.dirty) {
       this.dirty = false
       this.choose()
@@ -965,7 +973,13 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
       const dark = new THREE.BufferGeometry()
       dark.setAttribute('position', ground.getAttribute('position'))
       dark.setIndex(pit)
-      group.add(new THREE.Mesh(dark, this.materials.pit))
+      const hole = new THREE.Mesh<THREE.BufferGeometry, THREE.Material>(dark, this.materials.pit)
+      if (roofed) {
+        dark.setAttribute('roofed', ground.getAttribute('roofed'))
+        hole.material = this.materials.openPit
+        hole.renderOrder = -1
+      }
+      group.add(hole)
     }
 
     // Liquids: a square a liquid, at the levels of its corners, grouped by kind.
