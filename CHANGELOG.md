@@ -2,6 +2,20 @@
 
 What changed in each version of Twinmap, newest first. The section of a version is also the text of its release on GitHub and of the addon's file on CurseForge.
 
+## 0.19.0 - 2026-11-26
+
+### New
+
+- **Twinmap on Linux.** Twinmap now runs on Linux beside the game under Wine or Proton (Steam, Lutris), on X11 or XWayland. Each release has it as an AppImage, beside the Windows and Mac downloads, and it updates itself. With two monitors, the game can be fullscreen on either. Thanks to markus-barta.
+- **The shopping list on the map.** Under the list, Vendors on the map shows the nearest vendor of each item you are missing, in a gold ring, whatever the map filters. Add to route puts those vendors on your route, in the order to walk them. In the Professions panel, the + on a recipe adds it to the list. Thanks to Stalioot.
+- **Quests that will soon give less XP.** In Quests, in Now, a quest says "less XP at 22" when its XP drops at your next level or the one after, and "less XP" once it has. Its pin on the map says the same. Untick Low-level in Map filters to hide the quests to take that already give less XP. Thanks to Stalioot.
+- **Map icons.** Settings, Appearance, Map icons: the quest pins in Twinmap's style, with the game's own icons, or with Questie's when Questie is installed. Thanks to Stalioot.
+- **Objectives as areas.** Settings, Appearance, Objectives: Areas draws the objectives of each quest as an area in a colour of its own, round the places Questie gives for them. Thanks to Stalioot.
+
+### Changed
+
+- **The Mac app updates itself.** From this version, the Mac app opened from Applications looks for a new version as it opens and puts it in place, like the Windows app. With a Mac app of 0.18.0 or older, this one is still a download by hand.
+
 ## 0.18.0 - 2026-11-26
 
 ### New
