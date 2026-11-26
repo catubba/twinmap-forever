@@ -8,8 +8,9 @@
 //
 // What is kept: each model once, each run of its skin's first layers a piece with its own points, but not the pieces the
 // game keeps hidden (their texture weight or the alpha of their colour at rest is 0: the smoke columns of the Great
-// Forge, which read as stripes in the prototype of M23-F15). The copies by block: those of the blocks, and those of the
-// buildings in a room in the open (one under a roof is M23-F17). Trees thinned once for the whole continent (DENSITIES).
+// Forge, which read as stripes in the prototype of M23-F15). The copies by block: those of the blocks, those of the
+// buildings in a room in the open, and every one of a building inside the ground (caves.json: the anvils and forges of
+// Ironforge, M23-F17), which the view cuts as it cuts its building. Trees thinned once for the whole continent (DENSITIES).
 //   buildings/m2/format.json        the format the models and copies were made in: another one is made again
 //   buildings/m2/<file>.bin         a model, deflated (PropHead)
 //   buildings/tex/                  the textures, shared with the buildings (buildings.ts)
@@ -18,13 +19,13 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { deflateSync } from 'node:zlib'
-import { DENSITIES, KEPT_BITS, TREE_RADIUS, type Density, type PropBlocks, type PropHead, type PropPiece } from '../shared/props'
+import { COPY, DENSITIES, KEPT_BITS, TREE_RADIUS, type Density, type PropBlocks, type PropHead, type PropPiece } from '../shared/props'
 import { BLOCKS, BLOCK_YARDS } from '../shared/world'
-import { BUILDINGS_FOLDER, textureKeeper, type Texture } from './buildings'
+import { BUILDINGS_FOLDER, buriedKey, textureKeeper, type Texture } from './buildings'
 import { keep } from './tiles'
 
 export const PROPS_FILE = 'props.json'
-const FORMAT = 1
+const FORMAT = 2 // 1 had no copies of the rooms under a roof of the buildings inside the ground
 const M2 = 'm2'
 
 function* chunks(b: Buffer, from = 0): Generator<{ tag: string; data: Buffer }> {
@@ -126,15 +127,25 @@ const inBuilding = (px: number, py: number, pz: number, x: number, y: number, z:
   px, py, pz,
 ]
 
-/** The copies a continent has: the model's file and the copy's matrix into the view's yards. */
-export function copiesOf(wdt: Buffer, read: (id: number) => Buffer | null): { file: number; m: M }[] {
-  const maid = chunk(wdt, 'DIAM'), out: { file: number; m: M }[] = []
+/** A copy: the model's file, its matrix into the view's yards, and where its building stands when it is inside the ground (cut as it is). */
+export interface Copy {
+  file: number
+  m: M
+  under?: [number, number]
+}
+
+/**
+ * The copies a continent has. buried: its buildings inside the ground (caves.json), by buriedKey: of these, the copies
+ * of every room; of the others, those of the rooms in the open.
+ */
+export function copiesOf(wdt: Buffer, read: (id: number) => Buffer | null, buried?: Set<string>): Copy[] {
+  const maid = chunk(wdt, 'DIAM'), out: Copy[] = []
   const blockSeen = new Set<number>(), buildingSeen = new Set<number>()
-  // the doodads of a building's rooms in the open, by building file: those of its sets, where they stand in the file
-  const outdoor = new Map<number, Map<number, { file: number; m: M }[]> | null>()
-  const ofBuilding = (id: number): Map<number, { file: number; m: M }[]> | null => {
+  // the doodads of a building's rooms, by building file: those of its sets, where they stand in the file, in a room in the open or not
+  const outdoor = new Map<number, Map<number, { file: number; m: M; open: boolean }[]> | null>()
+  const ofBuilding = (id: number): Map<number, { file: number; m: M; open: boolean }[]> | null => {
     if (outdoor.has(id)) return outdoor.get(id)!
-    let sets: Map<number, { file: number; m: M }[]> | null = null
+    let sets: Map<number, { file: number; m: M; open: boolean }[]> | null = null
     const f = read(id), head = f && chunk(f, 'DHOM'), gfid = f && chunk(f, 'DIFG'), modd = f && chunk(f, 'DDOM'), mods = f && chunk(f, 'SDOM'), modi = f && chunk(f, 'IDOM')
     if (f && head && gfid && modd && mods && modi) {
       // a doodad is out in the open when every room that lists it is (MODR of each room)
@@ -147,12 +158,12 @@ export function copiesOf(wdt: Buffer, read: (id: number) => Buffer | null): { fi
       }
       sets = new Map()
       for (let s = 0; s * 32 + 32 <= mods.length; s++) {
-        const list: { file: number; m: M }[] = [], start = mods.readUInt32LE(s * 32 + 20), count = mods.readUInt32LE(s * 32 + 24)
+        const list: { file: number; m: M; open: boolean }[] = [], start = mods.readUInt32LE(s * 32 + 20), count = mods.readUInt32LE(s * 32 + 24)
         for (let d = start; d < start + count && d * 40 + 40 <= modd.length; d++) {
           const name = modd.readUInt32LE(d * 40) & 0xffffff, file = name * 4 + 4 <= modi.length ? modi.readUInt32LE(name * 4) : 0
-          if (!file || !open.get(d)) continue
+          if (!file) continue
           const a = d * 40, q = (k: number): number => modd.readFloatLE(a + k)
-          list.push({ file, m: mul(TO_VIEW, mul(inBuilding(q(4), q(8), q(12), q(16), q(20), q(24), q(28), q(32)), FROM_VIEW)) })
+          list.push({ file, open: !!open.get(d), m: mul(TO_VIEW, mul(inBuilding(q(4), q(8), q(12), q(16), q(20), q(24), q(28), q(32)), FROM_VIEW)) })
         }
         sets.set(s, list)
       }
@@ -177,8 +188,10 @@ export function copiesOf(wdt: Buffer, read: (id: number) => Buffer | null): { fi
       buildingSeen.add(modf.readUInt32LE(at + 4))
       const sets = ofBuilding(modf.readUInt32LE(at))
       if (!sets) continue
-      const place = standingAt(modf.readFloatLE(at + 8), modf.readFloatLE(at + 12), modf.readFloatLE(at + 16), ((modf.readFloatLE(at + 24) - 180) * Math.PI) / 180, modf.readUInt16LE(at + 62) / 1024 || 1)
-      for (const s of new Set([0, modf.readUInt16LE(at + 58)])) for (const c of sets.get(s) ?? []) out.push({ file: c.file, m: mul(place, c.m) })
+      const x = modf.readFloatLE(at + 8), z = modf.readFloatLE(at + 16)
+      const place = standingAt(x, modf.readFloatLE(at + 12), z, ((modf.readFloatLE(at + 24) - 180) * Math.PI) / 180, modf.readUInt16LE(at + 62) / 1024 || 1)
+      const under = buried?.has(buriedKey(modf.readUInt32LE(at), x, z))
+      for (const s of new Set([0, modf.readUInt16LE(at + 58)])) for (const c of sets.get(s) ?? []) if (c.open || under) out.push({ file: c.file, m: mul(place, c.m), ...(under ? { under: [x, z] as [number, number] } : {}) })
     }
   }
   return out
@@ -239,7 +252,7 @@ export function propsMade(folder: string, worlds: string[]): boolean {
  * (an interrupted run resumes), the copies of each continent by block, its list last. read: a game file by number, null
  * when there is none or the server has not sent its key. Gives what was made.
  */
-export function makeProps(worlds: { name: string; wdt: Buffer }[], read: (id: number) => Buffer | null, folder: string): { models: number; copies: number } {
+export function makeProps(worlds: { name: string; wdt: Buffer; buried?: Set<string> }[], read: (id: number) => Buffer | null, folder: string): { models: number; copies: number } {
   const dir = join(folder, BUILDINGS_FOLDER), m2 = join(dir, M2)
   if (formatOf(folder) !== FORMAT) {
     rmSync(m2, { recursive: true, force: true })
@@ -273,26 +286,26 @@ export function makeProps(worlds: { name: string; wdt: Buffer }[], read: (id: nu
   }
   let copies = 0
   for (const w of worlds) {
-    const all = copiesOf(w.wdt, read).filter((c) => model(c.file))
+    const all = copiesOf(w.wdt, read, w.buried).filter((c) => model(c.file))
     // giants (Darnassus' trees, wider than 100 yards) are never drawn: from above they are a roof over the city
     const scale = (c: { m: M }): number => Math.hypot(c.m[0]!, c.m[1]!, c.m[2]!)
     const shown = all.filter((c) => !(models.get(c.file)!.tree && models.get(c.file)!.radius * scale(c) > 100))
     const trees = shown.filter((c) => models.get(c.file)!.tree)
     const bits = thinned(trees.map((c) => ({ x: c.m[9]!, z: c.m[11]!, crown: 0.6 * models.get(c.file)!.radius * scale(c) })))
-    const kept = new Map<{ m: M }, number>(trees.map((c, i) => [c, bits[i]!]))
+    const kept = new Map<Copy, number>(trees.map((c, i) => [c, bits[i]!]))
     // by block, then by model
     const blocks = new Map<string, Map<number, number[]>>()
     for (const c of shown) {
       const column = Math.min(BLOCKS - 1, Math.max(0, Math.floor(c.m[9]! / BLOCK_YARDS))), row = Math.min(BLOCKS - 1, Math.max(0, Math.floor(c.m[11]! / BLOCK_YARDS)))
       const key = `${column}-${row}`, byModel = blocks.get(key) ?? blocks.set(key, new Map()).get(key)!
       const list = byModel.get(c.file) ?? byModel.set(c.file, []).get(c.file)!
-      list.push(...c.m, kept.get(c) ?? KEPT_BITS.few | KEPT_BITS.some | KEPT_BITS.many)
+      list.push(...c.m, kept.get(c) ?? KEPT_BITS.few | KEPT_BITS.some | KEPT_BITS.many, c.under?.[0] ?? NaN, c.under?.[1] ?? NaN)
     }
     const into = join(folder, w.name, 'props')
     mkdirSync(into, { recursive: true })
     for (const [key, byModel] of blocks) {
       const parts: Buffer[] = [Buffer.from(new Uint32Array([byModel.size]).buffer)]
-      for (const [file, list] of byModel) parts.push(Buffer.from(new Uint32Array([file, list.length / 13]).buffer), Buffer.from(new Float32Array(list).buffer))
+      for (const [file, list] of byModel) parts.push(Buffer.from(new Uint32Array([file, list.length / COPY]).buffer), Buffer.from(new Float32Array(list).buffer))
       writeFileSync(join(into, `${key}.bin`), deflateSync(Buffer.concat(parts)))
     }
     const list: PropBlocks = { format: FORMAT, blocks: [...blocks.keys()] }

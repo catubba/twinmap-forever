@@ -44,9 +44,11 @@ export type Density = keyof typeof DENSITIES
 
 /**
  * Of each copy of a block (its file <continent>/props/<column>-<row>.bin, deflated): Uint32 number of models, then of
- * each Uint32 file, Uint32 copies, and for each copy 12 Float32 (its 3 x 4 matrix, column by column, into the view's
- * yards) and a Float32 of these bits: drawn with few, some or many trees (always all three for what is not a tree).
+ * each Uint32 file, Uint32 copies, and for each copy COPY Float32: its 3 x 4 matrix (column by column, into the view's
+ * yards), a Float32 of these bits: drawn with few, some or many trees (always all three for what is not a tree), and
+ * the x and z of its building when that building is inside the ground (cut as it is, M23-F17), else NaN.
  */
+export const COPY = 15
 export const KEPT_BITS: Record<Density, number> = { few: 4, some: 2, many: 1 }
 
 /** The blocks of a continent that have copies, as "column-row": written last, the view takes none before it. */
