@@ -5,9 +5,10 @@ name: Mac app
 # release mac-<tag>. This workflow fetches it, checks it as a player's Mac will, checks that it holds our code and
 # nothing else (its app.asar the same as the one built here from the same tag), and attaches it to our release as
 # Twinmap-mac-arm64.zip: the one name the download buttons point to, as Twinmap-Setup.exe is for Windows.
+# release.yml starts it as soon as a release is published, and it waits for the fork (a release made with the
+# workflow's own token starts no `release` event, so that trigger would never fire). The schedule is the fallback:
+# GitHub runs it seldom, sometimes hours apart.
 on:
-  release:
-    types: [published]
   schedule:
     # His fork looks at our releases at 7 and 37: the build is ready from about half an hour later.
     - cron: '22,52 * * * *'
@@ -17,6 +18,10 @@ on:
         description: Tag of a release here (v1.2.3). Empty means the latest release.
         required: false
         default: ''
+      wait:
+        description: Minutes to wait for the fork's build, looking every two minutes. 0 looks once.
+        required: false
+        default: '0'
 
 permissions:
   contents: read
@@ -44,16 +49,25 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           INPUT_TAG: ${{ inputs.tag }}
+          INPUT_WAIT: ${{ inputs.wait }}
         run: |
           set -euo pipefail
           tag="${INPUT_TAG:-$(gh release view -R "$GITHUB_REPOSITORY" --json tagName --jq .tagName)}"
           [[ "$tag" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)$ ]] || { echo "::error::Not a version tag: $tag"; exit 1; }
           version="${BASH_REMATCH[1]}" todo=true
-          if gh release view "$tag" -R "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | grep -qx "$ZIP"; then
-            echo "$tag has its Mac app already."; todo=false
-          elif ! gh release view "mac-$tag" -R "$FORK" --json assets --jq '.assets[].name' 2>/dev/null | grep -qx "Twinmap-$version-arm64.zip"; then
-            echo "mac-$tag is not on $FORK yet: next time."; todo=false
-          fi
+          [[ "${INPUT_WAIT:-0}" =~ ^[0-9]+$ ]] || { echo "::error::Not a number of minutes: $INPUT_WAIT"; exit 1; }
+          deadline=$((SECONDS + 60 * ${INPUT_WAIT:-0}))
+          while true; do
+            if gh release view "$tag" -R "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | grep -qx "$ZIP"; then
+              echo "$tag has its Mac app already."; todo=false; break
+            elif gh release view "mac-$tag" -R "$FORK" --json assets --jq '.assets[].name' 2>/dev/null | grep -qx "Twinmap-$version-arm64.zip"; then
+              break
+            elif (( SECONDS >= deadline )); then
+              echo "mac-$tag is not on $FORK yet: next time."; todo=false; break
+            fi
+            echo "mac-$tag is not on $FORK yet, looking again in two minutes."
+            sleep 120
+          done
           echo "$tag, version $version, to do $todo"
           { echo "tag=$tag"; echo "version=$version"; echo "todo=$todo"; } >> "$GITHUB_OUTPUT"
 

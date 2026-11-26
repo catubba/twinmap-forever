@@ -11,7 +11,7 @@ on:
 
 permissions:
   contents: write
-  actions: read # the release reads the CI runs of its commit
+  actions: write # the release reads the CI runs of its commit, and starts Mac app
 
 jobs:
   release:
@@ -104,6 +104,15 @@ jobs:
           gh release create "$GITHUB_REF_NAME" --title "Twinmap $VERSION" --notes-file notes.md $PRE \
             "dist/Twinmap-Setup-$VERSION.exe" "dist/Twinmap-Setup-$VERSION.exe.blockmap" $UPDATE_FILES dist/Twinmap-Setup.exe \
             "dist/addon/TwinmapForever-$VERSION.zip" dist/addon/release.json
+
+      # The Mac app comes from markus-barta's fork about twenty minutes after the release (mac-app.yml): started
+      # here, Mac app waits for it and attaches it as soon as it is there. Its schedule stays as the fallback.
+      # A pre-release gets no Mac app.
+      - name: Start Mac app
+        continue-on-error: true
+        run: |
+          case "$VERSION" in *-*) exit 0 ;; esac
+          gh workflow run mac-app.yml -R "$GITHUB_REPOSITORY" --ref main -f tag="$GITHUB_REF_NAME" -f wait=60
 
       # The result goes into the release notes, and into virustotal.json for the badge of the README and of the site.
       # A scan that fails does not take the release back: it is published already.
