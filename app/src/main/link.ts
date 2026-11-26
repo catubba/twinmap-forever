@@ -2,7 +2,7 @@
 // keeps the character's state up to date.
 import { createGame, type GameState } from '../shared/game'
 import type { LinkSnapshot } from '../shared/link'
-import { decodeRow, readStrip } from '../shared/strip'
+import { decodeRow, readStrip, stretchAfter } from '../shared/strip'
 import { readFileSync } from 'node:fs'
 import { worldOfYards } from '../shared/inside'
 import type { Box } from '../shared/minimap'
@@ -145,7 +145,7 @@ export function startLink(
     if (read.drew) drew = read.drew
     if (reading.kind !== 'none') edgeSeenAt = now
     game.feed(reading, now)
-    stretch = drew ? (row.length >> 2) / drew : 1
+    stretch = stretchAfter(stretch, row, read.drew)
     lookInside(hwnd, now)
   }, READ_EVERY)
 

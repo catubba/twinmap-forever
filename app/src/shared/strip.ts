@@ -155,3 +155,11 @@ export function readStrip(row: Uint8Array, drew?: number): { reading: Reading; d
   }
   return { reading: decodeRow(row) }
 }
+
+/**
+ * Pixels of the screen for each pixel the game drew, after a row was read: told only by a row that
+ * held a block (drew, from readStrip), so the other edges, read in turn while no strip shows, keep
+ * the last one. A side is as long as the window is high: its length over the width drew would cut
+ * the minimap from the middle of the screen.
+ */
+export const stretchAfter = (stretch: number, row: Uint8Array, drew?: number): number => (drew ? (row.length >> 2) / drew : stretch)

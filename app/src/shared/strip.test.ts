@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { expect, test } from 'vitest'
 import { createGame } from './game'
-import { decodeRow, PROTOCOL, readStrip, type Block } from './strip'
+import { decodeRow, PROTOCOL, readStrip, stretchAfter, type Block } from './strip'
 
 // Strips the addon really drew, recorded in the simulated game by addon/tests/record.js.
 // Each is a string of cells, one digit 0 to 7 (R*4 + G*2 + B) per pixel.
@@ -197,6 +197,15 @@ test('a strip stretched to fill a wider monitor reads as the one the game drew, 
   expect(readStrip(pixels(strips.session[0]!), 1280), 'not stretched any more').toEqual({ reading: decodeRow(pixels(strips.session[0]!)), drew: 1920 })
   expect(readStrip(new Uint8Array(2560 * 4).fill(50))).toEqual({ reading: { kind: 'none' } })
   expect(readStrip(Uint8Array.from({ length: 2560 * 4 }, (_, i) => (i * 37) % 256))).toEqual({ reading: { kind: 'none' } })
+})
+
+test('the stretch comes from the edge the strip is on, not from the others read in turn while it does not show', () => {
+  const top = stretched(pixels(strips.session[0]!), 2560), side = new Uint8Array(1440 * 4).fill(50)
+  let stretch = stretchAfter(1, top, readStrip(top).drew)
+  expect(stretch).toBeCloseTo(2560 / 1920)
+  stretch = stretchAfter(stretch, side, readStrip(side, 1920).drew)
+  expect(stretch, 'a side holds no block: the stretch stays').toBeCloseTo(2560 / 1920)
+  expect(stretchAfter(1, pixels(strips.side[0]!), readStrip(pixels(strips.side[0]!)).drew), 'a strip down a side').toBe(1)
 })
 
 test('a column down the side of a game stretched to fill a higher monitor reads at the height the game drew', () => {
