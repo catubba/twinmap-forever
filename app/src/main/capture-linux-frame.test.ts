@@ -1,5 +1,55 @@
 import { expect, test, vi } from 'vitest'
-import { clientPidFrom, commandLine, inWindow, isGame, parseSetup, programFrom, rgbFrom, stateOf, edgeRect, wineProgramPath } from './capture-linux-frame'
+import { clientPidFrom, commandLine, inWindow, isGame, monitorsFrom, monitorEdgeRect, parseSetup, programFrom, rgbFrom, stateOf, edgeRect, wineProgramPath } from './capture-linux-frame'
+import type { Rect } from '../shared/window'
+
+function monitorReply(monitors: (Rect & { outputs?: number[] })[]): Buffer {
+  const bytes = Buffer.alloc(32 + monitors.reduce((size, monitor) => size + 24 + (monitor.outputs?.length ?? 0) * 4, 0))
+  bytes[0] = 1
+  bytes.writeUInt32LE((bytes.length - 32) / 4, 4)
+  bytes.writeUInt32LE(1234, 8) // timestamp, not nMonitors
+  bytes.writeUInt32LE(monitors.length, 12)
+  bytes.writeUInt32LE(monitors.reduce((count, monitor) => count + (monitor.outputs?.length ?? 0), 0), 16)
+  let offset = 32
+  for (const [i, monitor] of monitors.entries()) {
+    const outputs = monitor.outputs ?? []
+    bytes.writeUInt32LE(100 + i, offset)
+    bytes[offset + 4] = i === 0 ? 1 : 0
+    bytes[offset + 5] = 1
+    bytes.writeUInt16LE(outputs.length, offset + 6)
+    bytes.writeInt16LE(monitor.x, offset + 8)
+    bytes.writeInt16LE(monitor.y, offset + 10)
+    bytes.writeUInt16LE(monitor.width, offset + 12)
+    bytes.writeUInt16LE(monitor.height, offset + 14)
+    bytes.writeUInt32LE(600, offset + 16)
+    bytes.writeUInt32LE(340, offset + 20)
+    outputs.forEach((output, j) => bytes.writeUInt32LE(output, offset + 24 + j * 4))
+    offset += 24 + outputs.length * 4
+  }
+  return bytes
+}
+
+test('parses one or two RandR monitors, including signed origins and variable output lists', () => {
+  const first = { x: -1920, y: -100, width: 1920, height: 1080 }
+  const second = { x: 0, y: 0, width: 3840, height: 2160 }
+  expect(monitorsFrom(monitorReply([]))).toEqual([])
+  expect(monitorsFrom(monitorReply([first]))).toEqual([first])
+  expect(monitorsFrom(monitorReply([first, second]))).toEqual([first, second])
+  expect(monitorsFrom(monitorReply([{ ...first, outputs: [41, 42] }, { ...second, outputs: [43] }]))).toEqual([first, second])
+})
+
+test('rejects the entire malformed or truncated RandR monitor reply', () => {
+  const bytes = monitorReply([{ x: 0, y: 0, width: 1920, height: 1080, outputs: [41, 42] }])
+  for (let length = 0; length < bytes.length; length++) expect(monitorsFrom(bytes.subarray(0, length))).toEqual([])
+  for (const [offset, value] of [[0, 0], [4, 0xffffffff], [4, 0], [12, 0], [12, 2], [12, 0xffffffff], [16, 1], [38, 3], [44, 0]]) {
+    const malformed = Buffer.from(bytes)
+    malformed.writeUInt32LE(value!, offset!)
+    expect(monitorsFrom(malformed)).toEqual([])
+  }
+  const two = monitorReply([{ x: 0, y: 0, width: 1920, height: 1080 }, { x: 1920, y: 0, width: 1080, height: 1200 }])
+  two.writeUInt16LE(1, 62) // Missing output after the second record: discard the valid first record too.
+  expect(monitorsFrom(two)).toEqual([])
+  expect(monitorsFrom(Buffer.concat([bytes, Buffer.alloc(4)]))).toEqual([])
+})
 
 function clientIds(entries: { mask: number; values: number[] }[]): Buffer {
   const bytes = Buffer.alloc(32 + entries.reduce((size, entry) => size + 12 + entry.values.length * 4, 0))
@@ -331,5 +381,63 @@ test('keeps the whole drawable when the window is fully inside the root', () => 
 test('returns no edge rectangle when a larger window is fully outside the root', () => {
   for (const [x, y] of [[3840, 0], [0, 2160], [-4000, 0], [0, -2200], [4000, 3000]]) {
     expect(edgeRect({ x: x!, y: y!, width: 4000, height: 2200 }, 3840, 2160)).toBeNull()
+  }
+})
+
+test('clips fullscreen edges against the game monitor in single, side-by-side and stacked layouts', () => {
+  const large = { x: 0, y: 0, width: 3840, height: 2160 }
+  for (const { monitors, window, root, expected } of [
+    { monitors: [large], window: { ...large, height: 2161 }, root: [3840, 2160], expected: { x: 0, y: 0, width: 3840, height: 2160 } },
+    { monitors: [large, { ...large, x: 3840 }], window: { ...large, height: 2161 }, root: [7680, 2160], expected: { x: 0, y: 0, width: 3840, height: 2160 } },
+    { monitors: [large, { x: 3840, y: 0, width: 1920, height: 1080 }], window: { x: 3840, y: 0, width: 1920, height: 1081 }, root: [5760, 2160], expected: { x: 0, y: 0, width: 1920, height: 1080 } },
+    { monitors: [large, { ...large, y: 2160 }], window: { ...large, height: 2161 }, root: [3840, 4320], expected: { x: 0, y: 0, width: 3840, height: 2160 } },
+    { monitors: [large, { x: 3840, y: 400, width: 1920, height: 1080 }], window: { x: 3840, y: 400, width: 1920, height: 1081 }, root: [5760, 2160], expected: { x: 0, y: 0, width: 1920, height: 1080 } },
+    { monitors: [large, { x: 3840, y: 400, width: 1920, height: 1080 }], window: { x: 3840, y: 380, width: 1920, height: 1101 }, root: [5760, 2160], expected: { x: 0, y: 20, width: 1920, height: 1080 } },
+  ]) {
+    const edges = monitorEdgeRect(window, monitors, root[0]!, root[1]!)
+    expect(edges).toEqual(expected)
+    expect(edges!.y + edges!.height - 1).toBe(expected.y + expected.height - 1)
+  }
+})
+
+test('keeps a fitting window whole, including when it straddles monitors', () => {
+  const monitors = [{ x: 0, y: 0, width: 1920, height: 1080 }, { x: 1920, y: 0, width: 1080, height: 1200 }]
+  for (const window of [{ x: 2000, y: 100, width: 640, height: 480 }, { x: 1700, y: 800, width: 640, height: 480 }]) {
+    expect(monitorEdgeRect(window, monitors, 3000, 1200)).toEqual({ x: 0, y: 0, width: 640, height: 480 })
+  }
+})
+
+test('clips only the oversized x axis against an offset monitor', () => {
+  const monitors = [{ x: 0, y: 0, width: 3840, height: 2160 }, { x: 3840, y: 400, width: 1920, height: 1080 }]
+  expect(monitorEdgeRect({ x: 3800, y: 300, width: 2000, height: 480 }, monitors, 5760, 2160))
+    .toEqual({ x: 40, y: 0, width: 1920, height: 480 })
+})
+
+test('breaks equal intersections by centre containment, then monitor order', () => {
+  const window = { x: 50, y: 0, width: 200, height: 101 }
+  const monitors = [{ x: 0, y: 0, width: 150, height: 100 }, { x: 150, y: 0, width: 150, height: 100 }]
+  for (const order of [monitors, [...monitors].reverse()]) {
+    expect(monitorEdgeRect(window, order, 300, 200)).toEqual({ x: 100, y: 0, width: 100, height: 100 })
+  }
+  const separated = [{ x: 0, y: 0, width: 100, height: 100 }, { x: 200, y: 0, width: 100, height: 100 }]
+  expect(monitorEdgeRect({ x: 0, y: 0, width: 300, height: 101 }, separated, 300, 200))
+    .toEqual({ x: 0, y: 0, width: 100, height: 100 })
+  expect(monitorEdgeRect({ x: 0, y: 0, width: 300, height: 101 }, [...separated].reverse(), 300, 200))
+    .toEqual({ x: 200, y: 0, width: 100, height: 100 })
+  const overlapping = [{ x: 0, y: 0, width: 150, height: 100 }, { x: 50, y: 0, width: 150, height: 100 }]
+  expect(monitorEdgeRect({ x: 0, y: 0, width: 200, height: 101 }, overlapping, 300, 200))
+    .toEqual({ x: 0, y: 0, width: 150, height: 100 })
+})
+
+test('uses the exact root fallback with no monitors or no intersecting monitor', () => {
+  for (const window of [
+    { x: 0, y: 0, width: 3840, height: 2161 },
+    { x: -100, y: -20, width: 4000, height: 480 },
+    { x: 3800, y: 2100, width: 640, height: 480 },
+    { x: 4000, y: 3000, width: 4000, height: 2200 },
+  ]) {
+    for (const monitors of [[], [{ x: -10000, y: -10000, width: 100, height: 100 }]]) {
+      expect(monitorEdgeRect(window, monitors, 3840, 2160)).toEqual(edgeRect(window, 3840, 2160))
+    }
   }
 })

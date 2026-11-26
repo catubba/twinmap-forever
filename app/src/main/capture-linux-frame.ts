@@ -75,6 +75,28 @@ export function clientPidFrom(reply: Buffer): number | null {
   return offset === reply.length ? pid : null
 }
 
+// RandR 1.5 records have a variable-length output list after each monitor.
+export function monitorsFrom(reply: Buffer): Rect[] {
+  if (reply.length < 32 || reply[0] !== 1 || reply.readUInt32LE(4) * 4 !== reply.length - 32) return []
+  const count = reply.readUInt32LE(12), outputs = reply.readUInt32LE(16)
+  const monitors: Rect[] = []
+  let offset = 32, seenOutputs = 0
+  for (let i = 0; i < count; i++) {
+    if (offset + 24 > reply.length) return []
+    const nOutput = reply.readUInt16LE(offset + 6)
+    const monitor = {
+      x: reply.readInt16LE(offset + 8), y: reply.readInt16LE(offset + 10),
+      width: reply.readUInt16LE(offset + 12), height: reply.readUInt16LE(offset + 14),
+    }
+    offset += 24
+    if (!monitor.width || !monitor.height || nOutput * 4 > reply.length - offset) return []
+    monitors.push(monitor)
+    seenOutputs += nOutput
+    offset += nOutput * 4
+  }
+  return offset === reply.length && seenOutputs === outputs ? monitors : []
+}
+
 export function programFrom(args: string[], executable: string | null): string | null {
   const first = args[0] ?? executable
   const index = first && WINE_LOADER.test(first) ? 1 : 0
@@ -123,13 +145,35 @@ export function inWindow(width: number, height: number, x: number, y: number, w:
   return [x, y, w, h].every(Number.isSafeInteger) && x >= 0 && y >= 0 && w > 0 && h > 0 && x + w <= width && y + h <= height
 }
 
-// Edge source: XWayland keeps fitting windows readable whole even when they hang off-screen.
-export function edgeRect(window: Rect, rootWidth: number, rootHeight: number): Rect | null {
-  const x = window.width > rootWidth ? Math.max(0, -window.x) : 0
-  const y = window.height > rootHeight ? Math.max(0, -window.y) : 0
-  const width = window.width > rootWidth ? Math.min(window.width, rootWidth - window.x) - x : window.width
-  const height = window.height > rootHeight ? Math.min(window.height, rootHeight - window.y) - y : window.height
+// XWayland keeps fitting windows readable whole even when they hang off-screen.
+function clipEdges(window: Rect, bounds: Rect): Rect | null {
+  const x = window.width > bounds.width ? Math.max(0, bounds.x - window.x) : 0
+  const y = window.height > bounds.height ? Math.max(0, bounds.y - window.y) : 0
+  const width = window.width > bounds.width ? Math.min(window.width, bounds.x + bounds.width - window.x) - x : window.width
+  const height = window.height > bounds.height ? Math.min(window.height, bounds.y + bounds.height - window.y) - y : window.height
   return width > 0 && height > 0 ? { x, y, width, height } : null
+}
+
+export function edgeRect(window: Rect, rootWidth: number, rootHeight: number): Rect | null {
+  return clipEdges(window, { x: 0, y: 0, width: rootWidth, height: rootHeight })
+}
+
+export function monitorEdgeRect(window: Rect, monitors: Rect[], rootWidth: number, rootHeight: number): Rect | null {
+  let selected: Rect | undefined, largest = 0, containsCentre = false
+  const centreX = window.x + window.width / 2, centreY = window.y + window.height / 2
+  for (const monitor of monitors) {
+    const width = Math.max(0, Math.min(window.x + window.width, monitor.x + monitor.width) - Math.max(window.x, monitor.x))
+    const height = Math.max(0, Math.min(window.y + window.height, monitor.y + monitor.height) - Math.max(window.y, monitor.y))
+    const area = width * height
+    const centre = centreX >= monitor.x && centreX < monitor.x + monitor.width
+      && centreY >= monitor.y && centreY < monitor.y + monitor.height
+    if (area > largest || (area > 0 && area === largest && centre && !containsCentre)) {
+      selected = monitor
+      largest = area
+      containsCentre = centre
+    }
+  }
+  return selected ? clipEdges(window, selected) : edgeRect(window, rootWidth, rootHeight)
 }
 
 export function rgbFrom(pixels: Buffer): Uint8Array {
