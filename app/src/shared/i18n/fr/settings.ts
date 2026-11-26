@@ -39,6 +39,12 @@ export default {
     default: 'Par défaut',
   },
 
+  icons: {
+    label: 'Icônes de la carte',
+    game: 'Jeu',
+    hint: 'Pour les quêtes disponibles, les quêtes à rendre et les objectifs. Quand les icônes choisies n’en ont pas, celle de Twinmap s’affiche.',
+  },
+
   window: {
     onTop: 'Garder Twinmap au-dessus des autres fenêtres',
     textSize: 'Taille du texte',

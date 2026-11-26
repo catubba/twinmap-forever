@@ -39,6 +39,12 @@ export default {
     default: 'Predeterminado',
   },
 
+  icons: {
+    label: 'Íconos del mapa',
+    game: 'Juego',
+    hint: 'Para misiones disponibles, misiones para entregar y objetivos. Donde los íconos elegidos no tienen uno, se muestra el de Twinmap.',
+  },
+
   window: {
     onTop: 'Mantener Twinmap sobre las demás ventanas',
     textSize: 'Tamaño del texto',

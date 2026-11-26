@@ -23,10 +23,15 @@ const ITEM_FILE = 841626, ITEM_ICON = 7 // the table of the items, and its colum
 const SHEETS_FILE = 897470, SHEET_PICTURE = 1
 const SHEET_PICTURES_FILE = 897532, PICTURE_NAME = 0, PICTURE_SHEET = 2, PICTURE_LEFT = 5, PICTURE_RIGHT = 6, PICTURE_TOP = 7, PICTURE_BOTTOM = 8
 /** Pictures of the sheets, saved under our name, by the names the game gives them: the swirls of the doors (blue for a
- * dungeon, green for a raid), the tombstone the game marks a corpse with, and a ghost for the graveyard. */
-const SHEET_NAMES: Record<string, string> = { dungeon: 'dungeon', raid: 'raid', 'Navigation-Tombstone-Icon': 'corpse', 'poi-soulspiritghost': 'ghost' }
+ * dungeon, green for a raid), the tombstone the game marks a corpse with, and a ghost for the graveyard. Then the game's
+ * pack of quest pins (shared/packs.ts): the ! and the ?, the gold dot of an objective, and the pictures of its minimap
+ * for a creature to slay, a thing to loot and an event. */
+const SHEET_NAMES: Record<string, string> = {
+  dungeon: 'dungeon', raid: 'raid', 'Navigation-Tombstone-Icon': 'corpse', 'poi-soulspiritghost': 'ghost',
+  questnormal: 'game-quest', questturnin: 'game-turnin', questobjective: 'game-objective', vignettekill: 'game-slay', vignetteloot: 'game-loot', vignetteevent: 'game-event',
+}
 /** Written last in the folder of the icons: the icons there are the ones this app makes. An older folder is made again. */
-export const ICONS_MADE = 'made-5'
+export const ICONS_MADE = 'made-6'
 
 const SIZE = 32 // of an icon cut from an item's picture: the size of the others
 const FRAME = 5 // pixels of border an item's picture has on each side, of 64

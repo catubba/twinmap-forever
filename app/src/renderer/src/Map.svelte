@@ -46,7 +46,8 @@
   import { kept as keptByApp } from './kept.svelte'
   import { ARRIVE, pinOfMark, removePin, renamePin, savedAt, savedFrom, savePin, yardsBetween, type SavedPin } from '../../shared/saved'
   import { markPart, sendState, type GameMark, type Inbox, type Pin } from '../../shared/send'
-  import { companionPin, pin, pinSize, playerPin, type PinName } from './marks'
+  import { companionPin, pin, pinSize, playerPin } from './marks'
+  import { questPin } from './packs.svelte'
   import { COLOURS } from './look'
 
   // at: when the position was read off the game, in milliseconds.
@@ -1268,7 +1269,7 @@
       // Such a pin says "around here": it stands a little aside rather than on another pin or on the character's arrow.
       const taken: Point[] = [...[...alone].filter((q) => q.p.type !== 'objective'), ...(me && me.continent === continent ? [me.units] : [])]
       for (const group of groups) {
-        const [drawing, layer, above] = QUEST_PINS[group.type], size = pinSize(drawing), units = clearOf(group, taken, (size + 4) / 2 ** far)
+        const [drawing, layer, above] = QUEST_PINS[group.type], [size, html] = questPin(drawing), units = clearOf(group, taken, (size + 4) / 2 ** far)
         taken.push(units)
         const tip = document.createElement('span')
         group.of.forEach((q, i) => {
@@ -1276,7 +1277,7 @@
           tip.append(Object.assign(document.createElement('b'), { textContent: q.p.name }))
           questLines(tip, q.p)
         })
-        L.marker(at(units), { keyboard: false, zIndexOffset: above, opacity: lit(group.of.flatMap((q) => q.p.quests)), icon: L.divIcon({ className: 'door', iconSize: [size, size], html: pin(drawing) }) })
+        L.marker(at(units), { keyboard: false, zIndexOffset: above, opacity: lit(group.of.flatMap((q) => q.p.quests)), icon: L.divIcon({ className: 'door', iconSize: [size, size], html }) })
           .bindTooltip(tip, { direction: 'top', offset: [0, -size / 2], className: 'tip' })
           .on('click', () => map?.setView(at(units), PIN_ZOOM + 1.5))
           .addTo(questLayers[layer])
@@ -1293,8 +1294,8 @@
       const tip = document.createElement('span')
       tip.append(Object.assign(document.createElement('b'), { textContent: p.name }))
       questLines(tip, p)
-      const size = pinSize(drawing)
-      L.marker(at(unitsOfPlace(zone.rect, p.x, p.y)), { keyboard: false, zIndexOffset: above, opacity: lit(p.quests), icon: L.divIcon({ className: 'door', iconSize: [size, size], html: pin(drawing) }) })
+      const [size, html] = questPin(drawing)
+      L.marker(at(unitsOfPlace(zone.rect, p.x, p.y)), { keyboard: false, zIndexOffset: above, opacity: lit(p.quests), icon: L.divIcon({ className: 'door', iconSize: [size, size], html }) })
         .bindTooltip(tip, { direction: 'top', offset: [0, -size / 2], className: 'tip' })
         .on('click', () => label(p, zone))
         .addTo(questLayers[layer])
@@ -1303,7 +1304,7 @@
     // with the number of quests it is for when more than one. A click on it goes nearer, where they part; on one alone, its label.
     if (far !== null) return
     for (const g of objectiveGroups([...alone].filter((q) => q.p.type === 'objective'), GATHER / 2 ** zoom, front)) {
-      const drawing: PinName = g.kind ?? 'objective', size = pinSize(drawing), one = g.of.length === 1 ? g.of[0]! : null
+      const [size, html] = questPin(g.kind ?? 'objective'), one = g.of.length === 1 ? g.of[0]! : null
       const tip = document.createElement('span')
       if (one) {
         tip.append(Object.assign(document.createElement('b'), { textContent: one.p.name }))
@@ -1316,7 +1317,7 @@
           if (reward) tip.append(document.createElement('br'), reward)
         })
       const count = g.quests.length > 1 ? `<b class="count">${g.quests.length}</b>` : ''
-      L.marker(at(g), { keyboard: false, zIndexOffset: g.lit ? 0 : -100, opacity: g.lit ? 1 : DIM, icon: L.divIcon({ className: 'door', iconSize: [size, size], html: pin(drawing) + count }) })
+      L.marker(at(g), { keyboard: false, zIndexOffset: g.lit ? 0 : -100, opacity: g.lit ? 1 : DIM, icon: L.divIcon({ className: 'door', iconSize: [size, size], html: html + count }) })
         .bindTooltip(tip, { direction: 'top', offset: [0, -size / 2], className: 'tip' })
         .on('click', () => {
           if (one) label(one.p, one.zone)

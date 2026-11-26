@@ -35,6 +35,7 @@ import { workspacesOf } from '../shared/workspaces'
 import { addonHearsFonts, addonsFolder, askLangOf, newsSinceOf, readSettings, setupStatus, writeSettings } from './setup'
 import { hear, installChannel, removeSlots, send as sendSignal, sendOld, sentParts } from './signal'
 import { MAPS_FILE, servedFile } from './tiles'
+import { QUESTIE_ICONS } from '../shared/packs'
 import startTilesWorker from './tiles-worker?nodeWorker'
 import { updateFirst, updatesItself } from './update'
 import startWalkWorker from './walk-worker?nodeWorker'
@@ -436,6 +437,13 @@ function createWindow(): void {
         // not a name
       }
       const bytes = key ? await readFile(portraitFile(key)).catch(() => null) : null
+      return bytes ? { status: 200, type: 'image/png', bytes } : { status: 404 }
+    }
+    // A picture of Questie's pack (shared/packs.ts), read from its folder in the player's AddOns, never copied: none
+    // where Questie is not installed, and Settings then does not offer that pack.
+    const questie = /^\/questie\/([a-z_]+)\.png$/.exec(path)
+    if (questie) {
+      const bytes = gameFolder && QUESTIE_ICONS.has(questie[1]!) ? await readFile(join(addonsFolder(gameFolder), 'Questie', 'Icons', `${questie[1]}.png`)).catch(() => null) : null
       return bytes ? { status: 200, type: 'image/png', bytes } : { status: 404 }
     }
     // The picture of an item is made the first time it is asked for; one the game has none of is no picture at all. One asked

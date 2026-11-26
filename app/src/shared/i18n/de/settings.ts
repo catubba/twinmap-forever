@@ -39,6 +39,12 @@ export default {
     default: 'Standard',
   },
 
+  icons: {
+    label: 'Kartensymbole',
+    game: 'Spiel',
+    hint: 'Für verfügbare Quests, Quests zum Abgeben und Questziele. Wo die gewählten Symbole keines haben, erscheint das von Twinmap.',
+  },
+
   window: {
     // "Immer im Vordergrund" is how Windows and German apps name it.
     onTop: 'Twinmap immer im Vordergrund',

@@ -39,6 +39,12 @@ export default {
     default: '기본값',
   },
 
+  icons: {
+    label: '지도 아이콘',
+    game: '게임',
+    hint: '수락 가능한 퀘스트, 완료할 퀘스트, 임무에 쓰입니다. 선택한 아이콘에 없는 것은 Twinmap 아이콘으로 표시됩니다.',
+  },
+
   window: {
     // Twinmap is read 트윈맵: the particles after it follow the final ㅂ.
     onTop: 'Twinmap을 항상 다른 창 위에 표시',

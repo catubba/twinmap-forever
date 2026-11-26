@@ -59,6 +59,16 @@ export default {
     default: 'Default',
   },
 
+  // In Appearance, under the arrow: a dropdown of the icons of the quest pins on the map. Its other two choices are the
+  // names Twinmap and Questie, never translated.
+  icons: {
+    label: 'Map icons',
+    // The choice of the game's own icons.
+    game: 'Game',
+    // Under the dropdown.
+    hint: "For quests to take, quests to hand in and objectives. Where the chosen icons have none, Twinmap's is shown.",
+  },
+
   // In General: the app's window, switches, the text size and the hardware acceleration.
   window: {
     onTop: 'Keep Twinmap on top of other windows',

@@ -40,6 +40,12 @@ export default {
     default: '默认',
   },
 
+  icons: {
+    label: '地图图标',
+    game: '游戏',
+    hint: '用于可接任务、可交任务和任务目标。所选图标中没有的，显示 Twinmap 的图标。',
+  },
+
   window: {
     onTop: '让Twinmap始终显示在其他窗口上方',
     // GS FONT_SIZE.
