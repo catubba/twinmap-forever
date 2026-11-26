@@ -55,6 +55,15 @@ test('a release is shown in the language of its file of news/, its links on the 
   expect(releasesIn('deDE', releasesOf(SAMPLE), NEWS)[0]!.entries[1], 'no German: English, with its link').toEqual({ kind: 'New', title: 'Second.', text: 'Two.', go: 'layers' })
 })
 
+test('a picture under an entry of the CHANGELOG goes with it, in every language, and is no note', () => {
+  const shown = SAMPLE.replace('- **First.** One.\n', '- **First.** One.\n\n![The button](https://example.org/docs/images/news/0.17.0-first.png)\n')
+  const english = releasesOf(shown)
+  expect(english[0]!.entries[0]).toEqual({ kind: 'New', title: 'First.', text: 'One.', picture: '0.17.0-first.png' })
+  expect(english[0]!.notes).toEqual([])
+  expect(releasesIn('frFR', english, NEWS)[0]!.entries[0]).toEqual({ kind: 'New', title: 'Premier.', text: 'Un.', picture: '0.17.0-first.png' })
+  expect(releasesIn('frFR', english, NEWS)[0]!.entries[1]!.picture, 'only on its own entry').toBeUndefined()
+})
+
 test('the versions shown: those since the one seen up to this one, only this one when not known, every one from Settings', () => {
   const versions = (since: string, version: string): string[] => newsFor('enUS', since, version, releasesOf(SAMPLE), NEWS).map((r) => r.version)
   expect(versions('0.16.0', '0.17.0')).toEqual(['0.17.0', '0.16.1'])

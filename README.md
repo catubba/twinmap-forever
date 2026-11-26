@@ -93,16 +93,18 @@ Search NPCs, items, quests, zones, dungeons and your own pins, with the distance
 
 ### Every character, with the game closed
 
-Bags, bank, gear and statistics of every character you play, with a picture of each. A filter leaves lit what you are looking for, and tells you which other character holds it.
+Bags, bank, gear and statistics of every character you play, with a picture of each, and their professions, spellbook and talents. A filter leaves lit what you are looking for, and tells you which other character holds it.
 
-![The Items page: what a character wears, its bags and its bank, another character chosen by name, and a filter](https://twinmap.app/media/items.gif)
+![The Character workspace: what a character wears, its bags and its bank, another character chosen by name, and a filter](https://twinmap.app/media/items.gif)
 
 ### And more
 
+- **Your own layout.** The tabs at the top are workspaces of panels. With Edit layout, put the map, Now, your bags or the auction house side by side, stack them or group them as tabs, and make workspaces of your own.
+- **Shopping list.** Add a recipe or an item, and Twinmap says what is missing, where to get it and what it all costs.
 - **In your language.** English, Français, Deutsch, Español (España), Español (Latinoamérica), Русский, 한국어 and 简体中文, the app and the addon, with the names of your game in its own language.
 - **Auction House.** The prices of your character's auction house, every hour: what your bags, bank and gear are worth, how a price moved over a day or a week, and an alert when it crosses your line.
 - **Your quests.** Where to hand in what is done and where to find what is left, for every quest of your log, with the XP and money each one gives. With Questie installed, the ones to take as well.
-- **Services and resources.** Flight masters, inns, vendors, repair, trainers, banks, ore and herbs, each one a layer you turn on or off. Ore and herbs go by kind too, and can hide what no longer raises your skill.
+- **Services and resources.** Flight masters, inns, vendors, repair, trainers, banks, ships and zeppelins, ore and herbs, each one a layer you turn on or off. Ore and herbs go by kind too, and can hide what no longer raises your skill.
 - **Caves and mines.** Zoom in on a zone and their galleries show through the ground, before you go in.
 - **When you die.** The map marks your corpse, the graveyard and the way back on foot, or the door of the dungeon you died in.
 - **From the map to the game.** Mark a point or build a route on Twinmap, and it appears in the game.
@@ -158,12 +160,11 @@ Twinmap is young and it is being worked on all the time. New versions come out o
 Here is what is planned, in no particular order. These are plans, not promises: what you ask for can change them.
 
 - **Group**: quests you share, pins everyone sees
-- **Travel**: flight paths, boats and zeppelins, your hearthstone
+- **Travel**: flight paths, your hearthstone
 - **More on the map**: zones colored by level, the places you have explored, rares and treasures
 - **Quests**: your whole quest log, chains, item rewards, and a plan for the session
-- **Character**: experience per hour, professions, reputations, a reminder when your trainer has something new
+- **Character**: experience per hour, reputations, a reminder when your trainer has something new
 - **Alerts**: full bags, broken gear, a disconnected game, and why you died
-- **Items**: a shopping list
 - **Tools**: a macro builder, your action bars, a talent calculator, a screenshot gallery
 - **Guides**: leveling guides that turn into routes on the map
 - **Global shortcuts** and a **signed installer**

@@ -12,6 +12,10 @@
   let going: Go | null = null
   onMount(() => dialog.showModal())
 
+  // The pictures of the entries, built into the app from the files the CHANGELOG shows on GitHub: no network needed.
+  const PICTURES = Object.fromEntries(
+    Object.entries(import.meta.glob<string>('../../../../docs/images/news/*.png', { eager: true, query: '?url', import: 'default' })).map(([file, url]) => [file.split('/').pop()!, url]),
+  )
   const name = (go: Go): string => (go === 'now' ? t('app.top.map') : go === 'items' ? t('app.top.character') : go === 'ah' ? t('app.top.auctionHouse') : go === 'settings' ? t('app.top.settings') : t('map.layers.button'))
   const dated = (date: string): string => day(Date.parse(date + 'T00:00:00Z'), { dateStyle: 'long', timeZone: 'UTC' })
   const of = (release: Release, kind: Kind) => release.entries.filter((e) => e.kind === kind)
@@ -28,7 +32,10 @@
 {#snippet entries(list: Release['entries'])}
   <ul>
     {#each list as entry (entry.title)}
-      <li><b>{entry.title}</b> {entry.text}{#if entry.go}{' '}<button class="link" onclick={() => ((going = entry.go!), dialog.close())}>{t('news.goTo', { name: name(entry.go) })}</button>{/if}</li>
+      <li>
+        <b>{entry.title}</b> {entry.text}{#if entry.go}{' '}<button class="link" onclick={() => ((going = entry.go!), dialog.close())}>{t('news.goTo', { name: name(entry.go) })}</button>{/if}
+        {#if entry.picture && PICTURES[entry.picture]}<img src={PICTURES[entry.picture]} alt="" />{/if}
+      </li>
     {/each}
   </ul>
 {/snippet}
@@ -114,6 +121,12 @@
   li {
     margin: 0 0 12px;
     line-height: 1.45;
+  }
+  li img {
+    display: block;
+    width: 100%;
+    margin: 8px 0 0;
+    border: 1px solid var(--bronze-700, #0006);
   }
   .fixed li,
   .note {

@@ -2,6 +2,34 @@
 
 What changed in each version of Twinmap, newest first. The section of a version is also the text of its release on GitHub and of the addon's file on CurseForge.
 
+## 0.18.0 - 2026-11-26
+
+### New
+
+- **Workspaces, and Edit layout.** The tabs at the top are now workspaces, each a layout of panels that Twinmap keeps: Map, Character and Auction House to start, opened with Ctrl and 1 to 6. Click Edit layout, the icon after the tabs (or press Ctrl+E), to drag panels beside each other, stack them or group them as tabs, add panels from a list and close the ones you do not need. Make up to six workspaces of your own with +, rename one with a double click and drag it to move it. Reset this workspace and Restore default workspaces bring them back as they were.
+
+![Edit layout, the icon after the tabs](https://raw.githubusercontent.com/catubba/twinmap-forever/main/docs/images/news/0.18.0-edit-layout.png)
+
+- **Professions, Spellbook and Talents.** The Character workspace has them as panels beside Inventory: the level and recipes of each of your professions, the game's spellbook tab by tab, and the talent trees of your class with the talents you took. Every spell and talent shows the game's own tooltip.
+- **Now, a block at a time.** Next stop, Attention, My pins, Quests, Nearby and Experience can each go into a panel of their own. The Auction House is in panels too: its search, the item, My items and the alerts.
+- **Shopping list.** Add a recipe with the + on a profession trainer's window, or an item with the + of the search. The list says what is missing and where to get it (another of your characters, the nearest vendor and its price, the recipe that makes it, who drops it) and what buying it all costs, and it follows your bags and bank as you play. Thanks to Stalioot.
+- **Ships and zeppelins.** Every dock has its ship or zeppelin on the map: click one to see its way and where it goes, across the sea too. Turn them on or off with Ships and zeppelins in Map filters. Thanks to Stalioot.
+- **Your arrow, your colour.** Settings, Appearance, Arrow: any colour and a size from 75% to 200%, on the 2D map and in the 3D view. Thanks to Stalioot.
+- **The Mac app as a download.** Each release now has the Mac app beside the Windows installer, on GitHub and on twinmap.app. Thanks to markus-barta.
+- **Eight more bosses on the dungeon maps.** Eight bosses that had no pin on their dungeon map now have one, where the players who share data killed them.
+
+### Changed
+
+- **Items is now Character.** Bags, Bank and Inventory are panels of the Character workspace.
+- **Quest objectives by kind.** Objectives near each other that ask the same thing are one pin, drawn by what they ask, with the number of quests at its corner. Point at a quest in Quests, in Now, to keep its pins lit and dim the others. Thanks to Stalioot.
+- **A hidden map rests.** The map stops drawing while no workspace shows it.
+- **Fewer wrong places in dungeons.** A place found anew is let go when rooms the game always draws from there are not on the minimap.
+
+### Fixed
+
+- **Your arrow inside dungeons.** Since 0.17.0, standing still for a few seconds in a dungeon could make Twinmap read the wrong part of the screen and lose your character. It reads the minimap again.
+- **The Filters menu on a short map.** It stays inside the map however low its panel.
+
 ## 0.17.0 - 2026-11-24
 
 ### New

@@ -14,6 +14,8 @@ export interface Entry {
   title: string
   text: string
   go?: Go
+  /** A picture under it: the name of its file in docs/images/news, from a line `![words](.../name.png)` right after the entry. */
+  picture?: string
 }
 export interface Release {
   version: string
@@ -43,7 +45,9 @@ function entriesOf(body: string): { entries: Entry[]; notes: string[] } {
       continue
     }
     const entry = /^-\s+\*\*(.+?)\*\*\s*(.*)$/.exec(line)
+    const picture = /^\s*!\[[^\]]*\]\((?:[^)]*\/)?([^/)]+)\)\s*$/.exec(line)
     if (entry) entries.push({ kind, title: entry[1]!, text: entry[2]! })
+    else if (picture && entries.length) entries[entries.length - 1]!.picture = picture[1]!
     else if (line.trim() && !line.startsWith('#')) notes.push(line.trim())
   }
   return { entries, notes }
@@ -60,21 +64,21 @@ export function releasesOf(markdown: string): Release[] {
   return out
 }
 
-/** The releases in a language: its own section where a file of news/ has it, else the English. The buttons go on the entry at the same
- *  place among those of its kind as the English one they belong to: a section is translated entry by entry, in the same order. */
+/** The releases in a language: its own section where a file of news/ has it, else the English. The buttons and the pictures go on the
+ *  entry at the same place among those of its kind as the English one they belong to: a section is translated entry by entry, in the same order. */
 export function releasesIn(lang: string, english: Release[], news: Record<string, News>): Release[] {
   return english.map((release) => {
     const file = news[release.version]
     const own = file?.langs[lang]
     const shown = own ? { ...release, ...entriesOf(own) } : release
-    if (!file?.go) return shown
-    const go = file.go
+    if (!own && !file?.go) return shown
+    const go = file?.go ?? {}
     const counted: Record<string, number> = {}
     const entries = shown.entries.map((entry) => {
       const place = (counted[entry.kind] = (counted[entry.kind] ?? -1) + 1)
       const english = release.entries.filter((e) => e.kind === entry.kind)[place]
-      const to = english && go[english.title]
-      return to ? { ...entry, go: to } : entry
+      const to = english && go[english.title], picture = english?.picture
+      return { ...entry, ...(to ? { go: to } : {}), ...(picture ? { picture } : {}) }
     })
     return { ...shown, entries }
   })
