@@ -85,7 +85,18 @@ export interface ObjectiveArea {
  */
 export function objectiveAreas(placed: { x: number; y: number; p: QuestPin }[], reach: number, cell: number): ObjectiveArea[] {
   const quests = [...new Set(placed.flatMap((q) => q.p.quests))]
-  return quests.map((quest) => ({ quest, rings: outline(placed.filter((q) => q.p.quests.includes(quest)), reach, cell) }))
+  // Each group of places that may touch on its own grid: a grid over all of a quest's places would cover the ground
+  // between places far apart, up to a whole continent.
+  return quests.map((quest) => ({ quest, rings: touching(placed.filter((q) => q.p.quests.includes(quest)), 2 * (reach + cell)).flatMap((g) => outline(g, reach, cell)) }))
+}
+/** The points in groups: two nearer than within to each other are in one group, and so is a third near either. */
+function touching<T extends Spot>(points: T[], within: number): T[][] {
+  let groups: T[][] = []
+  for (const p of points) {
+    const near = groups.filter((g) => g.some((q) => Math.hypot(q.x - p.x, q.y - p.y) <= within))
+    groups = [...groups.filter((g) => !near.includes(g)), [p, ...near.flat()]]
+  }
+  return groups
 }
 /** The edge of the ground within reach of some of the points, as closed rings. */
 function outline(points: Spot[], reach: number, cell: number): Spot[][] {
@@ -117,8 +128,9 @@ function outline(points: Spot[], reach: number, cell: number): Spot[][] {
   }
   for (let j = 0; j < ny - 1; j++)
     for (let i = 0; i < nx - 1; i++) {
-      const top = cross(i, j, 'h'), bottom = cross(i, j + 1, 'h'), left = cross(i, j, 'v'), right = cross(i + 1, j, 'v')
       const corners = [at(i, j), at(i + 1, j), at(i + 1, j + 1), at(i, j + 1)].map((v) => v > 0)
+      if (corners.every((c) => c === corners[0])) continue // no edge here, as in most cells
+      const top = cross(i, j, 'h'), bottom = cross(i, j + 1, 'h'), left = cross(i, j, 'v'), right = cross(i + 1, j, 'v')
       // The sides the edge crosses, in order round the cell: top, right, bottom, left.
       const crossed = [top, right, bottom, left].filter((_, k) => corners[k] !== corners[(k + 1) % 4])
       if (crossed.length === 2) join(crossed[0]!, crossed[1]!)

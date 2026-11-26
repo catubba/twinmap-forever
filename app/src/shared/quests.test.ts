@@ -41,4 +41,8 @@ test("objectives as areas: a quest's places near each other are one area round t
   // A place alone: a ring round it, its area that of the circle.
   const ring = fish.rings[0]!, area = Math.abs(ring.reduce((s, p, i) => s + p.x * ring[(i + 1) % ring.length]!.y - ring[(i + 1) % ring.length]!.x * p.y, 0)) / 2
   expect(area).toBeCloseTo(Math.PI * 0.75 ** 2, 1)
+  // Places across a continent: each traced on its own, not on a grid over the whole ground between them.
+  const started = performance.now()
+  expect(objectiveAreas([at(0, 0, ['Far']), at(150, 150, ['Far'])], 0.49, 0.1)[0]!.rings.length).toBe(2)
+  expect(performance.now() - started, 'ms').toBeLessThan(50)
 })
