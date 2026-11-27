@@ -66,6 +66,15 @@ describe('the floors of a dungeon', () => {
     expect(standsOn(floors, [hall], 130, 110, undefined, null, all)).toBeNull()
     expect(standsOn(floors, [hall], 130, 110, undefined, 5, all)).toBeNull()
   })
+
+  it('count the ground of a dungeon that has one, and the floors of its other buildings', () => {
+    const onGround = { ...floors, also: (): number[] => [40] }
+    expect(floorsAt(onGround, 110, 110)).toEqual([40, 15, 5])
+    // in a room of the 2D map its lowest floor; in the open the highest of what is under the place, on a ground only
+    expect(standsOn(onGround, [hall], 110, 110, undefined, null, all)).toBe(5)
+    expect(standsOn(onGround, [], 110, 110, undefined, null, all)).toBe(40)
+    expect(standsOn(floors, [], 110, 110, undefined, null, all)).toBe(5)
+  })
 })
 
 describe('a room picture', () => {

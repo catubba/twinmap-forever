@@ -104,6 +104,7 @@ export class Buildings {
   private files = new Map<string, File>() // by its name in the folder (shared/buildings.ts)
   private shown = new Map<number, Standing>() // by the building's place in the list
   private wanted: number[] = [] // the ones chosen, the widest on the view first
+  private chosen = false // whether they were chosen since the list came
   private sizes = new Map<string, number>() // the bytes of each file ever read: the choice counts them before it is read again
   private perRadian = 0
   private stepped = 0
@@ -143,7 +144,8 @@ export class Buildings {
    * its list or one of those chosen is still being read: a floor taken before they are all in would be kept after.
    */
   floorsAt(x: number, z: number): number[] | null {
-    if (!this.list) return null
+    if (!this.on) return []
+    if (!this.list || !this.chosen) return null
     for (const i of this.wanted) if (this.list.placed[i]![6] === DUNGEON && !this.shown.has(i) && this.files.get(this.list.placed[i]![0])?.state !== 'none') return null
     const found: number[] = []
     for (const c of this.cuts.values()) if (c.floors && Math.hypot(x - c.x, z - c.z) < c.reach) found.push(...floorsAt(c.floors, x, z))
@@ -157,6 +159,7 @@ export class Buildings {
     this.folder = folder
     this.dungeon = dungeon
     this.list = null
+    this.chosen = false
     this.asked = -Infinity
   }
 
@@ -202,6 +205,7 @@ export class Buildings {
       this.perRadian = perRadian
       const chosen = onShow(this.list, camera, target, reach, perRadian, (i) => !!this.shown.get(i)?.up, (file) => this.sizes.get(file) ?? 0, ROOF)
       this.wanted = chosen.map(([i]) => i)
+      this.chosen = true
       const wanted = new Set(this.wanted), fine = new Set(chosen.filter(([, px]) => px >= FINE_PX).map(([i]) => this.list!.placed[i]![0]))
       for (const [i, s] of this.shown) s.up = wanted.has(i)
       for (const i of this.wanted) this.want(this.list.placed[i]![0], fine)
