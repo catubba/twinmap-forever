@@ -35,6 +35,8 @@ const FINE_PX = 100
 const SMALL = 128
 /** A building with no texture, or one not read: the stone of the prototype's walls. */
 const STONE = 0x9a8f80
+/** A building's own liquids, by kind (shared/water.ts: water, lava, fel, tar), as terrain3d.ts draws those of the ground: colour, and how much of what is under shows through. */
+const LIQUIDS: Record<number, [number, number]> = { 1: [0x2b5f86, 0.75], 2: [0xff5a14, 0.9], 3: [0x59c832, 0.8], 4: [0x15110e, 0.9] }
 /** Seconds before the list of a continent is asked again, while the app is still making it. */
 const RETRY = 30
 /** Yards over the floor a building inside the ground is cut at. */
@@ -438,6 +440,11 @@ export class Buildings {
 
   // A draw's material, lit by the sun of the view or by itself: as the prototype (design/terrain3d/city.html).
   private material(d: Draw, t: THREE.Texture | null, layers: { value: THREE.Texture } | null): THREE.Material {
+    if (d.liquid) {
+      // level and see-through, written over nothing: water shines a little, lava and fel glow by themselves
+      const [color, opacity] = LIQUIDS[d.liquid] ?? LIQUIDS[1]!, o = { color, opacity, transparent: true, depthWrite: false, side: THREE.DoubleSide }
+      return d.unlit ? new THREE.MeshBasicMaterial(o) : new THREE.MeshPhongMaterial({ ...o, specular: 0x445566, shininess: 60 })
+    }
     // an array is sampled where the map is: the map a white pixel, for the texture coordinates the shader then has
     const o = { color: t ? 0xffffff : STONE, map: layers ? WHITE : t, side: THREE.DoubleSide, alphaTest: d.blend === 1 ? 0.5 : 0, transparent: d.blend === 2, depthWrite: d.blend < 2 }
     const m = d.unlit ? new THREE.MeshBasicMaterial(o) : new THREE.MeshLambertMaterial(o)
