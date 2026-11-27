@@ -39,11 +39,11 @@ export interface Run {
 export function roundPng(box: Box): Buffer {
   let size = box.size, rgb = Uint8Array.from(box.rgb)
   for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) if (Math.hypot(x + 0.5 - size / 2, y + 0.5 - size / 2) > size / 2) rgb.fill(0, (y * size + x) * 3, (y * size + x) * 3 + 3)
-  let png = encodePng(rgb, size, size, 3, true)
+  let png = encodePng(rgb, size, size, 3, 2)
   while (png.length > LARGEST && size >= 64) {
     const half = size >> 1, small = new Uint8Array(half * half * 3)
     for (let y = 0; y < half; y++) for (let x = 0; x < half; x++) for (let c = 0; c < 3; c++) small[(y * half + x) * 3 + c] = (rgb[(2 * y * size + 2 * x) * 3 + c]! + rgb[(2 * y * size + 2 * x + 1) * 3 + c]! + rgb[((2 * y + 1) * size + 2 * x) * 3 + c]! + rgb[((2 * y + 1) * size + 2 * x + 1) * 3 + c]!) >> 2
-    ;(size = half), (rgb = small), (png = encodePng(rgb, size, size, 3, true))
+    ;(size = half), (rgb = small), (png = encodePng(rgb, size, size, 3, 2))
   }
   return png
 }

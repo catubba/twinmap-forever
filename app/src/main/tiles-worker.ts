@@ -30,6 +30,7 @@ import { MIDDLE_YARDS } from '../shared/inside'
 import { ICONS_MADE, writeIcons } from './icons'
 import { gamePictures, itemIcons } from './item-icons'
 import { convertParchment, parchmentFolder, parchmentSea } from './parchment'
+import startParchmentWorker from './parchment-worker?nodeWorker'
 import { convertWorld, dropOtherBuilds, finished, ICONS_FOLDER, MAPS_FILE, PLACES_FILE, tilesFolder, TRAVEL_FILE } from './tiles'
 
 // openmap: OpenMap's fills for the parchment, shipped beside the walking grid (scripts/import-openmap.js).
@@ -310,19 +311,22 @@ try {
     // The map of the continents is there all the same.
     interiors({ maps: 0, pieces: 0, dropped: 0, converted: false, problem: e instanceof Error ? e.message : String(e) })
   }
-  // The game's own map stitched into tiles (parchment.ts), a quarter of a minute a continent: last of all, as the map
-  // does without it until it is there. Told as each continent is made.
-  for (const world of WORLDS) {
-    if (parchment[world.name]) continue
-    try {
-      const files = open(), wdt = files.read(world.file), at = join(folder, world.name)
-      const maps = JSON.parse(readFileSync(join(folder, MAPS_FILE), 'utf8')) as GameMap[]
-      const sea = wdt && convertParchment(wdt, (id, skipHidden) => files.read(id, skipHidden), table, maps, world.continent, at, openmap) ? parchmentSea(at) : null
-      if (sea && last.state === 'ready') tell((last = { ...last, parchment: { ...parchment, [world.name]: (parchment[world.name] = sea) } }))
-    } catch {
-      // The map shows its tiles; tried again at the next start.
+  // The game's own map stitched into tiles (parchment.ts), a few seconds a continent: last of all, as the map does
+  // without it until it is there. Its tiles are painted on threads of their own (parchment-worker.ts), and meanwhile
+  // this one answers the pictures the window asks for. Told as each continent is made.
+  void (async () => {
+    for (const world of WORLDS) {
+      if (parchment[world.name]) continue
+      try {
+        const files = open(), wdt = files.read(world.file), at = join(folder, world.name)
+        const maps = JSON.parse(readFileSync(join(folder, MAPS_FILE), 'utf8')) as GameMap[]
+        const sea = wdt && (await convertParchment(wdt, (id, skipHidden) => files.read(id, skipHidden), table, maps, world.continent, at, openmap, undefined, () => startParchmentWorker({}))) ? parchmentSea(at) : null
+        if (sea && last.state === 'ready') tell((last = { ...last, parchment: { ...parchment, [world.name]: (parchment[world.name] = sea) } }))
+      } catch {
+        // The map shows its tiles; tried again at the next start.
+      }
     }
-  }
+  })()
 } catch (e) {
   tell({ state: 'failed', message: e instanceof Error ? e.message : String(e) })
 }

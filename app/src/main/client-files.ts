@@ -228,6 +228,20 @@ export function openClientFiles(folder: string, keys: Map<number, Buffer> = new 
     return number === undefined ? null : keys.get(number) ?? null
   }
 
+  // The archives stay open while the reading goes on (opened for each file, the opening took half the time of the reading);
+  // all closed once it stops (the next turn of the event loop), so the game is never kept from its own files for long.
+  const archives = new Map<string, number>()
+  const archiveFd = (name: string): number => {
+    let fd = archives.get(name)
+    if (fd === undefined) {
+      if (!archives.size) setImmediate(() => {
+        for (const open of archives.values()) closeSync(open)
+        archives.clear()
+      })
+      archives.set(name, (fd = openSync(join(data, name), 'r')))
+    }
+    return fd
+  }
   const readEncoded = (ekey: Buffer, skipHidden = false): Buffer | null => {
     const short = ekey.subarray(0, 9)
     let x = 0
@@ -243,13 +257,7 @@ export function openClientFiles(folder: string, keys: Map<number, Buffer> = new 
         const low = entries.readUInt32BE(at + 10)
         const archive = (entries[at + 9]! << 2) | (low >>> 30), offset = low & 0x3fffffff, size = entries.readUInt32LE(at + 14)
         const record = Buffer.alloc(size), name = `data.${String(archive).padStart(3, '0')}`
-        const fd = openSync(join(data, name), 'r')
-        let got: number
-        try {
-          got = readSync(fd, record, 0, size, offset)
-        } finally {
-          closeSync(fd)
-        }
+        const got = readSync(archiveFd(name), record, 0, size, offset)
         // The index lists it, the archive does not hold it: a game still downloading, or damaged.
         if (got < size) throw new Error(`${name} ends before the file (${got} of ${size} bytes at ${offset}): the game is not fully downloaded`)
         // The container comes after the header of the record, or at once where the record has none.
