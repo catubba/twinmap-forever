@@ -16,9 +16,12 @@
 // comes near, a level plane cuts away all of it higher than CUT yards over its main floor, or over the character's floor
 // while the character is in it and followed (the user's choice on the prototype design/underground/, ROADMAP.md M23-F15
 // and F16: the plane opens the cities, the ceilings left out open the mines, whose tunnels go up and down).
+//
+// A building of a dungeon or a raid (M23-F23, main/dungeons.ts) is drawn the same way without its ceilings, and whole:
+// its floors lie hundreds of yards over one another, and no one height opens them all.
 import * as THREE from 'three'
 import { decodeDxtCutout } from '../../shared/blp'
-import { DXT_KIND, onShow, type BuildingHead, type Draw, type Placed } from '../../shared/buildings'
+import { DUNGEON, DXT_KIND, onShow, type BuildingHead, type Draw, type Placed } from '../../shared/buildings'
 import { inflated } from './terrain3d'
 import { inApp, TILES } from './web'
 
@@ -76,6 +79,8 @@ interface Cut {
   reach: number
   floor: number
   top: number
+  /** Of a dungeon: never cut. */
+  dungeon: boolean
 }
 
 export class Buildings {
@@ -103,6 +108,12 @@ export class Buildings {
   /** Whether a building inside the ground is on show: its rooms are drawn whole, not as the pictures of inside3d.ts. */
   get under(): boolean {
     return this.cuts.size > 0
+  }
+
+  /** The main floor of the dungeon on show, in yards; null before its building is in. */
+  get dungeonFloor(): number | null {
+    for (const c of this.cuts.values()) if (c.dungeon) return c.floor
+    return null
   }
 
   /**
@@ -204,6 +215,7 @@ export class Buildings {
   private cut(camera: THREE.Vector3, character: THREE.Vector3 | null): boolean {
     let moved = false
     for (const c of this.cuts.values()) {
+      if (c.dungeon) continue
       const far = Math.max(0, Math.hypot(camera.x - c.x, camera.z - c.z) - c.reach),
         open = 1 - Math.min(1, Math.max(0, (far - OPEN) / (OPEN * 0.25))),
         inside = character && Math.hypot(character.x - c.x, character.z - c.z) < c.reach && character.y < c.top,
@@ -288,7 +300,7 @@ export class Buildings {
         const plane = new THREE.Plane(new THREE.Vector3(0, -1, 0), 1e6),
           reach = (this.list!.radius[id] ?? 0) * scale
         materials = materials.map((m, k) => Object.assign(m.clone(), { clippingPlanes: [plane], visible: !f.draws![k]!.ceiling, onBeforeCompile: m.onBeforeCompile, customProgramCacheKey: m.customProgramCacheKey }))
-        this.cuts.set(i, { plane, materials, x, z, reach, floor: y + (f.floor ?? 0) * scale, top: y + reach + 10 })
+        this.cuts.set(i, { plane, materials, x, z, reach, floor: y + (f.floor ?? 0) * scale, top: y + reach + 10, dungeon: buried === DUNGEON })
       }
       const mesh = new THREE.Mesh(f.geometry, materials)
       if (buried) mesh.renderOrder = -2

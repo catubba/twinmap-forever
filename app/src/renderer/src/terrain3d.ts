@@ -41,6 +41,8 @@ const SHARPNESS = 1.5
 const KEPT = inApp ? 200 : 60 // a phone on the home network has less room on its graphics card
 const LOADING = 6
 const SKY = 0x7f97ab
+/** Round a dungeon with no ground of its own: the dark of the window (--stone-950). */
+const VOID = 0x0c0a08
 /** The dark of a hole in the ground: chosen by the user on 18 November 2026 over leaving it open to the sky. */
 const PIT = 0x14110d
 /** The open sea, where the world has no blocks: as the ocean looks over its bed. */
@@ -164,6 +166,7 @@ export class Terrain {
   private frame = 0
   private dirty = true
   private folder = ''
+  private bare = false // a dungeon with no ground: no sea where there is none
   private turning: ((now: number) => void) | null = null
   private materials: {
     ground: THREE.MeshLambertMaterial
@@ -335,11 +338,13 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
     this.resize()
   }
 
-  /** The continent shown, by its folder; the tiles of another one go. */
-  show(folder: string): void {
+  /** The continent shown, by its folder, or a dungeon that is all buildings (bare: no ground, no sea); the tiles of another one go. */
+  show(folder: string, bare = false): void {
     if (folder === this.folder) return
     this.drop()
     this.folder = folder
+    this.bare = bare
+    ;(this.scene.fog as THREE.Fog).color.set(bare ? VOID : SKY)
     this.buildings.show(folder)
     this.props.show(folder)
     this.ground.show(folder)
@@ -448,7 +453,8 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
   private standAt(x: number, z: number): number {
     const ground = this.groundAt(x, z),
       floor = this.inside?.floorAt(x, z)
-    if (!Number.isFinite(ground)) return ground
+    // ponytail: a dungeon's main floor everywhere in it; the floor under each point comes with the arrow (M23-F24)
+    if (!Number.isFinite(ground)) return this.bare ? (this.buildings.dungeonFloor ?? ground) : ground
     return floor ? ground + (floor.y - ground) * floor.open : (this.streetAt(x, z) ?? ground)
   }
 
@@ -785,7 +791,7 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
       r.setRenderTarget(null)
       this.seenClear = true
     }
-    r.setClearColor(SKY, 1)
+    r.setClearColor(this.bare ? VOID : SKY, 1)
     r.clear()
     if (!this.seenClear) r.render(this.below, this.camera)
     r.render(this.scene, this.camera)
@@ -1172,6 +1178,7 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
     const size = WORLD / 2 ** n.z,
       geo = new THREE.PlaneGeometry(size, size).rotateX(-Math.PI / 2).translate((n.x + 0.5) * size, 0, (n.y + 0.5) * size)
     n.box = new THREE.Box3(new THREE.Vector3(n.x * size, 0, n.y * size), new THREE.Vector3((n.x + 1) * size, 0, (n.y + 1) * size))
+    if (this.bare) return new THREE.Group()
     return new THREE.Group().add(new THREE.Mesh(geo, this.materials.liquids[4]))
   }
 

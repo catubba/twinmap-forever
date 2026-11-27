@@ -76,6 +76,10 @@ export default {
     zoomOutTip: 'Alejar (-)',
     follow: 'Seguir',
     followTip: 'Seguir a tu personaje (F)',
+    dungeonsOff: 'Los calabozos en 3D están desactivados',
+    dungeonsOffText: 'Los calabozos en 3D son experimentales. Activa «Calabozo 3D (experimental)» en Opciones para ver este en 3D.',
+    dungeonsOpen: 'Abrir Opciones',
+    dungeonsLater: 'Ahora no',
   },
 
   offMap: 'Este lugar no está en el mapa.',

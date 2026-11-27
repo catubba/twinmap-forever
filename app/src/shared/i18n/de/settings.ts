@@ -67,6 +67,8 @@ export default {
     objectsHint: 'Zäune, Karren, Laternen, Zelte, Feuerschalen.',
     ground: 'Bodentextur aus der Nähe',
     groundHint: 'Aus der Nähe wird der Boden mit den Texturen des Spiels gezeichnet und bleibt scharf.',
+    dungeons: '3D-Dungeon (experimentell)',
+    dungeonsHint: 'Dungeons und Schlachtzüge in der 3D-Ansicht, die Räume von oben offen. Noch im Aufbau: Die Darstellung kann falsch oder langsam sein.',
     card: 'Grafikkarte',
   },
 

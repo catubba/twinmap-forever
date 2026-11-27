@@ -5,11 +5,12 @@ import { standing } from './buildings'
 import { dungeonAsked } from './dungeons'
 import { servedFile } from './tiles'
 
-test('only the list of a dungeon asks for its buildings to be made', () => {
+test('the lists of a dungeon, and nothing else, ask for its buildings and objects to be made', () => {
   expect(dungeonAsked('/i230/buildings.json')).toBe(230)
   expect(dungeonAsked('/i2959/buildings.json')).toBe(2959)
   expect(dungeonAsked('/azeroth/buildings.json')).toBeNull()
-  expect(dungeonAsked('/i230/props.json')).toBeNull()
+  expect(dungeonAsked('/i230/props.json')).toBe(230)
+  expect(dungeonAsked('/i230/props/32-31.bin')).toBeNull()
   expect(dungeonAsked('/i230/../buildings.json')).toBeNull()
   expect(dungeonAsked('/i/buildings.json')).toBeNull()
 })

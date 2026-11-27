@@ -67,6 +67,8 @@ export default {
     objectsHint: 'Cercas, carretas, faroles, tiendas, braseros.',
     ground: 'Textura del suelo de cerca',
     groundHint: 'De cerca, el suelo se dibuja con las texturas del juego y se ve nítido.',
+    dungeons: 'Calabozo 3D (experimental)',
+    dungeonsHint: 'Calabozos y bandas en la vista 3D, con las salas abiertas desde arriba. Aún en construcción: puede verse mal o ir lenta.',
     card: 'Tarjeta gráfica',
   },
 

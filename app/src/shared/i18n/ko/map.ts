@@ -82,6 +82,10 @@ export default {
     // The map follows the character: "따라가기", keeping "추적" for the game's arrow on a point.
     follow: '따라가기',
     followTip: '캐릭터 따라가기 (F)',
+    dungeonsOff: '3D 던전이 꺼져 있습니다',
+    dungeonsOffText: "3D 던전은 실험적 기능입니다. 이 던전을 3D로 보려면 설정에서 '3D 던전 (실험적)'을 켜세요.",
+    dungeonsOpen: '설정 열기',
+    dungeonsLater: '나중에',
   },
 
   offMap: '이곳은 지도에 없습니다.',

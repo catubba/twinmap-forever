@@ -76,6 +76,10 @@ export default {
     zoomOutTip: 'Zoom arrière (-)',
     follow: 'Suivre',
     followTip: 'Suivre votre personnage (F)',
+    dungeonsOff: 'Les donjons en 3D sont désactivés',
+    dungeonsOffText: 'Les donjons en 3D sont expérimentaux. Activez « Donjon 3D (expérimental) » dans les options pour voir celui-ci en 3D.',
+    dungeonsOpen: 'Ouvrir les options',
+    dungeonsLater: 'Pas maintenant',
   },
 
   offMap: 'Ce lieu n’est pas sur la carte.',
