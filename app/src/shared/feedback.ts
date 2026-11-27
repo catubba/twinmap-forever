@@ -8,8 +8,8 @@ import { t } from './i18n'
 export const FEEDBACK = { github: 'https://github.com/catubba/twinmap-forever/issues/new', email: 'dev@twinmap.app', privacy: 'https://twinmap.app/privacy.html', participation: 'https://twinmap.app/privacy.html#participation' } as const
 export type FeedbackWay = keyof typeof FEEDBACK
 
-/** A text with the name of the Windows account left out of any folder it names. */
-export const nameless = (text: string): string => text.replace(/([\\/]Users[\\/])[^\\/\s']+/gi, '$1...')
+/** A text with the name of the account left out of any folder it names: under Users on Windows and macOS, under home on Linux. */
+export const nameless = (text: string): string => text.replace(/([\\/](?:Users|home)[\\/])[^\\/\s']+/gi, '$1...')
 
 const LONGEST = 1500 // characters of details an address may carry: a browser or a mail program cuts longer ones as it likes
 

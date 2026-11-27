@@ -21,6 +21,17 @@ test('the record keeps what is said, says a subject again only when it changes, 
   expect(log.read().endsWith('line 299')).toBe(true)
 })
 
+test('the latest lines leave out the Linux account name too', () => {
+  const file = join(mkdtempSync(join(tmpdir(), 'twinmap-log-')), 'twinmap.log')
+  const log = startLog(file)
+  log.say('capture: Failed to load shared library: /home/someone/lib/libxcb.so.1: invalid ELF header')
+  log.say("update: failed, EACCES: rename '/var/home/someone/Apps/Twinmap-linux-x86_64.AppImage'")
+  expect(log.read().split('\n').map((line) => line.replace(/^\S+ /, ''))).toEqual([
+    'capture: Failed to load shared library: /home/.../lib/libxcb.so.1: invalid ELF header',
+    "update: failed, EACCES: rename '/var/home/.../Apps/Twinmap-linux-x86_64.AppImage'",
+  ])
+})
+
 test('a record grown too big loses its older half at start', () => {
   const file = join(mkdtempSync(join(tmpdir(), 'twinmap-log-')), 'twinmap.log')
   writeFileSync(file, Array.from({ length: 20000 }, (_, i) => `2026-01-01T00:00:00.000Z line ${i}`).join('\n') + '\n')

@@ -200,7 +200,7 @@ export function problemList(write: (line: string) => void): { say: (message: str
     },
     listen: (next) => {
       listener = next
-      for (const message of said) next(message)
+      for (const message of [...said]) next(message) // one said while these are told is told once, by say
     },
   }
 }

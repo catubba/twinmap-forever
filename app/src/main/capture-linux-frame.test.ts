@@ -495,3 +495,14 @@ test('says each problem once on stderr, and the record hears it once, also when 
     'Twinmap capture: the X11 connection was closed',
   ])
 })
+
+test('a problem said while the earlier ones are told reaches the record once', () => {
+  const heard: string[] = []
+  const problems = problemList(() => {})
+  problems.say('early')
+  problems.listen((message) => {
+    heard.push(message)
+    if (message === 'early') problems.say('new')
+  })
+  expect(heard).toEqual(['early', 'new'])
+})
