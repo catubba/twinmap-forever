@@ -33,7 +33,7 @@ import { keep } from './tiles'
 
 export const BUILDINGS_FOLDER = 'buildings'
 export const PLACED_FILE = 'buildings.json'
-const FORMAT = 5 // 1 was cut to what the sky sees; 2 kept of a city inside a mountain only its rooms in the open; 3 had no ceilings apart; 4 had no liquids
+export const FORMAT = 5 // 1 was cut to what the sky sees; 2 kept of a city inside a mountain only its rooms in the open; 3 had no ceilings apart; 4 had no liquids
 /** Pixels of a texture's widest level kept. */
 const TEX = 512
 
@@ -333,7 +333,9 @@ export function buildingsMade(folder: string, worlds: string[]): boolean {
  * made (an interrupted run resumes), each continent's list last. read: a game file by number, null when there is none
  * or the server has not sent its key. buried: of each continent, the buildings inside the ground (caves.json) by
  * buriedKey: the view cuts them at a height (buildings3d.ts). dungeon: a dungeon or a raid, made when it is first
- * opened in 3D (dungeons.ts): all its buildings are drawn open, without their ceilings (M23-F23). liquid: what a liquid
+ * opened in 3D (dungeons.ts): its buildings are drawn open, without their ceilings (M23-F23), all of them, or with
+ * buried only those it lists, the ones with rooms on the 2D map: the others stand on its ground as on a continent's
+ * (M23-F26). liquid: what a liquid
  * of the game's table is, water when not told. Gives what was made.
  */
 export function makeBuildings(
@@ -353,7 +355,7 @@ export function makeBuildings(
   }
   const texture = textureKeeper(dir, read)
   // each standing building with the name of its file, and whether it is inside the ground
-  const all = worlds.map((w) => standing(w.wdt, read).map((p) => ({ ...p, name: String(p.file), buried: w.dungeon ? DUNGEON : w.buried?.has(buriedKey(p.file, p.x, p.z)) ? 1 : 0 })))
+  const all = worlds.map((w) => standing(w.wdt, read).map((p) => ({ ...p, name: String(p.file), buried: w.dungeon ? (!w.buried || w.buried.has(buriedKey(p.file, p.x, p.z)) ? DUNGEON : 0) : w.buried?.has(buriedKey(p.file, p.x, p.z)) ? 1 : 0 })))
   const files = [...new Set(all.flat().map((p) => p.name))]
   // each file's radius, or 0 for one with nothing to draw
   const radius = new Map<string, number>()
