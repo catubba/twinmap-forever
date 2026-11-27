@@ -982,10 +982,9 @@
     terrain?.zoomAtCursor(!following)
   })
   let syncing = false // the 2D map is moved from the 3D view: not the other way round
-  // A dungeon or a raid has a 3D view where it is all buildings and no ground (M23-F23; the ones with a ground come with
-  // M23-F26), and shows it while "3D Dungeon (Experimental)" is on in Settings > Graphics.
-  const has3d = (m: InteriorMap | null): boolean => !m || !m.ground
-  const worldShown = (): string | undefined => (inside ? (graphics.dungeons && has3d(inside) ? dungeonFolder(inside.id) : undefined) : WORLDS.find((w) => w.continent === continent)?.name)
+  // A dungeon or a raid has a 3D view (M23-F23; with its ground, where it has one, since M23-F26), and shows it while
+  // "3D Dungeon (Experimental)" is on in Settings > Graphics.
+  const worldShown = (): string | undefined => (inside ? (graphics.dungeons ? dungeonFolder(inside.id) : undefined) : WORLDS.find((w) => w.continent === continent)?.name)
   // The 2D/3D switch and its key. Inside a dungeon with the option off it asks instead, and Settings is one click away.
   let askDungeons = $state(false)
   function switch3d(): void {
@@ -1042,22 +1041,33 @@
   // The rooms inside the ground of the continent on show, for the 3D view (inside3d.ts; under.json, main/caves.ts).
   let inside3d: Inside3d | undefined
   let underRooms: Record<string, UnderRoom[]> | undefined
-  let underOf = -1
+  let underOf = '' // the continent, or the dungeon by its folder, whose rooms the 3D view has
   function inside3dSet(): void {
-    // A dungeon has none of them: the continent's would be drawn at their own place in its square.
+    // A dungeon has its own, where it has a ground they lie under (main/dungeons.ts): the continent's would be drawn at
+    // their own place in its square. Asked for with its buildings, which the app makes the first time, so only once the
+    // dungeon is on the 3D view; open from any distance.
     if (inside) {
-      if (inside3d && underOf !== -1) inside3d.set([], [])
-      underOf = -1
+      const folder = dungeonFolder(inside.id), pieces = inside.pieces
+      if (!inside3d || !threeD || !graphics.dungeons || underOf === folder) return
+      if (underOf) inside3d.set([], [])
+      underOf = folder
+      void fetch(`${TILES}/${folder}/under.json`)
+        .then((answer) => (answer.status === 200 ? (answer.json() as Promise<UnderRoom[]>) : []))
+        .catch(() => [])
+        .then((under) => {
+          if (underOf === folder && under.length) inside3d!.set(pieces, under, true)
+        })
       return
     }
     const world = interiors?.maps.find((m) => m.kind === 'world' && m.id === continent)
-    if (!inside3d || !world || !underRooms || underOf === continent) return
-    underOf = continent
+    if (!inside3d || !world || !underRooms || underOf === String(continent)) return
+    underOf = String(continent)
     inside3d.set(world.pieces, underRooms[continent] ?? [])
   }
   $effect(() => {
     void continent
     void inside
+    void graphics.dungeons
     untrack(inside3dSet)
   })
   async function view3d(on: boolean): Promise<void> {
@@ -1100,6 +1110,7 @@
       map.setBearing(0)
       for (const layer of shown) layer.remove()
       terrain.show(folder!, !!inside)
+      inside3dSet()
       lookAsTheMap(0, azimuth)
       if (seen) terrain.start()
       await terrain.turn(tilted, azimuth)
@@ -1147,6 +1158,7 @@
       const folder = worldShown()
       if (!folder) return back2d()
       terrain.show(folder, !!inside)
+      inside3dSet()
     })
   })
 
@@ -1154,7 +1166,7 @@
     const made = L.map(holder, { scrollWheelZoom: 'center', doubleClickZoom: 'center', touchZoom: 'center', zoomControl: false, crs: L.CRS.Simple, minZoom: 1, maxZoom: 9, zoomSnap: 0.5, zoomDelta: 0.5, wheelPxPerZoomLevel: 90, attributionControl: false, zoomAnimation: !still(), fadeAnimation: !still(), rotate: true, rotateControl: false, shiftKeyRotate: false, pitchDrag: false, touchRotate: false })
     map = made
     // For the trials (design/map-2d-rotate): the 2D map within reach of a script, when the page is told so.
-    if (localStorage.getItem('trial')) (window as unknown as { map2d: unknown }).map2d = made
+    if (localStorage.getItem('trial')) Object.assign(window, { map2d: made, openDungeon })
     void compassReady().then(() => compassAt(made.getBearing()))
     made.on('rotate', layoutSoon) // the names, upright, are fitted again as the map turns under them
     made.setView([-128, 128], 2)
@@ -1917,7 +1929,7 @@
     } else if (e.key === 'l' || e.key === 'L') layersOpen = !layersOpen
     else if (e.key === 'f' || e.key === 'F') follow()
     else if (e.key === 'm' || e.key === 'M') setMapRight(!sides.mapRight)
-    else if (e.key === '3' && has3d(inside)) switch3d()
+    else if (e.key === '3') switch3d()
     else if (e.key === 'n' || e.key === 'N') setHeadingUp(!turning)
     else if (e.target === holder && e.key.startsWith('Arrow')) following = false // moved by hand, like a drag
     else if (e.key === ' ' && e.target === holder && map) {
@@ -2016,9 +2028,7 @@
       <button class="btn" aria-pressed={!inside && continent === which} onclick={() => choose(which)}>{NAMES[which]}</button>
     {/each}
     <button class="btn" aria-expanded={layersOpen} aria-controls="layers" title={t('map.layers.buttonTip')} onclick={() => (layersOpen = !layersOpen)}>{t('map.layers.button')}</button>
-    {#if has3d(inside)}
-      <button class="view" role="switch" aria-checked={threeD} aria-label={t('map.corner.view3d')} title={t('map.corner.view3dTip')} onclick={switch3d}><i class="knob"></i><span class="two">2D</span><span class="three">3D</span></button>
-    {/if}
+    <button class="view" role="switch" aria-checked={threeD} aria-label={t('map.corner.view3d')} title={t('map.corner.view3dTip')} onclick={switch3d}><i class="knob"></i><span class="two">2D</span><span class="three">3D</span></button>
   </div>
   {#if layersOpen}
     <div class="menus" in:fly={drop()} out:fade={gone}>

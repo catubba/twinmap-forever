@@ -11,7 +11,7 @@
 import * as THREE from 'three'
 import type { Compass } from './compass'
 import { MapControls } from 'three/examples/jsm/controls/MapControls.js'
-import { pinOn, standsOn } from '../../shared/floors'
+import { pinOn, standsOn, type Floors } from '../../shared/floors'
 import { solidAt, type Piece } from '../../shared/inside'
 import { BLOCK_ZOOM, HOLE, unpackLevels, type Levels } from '../../shared/levels'
 import { pictureOfBlock } from '../../shared/pixels'
@@ -171,7 +171,7 @@ export class Terrain {
   private frame = 0
   private dirty = true
   private folder = ''
-  /** A dungeon with no ground is on show: no sea where there is none, and what stands in it stands on its building's floors. */
+  /** A dungeon is on show, with a ground of its own or all buildings: no sea where it has no ground, and what stands in it stands on its buildings' floors, or on its ground. */
   bare = false
   /** In a dungeon: the pictures of its rooms and the level the character is on, as the minimap tells it (Map.svelte): they tell the floor it stands on to begin with (shared/floors.ts). */
   rooms: { pieces: Piece[]; level: number | undefined } | null = null
@@ -349,7 +349,7 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
     this.resize()
   }
 
-  /** The continent shown, by its folder, or a dungeon that is all buildings (bare: no ground, no sea); the tiles of another one go. */
+  /** The continent shown, by its folder, or a dungeon (bare: no sea; its ground, where it has one, is drawn as a continent's); the tiles of another one go. */
   show(folder: string, bare = false): void {
     if (folder === this.folder) return
     this.drop()
@@ -466,7 +466,7 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
    * stood on when last asked. undefined before the dungeon's building is in, or while a room's picture is read.
    */
   floorIn(x: number, z: number): number | undefined {
-    const floors = this.bare ? this.buildings.floors : null
+    const floors = this.bare ? this.floors() : null
     if (!floors) return undefined
     const on = standsOn(floors, this.rooms?.pieces ?? [], x, z, this.rooms?.level, this.stood, (p, u, v) => {
       if (!this.solids.has(p.file)) {
@@ -495,8 +495,32 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
    * high: how high what it marks stands, where that is told. undefined out of a dungeon, or before its building is in.
    */
   pinAt(x: number, z: number, high?: number): number | undefined {
-    const floors = this.bare ? this.buildings.floors : null
-    return floors ? pinOn(floors, x, z, high, this.buildings.dungeonFloor ?? 0) : undefined
+    const floors = this.bare ? this.floors() : null
+    if (!floors) return undefined
+    // with no height told: the floor nearest to the ground there, to the dungeon's main floor where it has no ground
+    const ground = this.groundAt(x, z)
+    return pinOn(floors, x, z, high, Number.isFinite(ground) ? ground : (this.buildings.dungeonFloor ?? 0))
+  }
+
+  // Every height one stands at in the dungeon on show: the floors of its buildings drawn open and, where it has one,
+  // its ground. null while its buildings are being read, or before its ground has answered (its coarsest tiles are
+  // in, or there are none): a floor is not chosen among half of them.
+  private none = new Float32Array(0)
+  private noCells = new Map<number, number[]>()
+  private floors(): Floors | null {
+    for (let k = 0; k < 4 ** ROOT; k++) {
+      const state = this.nodes.get(keyOf(ROOT, k % 2 ** ROOT, k >> ROOT))?.state
+      if (state !== 'ready' && state !== 'empty') return null
+    }
+    if (this.buildings.floorsAt(0, 0) === null) return null
+    return {
+      triangles: this.none,
+      cells: this.noCells,
+      also: (x, z) => {
+        const ground = this.groundAt(x, z)
+        return [...this.buildings.floorsAt(x, z)!, ...(Number.isFinite(ground) ? [ground] : [])]
+      },
+    }
   }
 
   /** Whether a height of the dungeon is on another floor than the character in it: cut away over it, or as far under it. */
@@ -509,8 +533,9 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
   private standAt(x: number, z: number): number {
     const ground = this.groundAt(x, z),
       floor = this.inside?.floorAt(x, z)
-    // in a dungeon the floor the character stands on everywhere, its main floor with no character in it: the view is held at that height. Its pins lie each on its own floor (pinAt).
-    if (!Number.isFinite(ground)) return this.bare ? (this.arrow?.y ?? this.buildings.dungeonFloor ?? ground) : ground
+    // in a dungeon the floor the character stands on everywhere: the view is held at that height. With no character in it, its ground, or its main floor where it has none. Its pins lie each on its own floor (pinAt).
+    if (this.bare && this.arrow) return this.arrow.y
+    if (!Number.isFinite(ground)) return this.bare ? (this.buildings.dungeonFloor ?? ground) : ground
     return floor ? ground + (floor.y - ground) * floor.open : (this.streetAt(x, z) ?? ground)
   }
 
@@ -1149,7 +1174,9 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
       group.add(hole)
     }
 
-    // Liquids: a square a liquid, at the levels of its corners, grouped by kind.
+    // Liquids: a square a liquid, at the levels of its corners, grouped by kind. In a dungeon, none over a room under
+    // the ground: the ground opens over it, and the water left there would hide it (the sea over Deadmines).
+    const drained = this.bare && roofed ? (a: number): boolean => [a, a + 1, a + N, a + N + 1].some((c) => roofed(pos[c * 3]!, pos[c * 3 + 2]!) >= 1) : null
     const lpos = new Float32Array(N * N * 3),
       byKind: number[][] = [[], [], [], [], []],
       wet = new Uint8Array(N * N) // the points of the squares of water
@@ -1158,14 +1185,15 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
       for (let j = 0; j < N - 1; j++) {
         const kind = g.kinds[i * (N - 1) + j]! & ~HOLE,
           a = i * N + j
-        // A square with no ground: open sea, at 0.
+        // A square with no ground: open sea, at 0. Not in a dungeon, which ends where its ground does.
         if (!ok(i, j) || !ok(i, j + 1) || !ok(i + 1, j) || !ok(i + 1, j + 1)) {
+          if (this.bare) continue
           for (const c of [a, a + 1, a + N, a + N + 1]) lpos[c * 3 + 1] = 0
           ;((low = Math.min(low, 0)), (high = Math.max(high, 0)))
           byKind[4]!.push(a, a + N, a + 1, a + 1, a + N, a + N + 1)
           continue
         }
-        if (kind === DRY || kind > TAR) continue
+        if (kind === DRY || kind > TAR || drained?.(a)) continue
         const corners = [a, a + 1, a + N, a + N + 1].map((c) => g.water[c]!)
         if (!corners.every(Number.isFinite)) continue
         high = Math.max(high, ...corners)
@@ -1180,7 +1208,7 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
       for (let j = 0; j < N - 1; j++) {
         const a = i * N + j,
           corners = [a, a + 1, a + N, a + N + 1]
-        if ((g.kinds[i * (N - 1) + j]! & ~HOLE) !== DRY || !corners.every((c) => Number.isFinite(h[c]!))) continue
+        if ((g.kinds[i * (N - 1) + j]! & ~HOLE) !== DRY || !corners.every((c) => Number.isFinite(h[c]!)) || drained?.(a)) continue
         const level = Math.max(...corners.map((c) => (wet[c] ? lpos[c * 3 + 1]! : -Infinity)))
         if (corners.some((c) => h[c]! < level)) shore.push(a, level)
       }

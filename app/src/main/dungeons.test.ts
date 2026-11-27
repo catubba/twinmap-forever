@@ -5,7 +5,7 @@ import { standing } from './buildings'
 import { dungeonAsked } from './dungeons'
 import { servedFile } from './tiles'
 
-test('the lists of a dungeon, and nothing else, ask for its buildings and objects to be made', () => {
+test('the lists of a dungeon and the tiles of its ground, and nothing else, ask for it to be made', () => {
   expect(dungeonAsked('/i230/buildings.json')).toBe(230)
   expect(dungeonAsked('/i2959/buildings.json')).toBe(2959)
   expect(dungeonAsked('/azeroth/buildings.json')).toBeNull()
@@ -13,6 +13,10 @@ test('the lists of a dungeon, and nothing else, ask for its buildings and object
   expect(dungeonAsked('/i230/props/32-31.bin')).toBeNull()
   expect(dungeonAsked('/i230/../buildings.json')).toBeNull()
   expect(dungeonAsked('/i/buildings.json')).toBeNull()
+  expect(dungeonAsked('/i209/levels/2/1/1.bin')).toBe(209)
+  expect(dungeonAsked('/i209/under.json')).toBe(209)
+  expect(dungeonAsked('/azeroth/levels/2/1/1.bin')).toBeNull()
+  expect(dungeonAsked('/i209/heights/31/30.bin')).toBeNull()
 })
 
 test('the window is given the buildings and objects of a dungeon from its own folder', () => {
@@ -21,6 +25,9 @@ test('the window is given the buildings and objects of a dungeon from its own fo
   expect(servedFile(base, '/i230/props.json')).toBe(join(base, 'i230', 'props.json'))
   expect(servedFile(base, '/i230/props/32-31.bin')).toBe(join(base, 'i230', 'props', '32-31.bin'))
   expect(servedFile(base, '/i23x/buildings.json')).toBeNull()
+  expect(servedFile(base, '/i209/levels/6/31/30.bin')).toBe(join(base, 'i209', 'levels', '6', '31', '30.bin'))
+  expect(servedFile(base, '/i209/under.json')).toBe(join(base, 'i209', 'under.json'))
+  expect(servedFile(base, '/azeroth/under.json')).toBeNull()
 })
 
 test('a map that is one building has it at the middle of the square', () => {

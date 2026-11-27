@@ -87,14 +87,19 @@ export class Inside3d {
   private s3tc: boolean
   private shown = ''
   private hidden = false
+  private always = false
 
   constructor(private terrain: Terrain) {
     this.s3tc = terrain.s3tc
     terrain.under(this.group, this)
   }
 
-  /** The rooms inside the ground of the continent on show: its pieces, and which of them with their floor and roof (under.json). */
-  set(pieces: Piece[], under: UnderRoom[]): void {
+  /**
+   * The rooms inside the ground of the continent on show: its pieces, and which of them with their floor and roof
+   * (under.json). always: of a dungeon (M23-F26), which is open from any distance: its rooms are what the view is of.
+   */
+  set(pieces: Piece[], under: UnderRoom[], always = false): void {
+    this.always = always
     for (const b of this.buildings) this.unload(b)
     this.opened = []
     const by = new Map<number, Room[]>()
@@ -161,7 +166,7 @@ export class Inside3d {
     this.opened = []
     for (const b of this.buildings) {
       const far = Math.hypot(Math.max(b.x0 - camera.x, 0, camera.x - b.x1), Math.max(b.low - camera.y, 0, camera.y - b.high), Math.max(b.z0 - camera.z, 0, camera.z - b.z1))
-      const want = 1 - Math.min(1, Math.max(0, (far - NEAR) / (NEAR * 0.25)))
+      const want = this.always ? 1 : 1 - Math.min(1, Math.max(0, (far - NEAR) / (NEAR * 0.25)))
       if (want > 0 && b.state === 'out') void this.load(b)
       if (b.state !== 'in') continue
       b.open += (want - b.open) * Math.min(1, dt * 6)

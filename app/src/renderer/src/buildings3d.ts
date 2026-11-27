@@ -21,10 +21,14 @@
 // its floors lie hundreds of yards over one another, and no one height opens them all. With the character in it, the
 // plane cuts away all of it higher than DUNGEON_CUT yards over the floor the character stands on (M23-F24), which is
 // looked for among the building's own floors (shared/floors.ts).
+//
+// A dungeon that has a ground (M23-F26) has many buildings: those with rooms on the 2D map are drawn as above, the
+// others as on a continent. Of the first, what looks down is left out in the rooms in the open too: the vault over a
+// cave the game marks as open air (the bay of Deadmines) would hide all that is under it.
 import * as THREE from 'three'
 import { decodeDxtCutout } from '../../shared/blp'
 import { DUNGEON, DXT_KIND, onShow, type BuildingHead, type Draw, type Placed } from '../../shared/buildings'
-import { floorsOf, walkedOn, type Floors } from '../../shared/floors'
+import { floorsAt, floorsOf, walkedOn, type Floors } from '../../shared/floors'
 import { inflated } from './terrain3d'
 import { inApp, TILES } from './web'
 
@@ -100,6 +104,7 @@ export class Buildings {
   private files = new Map<string, File>() // by its name in the folder (shared/buildings.ts)
   private shown = new Map<number, Standing>() // by the building's place in the list
   private wanted: number[] = [] // the ones chosen, the widest on the view first
+  private chosen = false // whether they were chosen since the list came
   private sizes = new Map<string, number>() // the bytes of each file ever read: the choice counts them before it is read again
   private perRadian = 0
   private stepped = 0
@@ -134,10 +139,17 @@ export class Buildings {
     return null
   }
 
-  /** The floors of the dungeon on show, to find the one under a place (shared/floors.ts); null before its building is in. */
-  get floors(): Floors | null {
-    for (const c of this.cuts.values()) if (c.floors) return c.floors
-    return null
+  /**
+   * The heights of the floors under a place in the buildings of the dungeon on show, the ones drawn open; null while
+   * its list or one of those chosen is still being read: a floor taken before they are all in would be kept after.
+   */
+  floorsAt(x: number, z: number): number[] | null {
+    if (!this.on) return []
+    if (!this.list || !this.chosen) return null
+    for (const i of this.wanted) if (this.list.placed[i]![6] === DUNGEON && !this.shown.has(i) && this.files.get(this.list.placed[i]![0])?.state !== 'none') return null
+    const found: number[] = []
+    for (const c of this.cuts.values()) if (c.floors && Math.hypot(x - c.x, z - c.z) < c.reach) found.push(...floorsAt(c.floors, x, z))
+    return found
   }
 
   /** The continent shown, by its folder; dungeon: a dungeon's folder, whose buildings keep their floors. */
@@ -147,6 +159,7 @@ export class Buildings {
     this.folder = folder
     this.dungeon = dungeon
     this.list = null
+    this.chosen = false
     this.asked = -Infinity
   }
 
@@ -192,6 +205,7 @@ export class Buildings {
       this.perRadian = perRadian
       const chosen = onShow(this.list, camera, target, reach, perRadian, (i) => !!this.shown.get(i)?.up, (file) => this.sizes.get(file) ?? 0, ROOF)
       this.wanted = chosen.map(([i]) => i)
+      this.chosen = true
       const wanted = new Set(this.wanted), fine = new Set(chosen.filter(([, px]) => px >= FINE_PX).map(([i]) => this.list!.placed[i]![0]))
       for (const [i, s] of this.shown) s.up = wanted.has(i)
       for (const i of this.wanted) this.want(this.list.placed[i]![0], fine)
@@ -318,6 +332,7 @@ export class Buildings {
         const plane = new THREE.Plane(new THREE.Vector3(0, -1, 0), 1e6),
           reach = (this.list!.radius[id] ?? 0) * scale
         materials = materials.map((m, k) => Object.assign(m.clone(), { clippingPlanes: [plane], visible: !f.draws![k]!.ceiling, onBeforeCompile: m.onBeforeCompile, customProgramCacheKey: m.customProgramCacheKey }))
+        if (buried === DUNGEON) materials.forEach(openTop)
         this.cuts.set(i, { plane, materials, x, z, reach, floor: y + (f.floor ?? 0) * scale, top: y + reach + 10, dungeon: buried === DUNGEON, ...(buried === DUNGEON && f.walked ? { floors: floorsOf(f.walked, x, y, z, turn, scale) } : {}) })
       }
       const mesh = new THREE.Mesh(f.geometry, materials)
@@ -492,6 +507,18 @@ export class Buildings {
     m.customProgramCacheKey = () => 'layers'
     return m
   }
+}
+
+// A material of a dungeon's building, made to leave out what looks down: the ceilings its file does not tell apart,
+// those of the rooms in the open (main/buildings.ts tells only the ones under a roof). As steep as a ceiling is there.
+function openTop(m: THREE.Material): void {
+  const before = m.onBeforeCompile, key = m.customProgramCacheKey()
+  m.onBeforeCompile = (shader, renderer) => {
+    before.call(m, shader, renderer)
+    shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nvarying float vDown;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvDown = normal.y;')
+    shader.fragmentShader = shader.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vDown;').replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\nif (vDown < -0.25) discard;')
+  }
+  m.customProgramCacheKey = () => `${key} open`
 }
 
 // The bytes of a texture on the graphics card: its blocks as they are, or its pixels and their smaller copies.

@@ -24,6 +24,8 @@ const ROUND = [[0, 0], ...[2, 4].flatMap((r) => [[r, 0], [-r, 0], [0, r], [0, -r
 export interface Floors {
   triangles: Float32Array
   cells: Map<number, number[]>
+  /** In a dungeon that has a ground (M23-F26): every other height one stands at on a place, the ground and the floors of its other buildings. */
+  also?: (x: number, z: number) => number[]
 }
 
 /**
@@ -76,6 +78,7 @@ export function floorsAt(floors: Floors, x: number, z: number): number[] {
     if (u < 0 || v < 0 || u + v > 1) continue
     found.push(t[k + 1]! + u * (t[k + 4]! - t[k + 1]!) + v * (t[k + 7]! - t[k + 1]!))
   }
+  if (floors.also) found.push(...floors.also(x, z))
   found.sort((a, b) => b - a)
   return found.filter((h, i) => i === 0 || found[i - 1]! - h >= APART)
 }
@@ -112,7 +115,8 @@ export function pinOn(floors: Floors, x: number, z: number, high: number | undef
  * the others); what lies higher in a room's box is a bridge, the top of a wall, a ledge. Both tried against other ways
  * on the recorded runs of Blackrock Depths (design/ROADMAP.md, M23-F24; design/dungeons3d/floors.ts). A place read a
  * little into a wall has no floor under it: then the floors a few yards round it. null where there is none;
- * undefined while a picture is awaited.
+ * undefined while a picture is awaited. On a ground (floors.also), a place no room's picture is solid at is in the
+ * open: the highest of what is under it, a street or a stair over the ground, not a cellar under it. Not measured yet.
  */
 export function standsOn(floors: Floors, pieces: Piece[], x: number, z: number, level: number | undefined, before: number | null, solid: (piece: Piece, x: number, z: number) => boolean | undefined): number | null | undefined {
   if (before !== null) return floorNear(floors, x, z, before)
@@ -127,7 +131,7 @@ export function standsOn(floors: Floors, pieces: Piece[], x: number, z: number, 
   for (const [dx, dz] of ROUND) {
     const all = floorsAt(floors, x + dx, z + dz), inRoom = all.filter((h) => room && h >= room.bottom - SLACK && h <= room.top + SLACK)
     if (inRoom.length) return inRoom.at(-1)!
-    lowest ??= all.at(-1) ?? null
+    lowest ??= (floors.also && !room ? all[0] : all.at(-1)) ?? null
   }
   return lowest
 }

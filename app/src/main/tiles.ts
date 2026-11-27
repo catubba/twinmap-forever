@@ -69,8 +69,8 @@ export const ICONS_FOLDER = 'icons'
 export function servedFile(base: string, path: string): string | null {
   const icon = /^\/icons\/([a-z0-9-]{1,40})\.png$/.exec(path)
   if (icon) return joinPath(base, ICONS_FOLDER, `${icon[1]}.png`)
-  // The ground of the 3D view (heights.ts), a continent's only.
-  const levels = /^\/([a-z]+)\/levels\/(\d)\/(\d{1,2})\/(\d{1,2})\.bin$/.exec(path)
+  // The ground of the 3D view (heights.ts): a continent's, or a dungeon's that has one (dungeons.ts).
+  const levels = /^\/([a-z]+|i\d{1,5})\/levels\/(\d)\/(\d{1,2})\/(\d{1,2})\.bin$/.exec(path)
   if (levels) return joinPath(base, levels[1]!, 'levels', levels[2]!, levels[3]!, `${levels[4]}.bin`)
   // The buildings of the 3D view (buildings.ts): a building's file, a texture, a continent's list.
   const building = /^\/buildings\/(?:(\d{1,9})\.bin|tex\/(\d{1,9})\.(bin|png))$/.exec(path)
@@ -81,6 +81,9 @@ export function servedFile(base: string, path: string): string | null {
   // Where things stand over the ground in the 3D view (stands.ts), a continent's.
   const stands = /^\/([a-z]+)\/stands\.json$/.exec(path)
   if (stands) return joinPath(base, stands[1]!, 'stands.json')
+  // The rooms of a dungeon that lie under its ground (dungeons.ts).
+  const under = /^\/(i\d{1,5})\/under\.json$/.exec(path)
+  if (under) return joinPath(base, under[1]!, 'under.json')
   // The trees and objects of the 3D view (props.ts): a model, a continent's list of blocks, the copies of a block.
   const model = /^\/buildings\/m2\/(\d{1,9})\.bin$/.exec(path)
   if (model) return joinPath(base, 'buildings', 'm2', `${model[1]}.bin`)

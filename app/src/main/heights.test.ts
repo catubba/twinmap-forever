@@ -60,5 +60,7 @@ test('the relief is served from its folder, and nothing beside it', () => {
   const base = join(tmpdir(), 'build')
   expect(servedFile(base, '/azeroth/shade/6/32/48.png')).toBe(shadeFile(join(base, 'azeroth'), 6, 32, 48))
   expect(servedFile(base, '/azeroth/levels/6/32/48.bin')).toBe(levelsFile(join(base, 'azeroth'), 6, 32, 48))
-  for (const path of ['/azeroth/shade/../6/1/1.png', '/azeroth/heights/32/48.bin', '/azeroth/shade/12/1/1.png', '/azeroth/levels/6/../1.bin', '/i33/levels/6/1/1.bin']) expect(servedFile(base, path), path).toBeNull()
+  for (const path of ['/azeroth/shade/../6/1/1.png', '/azeroth/heights/32/48.bin', '/azeroth/shade/12/1/1.png', '/azeroth/levels/6/../1.bin', '/i33/heights/1/1.bin']) expect(servedFile(base, path), path).toBeNull()
+  // a dungeon that has a ground has its 3D tiles too (dungeons.ts)
+  expect(servedFile(base, '/i33/levels/6/1/1.bin')).toBe(levelsFile(join(base, 'i33'), 6, 1, 1))
 })
