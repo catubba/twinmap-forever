@@ -17,6 +17,8 @@ interface Capture {
   captureAllowed?(): boolean
   requestCapture?(): boolean
   stopCapture?(): void
+  /** Hands the reader's problems to the listener as well as to stderr, those said before included. */
+  onProblem?(listener: (message: string) => void): void
 }
 
 let capture: Capture | undefined
@@ -41,3 +43,5 @@ export const readRow: Capture['readRow'] = (...args) => capture?.readRow(...args
 export const captureAllowed = (): boolean => capture?.captureAllowed?.() ?? true
 export const requestCapture = (): boolean => capture?.requestCapture?.() ?? true
 export const stopCapture = (): void => capture?.stopCapture?.()
+/** Where the reader's problems go besides stderr: only the Linux reader tells them so far. Call after loadCapture. */
+export const onCaptureProblem = (listener: (message: string) => void): void => capture?.onProblem?.(listener)

@@ -1,5 +1,5 @@
 import { expect, test, vi } from 'vitest'
-import { clientPidFrom, commandLine, inWindow, isGame, monitorsFrom, coveredMonitorEdgeRect, parseSetup, programFrom, rgbFrom, stateOf, edgeRect, wineProgramPath } from './capture-linux-frame'
+import { clientPidFrom, commandLine, inWindow, isGame, monitorsFrom, coveredMonitorEdgeRect, parseSetup, problemList, programFrom, rgbFrom, stateOf, edgeRect, wineProgramPath } from './capture-linux-frame'
 import type { Rect } from '../shared/window'
 
 function monitorReply(monitors: (Rect & { outputs?: number[] })[]): Buffer {
@@ -475,4 +475,23 @@ test('uses the exact root fallback with no fully covered monitor, even with part
   expect(coveredMonitorEdgeRect({ x: 3800, y: 300, width: 2000, height: 480 },
     [{ x: 0, y: 0, width: 3840, height: 2160 }, { x: 3840, y: 400, width: 1920, height: 1080 }], 5760, 2160))
     .toEqual({ x: 0, y: 0, width: 2000, height: 480 })
+})
+
+test('says each problem once on stderr, and the record hears it once, also when it listens later', () => {
+  const lines: string[] = [], heard: string[] = []
+  const problems = problemList((line) => lines.push(line))
+  problems.say('X-Resource is not available')
+  problems.say('X-Resource is not available')
+  problems.say('RandR 1.5 monitors are not available')
+  problems.listen((message) => heard.push(message))
+  expect(heard).toEqual(['X-Resource is not available', 'RandR 1.5 monitors are not available'])
+  problems.say('the X11 connection was closed')
+  problems.say('X-Resource is not available')
+  problems.say('the X11 connection was closed')
+  expect(heard).toEqual(['X-Resource is not available', 'RandR 1.5 monitors are not available', 'the X11 connection was closed'])
+  expect(lines).toEqual([
+    'Twinmap capture: X-Resource is not available',
+    'Twinmap capture: RandR 1.5 monitors are not available',
+    'Twinmap capture: the X11 connection was closed',
+  ])
 })
