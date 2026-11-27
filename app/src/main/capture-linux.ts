@@ -415,7 +415,7 @@ export function readRow(window: WindowHandle, edge: Edge = 'top'): Buffer | null
   // Fullscreen Wine adds a black row; read the edge bounded by fully covered monitors (or the root).
   const { x, y, width, height } = info.edges
   const side = edge === 'left' || edge === 'right'
-  return pixels(n, info, edge === 'right' ? x + width - 1 : x, edge === 'bottom' ? y + height - 1 : y + 1, side ? 1 : width, side ? height : 1)
+  return pixels(n, info, edge === 'right' ? x + width - 1 : x, edge === 'bottom' ? y + height - 1 : y, side ? 1 : width, side ? height : 1)
 }
 
 export function stopCapture(): void {
