@@ -323,6 +323,13 @@ try {
       } catch {
         // none known: all drawn whole
       }
+      // what each liquid of the buildings is, by its name in the game's table, as for the ground; without the table, all water
+      const liquids = new Map<number, number>()
+      try {
+        for (const row of table(files.read(LIQUID_TYPE_FILE)!).rows) liquids.set(row.id, liquidOfName(row.text(0)))
+      } catch {
+        // all water
+      }
       const made = makeBuildings(
         WORLDS.map((w) => {
           const wdt = read(w.file)!, list = placedIn(wdt, read)
@@ -330,6 +337,7 @@ try {
         }),
         read,
         folder,
+        (type) => liquids.get(type) ?? WATER,
       )
       parentPort?.postMessage({ buildings: { ...made, seconds: (Date.now() - buildingsStarted) / 1000 } })
     }

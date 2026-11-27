@@ -15,6 +15,8 @@ export interface Draw {
   unlit: boolean
   /** Ceilings of rooms under a roof: left out of a building inside the ground. */
   ceiling?: boolean
+  /** The building's own liquid, with no texture: what it is, as shared/water.ts numbers them (the canals of Stormwind, the lava of Ironforge). */
+  liquid?: number
 }
 
 /**

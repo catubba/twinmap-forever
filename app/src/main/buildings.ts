@@ -4,7 +4,8 @@
 // What the game has: a building is a file (.wmo) standing on the blocks of a continent ("MODF" of each block's "obj0",
 // listed by every block it lies on). Its rooms are files of their own ("GFID": for each level of detail, a file a
 // room); a room has its triangles ("MOVT", "MOVI"), texture coordinates and normals ("MOTV", "MONR"), and its runs of
-// triangles of one material ("MOBA"); the building lists the materials ("MOMT": texture, blending, lit or not).
+// triangles of one material ("MOBA"); the building lists the materials ("MOMT": texture, blending, lit or not). A room
+// may hold a liquid of its own ("MLIQ": the canals of Stormwind, the lava of Ironforge), which is not the ground's.
 //
 // What is kept: every room at full detail, outdoors and indoors (the user's choice of 26 November 2026), each building
 // file once; its materials gathered by what can share a texture array (same kind, size, levels, blending, light), as the
@@ -25,13 +26,14 @@ import { join } from 'node:path'
 import { deflateSync } from 'node:zlib'
 import { decodeBlpCutout } from '../shared/blp'
 import type { BuildingHead, Draw, Placed, TexKind } from '../shared/buildings'
+import { FEL, LAVA, WATER } from '../shared/water'
 import { BLOCKS } from '../shared/world'
 import { encodePng } from './png'
 import { keep } from './tiles'
 
 export const BUILDINGS_FOLDER = 'buildings'
 export const PLACED_FILE = 'buildings.json'
-const FORMAT = 4 // 1 was cut to what the sky sees; 2 kept of a city inside a mountain only its rooms in the open; 3 had no ceilings apart
+const FORMAT = 5 // 1 was cut to what the sky sees; 2 kept of a city inside a mountain only its rooms in the open; 3 had no ceilings apart; 4 had no liquids
 /** Pixels of a texture's widest level kept. */
 const TEX = 512
 
@@ -78,14 +80,42 @@ interface Room {
   batches: { start: number; count: number; material: number }[]
   /** Marked outdoors, or lit as outdoors (the streets of Stormwind's districts): what stands out of a mountain. */
   outdoor: boolean
+  /** Its own liquid: which (a row of the game's table of liquids), its points in the view's axes, its triangles. */
+  liquid?: { type: number; pos: Float32Array; tris: number[] }
+}
+
+/** Yards a side of a square of a room's liquid, as of the ground's. */
+const LIQUID_SQUARE = 25 / 6
+// A room's liquid from its "MLIQ": 30 bytes of head (points each way, squares each way, the corner it starts from, a
+// material), 8 bytes a point, a byte a square: no liquid there when its low four bits are all set. Laid flat at the
+// height of the corner: the heights of the points are 0 wherever the game does not use them. Undefined when it has none.
+function liquidOf(d: Buffer, type: number): Room['liquid'] {
+  const xv = d.readUInt32LE(0), yv = d.readUInt32LE(4), xt = d.readUInt32LE(8), yt = d.readUInt32LE(12)
+  if (xt !== xv - 1 || yt !== yv - 1 || d.length < 30 + xv * yv * 8 + xt * yt) return undefined
+  const x0 = d.readFloatLE(16), y0 = d.readFloatLE(20), z = d.readFloatLE(24), squares = d.subarray(30 + xv * yv * 8)
+  const pos: number[] = [], tris: number[] = [], made = new Map<number, number>()
+  const point = (i: number, j: number): number => {
+    const k = j * xv + i
+    if (!made.has(k)) (made.set(k, pos.length / 3), pos.push(-(y0 + j * LIQUID_SQUARE), z, -(x0 + i * LIQUID_SQUARE)))
+    return made.get(k)!
+  }
+  for (let j = 0; j < yt; j++)
+    for (let i = 0; i < xt; i++) {
+      if ((squares[j * xt + i]! & 15) === 15) continue
+      const a = point(i, j), b = point(i + 1, j), c = point(i, j + 1), e = point(i + 1, j + 1)
+      tris.push(a, b, c, b, e, c)
+    }
+  return tris.length ? { type, pos: new Float32Array(pos), tris } : undefined
 }
 /** A room of a building from its file: its points turned into the view's axes (x east = -y of the file, y up = z, z south = -x). */
 export function roomOf(f: Buffer): Room | null {
   const g = chunk(f, 'PGOM')
   if (!g) return null
-  let verts: Float32Array | undefined, uvs: Float32Array | undefined, normals: Float32Array | undefined, tris: Uint16Array | undefined
+  let verts: Float32Array | undefined, uvs: Float32Array | undefined, normals: Float32Array | undefined, tris: Uint16Array | undefined, liquid: Room['liquid']
   const batches: Room['batches'] = []
   for (const c of chunks(g, 68)) {
+    // the liquid is told at byte 52 of the room's head
+    if (c.tag === 'QILM' && c.data.length >= 30) liquid = liquidOf(c.data, g.readUInt32LE(52))
     if (c.tag === 'TVOM') verts = floats(c.data)
     if (c.tag === 'IVOM') tris = new Uint16Array(c.data.buffer.slice(c.data.byteOffset, c.data.byteOffset + c.data.length))
     if (c.tag === 'VTOM' && !uvs) uvs = floats(c.data)
@@ -103,7 +133,7 @@ export function roomOf(f: Buffer): Room | null {
     pos.set([-verts[i * 3 + 1]!, verts[i * 3 + 2]!, -verts[i * 3]!], i * 3)
     normal.set(normals ? [-normals[i * 3 + 1]!, normals[i * 3 + 2]!, -normals[i * 3]!] : [0, 1, 0], i * 3)
   }
-  return { pos, uv: uvs && uvs.length >= n * 2 ? uvs.subarray(0, n * 2) : new Float32Array(n * 2), normal, tris, batches, outdoor: (g.readUInt32LE(8) & 0x48) !== 0 }
+  return { pos, uv: uvs && uvs.length >= n * 2 ? uvs.subarray(0, n * 2) : new Float32Array(n * 2), normal, tris, batches, outdoor: (g.readUInt32LE(8) & 0x48) !== 0, ...(liquid ? { liquid } : {}) }
 }
 
 interface Material { texture: number; blend: number; unlit: boolean }
@@ -113,9 +143,10 @@ export interface Texture { kind: TexKind; width: number; height: number; levels:
  * A building's file made from the game's: its rooms at full detail, the draws gathered by what can share a texture
  * array, the ceilings of its rooms under a roof in draws of their own (a building inside the ground is drawn without
  * them, buildings3d.ts), and the height of its main floor. read: a game file by number; texture: what a texture is (written once by
- * makeTexture). Null for a file that is not a building or has nothing to draw.
+ * makeTexture); liquid: what a liquid of the game's table is (shared/water.ts). The liquids of its rooms are draws of
+ * their own, one a kind, with no texture. Null for a file that is not a building or has nothing to draw.
  */
-export function makeBuilding(file: Buffer, read: (id: number) => Buffer | null, texture: (id: number) => Texture | null): { head: BuildingHead; body: Buffer } | null {
+export function makeBuilding(file: Buffer, read: (id: number) => Buffer | null, texture: (id: number) => Texture | null, liquid: (type: number) => number = () => WATER): { head: BuildingHead; body: Buffer } | null {
   const head = chunk(file, 'DHOM'), gfid = chunk(file, 'DIFG'), momt = chunk(file, 'TMOM')
   if (!head || !gfid) return null
   const rooms = head.readUInt32LE(4)
@@ -126,6 +157,8 @@ export function makeBuilding(file: Buffer, read: (id: number) => Buffer | null, 
   const pos: number[] = [], uv: number[] = [], normal: number[] = [], byMaterial = new Map<number, number[]>()
   // the heights of the points of floors under a roof: those whose normal looks up, in the rooms not in the open
   const floors: number[] = []
+  // the triangles of the liquids, by kind
+  const liquids = new Map<number, number[]>()
   for (let i = 0; i < rooms && i * 4 < gfid.length; i++) {
     const id = gfid.readUInt32LE(i * 4), b = id ? read(id) : null, room = b && roomOf(b)
     if (!room) continue
@@ -143,9 +176,16 @@ export function makeBuilding(file: Buffer, read: (id: number) => Buffer | null, 
         ;(byMaterial.get(key) ?? byMaterial.set(key, []).get(key)!).push(first + a, first + b, first + c)
       }
     }
+    if (room.liquid) {
+      // its points after the room's, level and with no picture
+      const from = pos.length / 3, kind = liquid(room.liquid.type), list = liquids.get(kind) ?? liquids.set(kind, []).get(kind)!
+      for (const v of room.liquid.pos) pos.push(v)
+      for (let k = 0; k < room.liquid.pos.length / 3; k++) (uv.push(0, 0), normal.push(0, 1, 0))
+      for (const v of room.liquid.tris) list.push(from + v)
+    }
   }
   // the draws: materials of one look, their textures as layers
-  const looks = new Map<string, { kind: TexKind; blend: number; unlit: boolean; ceiling: boolean; textures: number[]; tris: number[] }>()
+  const looks = new Map<string, { kind: TexKind; blend: number; unlit: boolean; ceiling: boolean; textures: number[]; tris: number[]; liquid?: number }>()
   for (const [key0, list] of byMaterial) {
     const ceiling = key0 < 0, m = ceiling ? -1 - key0 : key0
     const mat = materials[m] ?? { texture: 0, blend: 0, unlit: false }, tex = mat.texture ? texture(mat.texture) : null
@@ -156,6 +196,12 @@ export function makeBuilding(file: Buffer, read: (id: number) => Buffer | null, 
     let layer = look.textures.indexOf(mat.texture)
     if (layer < 0 && kind !== 'none') layer = look.textures.push(mat.texture) - 1
     for (let k = 0; k < list.length; k += 3) look.tris.push(list[k]!, list[k + 1]!, list[k + 2]!, Math.max(0, layer))
+  }
+  // the liquids last: see-through, lava and fel lit by themselves
+  for (const [kind, list] of liquids) {
+    const tris: number[] = []
+    for (let k = 0; k < list.length; k += 3) tris.push(list[k]!, list[k + 1]!, list[k + 2]!, 0)
+    looks.set(`liquid ${kind}`, { kind: 'none', blend: 2, unlit: kind === LAVA || kind === FEL, ceiling: false, textures: [], tris, liquid: kind })
   }
   // only the points still used, each with the layer of its texture (a point is in one room, so of one material)
   const remap = new Int32Array(pos.length / 3).fill(-1), used: number[] = [], layers: number[] = [], index: number[] = [], draws: Draw[] = []
@@ -175,7 +221,7 @@ export function makeBuilding(file: Buffer, read: (id: number) => Buffer | null, 
         index.push(v)
       }
     }
-    draws.push({ start, count: index.length - start, kind: look.kind, textures: look.textures, blend: look.blend, unlit: look.unlit, ...(look.ceiling ? { ceiling: true } : {}) })
+    draws.push({ start, count: index.length - start, kind: look.kind, textures: look.textures, blend: look.blend, unlit: look.unlit, ...(look.ceiling ? { ceiling: true } : {}), ...(look.liquid ? { liquid: look.liquid } : {}) })
   }
   if (!index.length) return null
   const n = used.length, p = new Float32Array(n * 3), q = new Float32Array(n * 2), r = new Float32Array(n * 3)
@@ -274,12 +320,14 @@ export function buildingsMade(folder: string, worlds: string[]): boolean {
  * Makes the buildings of the continents given, in the folder of the build: each file and texture once, kept as it is
  * made (an interrupted run resumes), each continent's list last. read: a game file by number, null when there is none
  * or the server has not sent its key. buried: of each continent, the buildings inside the ground (caves.json) by
- * buriedKey: the view cuts them at a height (buildings3d.ts). Gives what was made.
+ * buriedKey: the view cuts them at a height (buildings3d.ts). liquid: what a liquid of the game's table is, water when
+ * not told. Gives what was made.
  */
 export function makeBuildings(
   worlds: { name: string; wdt: Buffer; buried?: Set<string> }[],
   read: (id: number) => Buffer | null,
   folder: string,
+  liquid?: (type: number) => number,
   onProgress?: (done: number, total: number) => void,
 ): { files: number; placed: number; converted: boolean } {
   const dir = join(folder, BUILDINGS_FOLDER), formatFile = join(dir, 'format.json')
@@ -305,7 +353,7 @@ export function makeBuildings(
       radius.set(name, (JSON.parse(readFileSync(out + '.json', 'utf8')) as { radius: number }).radius)
       return
     }
-    const f = read(parseInt(name)), b = f && makeBuilding(f, read, texture)
+    const f = read(parseInt(name)), b = f && makeBuilding(f, read, texture, liquid)
     if (!b) return void keep(none, () => Buffer.alloc(0))
     // the radius beside it first, so a building kept is never without one
     writeFileSync(out + '.json', JSON.stringify({ radius: b.head.radius }))
