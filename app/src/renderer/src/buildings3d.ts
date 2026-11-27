@@ -18,10 +18,13 @@
 // and F16: the plane opens the cities, the ceilings left out open the mines, whose tunnels go up and down).
 //
 // A building of a dungeon or a raid (M23-F23, main/dungeons.ts) is drawn the same way without its ceilings, and whole:
-// its floors lie hundreds of yards over one another, and no one height opens them all.
+// its floors lie hundreds of yards over one another, and no one height opens them all. With the character in it, the
+// plane cuts away all of it higher than DUNGEON_CUT yards over the floor the character stands on (M23-F24), which is
+// looked for among the building's own floors (shared/floors.ts).
 import * as THREE from 'three'
 import { decodeDxtCutout } from '../../shared/blp'
 import { DUNGEON, DXT_KIND, onShow, type BuildingHead, type Draw, type Placed } from '../../shared/buildings'
+import { floorsOf, walkedOn, type Floors } from '../../shared/floors'
 import { inflated } from './terrain3d'
 import { inApp, TILES } from './web'
 
@@ -46,6 +49,8 @@ const RETRY = 30
 const CUT = 30
 /** Yards from the camera to a building inside the ground within which it is cut, as inside3d.ts opens its rooms; the cut comes down over a quarter more. */
 const OPEN = 700
+/** Yards over the character's floor a dungeon is cut at: lower than a city, its floors lie closer over one another (the user's choice on the prototype, design/dungeons3d). */
+const DUNGEON_CUT = 12
 
 const FORMATS = { dxt1: THREE.RGB_S3TC_DXT1_Format, dxt1a: THREE.RGBA_S3TC_DXT1_Format, dxt3: THREE.RGBA_S3TC_DXT3_Format, dxt5: THREE.RGBA_S3TC_DXT5_Format } as const
 
@@ -58,6 +63,7 @@ interface File {
   draws?: Draw[]
   fine?: boolean // its textures whole, or being read so
   floor?: number
+  walked?: Float32Array // of a dungeon's: its triangles one walks on (shared/floors.ts)
   bytes?: number // on the graphics card
   used: number
 }
@@ -79,13 +85,16 @@ interface Cut {
   reach: number
   floor: number
   top: number
-  /** Of a dungeon: never cut. */
+  /** Of a dungeon: cut only over the character in it. */
   dungeon: boolean
+  /** Of a dungeon: its floors where it stands. */
+  floors?: Floors
 }
 
 export class Buildings {
   readonly group = new THREE.Group()
   private folder = ''
+  private dungeon = false
   private list: Placed | null = null
   private asked = -Infinity // when the list was last asked for, in seconds
   private files = new Map<string, File>() // by its name in the folder (shared/buildings.ts)
@@ -125,11 +134,18 @@ export class Buildings {
     return null
   }
 
-  /** The continent shown, by its folder. */
-  show(folder: string): void {
+  /** The floors of the dungeon on show, to find the one under a place (shared/floors.ts); null before its building is in. */
+  get floors(): Floors | null {
+    for (const c of this.cuts.values()) if (c.floors) return c.floors
+    return null
+  }
+
+  /** The continent shown, by its folder; dungeon: a dungeon's folder, whose buildings keep their floors. */
+  show(folder: string, dungeon = false): void {
     if (folder === this.folder) return
     this.clear()
     this.folder = folder
+    this.dungeon = dungeon
     this.list = null
     this.asked = -Infinity
   }
@@ -145,7 +161,7 @@ export class Buildings {
 
   /**
    * At each frame, with the camera, the point looked at, the yards from it to the farthest ground on the view, the
-   * pixels a radian of the view, and where the character stands while it is followed: true when the view must be drawn again.
+   * pixels a radian of the view, and where the character stands while it is followed (in a dungeon: while it is in it): true when the view must be drawn again.
    */
   step(camera: THREE.Vector3, target: THREE.Vector3, reach: number, perRadian: number, character: THREE.Vector3 | null): boolean {
     this.frame++
@@ -211,15 +227,15 @@ export class Buildings {
   }
 
   // Each building inside the ground cut as the camera is near it: from over its top, far, down to CUT over its main
-  // floor, or over the character's while it is in there. True when a plane has moved.
+  // floor, or over the character's while it is in there. A dungeon is whole from anywhere, and cut DUNGEON_CUT over
+  // the character in it. True when a plane has moved.
   private cut(camera: THREE.Vector3, character: THREE.Vector3 | null): boolean {
     let moved = false
     for (const c of this.cuts.values()) {
-      if (c.dungeon) continue
       const far = Math.max(0, Math.hypot(camera.x - c.x, camera.z - c.z) - c.reach),
         open = 1 - Math.min(1, Math.max(0, (far - OPEN) / (OPEN * 0.25))),
         inside = character && Math.hypot(character.x - c.x, character.z - c.z) < c.reach && character.y < c.top,
-        to = c.top + ((inside ? character.y : c.floor) + CUT - c.top) * open
+        to = c.dungeon ? (character ? character.y + DUNGEON_CUT : 1e6) : c.top + ((inside ? character.y : c.floor) + CUT - c.top) * open
       if (Math.abs(c.plane.constant - to) < 0.05) continue
       c.plane.constant = to
       moved = true
@@ -300,7 +316,7 @@ export class Buildings {
         const plane = new THREE.Plane(new THREE.Vector3(0, -1, 0), 1e6),
           reach = (this.list!.radius[id] ?? 0) * scale
         materials = materials.map((m, k) => Object.assign(m.clone(), { clippingPlanes: [plane], visible: !f.draws![k]!.ceiling, onBeforeCompile: m.onBeforeCompile, customProgramCacheKey: m.customProgramCacheKey }))
-        this.cuts.set(i, { plane, materials, x, z, reach, floor: y + (f.floor ?? 0) * scale, top: y + reach + 10, dungeon: buried === DUNGEON })
+        this.cuts.set(i, { plane, materials, x, z, reach, floor: y + (f.floor ?? 0) * scale, top: y + reach + 10, dungeon: buried === DUNGEON, ...(buried === DUNGEON && f.walked ? { floors: floorsOf(f.walked, x, y, z, turn, scale) } : {}) })
       }
       const mesh = new THREE.Mesh(f.geometry, materials)
       if (buried) mesh.renderOrder = -2
@@ -335,7 +351,7 @@ export class Buildings {
   }
 
   // A building's file: its geometry, a material a draw, and the textures they use, whole or small.
-  private async load(id: string, fine: boolean): Promise<{ parts: Pick<File, 'geometry' | 'materials' | 'textures' | 'layers' | 'draws' | 'floor' | 'bytes'>; dispose: () => void } | null> {
+  private async load(id: string, fine: boolean): Promise<{ parts: Pick<File, 'geometry' | 'materials' | 'textures' | 'layers' | 'draws' | 'floor' | 'walked' | 'bytes'>; dispose: () => void } | null> {
     const b = await inflated(`${TILES}/buildings/${id}.bin`)
     if (!b) return null
     const view = new DataView(b.buffer, b.byteOffset, b.byteLength), length = view.getUint32(0, true)
@@ -352,6 +368,8 @@ export class Buildings {
       normal = take((o, c) => new Float32Array(b.buffer, o, c), n * 3, 4),
       layer = take((o, c) => new Uint8Array(b.buffer, o, c), n, 1),
       index = n < 65536 ? take((o, c) => new Uint16Array(b.buffer, o, c), head.indices, 2) : take((o, c) => new Uint32Array(b.buffer, o, c), head.indices, 4)
+    // a dungeon's floors, before its points go to the graphics card and are let go here
+    const walked = this.dungeon ? walkedOn(position, normal, index, head.draws) : undefined
     const geometry = new THREE.BufferGeometry()
     geometry.setAttribute('position', new THREE.BufferAttribute(position, 3))
     geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2))
@@ -381,7 +399,7 @@ export class Buildings {
         ;(this as { array: unknown }).array = null
       })
     return {
-      parts: { geometry, materials, textures, layers, draws: head.draws, floor: head.floor, bytes },
+      parts: { geometry, materials, textures, layers, draws: head.draws, floor: head.floor, walked, bytes },
       dispose: () => {
         geometry.dispose()
         for (const m of materials) m.dispose()

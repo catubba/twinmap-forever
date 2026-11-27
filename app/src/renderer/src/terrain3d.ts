@@ -11,6 +11,8 @@
 import * as THREE from 'three'
 import type { Compass } from './compass'
 import { MapControls } from 'three/examples/jsm/controls/MapControls.js'
+import { standsOn } from '../../shared/floors'
+import { solidAt, type Piece } from '../../shared/inside'
 import { BLOCK_ZOOM, HOLE, unpackLevels, type Levels } from '../../shared/levels'
 import { pictureOfBlock } from '../../shared/pixels'
 import { STANDS_FILE, type Stands } from '../../shared/stands'
@@ -41,6 +43,9 @@ const SHARPNESS = 1.5
 const KEPT = inApp ? 200 : 60 // a phone on the home network has less room on its graphics card
 const LOADING = 6
 const SKY = 0x7f97ab
+/** Yards between the floor the character stood on and the one under it now from which it is another floor, not the same one rising or falling, and the milliseconds it must last to be taken. */
+const FLOOR_STEP = 4
+const FLOOR_SETTLE = 500
 /** Round a dungeon with no ground of its own: the dark of the window (--stone-950). */
 const VOID = 0x0c0a08
 /** The dark of a hole in the ground: chosen by the user on 18 November 2026 over leaving it open to the sky. */
@@ -166,7 +171,13 @@ export class Terrain {
   private frame = 0
   private dirty = true
   private folder = ''
-  private bare = false // a dungeon with no ground: no sea where there is none
+  /** A dungeon with no ground is on show: no sea where there is none, and what stands in it stands on its building's floors. */
+  bare = false
+  /** In a dungeon: the pictures of its rooms and the level the character is on, as the minimap tells it (Map.svelte): they tell the floor it stands on to begin with (shared/floors.ts). */
+  rooms: { pieces: Piece[]; level: number | undefined } | null = null
+  private solids = new Map<number, Uint8Array | null | undefined>() // the pictures of the rooms asked about, by file: undefined while one is read
+  private stood: number | null = null // the height the character last stood at in the dungeon on show
+  private other: { y: number; since: number } | null = null // another floor under it, and since when
   private turning: ((now: number) => void) | null = null
   private materials: {
     ground: THREE.MeshLambertMaterial
@@ -344,8 +355,10 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
     this.drop()
     this.folder = folder
     this.bare = bare
+    this.stood = null
+    this.other = null
     ;(this.scene.fog as THREE.Fog).color.set(bare ? VOID : SKY)
-    this.buildings.show(folder)
+    this.buildings.show(folder, bare)
     this.props.show(folder)
     this.ground.show(folder)
     this.stands = null
@@ -448,13 +461,42 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
     return !!floor && Number.isFinite(ground) && Math.abs(high - ground) < Math.abs(high - floor.y)
   }
 
+  /**
+   * The height the character stands at in the dungeon on show, at a place: the floor under it nearest to the one it
+   * stood on when last asked. undefined before the dungeon's building is in, or while a room's picture is read.
+   */
+  floorIn(x: number, z: number): number | undefined {
+    const floors = this.bare ? this.buildings.floors : null
+    if (!floors) return undefined
+    const on = standsOn(floors, this.rooms?.pieces ?? [], x, z, this.rooms?.level, this.stood, (p, u, v) => {
+      if (!this.solids.has(p.file)) {
+        this.solids.set(p.file, undefined)
+        void inflated(`${TILES}/rooms/${p.file}.dxt`).then((dxt) => (this.solids.set(p.file, dxt), (this.dirty = true)))
+      }
+      const dxt = this.solids.get(p.file)
+      return dxt === undefined ? undefined : !!dxt && solidAt(p, dxt, u, v)
+    })
+    if (on === undefined) return undefined
+    // Another floor than the one it stood on is taken once it has been the one for a while: the arrow glides between
+    // two places read (glide.ts) over whatever lies between them, a pit as well, and would be left at its bottom.
+    if (on !== null && this.stood !== null && Math.abs(on - this.stood) > FLOOR_STEP) {
+      const now = performance.now()
+      if (!this.other || Math.abs(this.other.y - on) > FLOOR_STEP) this.other = { y: on, since: now }
+      if (now - this.other.since < FLOOR_SETTLE) return this.stood
+    }
+    this.other = null
+    // no floor near: where it stood, or the dungeon's main floor
+    if (on !== null) this.stood = on
+    return on ?? this.stood ?? this.buildings.dungeonFloor ?? undefined
+  }
+
   // Where what lies on the ground at a place is put: on the ground, on the floor of the room under it as it opens, or
   // on the street over it where the ground of the game is not where one walks.
   private standAt(x: number, z: number): number {
     const ground = this.groundAt(x, z),
       floor = this.inside?.floorAt(x, z)
-    // ponytail: a dungeon's main floor everywhere in it; the floor under each point comes with the arrow (M23-F24)
-    if (!Number.isFinite(ground)) return this.bare ? (this.buildings.dungeonFloor ?? ground) : ground
+    // ponytail: in a dungeon the floor the character stands on everywhere, its main floor with no character in it: the view is held and the pins lie at that height. The floor under each pin comes with M23-F25.
+    if (!Number.isFinite(ground)) return this.bare ? (this.arrow?.y ?? this.buildings.dungeonFloor ?? ground) : ground
     return floor ? ground + (floor.y - ground) * floor.open : (this.streetAt(x, z) ?? ground)
   }
 
@@ -734,7 +776,8 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
     // After the arrow is turned for this frame, so the view turns with it in the same frame, not one behind.
     if (this.heading !== null && !this.turning) this.steer()
     if (this.inside?.step(this.camera.position, Math.min(0.1, FRAME_MS / 1000 + 0.004))) this.dirty = true
-    if (this.buildings.step(this.camera.position, this.controls.target, this.farthest(fog.far), this.height / 2 / Math.tan((FOV * Math.PI) / 360), this.character)) this.dirty = true
+    // a dungeon is cut over the character in it, followed or not: the view moved by hand stays on its floor
+    if (this.buildings.step(this.camera.position, this.controls.target, this.farthest(fog.far), this.height / 2 / Math.tan((FOV * Math.PI) / 360), this.bare ? this.arrow : this.character)) this.dirty = true
     if (this.props.step(this.controls.target, distance, this.arrow)) this.dirty = true
     if (this.ground.step(this.camera.position, this.controls.target.y)) this.dirty = true
     this.askStands()
