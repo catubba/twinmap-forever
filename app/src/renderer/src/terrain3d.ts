@@ -173,8 +173,8 @@ export class Terrain {
   private folder = ''
   /** A dungeon is on show, with a ground of its own or all buildings: no sea where it has no ground, and what stands in it stands on its buildings' floors, or on its ground. */
   bare = false
-  /** In a dungeon: the pictures of its rooms and the level the character is on, as the minimap tells it (Map.svelte): they tell the floor it stands on to begin with (shared/floors.ts). */
-  rooms: { pieces: Piece[]; level: number | undefined } | null = null
+  /** In a dungeon: the pictures of its rooms, and of the character in it the level it is on and whether it is in the open, as the minimap tells them (Map.svelte): they tell the floor it stands on (shared/floors.ts). */
+  rooms: { pieces: Piece[]; level?: number; open?: boolean } | null = null
   private solids = new Map<number, Uint8Array | null | undefined>() // the pictures of the rooms asked about, by file: undefined while one is read
   private stood: number | null = null // the height the character last stood at in the dungeon on show
   private other: { y: number; since: number } | null = null // another floor under it, and since when
@@ -468,14 +468,7 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
   floorIn(x: number, z: number): number | undefined {
     const floors = this.bare ? this.floors() : null
     if (!floors) return undefined
-    const on = standsOn(floors, this.rooms?.pieces ?? [], x, z, this.rooms?.level, this.stood, (p, u, v) => {
-      if (!this.solids.has(p.file)) {
-        this.solids.set(p.file, undefined)
-        void inflated(`${TILES}/rooms/${p.file}.dxt`).then((dxt) => (this.solids.set(p.file, dxt), (this.dirty = true)))
-      }
-      const dxt = this.solids.get(p.file)
-      return dxt === undefined ? undefined : !!dxt && solidAt(p, dxt, u, v)
-    })
+    const on = standsOn(floors, this.rooms?.pieces ?? [], x, z, this.rooms?.level, this.stood, this.solid, this.rooms?.open)
     if (on === undefined) return undefined
     // Another floor than the one it stood on is taken once it has been the one for a while: the arrow glides between
     // two places read (glide.ts) over whatever lies between them, a pit as well, and would be left at its bottom.
@@ -490,16 +483,27 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
     return on ?? this.stood ?? this.buildings.dungeonFloor ?? undefined
   }
 
+  // Whether a room's picture is solid at a place: undefined while it is read, which draws the view again once it is in.
+  private solid = (p: Piece, u: number, v: number): boolean | undefined => {
+    if (!this.solids.has(p.file)) {
+      this.solids.set(p.file, undefined)
+      void inflated(`${TILES}/rooms/${p.file}.dxt`).then((dxt) => (this.solids.set(p.file, dxt), (this.dirty = true)))
+    }
+    const dxt = this.solids.get(p.file)
+    return dxt === undefined ? undefined : !!dxt && solidAt(p, dxt, u, v)
+  }
+
   /**
    * The height a pin of the dungeon on show lies at: on its own floor, not the character's (shared/floors.ts, pinOn).
-   * high: how high what it marks stands, where that is told. undefined out of a dungeon, or before its building is in.
+   * high: how high what it marks stands, where that is told. undefined out of a dungeon, before its building is in, or
+   * while the picture of its room is read.
    */
   pinAt(x: number, z: number, high?: number): number | undefined {
     const floors = this.bare ? this.floors() : null
     if (!floors) return undefined
-    // with no height told: the floor nearest to the ground there, to the dungeon's main floor where it has no ground
-    const ground = this.groundAt(x, z)
-    return pinOn(floors, x, z, high, Number.isFinite(ground) ? ground : (this.buildings.dungeonFloor ?? 0))
+    const on = pinOn(floors, this.rooms?.pieces ?? [], x, z, high, this.solid)
+    // no floor there at all: the dungeon's main floor
+    return on === null ? (this.buildings.dungeonFloor ?? 0) : on
   }
 
   // Every height one stands at in the dungeon on show: the floors of its buildings drawn open and, where it has one,
@@ -516,9 +520,10 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
     return {
       triangles: this.none,
       cells: this.noCells,
-      also: (x, z) => {
+      also: (x, z) => this.buildings.floorsAt(x, z)!,
+      ground: (x, z) => {
         const ground = this.groundAt(x, z)
-        return [...this.buildings.floorsAt(x, z)!, ...(Number.isFinite(ground) ? [ground] : [])]
+        return Number.isFinite(ground) ? ground : null
       },
     }
   }
@@ -560,7 +565,8 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
    * fog; and how far it is from the camera, in distances of the point looked at. lift: yards over
    * the ground, for what is written above its point (names3d.ts); above: over the ground also where a
    * room under it is open, as the name of a city in a mountain is. high: a height of its own, in
-   * yards, whatever the ground there (a flight's arc, pins3d.ts).
+   * yards, whatever the ground there (a flight's arc, pins3d.ts; a pin of a dungeon on its floor: under
+   * the ground, which is open over the rooms, it is seen through the opening, not hidden by it).
    */
   spot(x: number, z: number, lift = 0, above = false, high?: number): { x: number; y: number; shows: number; away: number } {
     const fog = this.scene.fog as THREE.Fog,
@@ -575,7 +581,9 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
     if (on.z > 1 || far >= fog.far) return { ...at, shows: 0, away }
     const clear = Math.min(1, (fog.far - far) / (fog.far - fog.near)),
       off = at.x < -OFF || at.y < -OFF || at.x > this.width + OFF || at.y > this.height + OFF // off the view: no hill looked for
-    return { ...at, shows: off || inRoom || !this.behindHill(p) ? clear : clear * HIDDEN, away }
+    // a pin of the dungeon on its floor in a room under the ground: the ground is open over the rooms and does not hide it
+    const sunk = high !== undefined && this.bare && !off && this.groundAt(x, z) > high + 2
+    return { ...at, shows: off || inRoom || sunk || !this.behindHill(p) ? clear : clear * HIDDEN, away }
   }
 
   /** The height spot() puts a point of the ground at, in yards (0 where there is no ground). */
