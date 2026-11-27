@@ -81,6 +81,10 @@ export function startLink(
   let permissionAt = -Infinity, allowed = true
 
   const replay = process.env.TWINMAP_REPLAY ? replayed(process.env.TWINMAP_REPLAY) : null
+  // For trials inside a dungeon without the game's minimap on a screen: TWINMAP_INSIDE names a file of places as the
+  // minimap would tell them (a list of { ms, u, v, facing, level }, ms from the start of the app), each held until the next.
+  const walk = replay && process.env.TWINMAP_INSIDE ? (JSON.parse(readFileSync(process.env.TWINMAP_INSIDE, 'utf8')) as (Inside & { ms: number })[]) : null
+  const walkFrom = Date.now()
 
   // The addon tells where the minimap is in pixels of the game: on a stretched game the square is as much further and bigger on screen.
   let said: InsideReport | null = null
@@ -109,6 +113,10 @@ export function startLink(
       // In a trial the minimap is cut from the window TWINMAP_WINDOW names by its title, as the portrait is.
       const stand = process.env.TWINMAP_WINDOW ? findWindow(process.env.TWINMAP_WINDOW) : null
       if (stand !== null) lookInside(stand, now)
+      else if (walk) {
+        const place = walk.filter((p) => p.ms <= now - walkFrom).at(-1) ?? null
+        found = place && (found && found.u === place.u && found.v === place.v ? found : { u: place.u, v: place.v, facing: place.facing, level: place.level, at: now })
+      }
       return
     }
     if (hwnd === null) {

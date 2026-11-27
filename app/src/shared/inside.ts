@@ -233,3 +233,18 @@ export function roomPixels(dxt: Uint8Array, width: number, height: number): Uint
   }
   return rgba
 }
+
+/**
+ * Whether a room's picture is solid at a place of the map, from its DXT1 blocks as roomPixels reads them: the room is
+ * there, not the see-through rest of its square picture. False outside the picture.
+ */
+export function solidAt(p: Piece, dxt: Uint8Array, u: number, v: number): boolean {
+  const at = inPiece(p, u, v)
+  if (!at) return false
+  // the picture's pixels from its bytes, half a byte each, as the 2D map reads it
+  const width = Math.round(Math.sqrt((dxt.length * 2 * p.width) / p.height)), scale = width / p.width
+  const x = Math.floor(at[0] * scale), y = Math.floor(at[1] * scale), block = ((y >> 2) * (width >> 2) + (x >> 2)) * 8
+  if (block + 8 > dxt.length) return false
+  const view = new DataView(dxt.buffer, dxt.byteOffset + block, 8)
+  return view.getUint16(0, true) > view.getUint16(2, true) || ((view.getUint32(4, true) >>> (((y & 3) * 4 + (x & 3)) * 2)) & 3) !== 3
+}

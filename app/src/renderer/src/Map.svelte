@@ -863,6 +863,7 @@
 
   // Where the character is on the map, or nothing: a place with no map, or one outside the two continents.
   let placed = false
+  let arriving: number | null = null // yards the 3D view showed when the character went into a dungeon, until its first place in it
   let under = '' // the buildings whose rooms are on show on a continent: the character is under their roof
   function place(jump = false): void {
     if (!map || !maps.length) return
@@ -877,15 +878,22 @@
     const inst = pos?.inst, dungeon = inst && interiors?.maps.find((m) => m.id === inst.id && m.kind !== 'world')
     if (inst && dungeon) {
       const entering = inside?.id !== dungeon.id
+      // Entered from the 3D view, the view stays as far from the arrow as it was outside (M23-F24).
+      if (entering) arriving = threeD && terrain ? terrain.looking().seen : null
       if (entering) showInside(dungeon)
       offMap = false
       placed = false // back in the world, the map goes to where the character comes out
       me = null
       const where = yardsInside(inst)
       if (!where) return void arrow.remove() // the game does not tell the place in here
-      // On the way in the whole dungeon is in view, and stays so while the arrow is well inside it.
-      if (entering) mark(atYards(where), true)
+      // On the way in the whole dungeon is in view, and stays so while the arrow is well inside it. In 3D the view
+      // goes with the arrow as it does outside: the cut is over the arrow's floor, and what is far from it is cut too.
+      if (threeD && terrain) {
+        if (arriving !== null) terrain.look({ ...terrain.looking(), seen: arriving })
+        point(atYards(where), entering || jump || arriving !== null)
+      } else if (entering) mark(atYards(where), true)
       else point(atYards(where), jump, true)
+      arriving = null
       return
     }
     const leaving = inside !== null
@@ -1068,6 +1076,8 @@
           // a city inside the ground is cut over the floor of the character followed in it
           terrain!.arrow = body.at()
           terrain!.character = following ? terrain!.arrow : null
+          // in a dungeon the floor the arrow stands on is looked for among the rooms of the level the minimap tells
+          terrain!.rooms = inside && pos?.inst?.id === inside.id ? { pieces: inside.pieces, level: pos.inst.level } : null
           return moved
         }
         pins3d ??= new Pins3d(map, terrain, pinsHost, terrainHost, arrow, () => turned, body, () => floorAt)

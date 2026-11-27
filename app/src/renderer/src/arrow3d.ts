@@ -169,8 +169,10 @@ export class Arrow3d {
   step(now: number): boolean {
     const dt = Math.max(0, Math.min(0.1, (now - this.last) / 1000))
     this.last = now
+    // In a dungeon that is all buildings there is no ground: the floor of the building the character stands on (M23-F24).
     const w = this.want,
-      ground = w ? this.terrain.groundAt(w.x, w.z) : NaN
+      inside = w && this.terrain.bare ? this.terrain.floorIn(w.x, w.z) : undefined,
+      ground = !w ? NaN : this.terrain.bare ? (inside ?? NaN) : this.terrain.groundAt(w.x, w.z)
     if (!w || !Number.isFinite(ground)) {
       this.y = this.pointing = null
       return this.show(false, '')
@@ -183,11 +185,11 @@ export class Arrow3d {
     // In a city whose streets are its building's, on the street when the floor the character stands on is not known,
     // or is told as the ground of the game, which there lies under the streets and no one stands on.
     const street = this.terrain.streetAt(w.x, w.z),
-      floor = street !== null && (w.floor === null || Math.abs(w.floor - ground) <= FLOOR) ? street : w.floor,
-      lifted = floor !== null && floor > ground + FLOOR,
-      room = floor !== null && floor < ground - FLOOR ? this.terrain.floorAt(w.x, w.z) : null,
+      floor = inside !== undefined ? inside : street !== null && (w.floor === null || Math.abs(w.floor - ground) <= FLOOR) ? street : w.floor,
+      lifted = inside !== undefined || (floor !== null && floor > ground + FLOOR),
+      room = !lifted && floor !== null && floor < ground - FLOOR ? this.terrain.floorAt(w.x, w.z) : null,
       y = lifted ? floor! : room ? ground + (floor! - ground) * room.open : ground,
-      paved = lifted && street !== null // its shadow on the street, not on the ground under it
+      paved = lifted && (street !== null || inside !== undefined) // its shadow on the street or on the floor, not on the ground under it
     for (const o of [this.group, this.shadow, this.stem]) this.terrain.sink(o, !!room && room.open > 0.5)
     this.look(arrow.colour)
     const camera = this.terrain.camera,
