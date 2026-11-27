@@ -77,6 +77,12 @@ export function mapEntries(maps: Table, encounters: Table): MapEntry[] {
   return out
 }
 
+/** The world file of a dungeon or a raid, by the game's number of its map; null for any other map. */
+export function dungeonWorldFile(maps: Table, id: number): number | null {
+  const row = maps.rows.find((r) => r.id === id)
+  return row && KINDS[row.int(KIND)] ? row.int(WORLD_FILE) : null
+}
+
 /** The pictures of the rooms of every building: building number -> its pictures. */
 export function roomPictures(table: Table): Map<number, RoomPicture[]> {
   const all = new Map<number, RoomPicture[]>()

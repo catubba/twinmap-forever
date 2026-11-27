@@ -75,7 +75,8 @@ export function servedFile(base: string, path: string): string | null {
   // The buildings of the 3D view (buildings.ts): a building's file, a texture, a continent's list.
   const building = /^\/buildings\/(?:(\d{1,9})\.bin|tex\/(\d{1,9})\.(bin|png))$/.exec(path)
   if (building) return building[1] ? joinPath(base, 'buildings', `${building[1]}.bin`) : joinPath(base, 'buildings', 'tex', `${building[2]}.${building[3]}`)
-  const placed = /^\/([a-z]+)\/buildings\.json$/.exec(path)
+  // a continent's, or a dungeon's by "i" and its number (dungeons.ts)
+  const placed = /^\/([a-z]+|i\d{1,5})\/buildings\.json$/.exec(path)
   if (placed) return joinPath(base, placed[1]!, 'buildings.json')
   // Where things stand over the ground in the 3D view (stands.ts), a continent's.
   const stands = /^\/([a-z]+)\/stands\.json$/.exec(path)
@@ -83,7 +84,7 @@ export function servedFile(base: string, path: string): string | null {
   // The trees and objects of the 3D view (props.ts): a model, a continent's list of blocks, the copies of a block.
   const model = /^\/buildings\/m2\/(\d{1,9})\.bin$/.exec(path)
   if (model) return joinPath(base, 'buildings', 'm2', `${model[1]}.bin`)
-  const props = /^\/([a-z]+)\/props(?:\.json|\/(\d{1,2})-(\d{1,2})\.bin)$/.exec(path)
+  const props = /^\/([a-z]+|i\d{1,5})\/props(?:\.json|\/(\d{1,2})-(\d{1,2})\.bin)$/.exec(path)
   if (props) return props[2] ? joinPath(base, props[1]!, 'props', `${props[2]}-${props[3]}.bin`) : joinPath(base, props[1]!, 'props.json')
   const item = /^\/(items|pictures)\/(\d{1,7})\.png$/.exec(path)
   if (item) return joinPath(base, item[1]!, `${item[2]}.png`)

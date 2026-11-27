@@ -80,6 +80,10 @@ export default {
     // The map follows the character: the game's FOLLOW, keeping 追踪 for the arrow on a point.
     follow: '跟随',
     followTip: '跟随你的角色（F）',
+    dungeonsOff: '3D地下城已关闭',
+    dungeonsOffText: '3D地下城为实验性功能。在设置中开启“3D地下城（实验性）”即可用3D查看此地下城。',
+    dungeonsOpen: '打开设置',
+    dungeonsLater: '以后再说',
   },
 
   offMap: '地图上没有这个地方。',

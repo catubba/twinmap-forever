@@ -77,6 +77,10 @@ export default {
     zoomOutTip: 'Verkleinern (-)',
     follow: 'Folgen',
     followTip: 'Eurem Charakter folgen (F)',
+    dungeonsOff: '3D-Dungeons sind aus',
+    dungeonsOffText: 'Dungeons in 3D sind experimentell. Schaltet „3D-Dungeon (experimentell)“ in den Optionen ein, um diesen in 3D zu sehen.',
+    dungeonsOpen: 'Optionen öffnen',
+    dungeonsLater: 'Nicht jetzt',
   },
 
   offMap: 'Dieser Ort ist nicht auf der Karte.',

@@ -67,6 +67,8 @@ export default {
     objectsHint: 'Clôtures, charrettes, lanternes, tentes, braseros.',
     ground: 'Texture du sol de près',
     groundHint: 'De près, le sol est dessiné avec les textures du jeu et reste net.',
+    dungeons: 'Donjon 3D (expérimental)',
+    dungeonsHint: 'Donjons et raids dans la vue 3D, salles ouvertes vues d’en haut. Encore en chantier : l’affichage peut être faux ou lent.',
     card: 'Carte graphique',
   },
 

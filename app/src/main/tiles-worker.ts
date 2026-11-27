@@ -32,6 +32,7 @@ import { navFrom } from '../shared/nav-data'
 import { walker, type Walker } from './walk'
 import { MIDDLE_YARDS } from '../shared/inside'
 import { ICONS_MADE, writeIcons } from './icons'
+import { dungeonMaker } from './dungeons'
 import { groundMaker } from './ground'
 import { gamePictures, itemIcons } from './item-icons'
 import { convertWorld, dropOtherBuilds, finished, ICONS_FOLDER, MAPS_FILE, PLACES_FILE, tilesFolder, TRAVEL_FILE } from './tiles'
@@ -81,12 +82,12 @@ try {
   const open = (): ClientFiles => (client ??= openClientFiles(gameFolder, keys, locale))
   // The picture of an item, or of a spell by its file, when a screen asks for one the folder does not have yet (item-icons.ts).
   // Asked while the map is being made, it is answered once the making is done.
-  // The ground's own textures of the 3D view, the same way (ground.ts).
-  const makers = { items: itemIcons(open, folder), pictures: gamePictures(open, folder), ground: groundMaker(open, folder) }
-  parentPort?.on('message', (asked: { kind?: unknown; id?: unknown }) => {
-    if ((asked.kind === 'items' || asked.kind === 'pictures' || asked.kind === 'ground') && typeof asked.id === 'number') parentPort?.postMessage({ asked: `${asked.kind}/${asked.id}`, made: makers[asked.kind](asked.id) })
-  })
   const table = (b: Buffer) => readTable(b, (keyName) => open().opens(keyName))
+  // The ground's own textures of the 3D view, the same way (ground.ts), and the buildings and objects of a dungeon (dungeons.ts).
+  const makers = { items: itemIcons(open, folder), pictures: gamePictures(open, folder), ground: groundMaker(open, folder), dungeon: dungeonMaker(open, folder, table) }
+  parentPort?.on('message', (asked: { kind?: unknown; id?: unknown }) => {
+    if ((asked.kind === 'items' || asked.kind === 'pictures' || asked.kind === 'ground' || asked.kind === 'dungeon') && typeof asked.id === 'number') parentPort?.postMessage({ asked: `${asked.kind}/${asked.id}`, made: makers[asked.kind](asked.id) })
+  })
   const progress = (percent: number): void => {
     if (Math.floor(percent) !== told) tell({ state: 'converting', percent: Math.floor(percent) })
     told = Math.floor(percent)

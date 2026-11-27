@@ -37,7 +37,7 @@ export interface BuildingHead {
 /**
  * Where the buildings of a continent stand: file (its name in the folder), x, y, z (yards, as the 3D view), turn
  * (radians round y), scale, and 1 for a building inside the ground (Ironforge, Undercity, a mine), which the view cuts
- * at a height.
+ * at a height, or DUNGEON for one of a dungeon or a raid, drawn without its ceilings and not cut (M23-F23).
  */
 export interface Placed {
   format: number
@@ -45,6 +45,11 @@ export interface Placed {
   /** Each file's radius, by file. */
   radius: Record<string, number>
 }
+
+export const DUNGEON = 2
+
+/** The folder of a dungeon's or raid's buildings, trees and objects, by the game's number of its map: the one its ground has, where it has one (interiors.ts). */
+export const dungeonFolder = (map: number): string => `i${map}`
 
 /** Pixels a building's radius is on the view when it comes on show, and those under which it goes again: smaller, it is left to the picture of the ground, where the game has it painted. */
 export const SHOW_PX = 14

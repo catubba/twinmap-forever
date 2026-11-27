@@ -68,6 +68,8 @@ export default {
     objectsHint: '栅栏、推车、路灯、帐篷、火盆。',
     ground: '近处地面纹理',
     groundHint: '近处的地面使用游戏自身的纹理绘制，保持清晰。',
+    dungeons: '3D地下城（实验性）',
+    dungeonsHint: '在3D视图中显示地下城和团队副本，房间从上方敞开。仍在开发中：显示可能有误或较慢。',
     card: '显卡',
   },
 

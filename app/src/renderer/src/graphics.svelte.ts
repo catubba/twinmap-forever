@@ -25,10 +25,12 @@ export const graphics = $state({
   objects: on('objects', starts),
   /** The ground's own textures up close (M23-F8). */
   ground: on('ground', starts),
+  /** Dungeons and raids in the 3D view (M23-F23): "3D Dungeon (Experimental)", off until the player turns it on. */
+  dungeons: on('dungeons', () => false),
 })
 
 export function setGraphics(to: Partial<typeof graphics>): void {
   Object.assign(graphics, to)
-  for (const key of ['buildings', 'trees', 'objects', 'ground'] as const) localStorage.setItem(key, graphics[key] ? 'on' : 'off')
+  for (const key of ['buildings', 'trees', 'objects', 'ground', 'dungeons'] as const) localStorage.setItem(key, graphics[key] ? 'on' : 'off')
   localStorage.setItem('density', graphics.density)
 }

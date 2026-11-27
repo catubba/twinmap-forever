@@ -135,10 +135,10 @@ export interface Copy {
 }
 
 /**
- * The copies a continent has. buried: its buildings inside the ground (caves.json), by buriedKey: of these, the copies
- * of every room; of the others, those of the rooms in the open.
+ * The copies a continent has. buried: its buildings inside the ground (caves.json), by buriedKey, or 'all' for a
+ * dungeon: of these, the copies of every room; of the others, those of the rooms in the open.
  */
-export function copiesOf(wdt: Buffer, read: (id: number) => Buffer | null, buried?: Set<string>): Copy[] {
+export function copiesOf(wdt: Buffer, read: (id: number) => Buffer | null, buried?: Set<string> | 'all'): Copy[] {
   const maid = chunk(wdt, 'DIAM'), out: Copy[] = []
   const blockSeen = new Set<number>(), buildingSeen = new Set<number>()
   // the doodads of a building's rooms, by building file: those of its sets, where they stand in the file, in a room in the open or not
@@ -171,6 +171,22 @@ export function copiesOf(wdt: Buffer, read: (id: number) => Buffer | null, burie
     outdoor.set(id, sets)
     return sets
   }
+  // the copies of the buildings a "MODF" tells; middle: the yards to add to where each stands (buildings.ts, placements)
+  const ofBuildings = (modf: Buffer, middle: number): void => {
+    for (let at = 0; at + 64 <= modf.length; at += 64) {
+      if (!(modf.readUInt16LE(at + 56) & 8) || buildingSeen.has(modf.readUInt32LE(at + 4))) continue
+      buildingSeen.add(modf.readUInt32LE(at + 4))
+      const sets = ofBuilding(modf.readUInt32LE(at))
+      if (!sets) continue
+      const x = modf.readFloatLE(at + 8) + middle, z = modf.readFloatLE(at + 16) + middle
+      const place = standingAt(x, modf.readFloatLE(at + 12), z, ((modf.readFloatLE(at + 24) - 180) * Math.PI) / 180, modf.readUInt16LE(at + 62) / 1024 || 1)
+      const under = buried === 'all' || buried?.has(buriedKey(modf.readUInt32LE(at), x, z))
+      for (const s of new Set([0, modf.readUInt16LE(at + 58)])) for (const c of sets.get(s) ?? []) if (c.open || under) out.push({ file: c.file, m: mul(place, c.m), ...(under ? { under: [x, z] as [number, number] } : {}) })
+    }
+  }
+  // a map that is one building and no ground has it in the world file itself, at the middle of the square
+  const own = chunk(wdt, 'FDOM')
+  if (own) ofBuildings(own, (BLOCKS / 2) * BLOCK_YARDS)
   for (let block = 0; maid && block < BLOCKS * BLOCKS; block++) {
     const id = maid.readUInt32LE(block * 32 + 4), objects = id ? read(id) : null
     if (!objects) continue
@@ -183,16 +199,7 @@ export function copiesOf(wdt: Buffer, read: (id: number) => Buffer | null, burie
       const turn = ((mddf.readFloatLE(at + 24) - 180) * Math.PI) / 180
       out.push({ file: mddf.readUInt32LE(at), m: standingAt(mddf.readFloatLE(at + 8), mddf.readFloatLE(at + 12), mddf.readFloatLE(at + 16), turn, mddf.readUInt16LE(at + 32) / 1024 || 1) })
     }
-    for (let at = 0; modf && at + 64 <= modf.length; at += 64) {
-      if (!(modf.readUInt16LE(at + 56) & 8) || buildingSeen.has(modf.readUInt32LE(at + 4))) continue
-      buildingSeen.add(modf.readUInt32LE(at + 4))
-      const sets = ofBuilding(modf.readUInt32LE(at))
-      if (!sets) continue
-      const x = modf.readFloatLE(at + 8), z = modf.readFloatLE(at + 16)
-      const place = standingAt(x, modf.readFloatLE(at + 12), z, ((modf.readFloatLE(at + 24) - 180) * Math.PI) / 180, modf.readUInt16LE(at + 62) / 1024 || 1)
-      const under = buried?.has(buriedKey(modf.readUInt32LE(at), x, z))
-      for (const s of new Set([0, modf.readUInt16LE(at + 58)])) for (const c of sets.get(s) ?? []) if (c.open || under) out.push({ file: c.file, m: mul(place, c.m), ...(under ? { under: [x, z] as [number, number] } : {}) })
-    }
+    if (modf) ofBuildings(modf, 0)
   }
   return out
 }
@@ -252,7 +259,7 @@ export function propsMade(folder: string, worlds: string[]): boolean {
  * (an interrupted run resumes), the copies of each continent by block, its list last. read: a game file by number, null
  * when there is none or the server has not sent its key. Gives what was made.
  */
-export function makeProps(worlds: { name: string; wdt: Buffer; buried?: Set<string> }[], read: (id: number) => Buffer | null, folder: string): { models: number; copies: number } {
+export function makeProps(worlds: { name: string; wdt: Buffer; buried?: Set<string> | 'all' }[], read: (id: number) => Buffer | null, folder: string): { models: number; copies: number } {
   const dir = join(folder, BUILDINGS_FOLDER), m2 = join(dir, M2)
   if (formatOf(folder) !== FORMAT) {
     rmSync(m2, { recursive: true, force: true })

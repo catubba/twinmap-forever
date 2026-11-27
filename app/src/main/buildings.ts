@@ -25,9 +25,9 @@ import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync 
 import { join } from 'node:path'
 import { deflateSync } from 'node:zlib'
 import { decodeBlpCutout } from '../shared/blp'
-import type { BuildingHead, Draw, Placed, TexKind } from '../shared/buildings'
+import { DUNGEON, type BuildingHead, type Draw, type Placed, type TexKind } from '../shared/buildings'
 import { FEL, LAVA, WATER } from '../shared/water'
-import { BLOCKS } from '../shared/world'
+import { BLOCK_YARDS, BLOCKS } from '../shared/world'
 import { encodePng } from './png'
 import { keep } from './tiles'
 
@@ -50,20 +50,32 @@ const chunk = (b: Buffer, tag: string): Buffer | undefined => {
 }
 const floats = (d: Buffer): Float32Array => new Float32Array(d.buffer.slice(d.byteOffset, d.byteOffset + d.length))
 
-/** The buildings standing on a continent, each once, in the view's yards. wdt: its world file; read: a game file by number. */
-export function standing(wdt: Buffer, read: (id: number) => Buffer | null): { file: number; x: number; y: number; z: number; turn: number; scale: number }[] {
-  const maid = chunk(wdt, 'DIAM')
-  const placed = new Map<number, { file: number; x: number; y: number; z: number; turn: number; scale: number }>()
+/**
+ * Where a map's buildings are told ("MODF", 64 bytes each): in each block's "obj0", and in the world file itself for a
+ * map that is one building and no ground (a dungeon), which stands at the middle of the square whatever its entry says
+ * (interiors.ts). middle: the yards to add to its x and z.
+ */
+export function* placements(wdt: Buffer, read: (id: number) => Buffer | null): Generator<{ modf: Buffer; middle: number }> {
+  const own = chunk(wdt, 'FDOM'), maid = chunk(wdt, 'DIAM')
+  if (own) yield { modf: own, middle: (BLOCKS / 2) * BLOCK_YARDS }
   for (let block = 0; maid && block < BLOCKS * BLOCKS; block++) {
     const id = maid.readUInt32LE(block * 32 + 4), objects = id ? read(id) : null, modf = objects && chunk(objects, 'FDOM')
-    for (let at = 0; modf && at + 64 <= modf.length; at += 64) {
+    if (modf) yield { modf, middle: 0 }
+  }
+}
+
+/** The buildings standing on a continent or in a dungeon, each once, in the view's yards. wdt: its world file; read: a game file by number. */
+export function standing(wdt: Buffer, read: (id: number) => Buffer | null): { file: number; x: number; y: number; z: number; turn: number; scale: number }[] {
+  const placed = new Map<number, { file: number; x: number; y: number; z: number; turn: number; scale: number }>()
+  for (const { modf, middle } of placements(wdt, read)) {
+    for (let at = 0; at + 64 <= modf.length; at += 64) {
       if (!(modf.readUInt16LE(at + 56) & 8)) continue // named, not numbered: not seen in this game (interiors.ts)
       // as interiors.ts lays a building: u east and v south of the world's corner, the turn round the up of the world
       placed.set(modf.readUInt32LE(at + 4), {
         file: modf.readUInt32LE(at),
-        x: modf.readFloatLE(at + 8),
+        x: modf.readFloatLE(at + 8) + middle,
         y: modf.readFloatLE(at + 12),
-        z: modf.readFloatLE(at + 16),
+        z: modf.readFloatLE(at + 16) + middle,
         turn: ((modf.readFloatLE(at + 24) - 180) * Math.PI) / 180,
         scale: modf.readUInt16LE(at + 62) / 1024 || 1,
       })
@@ -320,11 +332,12 @@ export function buildingsMade(folder: string, worlds: string[]): boolean {
  * Makes the buildings of the continents given, in the folder of the build: each file and texture once, kept as it is
  * made (an interrupted run resumes), each continent's list last. read: a game file by number, null when there is none
  * or the server has not sent its key. buried: of each continent, the buildings inside the ground (caves.json) by
- * buriedKey: the view cuts them at a height (buildings3d.ts). liquid: what a liquid of the game's table is, water when
- * not told. Gives what was made.
+ * buriedKey: the view cuts them at a height (buildings3d.ts). dungeon: a dungeon or a raid, made when it is first
+ * opened in 3D (dungeons.ts): all its buildings are drawn open, without their ceilings (M23-F23). liquid: what a liquid
+ * of the game's table is, water when not told. Gives what was made.
  */
 export function makeBuildings(
-  worlds: { name: string; wdt: Buffer; buried?: Set<string> }[],
+  worlds: { name: string; wdt: Buffer; buried?: Set<string>; dungeon?: boolean }[],
   read: (id: number) => Buffer | null,
   folder: string,
   liquid?: (type: number) => number,
@@ -340,7 +353,7 @@ export function makeBuildings(
   }
   const texture = textureKeeper(dir, read)
   // each standing building with the name of its file, and whether it is inside the ground
-  const all = worlds.map((w) => standing(w.wdt, read).map((p) => ({ ...p, name: String(p.file), buried: w.buried?.has(buriedKey(p.file, p.x, p.z)) ? 1 : 0 })))
+  const all = worlds.map((w) => standing(w.wdt, read).map((p) => ({ ...p, name: String(p.file), buried: w.dungeon ? DUNGEON : w.buried?.has(buriedKey(p.file, p.x, p.z)) ? 1 : 0 })))
   const files = [...new Set(all.flat().map((p) => p.name))]
   // each file's radius, or 0 for one with nothing to draw
   const radius = new Map<string, number>()

@@ -76,6 +76,10 @@ export default {
     zoomOutTip: 'Alejar (-)',
     follow: 'Seguir',
     followTip: 'Seguir a tu personaje (F)',
+    dungeonsOff: 'Las mazmorras en 3D están desactivadas',
+    dungeonsOffText: 'Las mazmorras en 3D son experimentales. Activa «Mazmorra 3D (experimental)» en Opciones para ver esta en 3D.',
+    dungeonsOpen: 'Abrir Opciones',
+    dungeonsLater: 'Ahora no',
   },
 
   offMap: 'Este lugar no está en el mapa.',

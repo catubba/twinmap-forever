@@ -111,6 +111,11 @@ export default {
     follow: 'Follow',
     // Its tooltip: F is the key that does it too.
     followTip: 'Follow your character (F)',
+    // Inside a dungeon, the 2D/3D switch pressed while "3D Dungeon (Experimental)" (settings.graphics.dungeons) is off: a small window, its title, its text, the button that opens Settings on Graphics, the one that closes it.
+    dungeonsOff: '3D dungeons are off',
+    dungeonsOffText: 'Dungeons in 3D are experimental. Turn on "3D Dungeon (Experimental)" in Settings to see this one in 3D.',
+    dungeonsOpen: 'Open Settings',
+    dungeonsLater: 'Not now',
   },
 
   // A note over the map when the character is somewhere the map has no picture of.
