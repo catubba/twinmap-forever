@@ -2,7 +2,8 @@
 // on the map and which level it is on, counted from the minimap (main/minimap.ts), not how high it stands: the height
 // is the floor under that place, looked for in the building itself (its triangles that look up, as buildings3d.ts
 // reads them): the one nearest to where the character stood a moment ago, and to begin with the floor of the room the
-// 2D map shows there at that level.
+// 2D map shows there at that level. A pin of the dungeon has no height either (M23-F25): it lies on the floor under it
+// nearest to where what it marks stands, which a table tells (pin-heights.ts).
 import type { Draw } from './buildings'
 import { inPiece, type Piece } from './inside'
 
@@ -14,6 +15,8 @@ const APART = 2
 const SLACK = 2
 /** How much of a triangle's normal looks up for it to be walked on: steeper is a wall. */
 const UP = 0.5
+/** Yards between the height a pin is told and a floor under it for the pin to lie on that floor. */
+const ON = 6
 /** A place read a little into a wall has no floor under it: then the ones this many yards round it, the nearest first. */
 const ROUND = [[0, 0], ...[2, 4].flatMap((r) => [[r, 0], [-r, 0], [0, r], [0, -r], [r, r], [-r, r], [r, -r], [-r, -r]])] as const
 
@@ -77,6 +80,27 @@ export function floorsAt(floors: Floors, x: number, z: number): number[] {
   return found.filter((h, i) => i === 0 || found[i - 1]! - h >= APART)
 }
 
+/** Of the floors under a place, the nearest to a height; with none under it, of those a few yards round it. null where there is none. */
+export function floorNear(floors: Floors, x: number, z: number, high: number): number | null {
+  for (const [dx, dz] of ROUND) {
+    const all = floorsAt(floors, x + dx, z + dz)
+    if (all.length) return all.reduce((a, b) => (Math.abs(b - high) < Math.abs(a - high) ? b : a))
+  }
+  return null
+}
+
+/**
+ * The height a pin of a dungeon lies at. high: how high what it marks stands (pin-heights.ts), undefined when not
+ * told; main: the dungeon's main floor. With a height, the floor under the pin nearest to it, or the height itself
+ * where no floor is within ON yards: a boss that swims, or stands on an object of the room. With none, the floor
+ * nearest to the main one. No way of choosing without a height is right more than half the times where the building
+ * has several floors under a pin (design/ROADMAP.md, M23-F25; design/dungeons3d/pins.ts).
+ */
+export function pinOn(floors: Floors, x: number, z: number, high: number | undefined, main: number): number {
+  const on = floorNear(floors, x, z, high ?? main)
+  return high !== undefined && (on === null || Math.abs(on - high) > ON) ? high : (on ?? main)
+}
+
 /**
  * The height the character stands at in a dungeon. pieces: the pictures of its rooms, the lowest first; x, z: the
  * place, in the yards of the map (u east, v south); level: the one the minimap tells, the rooms up to which are on show
@@ -91,13 +115,7 @@ export function floorsAt(floors: Floors, x: number, z: number): number[] {
  * undefined while a picture is awaited.
  */
 export function standsOn(floors: Floors, pieces: Piece[], x: number, z: number, level: number | undefined, before: number | null, solid: (piece: Piece, x: number, z: number) => boolean | undefined): number | null | undefined {
-  if (before !== null) {
-    for (const [dx, dz] of ROUND) {
-      const all = floorsAt(floors, x + dx, z + dz)
-      if (all.length) return all.reduce((a, b) => (Math.abs(b - before) < Math.abs(a - before) ? b : a))
-    }
-    return null
-  }
+  if (before !== null) return floorNear(floors, x, z, before)
   let room: Piece | undefined
   for (const p of pieces) {
     if ((level !== undefined && p.level > level) || !inPiece(p, x, z)) continue

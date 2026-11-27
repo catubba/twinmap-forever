@@ -75,6 +75,11 @@ const ARC_RISE = 0.25,
  */
 const CROWD = 1.5,
   CROWD_ROUTES = 2
+/**
+ * In a dungeon with the character in it, how much a pin of another floor shows: one whose floor is cut away over the
+ * character, or lies as far under it (terrain3d.ts, offFloor). As the prototype had it (design/dungeons3d).
+ */
+const OFF_FLOOR = 0.45
 const thinned = (s: Spot, crowd = CROWD): number => s.shows * Math.max(0, Math.min(1, 2 - s.away / crowd))
 
 export class Pins3d {
@@ -202,7 +207,8 @@ export class Pins3d {
     this.canvas.getContext('2d')!.clearRect(0, 0, this.canvas.width, this.canvas.height)
   }
 
-  // A pin drawn as an element: a copy of it, on the ground under it. The names of places are not pins.
+  // A pin drawn as an element: a copy of it, on the ground under it. The names of places are not pins. A boss or the
+  // entrance of a dungeon on show lies on its own floor of the building, faint when that is not the character's.
   private copy(marker: L.Marker, seen: Set<L.Marker>): void {
     const from = marker.getElement()
     if (!from || from.classList.contains('place')) return
@@ -223,8 +229,10 @@ export class Pins3d {
     const ll = marker.getLatLng(),
       x = ll.lng * YARDS_PER_UNIT,
       z = -ll.lat * YARDS_PER_UNIT,
-      s = this.terrain.spot(x, z),
-      shows = from.classList.contains('door') ? thinned(s) : s.shows,
+      door = from.classList.contains('door'),
+      high = door ? this.terrain.pinAt(x, z, ll.alt) : undefined,
+      s = this.terrain.spot(x, z, 0, false, high),
+      shows = (door ? thinned(s) : s.shows) * (high !== undefined && this.terrain.offFloor(high) ? OFF_FLOOR : 1),
       style = c.copy.style
     style.visibility = shows > 0 ? '' : 'hidden'
     if (this.tipped?.marker === marker) {

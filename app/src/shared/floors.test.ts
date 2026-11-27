@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { floorsAt, floorsOf, standsOn, walkedOn } from './floors'
+import { floorsAt, floorsOf, pinOn, standsOn, walkedOn } from './floors'
 import { solidAt, type Piece } from './inside'
 
 // A hall 20 yards a side with its floor at 0, a bridge over its middle at 10 (x 8 to 12), a ceiling at 30 and a pool:
@@ -48,6 +48,17 @@ describe('the floors of a dungeon', () => {
     expect(standsOn(floors, [hall, gallery], 110, 110, 0, null, all)).toBe(5)
     expect(standsOn(floors, [hall, gallery], 110, 110, 1, null, (p) => p === hall)).toBe(5)
     expect(standsOn(floors, [hall, gallery], 110, 110, 1, null, () => undefined)).toBeUndefined()
+  })
+
+  it('put a pin on the floor nearest to the height it is told, or at that height with no floor near it', () => {
+    expect(pinOn(floors, 110, 110, 16, 5)).toBe(15)
+    expect(pinOn(floors, 110, 110, 4, 5)).toBe(5)
+    // a boss that swims 9 yards over the floor, one on a ledge the building does not have
+    expect(pinOn(floors, 104, 110, 14, 5)).toBe(14)
+    expect(pinOn(floors, 130, 110, 14, 5)).toBe(14)
+    // no height told: the floor nearest to the main one, the main one with no floor at all
+    expect(pinOn(floors, 110, 110, undefined, 13)).toBe(15)
+    expect(pinOn(floors, 130, 110, undefined, 13)).toBe(13)
   })
 
   it('look a few yards round a place with no floor under it', () => {

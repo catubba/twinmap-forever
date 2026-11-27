@@ -11,14 +11,14 @@
 import * as THREE from 'three'
 import type { Compass } from './compass'
 import { MapControls } from 'three/examples/jsm/controls/MapControls.js'
-import { standsOn } from '../../shared/floors'
+import { pinOn, standsOn } from '../../shared/floors'
 import { solidAt, type Piece } from '../../shared/inside'
 import { BLOCK_ZOOM, HOLE, unpackLevels, type Levels } from '../../shared/levels'
 import { pictureOfBlock } from '../../shared/pixels'
 import { STANDS_FILE, type Stands } from '../../shared/stands'
 import { DRY, TAR } from '../../shared/water'
 import { BLOCKS, BLOCK_YARDS } from '../../shared/world'
-import { Buildings } from './buildings3d'
+import { Buildings, DUNGEON_CUT } from './buildings3d'
 import { Ground } from './ground3d'
 import { Props } from './props3d'
 import type { Density } from '../../shared/props'
@@ -490,12 +490,26 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
     return on ?? this.stood ?? this.buildings.dungeonFloor ?? undefined
   }
 
+  /**
+   * The height a pin of the dungeon on show lies at: on its own floor, not the character's (shared/floors.ts, pinOn).
+   * high: how high what it marks stands, where that is told. undefined out of a dungeon, or before its building is in.
+   */
+  pinAt(x: number, z: number, high?: number): number | undefined {
+    const floors = this.bare ? this.buildings.floors : null
+    return floors ? pinOn(floors, x, z, high, this.buildings.dungeonFloor ?? 0) : undefined
+  }
+
+  /** Whether a height of the dungeon is on another floor than the character in it: cut away over it, or as far under it. */
+  offFloor(y: number): boolean {
+    return this.bare && !!this.arrow && Math.abs(y - this.arrow.y) > DUNGEON_CUT
+  }
+
   // Where what lies on the ground at a place is put: on the ground, on the floor of the room under it as it opens, or
   // on the street over it where the ground of the game is not where one walks.
   private standAt(x: number, z: number): number {
     const ground = this.groundAt(x, z),
       floor = this.inside?.floorAt(x, z)
-    // ponytail: in a dungeon the floor the character stands on everywhere, its main floor with no character in it: the view is held and the pins lie at that height. The floor under each pin comes with M23-F25.
+    // in a dungeon the floor the character stands on everywhere, its main floor with no character in it: the view is held at that height. Its pins lie each on its own floor (pinAt).
     if (!Number.isFinite(ground)) return this.bare ? (this.arrow?.y ?? this.buildings.dungeonFloor ?? ground) : ground
     return floor ? ground + (floor.y - ground) * floor.open : (this.streetAt(x, z) ?? ground)
   }

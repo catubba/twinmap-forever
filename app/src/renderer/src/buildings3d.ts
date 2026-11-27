@@ -50,7 +50,7 @@ const CUT = 30
 /** Yards from the camera to a building inside the ground within which it is cut, as inside3d.ts opens its rooms; the cut comes down over a quarter more. */
 const OPEN = 700
 /** Yards over the character's floor a dungeon is cut at: lower than a city, its floors lie closer over one another (the user's choice on the prototype, design/dungeons3d). */
-const DUNGEON_CUT = 12
+export const DUNGEON_CUT = 12
 
 const FORMATS = { dxt1: THREE.RGB_S3TC_DXT1_Format, dxt1a: THREE.RGBA_S3TC_DXT1_Format, dxt3: THREE.RGBA_S3TC_DXT3_Format, dxt5: THREE.RGBA_S3TC_DXT5_Format } as const
 
@@ -270,11 +270,13 @@ export class Buildings {
         if (!made) return void (file.state = 'none')
         Object.assign(file, made.parts, { state: 'in' })
         this.sizes.set(id, made.parts.bytes!)
-        this.from.set(Infinity, 0, 0) // and the ones waiting for it are put in place
       })
       .catch(() => (file.state = 'none'))
       .finally(() => {
         this.loading--
+        // the ones waiting for it are put in place, and the next one waiting is read: also after a file of the folder
+        // shown before, or a dungeon opened while two of them were being read was never asked for until the camera moved
+        this.from.set(Infinity, 0, 0)
         this.changed = true
       })
   }

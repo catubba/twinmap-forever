@@ -22,6 +22,7 @@
   import { gameName, setGameNames } from '../../shared/game-names'
   import { NEW_DUNGEON_PINS } from '../../shared/new-dungeon-pins'
   import { MORE_BOSS_PINS } from '../../shared/more-boss-pins'
+  import { PIN_HEIGHTS } from '../../shared/pin-heights'
   import type { Position } from '../../shared/game'
   import { coloursFor, type Companion } from '../../shared/group'
   import { clearOf, gathered, unitsOfPlace, unitsOfRect, type Point } from '../../shared/geo'
@@ -644,14 +645,17 @@
     // A boss: its skull, and its name written under it, there without the pointer on it. On a second
     // screen nobody hovers while playing. Those of the pins, then the ones the pins lacked.
     const all = [...dungeons.flatMap((d) => d.bosses), ...MORE_BOSS_PINS.filter(([map]) => map === m.id).map(([, name, u, v]) => [name, u, v] as const)]
+    // How high each stands, where that is known: the 3D view puts it on its own floor (pins3d.ts). The 2D map has no use for it.
+    const high = PIN_HEIGHTS[m.id] ?? {}
+    const pinAt = (u: number, v: number, name: string): L.LatLng => L.latLng(atYards({ u, v }).lat, atYards({ u, v }).lng, high[name])
     for (const [name, u, v] of all) {
       // A rare boss is not there in every run: a silver ring, and said in its name.
       const rare = RARE_BOSSES.has(nameOfBoss(name)), shown = gameName(name)
-      bossMarks.push({ name, rare, gone: false, marker: L.marker(atYards({ u, v }), { keyboard: false, icon: bossIcon(false, rare) }).bindTooltip(rare ? t('map.pins.rareBoss', { name: shown }) : shown, { permanent: true, direction: 'bottom', offset: [0, rare ? 11 : 9], className: 'boss-name' }).addTo(pins) })
+      bossMarks.push({ name, rare, gone: false, marker: L.marker(pinAt(u, v, name), { keyboard: false, icon: bossIcon(false, rare) }).bindTooltip(rare ? t('map.pins.rareBoss', { name: shown }) : shown, { permanent: true, direction: 'bottom', offset: [0, rare ? 11 : 9], className: 'boss-name' }).addTo(pins) })
     }
     for (const d of dungeons) {
       if (d.entrance)
-        L.marker(atYards({ u: d.entrance[0], v: d.entrance[1] }), { keyboard: false, icon: doorIcon(m.kind === 'raid') })
+        L.marker(pinAt(d.entrance[0], d.entrance[1], d.name), { keyboard: false, icon: doorIcon(m.kind === 'raid') })
           .bindTooltip(dungeons.length > 1 ? t('map.pins.entranceOf', { name: gameName(d.name) }) : t('map.pins.entrance'), { direction: 'top', offset: [0, -13], className: 'tip' })
           .addTo(pins)
     }
