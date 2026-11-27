@@ -1,5 +1,5 @@
 import { expect, test, vi } from 'vitest'
-import { clientPidFrom, commandLine, inWindow, isGame, monitorsFrom, coveredMonitorEdgeRect, parseSetup, problemList, programFrom, rgbFrom, stateOf, edgeRect, wineProgramPath } from './capture-linux-frame'
+import { clientPidFrom, commandLine, inWindow, isGame, monitorsFrom, coveredMonitorEdgeRect, parseSetup, problemList, programFrom, rgbFrom, stateOf, edgeRect, windowlessGame, wineProgramPath } from './capture-linux-frame'
 import type { Rect } from '../shared/window'
 
 function monitorReply(monitors: (Rect & { outputs?: number[] })[]): Buffer {
@@ -257,6 +257,37 @@ test('requires Forever, or a bare game executable with both the Wine class and a
   expect(isGame(['/games/_retail_/Wow.exe'], '/usr/bin/wine', ['wow.exe'])).toBe(false)
   expect(isGame(['/games/_forever_/Launcher.exe'], '/usr/bin/wine', ['launcher.exe'])).toBe(false)
   expect(isGame(['/games/_forever_backup/'], '/usr/bin/wine', ['wow.exe'])).toBe(false)
+})
+
+test('tells once, and only when the game has run 30 s with no window found', () => {
+  const look = windowlessGame(30_000, 10_000), runs = vi.fn(() => true)
+  expect([0, 10_000, 20_000].map((now) => look(false, now, runs))).toEqual([false, false, false])
+  expect(look(false, 30_000, runs)).toBe(true)
+  expect([40_000, 90_000].map((now) => look(false, now, runs))).toEqual([false, false])
+  expect(runs).toHaveBeenCalledTimes(4) // no more looks once told
+  const none = vi.fn(() => false), quiet = windowlessGame(30_000, 10_000)
+  expect([0, 30_000, 60_000].map((now) => quiet(false, now, none))).toEqual([false, false, false]) // no game
+})
+
+test('a window found, or the game gone, starts the 30 s again', () => {
+  const look = windowlessGame(30_000, 10_000), runs = () => true
+  look(false, 0, runs)
+  expect(look(true, 20_000, runs)).toBe(false) // the window of a game that started
+  expect(look(false, 30_000, runs)).toBe(false)
+  expect(look(false, 50_000, runs)).toBe(false)
+  expect(look(false, 60_000, runs)).toBe(true)
+  const again = windowlessGame(30_000, 10_000)
+  again(false, 0, runs)
+  expect(again(false, 20_000, () => false)).toBe(false) // closed
+  expect(again(false, 40_000, runs)).toBe(false)
+  expect(again(false, 70_000, runs)).toBe(true)
+})
+
+test('looks for the running game at most every 10 s, and not while a window is found', () => {
+  const look = windowlessGame(30_000, 10_000), runs = vi.fn(() => true)
+  for (const now of [0, 3000, 6000, 9000, 12_000, 15_000]) look(false, now, runs)
+  look(true, 21_000, runs)
+  expect(runs).toHaveBeenCalledTimes(2) // at 0 and 12 s
 })
 
 test('translates the C drive using the process Wine prefix, ahead of Steam compat data', () => {

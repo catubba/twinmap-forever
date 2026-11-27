@@ -137,6 +137,30 @@ export function isGame(args: string[], executable: string | null, classes: strin
     || (/^wow\.exe$/i.test(program) && classes.some((name) => name.toLowerCase() === 'wow.exe') && args.some((arg) => FOREVER_FOLDER.test(arg)))
 }
 
+/**
+ * Tells once when the game has run `after` ms with no window found on the X display: a game that starts
+ * shows its window within seconds, one drawn by Wine's Wayland driver or in a gamescope of its own never
+ * does. `runs` is asked at most every `every` ms, and no more once told.
+ */
+export function windowlessGame(after: number, every: number): (found: boolean, now: number, runs: () => boolean) => boolean {
+  let since: number | null = null, lookAt = -Infinity, told = false
+  return (found, now, runs) => {
+    if (told) return false
+    if (found) {
+      since = null
+      return false
+    }
+    if (now < lookAt) return false
+    lookAt = now + every
+    if (!runs()) {
+      since = null
+      return false
+    }
+    since ??= now
+    return told = now - since >= after
+  }
+}
+
 export function stateOf(mapState: number | null, states: number[], hidden: number): 'gone' | 'minimized' | 'open' {
   return mapState === null ? 'gone' : mapState !== 2 || states.includes(hidden) ? 'minimized' : 'open'
 }
