@@ -1,5 +1,5 @@
 // The layers of the map, in the groups the Layers button shows. A layer that is not built yet is
-// listed, greyed out: its turn comes with the data that fills it.
+// listed, greyed out: its turn comes with the data that fills it. A layer marked off starts unticked.
 import { t } from './i18n'
 
 export const LAYER_GROUPS = [
@@ -38,6 +38,7 @@ export const LAYER_GROUPS = [
     layers: [
       { id: 'zones', built: true },
       { id: 'relief', built: true },
+      { id: 'levels', built: true, off: true }, // off until the player ticks it
       { id: 'caves', built: true },
       { id: 'dungeons', built: true },
       { id: 'routes', built: true },
@@ -56,7 +57,7 @@ export type GroupId = (typeof LAYER_GROUPS)[number]['id']
 export const layerName = (id: LayerId): string => t(`map.layers.names.${id}`)
 export const groupName = (id: GroupId): string => t(`map.layers.groups.${id}`)
 
-/** The player's choices as they were saved, every layer on where nothing readable says otherwise. */
+/** The player's choices as they were saved, every layer on (or off, if marked so) where nothing readable says otherwise. */
 export function layersFrom(saved: string | null): LayerChoices {
   let kept: Record<string, unknown> = {}
   try {
@@ -66,6 +67,6 @@ export function layersFrom(saved: string | null): LayerChoices {
     // nothing saved yet, or not ours
   }
   const choices = {} as LayerChoices
-  for (const group of LAYER_GROUPS) for (const layer of group.layers) choices[layer.id] = kept[layer.id] !== false
+  for (const group of LAYER_GROUPS) for (const layer of group.layers) choices[layer.id] = typeof kept[layer.id] === 'boolean' ? (kept[layer.id] as boolean) : !('off' in layer)
   return choices
 }

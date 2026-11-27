@@ -49,11 +49,12 @@
   import { companionPin, pin, pinSize, playerPin } from './marks'
   import { mapLook, objectives, questPin } from './packs.svelte'
   import { COLOURS } from './look'
+  import { ZONE_LEVELS, zoneDifficulty } from '../../shared/zone-levels'
 
   // at: when the position was read off the game, in milliseconds.
   // insideReady: the rooms of the buildings are converted, and their list can be asked for.
   // parchment: the continents (by their folder) whose game map is made (main/parchment.ts), with the colour of its sea.
-  let { pos, group = [], at: readAt, insideReady, quests = [], fixed = [], side, live = false, inbox = null, removed = [], set = [], gameFollows = null, journey = null, route = noRoute(), marked = [], onroute, onnpc, kills, death = null, parchment, skills, xpLevel, back = $bindable(null), looking = $bindable(null) }: { parchment?: Record<string, number[]>; kills?: unknown; skills?: unknown; xpLevel?: number | null; death?: Death | null; back?: (DeathPlace & { name: string; door: boolean }) | null; looking?: { zone: string; where: string } | null; journey?: Journey | null; pos: Position | undefined; at: number | undefined; insideReady: boolean; quests?: QuestPin[]; fixed?: FixedPin[]; side?: string; live?: boolean; inbox?: Inbox | null; removed?: string[]; set?: GameMark[]; gameFollows?: Pin | null; route?: Route; marked?: number[]; onroute?: (stop: Stop) => void; onnpc?: (pin: FixedPin | null) => void; group?: Companion[] } = $props()
+  let { pos, group = [], at: readAt, insideReady, quests = [], fixed = [], side, live = false, inbox = null, removed = [], set = [], gameFollows = null, journey = null, route = noRoute(), marked = [], onroute, onnpc, kills, death = null, parchment, skills, xpLevel, level, back = $bindable(null), looking = $bindable(null) }: { parchment?: Record<string, number[]>; kills?: unknown; skills?: unknown; xpLevel?: number | null; level?: number; death?: Death | null; back?: (DeathPlace & { name: string; door: boolean }) | null; looking?: { zone: string; where: string } | null; journey?: Journey | null; pos: Position | undefined; at: number | undefined; insideReady: boolean; quests?: QuestPin[]; fixed?: FixedPin[]; side?: string; live?: boolean; inbox?: Inbox | null; removed?: string[]; set?: GameMark[]; gameFollows?: Pin | null; route?: Route; marked?: number[]; onroute?: (stop: Stop) => void; onnpc?: (pin: FixedPin | null) => void; group?: Companion[] } = $props()
 
   const TOP_ZOOM = 7 // the detail of the game itself: the picture of a block is four tiles
   const PARCHMENT_ZOOM = 5 // the detail of the game's map (main/parchment.ts): about 4 yards a pixel
@@ -430,6 +431,50 @@
     relief?.remove()
     const world = WORLDS.find((w) => w.continent === continent)
     relief = maps.length > 0 && layers.relief && !inside && !onParchment && !threeD && world && map ? L.tileLayer(`${TILES}/${world.name}/shade/{z}/{x}/{y}.png`, { minZoom: 0, maxZoom: 9, maxNativeZoom: 6, bounds: WORLD_BOUNDS, errorTileUrl: BLANK, keepBuffer: 4, zIndex: 3, className: 'relief' }).addTo(map) : undefined
+  })
+
+  // The zones tinted by their levels for the character (shared/zone-levels.ts), each on its own land (main/zone-grid.ts):
+  // a picture of the continent at a pixel a chunk (33 yards), coloured again when the level changes, cut into the map's
+  // tiles and smoothed, so a border fades over a chunk. Under the names, over the ground and its relief. 2D only.
+  const TINT_OPACITY = 0.3
+  const ZONES = 'zones.bin' // main/zone-grid.ts
+  const zoneGrid = kept(2, (world: string) => inflated(`${TILES}/${world}/${ZONES}`).then((b) => b && new Uint16Array(b.buffer)))
+  const TintLayer = L.GridLayer.extend({
+    createTile(this: L.GridLayer & { options: { picture: HTMLCanvasElement } }, coords: L.Coords) {
+      const canvas = document.createElement('canvas'), picture = this.options.picture
+      canvas.width = canvas.height = 256
+      // A chunk past each side too: the smoothing at a tile's edge then matches the tile beside it.
+      const side = picture.width / 2 ** coords.z, scale = 256 / side
+      canvas.getContext('2d')!.drawImage(picture, coords.x * side - 1, coords.y * side - 1, side + 2, side + 2, -scale, -scale, 256 + 2 * scale, 256 + 2 * scale)
+      return canvas
+    },
+  }) as unknown as new (options: L.GridLayerOptions & { picture: HTMLCanvasElement }) => L.GridLayer
+  function tinted(grid: Uint16Array, level: number): HTMLCanvasElement {
+    const side = Math.sqrt(grid.length), canvas = document.createElement('canvas'), image = new ImageData(side, side)
+    canvas.width = canvas.height = side
+    const colours = new Map<number, number[] | null>()
+    const colourOf = (zone: number): number[] | null => {
+      const range = ZONE_LEVELS[zone], hex = range && COLOURS.levels[zoneDifficulty(range, level)]
+      return hex ? [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)) : null
+    }
+    grid.forEach((zone, i) => {
+      if (!zone) return
+      if (!colours.has(zone)) colours.set(zone, colourOf(zone))
+      const c = colours.get(zone)
+      if (c) image.data.set([c[0]!, c[1]!, c[2]!, 255], i * 4)
+    })
+    canvas.getContext('2d')!.putImageData(image, 0, 0)
+    return canvas
+  }
+  let tint: L.Layer | undefined, tintFor = 0
+  $effect(() => {
+    tint?.remove()
+    tint = undefined
+    const world = WORLDS.find((w) => w.continent === continent), asked = ++tintFor, at = level, view = map
+    if (!(maps.length > 0 && layers.levels && !inside && !threeD && world && view && at)) return
+    void zoneGrid(world.name).then((grid) => {
+      if (grid && asked === tintFor) tint = new TintLayer({ picture: tinted(grid, at), bounds: WORLD_BOUNDS, minZoom: 0, maxZoom: 9, keepBuffer: 4, zIndex: 3, opacity: TINT_OPACITY, className: 'tint' }).addTo(view)
+    })
   })
 
   // Puts these rooms on the map, in place of the ones before.

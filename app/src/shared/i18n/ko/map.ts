@@ -48,6 +48,7 @@ export default {
       herbs: '약초',
       zones: '지명',
       relief: '지형',
+      levels: '지역 레벨',
       caves: '동굴',
       dungeons: '던전',
       routes: '비행 경로',

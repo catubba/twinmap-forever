@@ -47,6 +47,7 @@ export default {
       herbs: '草药',
       zones: '地名',
       relief: '地形',
+      levels: '地区等级',
       caves: '洞穴',
       dungeons: '地下城',
       routes: '飞行路线',

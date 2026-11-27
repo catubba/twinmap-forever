@@ -22,6 +22,8 @@ export const COLOURS = {
   journey: '#ffd100', // the way of a journey of Shortest Path, and its goal
   wayBack: '#e0703a', // from the graveyard back to the corpse
   flights: '#7fc8ff', // the net of flight routes
+  // The zones tinted by level (Map.svelte): the game's colours of difficulty, as it gives them to a quest.
+  levels: { red: '#ff1a1a', orange: '#ff8040', yellow: '#ffd100', green: '#40bf40', grey: '#808080' },
   legs: { flight: '#33ff59', boat: '#00bfff', zeppelin: '#ff591a', tram: '#ff8000', lift: '#ff8000' } as Record<string, string>,
 } as const
 

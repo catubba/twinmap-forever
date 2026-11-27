@@ -972,7 +972,9 @@ by the OpenMap contributors (an addon for World of Warcraft: Forever)
 Used in: the app, the map drawn as the game's (app/src/main/parchment.ts): the
 fills of the land no zone map covers and the maps of the two continents, from
 OpenMap v0.8.13, brought in by app/scripts/import-openmap.js into
-app/resources/openmap
+app/resources/openmap; and the zones tinted by level
+(app/src/shared/zone-levels.ts): the level range of each zone, from
+Data/Forever/Levels.lua of OpenMap v0.8.13
 ================================================================================
 
 MIT License

@@ -2,6 +2,7 @@
 // stop the reading of the strip if it ran with it. Tells its progress in whole percents.
 import { existsSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { deflateSync } from 'node:zlib'
 import { parentPort, workerData } from 'node:worker_threads'
 import { GAME_NAMES_FILE, pairNames, wingNames } from '../shared/game-names'
 import { DUNGEON_PINS } from '../shared/dungeon-pins'
@@ -31,6 +32,7 @@ import { ICONS_MADE, writeIcons } from './icons'
 import { gamePictures, itemIcons } from './item-icons'
 import { convertParchment, parchmentFolder, parchmentSea } from './parchment'
 import startParchmentWorker from './parchment-worker?nodeWorker'
+import { zoneGrid, ZONES_FILE } from './zone-grid'
 import { convertWorld, dropOtherBuilds, finished, ICONS_FOLDER, MAPS_FILE, PLACES_FILE, tilesFolder, TRAVEL_FILE } from './tiles'
 
 // openmap: OpenMap's fills for the parchment, shipped beside the walking grid (scripts/import-openmap.js).
@@ -140,6 +142,18 @@ try {
     const maps = JSON.parse(readFileSync(join(folder, MAPS_FILE), 'utf8')) as GameMap[]
     // Without the tables the map has the names of its zones only: no reason to refuse it.
     writeFileSync(join(folder, PLACES_FILE), JSON.stringify(poi && overlays && arts && areas ? places(table(poi), table(overlays), table(arts), table(areas), maps) : []))
+  }
+  // Which zone each chunk of land is, for the zones tinted by level (zone-grid.ts): about a second a continent, once for each build.
+  for (const world of WORLDS) {
+    const file = join(folder, world.name, ZONES_FILE)
+    if (existsSync(file)) continue
+    try {
+      const files = open(), wdt = files.read(world.file), areas = files.read(AREA_TABLE_FILE, true)
+      const maps = JSON.parse(readFileSync(join(folder, MAPS_FILE), 'utf8')) as GameMap[]
+      if (wdt && areas) writeFileSync(file, deflateSync(new Uint8Array(zoneGrid(wdt, (id) => files.read(id), table(areas), maps, world.continent).buffer)))
+    } catch {
+      // The zones are not tinted; tried again at the next start.
+    }
   }
   // The doors of the dungeons and the flight routes. Without the tables the map has none of them.
   let travelMade = false
