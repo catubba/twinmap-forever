@@ -87,13 +87,8 @@ export function blockWater(adt: Buffer, liquid: (type: number) => number): Block
             if (kinds[r * SQUARES + c] || !covers(sx, sy)) continue
             kinds[r * SQUARES + c] = kind
             any = true
-            for (const [dy, dx] of [
-              [0, 0],
-              [0, 1],
-              [1, 0],
-              [1, 1],
-            ] as const)
-              levels[(r + dy) * SIDE + c + dx] = heights ? heights[(sy + dy) * (w + 1) + sx + dx]! : max
+            for (let dy = 0; dy < 2; dy++)
+              for (let dx = 0; dx < 2; dx++) levels[(r + dy) * SIDE + c + dx] = heights ? heights[(sy + dy) * (w + 1) + sx + dx]! : max
           }
         }
       }

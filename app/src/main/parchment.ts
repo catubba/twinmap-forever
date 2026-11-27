@@ -16,9 +16,14 @@
 // Kept: <continent folder>/parchment/<zoom>/<column>/<row>.png, zoom 0 to 5 (5 is the detail of the zones' pictures,
 // about 4 yards a pixel; the map enlarges it above), and 6 and 7 over the cities, whose maps are drawn about a yard a
 // pixel.
+//
+// The game's files are read here; the tiles are painted and kept on a few threads of their own (parchment-worker.ts),
+// which share what painting takes instead of copying it.
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { availableParallelism } from 'node:os'
 import { join as joinPath } from 'node:path'
 import { inflateSync } from 'node:zlib'
+import type { Worker } from 'node:worker_threads'
 import { decodeBlp, decodeBlpCutout } from '../shared/blp'
 import { unitsOfRect } from '../shared/geo'
 import { UI_MAP_ASSIGNMENT_FILE, type GameMap } from '../shared/maps'
@@ -95,8 +100,9 @@ function keptPicture(file: string): Picture | undefined {
   const b = readFileSync(file), width = b.readUInt16LE(0), height = b.readUInt16LE(2), channels = b[4]!, row = width * channels
   const rows = inflateSync(b.subarray(5))
   for (let i = row; i < rows.length; i++) rows[i] = (rows[i]! + rows[i - row]!) & 255
-  if (channels === 3) return { width, height, rgb: rows }
-  const rgb = new Uint8Array(width * height * 3), alpha = new Uint8Array(width * height)
+  const rgb = shared(Uint8Array, width * height * 3)
+  if (channels === 3) return rgb.set(rows), { width, height, rgb }
+  const alpha = shared(Uint8Array, width * height)
   for (let i = 0; i < alpha.length; i++) {
     for (let k = 0; k < 3; k++) rgb[i * 3 + k] = rows[i * 4 + k]!
     alpha[i] = rows[i * 4 + 3]!
@@ -104,12 +110,196 @@ function keptPicture(file: string): Picture | undefined {
   return { width, height, rgb, alpha }
 }
 
+/** What painting a tile of a continent takes, worked out once; its arrays shared with the threads that paint (parchment-worker.ts). */
+export interface Ground {
+  /** By layer: none for PAPER, the continent's picture for SEA, then the zones and the pictures of EXTRA. */
+  layers: (Layer | undefined)[]
+  /** By chunk: its layer, whether water, how far from any picture, whether calm, its shade. */
+  ground: Int16Array
+  water: Uint8Array
+  reach: Uint8Array
+  calm: Uint8Array
+  shading: Float32Array
+  shaded: Uint8Array
+  /** By chunk of a picture: the picture across its nearest border with another, -1 for none. */
+  beyond: Int16Array
+  /** A city's layer and the layer of the zone around it. */
+  around: [number, number][]
+  /** The layers of OpenMap's fills. */
+  fills: number[]
+  /** The one colour of the far sea. */
+  sea: Float32Array
+}
+
+/** A typed array the threads that paint share with the one that made it. */
+function shared<T>(Type: { new (buffer: SharedArrayBuffer): T; BYTES_PER_ELEMENT: number }, length: number): T {
+  return new Type(new SharedArrayBuffer(length * Type.BYTES_PER_ELEMENT))
+}
+
+/** The colours of a continent's parchment, from what convertParchment worked out. */
+export function painter(g: Ground) {
+  const { layers, ground, water, beyond, reach, calm, shading, shaded, sea, fills } = g, around = new Map(g.around)
+  const chunkAt = (u: number, v: number): number => Math.min(SIDE - 1, Math.max(0, Math.floor(v * PER_UNIT))) * SIDE + Math.min(SIDE - 1, Math.max(0, Math.floor(u * PER_UNIT)))
+  // The continent's picture, enlarged: the land of no zone and the open sea, as the game's map shows them.
+  const enlarged = (u: number, v: number, out: Float32Array): boolean => {
+    const l = layers[SEA], p = l?.picture
+    if (!l || !p) return false
+    const px = Math.min(p.width - 1, Math.max(0, ((u - l.tl.x) / (l.br.x - l.tl.x)) * p.width - 0.5)), py = Math.min(p.height - 1, Math.max(0, ((v - l.tl.y) / (l.br.y - l.tl.y)) * p.height - 0.5))
+    const x0 = Math.floor(px), y0 = Math.floor(py), x1 = Math.min(x0 + 1, p.width - 1), y1 = Math.min(y0 + 1, p.height - 1), fx = px - x0, fy = py - y0
+    for (let k = 0; k < 3; k++) {
+      const a = p.rgb[(y0 * p.width + x0) * 3 + k]!, b = p.rgb[(y0 * p.width + x1) * 3 + k]!, c = p.rgb[(y1 * p.width + x0) * 3 + k]!, d = p.rgb[(y1 * p.width + x1) * 3 + k]!
+      out[k] = (a * (1 - fx) + b * fx) * (1 - fy) + (c * (1 - fx) + d * fx) * fy
+    }
+    return true
+  }
+  const open = (u: number, v: number, out: Float32Array): void => {
+    const near = 1 - reach[chunkAt(u, v)]! / REACH
+    if (!near || !enlarged(u, v, out)) return out.set(sea)
+    for (let k = 0; k < 3; k++) out[k] = sea[k]! + (out[k]! - sea[k]!) * near
+  }
+  // A layer's colour at a point of the map (units), or false off its picture.
+  // The edge of a zone's picture is its torn frame: off the picture too. A picture clear in parts (a fill) is laid over
+  // the continent's, as much as it shows; off the picture where it is all clear.
+  const behind = new Float32Array(3)
+  const sample = (layer: number, u: number, v: number, out: Float32Array): boolean => {
+    if (layer === PAPER || layer === SEA) return open(u, v, out), true
+    const l = layers[layer], p = l?.picture, frame = l?.frame ?? FRAME
+    if (!p) return false
+    const px = ((u - l.tl.x) / (l.br.x - l.tl.x)) * p.width - 0.5, py = ((v - l.tl.y) / (l.br.y - l.tl.y)) * p.height - 0.5
+    if (px < frame || py < frame || px > p.width - 1 - frame || py > p.height - 1 - frame) return false
+    const x0 = Math.floor(px), y0 = Math.floor(py), x1 = Math.min(x0 + 1, p.width - 1), y1 = Math.min(y0 + 1, p.height - 1), fx = px - x0, fy = py - y0
+    if (!p.alpha) {
+      for (let k = 0; k < 3; k++) {
+        const a = p.rgb[(y0 * p.width + x0) * 3 + k]!, b = p.rgb[(y0 * p.width + x1) * 3 + k]!, c = p.rgb[(y1 * p.width + x0) * 3 + k]!, d = p.rgb[(y1 * p.width + x1) * 3 + k]!
+        out[k] = (a * (1 - fx) + b * fx) * (1 - fy) + (c * (1 - fx) + d * fx) * fy
+      }
+      return true
+    }
+    const at = [y0 * p.width + x0, y0 * p.width + x1, y1 * p.width + x0, y1 * p.width + x1], w = [(1 - fx) * (1 - fy), fx * (1 - fy), (1 - fx) * fy, fx * fy]
+    let shown = 0
+    for (let n = 0; n < 4; n++) shown += (w[n]! * p.alpha[at[n]!]!) / 255
+    if (shown < 1 / 255) return false
+    open(u, v, behind)
+    for (let k = 0; k < 3; k++) {
+      let c = 0
+      for (let n = 0; n < 4; n++) c += (w[n]! * p.rgb[at[n]! * 3 + k]! * p.alpha[at[n]!]!) / 255
+      out[k] = c + behind[k]! * (1 - shown)
+    }
+    return true
+  }
+
+  // A layer's colour; where it has none (off its picture) the zone around a city, or a fill of OpenMap (which paints its
+  // own coasts and shallows), or the picture beyond its nearest border, or the continent's picture.
+  const colour = (layer: number, i: number, u: number, v: number, out: Float32Array): void => {
+    if (layer >= 2 && (sample(layer, u, v, out) || (around.has(layer) && sample(around.get(layer)!, u, v, out)))) return
+    if (fills.some((fill) => fill !== layer && sample(fill, u, v, out))) return
+    if (layer >= 2 && beyond[i]! >= 2 && sample(beyond[i]!, u, v, out)) return
+    sample(layer < 2 ? layer : water[i] ? SEA : PAPER, u, v, out)
+  }
+
+  // One tile of a detailed zoom: each pixel the layers of the chunks around it, weighed by how close.
+  // Undefined for a tile all of the one colour of the open sea.
+  const detail = (zoom: number, column: number, row: number): Uint8Array | undefined => {
+    const scale = 2 ** zoom, rgb = new Uint8Array(TILE * TILE * 3)
+    const c = new Float32Array(3), fround = Math.fround
+    const ids = new Int32Array(16), weights = new Float64Array(16), chunks = new Int32Array(16)
+    let land = false
+    for (let y = 0; y < TILE; y++) {
+      const v = (row * TILE + y + 0.5) / scale, fy = v * PER_UNIT - 0.5, cy = Math.floor(fy)
+      const my = Math.min(SIDE - 1, Math.max(0, Math.round(fy))) * SIDE
+      for (let x = 0; x < TILE; x++) {
+        const u = (column * TILE + x + 0.5) / scale, at = (y * TILE + x) * 3
+        const fx = u * PER_UNIT - 0.5, cx = Math.floor(fx)
+        const middle = my + Math.min(SIDE - 1, Math.max(0, Math.round(fx)))
+        if (reach[middle]! < REACH) land = true
+        if (calm[middle]) {
+          colour(ground[middle]!, middle, u, v, c)
+          rgb[at] = Math.round(c[0]!), rgb[at + 1] = Math.round(c[1]!), rgb[at + 2] = Math.round(c[2]!)
+          continue
+        }
+        // The chunks whose middles are within two of the pixel, by a tent: the fade across a border.
+        // The sums as the bytes of a picture of floats would keep them, the way the tiles have always been worked out.
+        let red = 0, green = 0, blue = 0, weight = 0, count = 0
+        for (let gy = Math.max(0, cy - 1); gy <= cy + 2 && gy < SIDE; gy++) {
+          const wy = Math.max(0, 1 - Math.abs(fy - gy) / 2)
+          for (let gx = Math.max(0, cx - 1); gx <= cx + 2 && gx < SIDE; gx++) {
+            const w = Math.max(0, 1 - Math.abs(fx - gx) / 2) * wy
+            if (!w) continue
+            const i = gy * SIDE + gx, id = ground[i]!
+            let n = 0
+            while (n < count && ids[n] !== id) n++
+            if (n === count) (ids[n] = id), (weights[n] = w), (chunks[n] = i), count++
+            else weights[n] += w
+            if (shaded[i]) (red = fround(red + shading[i * 3]! * w)), (green = fround(green + shading[i * 3 + 1]! * w)), (blue = fround(blue + shading[i * 3 + 2]! * w))
+            weight += w
+          }
+        }
+        for (let n = 0; n < count; n++) {
+          colour(ids[n]!, chunks[n]!, u, v, c)
+          ;(red = fround(red + c[0]! * weights[n]!)), (green = fround(green + c[1]! * weights[n]!)), (blue = fround(blue + c[2]! * weights[n]!))
+        }
+        rgb[at] = Math.max(0, Math.min(255, Math.round(red / weight)))
+        rgb[at + 1] = Math.max(0, Math.min(255, Math.round(green / weight)))
+        rgb[at + 2] = Math.max(0, Math.min(255, Math.round(blue / weight)))
+      }
+    }
+    return land ? rgb : undefined
+  }
+  return { enlarged, sample, detail }
+}
+
+/** A tile to make: painted, or given its pixels; kept as a PNG unless it is all of the open sea. */
+export interface Task {
+  zoom: number
+  column: number
+  row: number
+  file: string
+  rgb?: Uint8Array
+}
+
+/** Makes a tile; gives its pixels, or undefined for one all of the open sea. */
+export function make(detail: ReturnType<typeof painter>['detail'], task: Task): Uint8Array | undefined {
+  const rgb = task.rgb ?? detail(task.zoom, task.column, task.row)
+  if (rgb) keep(task.file, () => encodePng(rgb, TILE, TILE, 3, 4, 4))
+  return rgb
+}
+
+/** How many threads paint: a few, and two cores left to the game and the app. */
+// ponytail: a fixed share of the cores, not a measure of how busy they are.
+const PAINTERS = Math.max(1, Math.min(4, availableParallelism() - 2))
+
+/** Tiles made on the threads of parchment-worker.ts, each given the next in turn; all fail if one of them stops. */
+function onThreads(threads: Worker[], g: Ground): (task: Task) => Promise<Uint8Array | undefined> {
+  const waiting = new Map<number, { done: (rgb?: Uint8Array) => void; fail: (e: unknown) => void }>()
+  const stopped = (e: unknown): void => {
+    for (const { fail } of waiting.values()) fail(e)
+    waiting.clear()
+  }
+  for (const t of threads) {
+    t.postMessage(g)
+    t.on('message', ({ id, rgb }: { id: number; rgb?: Uint8Array }) => {
+      waiting.get(id)?.done(rgb)
+      waiting.delete(id)
+    })
+    t.on('error', stopped)
+    t.on('exit', () => stopped(new Error('a thread painting the parchment stopped')))
+  }
+  let next = 0
+  return (task) =>
+    new Promise((done, fail) => {
+      const id = next++
+      waiting.set(id, { done, fail })
+      threads[id % threads.length]!.postMessage({ id, ...task })
+    })
+}
+
 /**
  * Makes one continent's parchment. read: a game file by number. table: a table from its file. openmap: the folder of
- * what scripts/import-openmap.js keeps; without it the land of no zone is the continent's picture alone.
- * Gives the tiles made, or 0 when the game has not the tables of its pictures.
+ * what scripts/import-openmap.js keeps; without it the land of no zone is the continent's picture alone. start: a thread
+ * of parchment-worker.ts; without, the tiles are painted on this one. Gives the tiles made, or 0 when the game has not the
+ * tables of its pictures.
  */
-export function convertParchment(
+export async function convertParchment(
   wdt: Buffer,
   read: (id: number, skipHidden?: boolean) => Buffer | null,
   table: (file: Buffer) => Table,
@@ -118,7 +308,8 @@ export function convertParchment(
   continentFolder: string,
   openmap?: string,
   onProgress?: (done: number, total: number) => void,
-): number {
+  start?: () => Worker,
+): Promise<number> {
   const folder = parchmentFolder(continentFolder)
   const tableOf = (id: number): Table | null => {
     const f = read(id, true)
@@ -129,7 +320,7 @@ export function convertParchment(
 
   // A picture from its tiles, and pieces over them.
   const drawn = (width: number, height: number, tiles: { file: number; x: number; y: number; cutout: boolean }[]): Picture => {
-    const rgb = new Uint8Array(width * height * 3)
+    const rgb = shared(Uint8Array, width * height * 3)
     const put = (file: number, ox: number, oy: number, cutout: boolean): void => {
       const f = read(file)
       if (!f) return
@@ -209,7 +400,7 @@ export function convertParchment(
     for (let n = 0; parent.get(a) && n < 8; n++) a = parent.get(a)!
     return a
   }
-  const ground = new Int16Array(SIDE * SIDE).fill(SEA), water = new Uint8Array(SIDE * SIDE).fill(1)
+  const ground = shared(Int16Array, SIDE * SIDE).fill(SEA), water = shared(Uint8Array, SIDE * SIDE).fill(1)
   const blocks = terrainFiles(wdt)
   for (const [block, file] of blocks) {
     const adt = read(file)
@@ -302,7 +493,7 @@ export function convertParchment(
   // For each chunk of a picture, the picture across its nearest border with another: what shows where its own does not
   // reach (colour()). Not the sea's or the paper's across their borders, nor only up to BAND: either drew steps, chunk by
   // chunk, between the neighbour's picture and the continent's.
-  const beyond = new Int16Array(SIDE * SIDE).fill(-1)
+  const beyond = shared(Int16Array, SIDE * SIDE).fill(-1)
   edge = []
   for (let i = 0; i < ground.length; i++) {
     const other = ground[i]! >= 2 ? neighbours(i).find((j) => ground[j]! >= 2 && ground[j] !== ground[i]) : undefined
@@ -316,7 +507,7 @@ export function convertParchment(
 
   // How far each chunk of open sea, or of land of no zone (paper), is from any picture, up to REACH: both fade to the one
   // colour of the far sea, so an island of no zone far out (Gillijim's Isle) is sea, as on the game's map.
-  const reach = new Uint8Array(SIDE * SIDE).fill(REACH)
+  const reach = shared(Uint8Array, SIDE * SIDE).fill(REACH)
   edge = []
   for (let i = 0; i < ground.length; i++) if (ground[i]! >= 2) (reach[i] = 0), edge.push(i)
   for (let step = 1; step < REACH && edge.length; step++) {
@@ -324,21 +515,12 @@ export function convertParchment(
     for (const i of edge) for (const j of neighbours(i)) if (reach[j] === REACH) (reach[j] = step), next.push(j)
     edge = next
   }
-  const chunkAt = (u: number, v: number): number => Math.min(SIDE - 1, Math.max(0, Math.floor(v * PER_UNIT))) * SIDE + Math.min(SIDE - 1, Math.max(0, Math.floor(u * PER_UNIT)))
-  // The continent's picture, enlarged: the land of no zone and the open sea, as the game's map shows them.
-  const enlarged = (u: number, v: number, out: Float32Array): boolean => {
-    const l = layers[SEA], p = l?.picture
-    if (!l || !p) return false
-    const px = Math.min(p.width - 1, Math.max(0, ((u - l.tl.x) / (l.br.x - l.tl.x)) * p.width - 0.5)), py = Math.min(p.height - 1, Math.max(0, ((v - l.tl.y) / (l.br.y - l.tl.y)) * p.height - 0.5))
-    const x0 = Math.floor(px), y0 = Math.floor(py), x1 = Math.min(x0 + 1, p.width - 1), y1 = Math.min(y0 + 1, p.height - 1), fx = px - x0, fy = py - y0
-    for (let k = 0; k < 3; k++) {
-      const a = p.rgb[(y0 * p.width + x0) * 3 + k]!, b = p.rgb[(y0 * p.width + x1) * 3 + k]!, c = p.rgb[(y1 * p.width + x0) * 3 + k]!, d = p.rgb[(y1 * p.width + x1) * 3 + k]!
-      out[k] = (a * (1 - fx) + b * fx) * (1 - fy) + (c * (1 - fx) + d * fx) * fy
-    }
-    return true
-  }
+  // What painting a tile takes; the shades, the calm chunks and the colour of the far sea are worked out below with its
+  // help.
+  const sea = new Float32Array([130, 130, 110]), shading = shared(Float32Array, SIDE * SIDE * 3), shaded = shared(Uint8Array, SIDE * SIDE), calm = shared(Uint8Array, SIDE * SIDE)
+  const g: Ground = { layers, ground, water, beyond, reach, calm, shading, shaded, around: [...around], fills, sea }
+  const { enlarged, sample } = painter(g)
   // The one colour of the far sea: the middle of the continent's picture there.
-  const sea = new Float32Array([130, 130, 110])
   {
     const seen: number[][] = [[], [], []], c = new Float32Array(3)
     for (let i = 0; i < ground.length; i += 7) {
@@ -346,41 +528,6 @@ export function convertParchment(
       for (let k = 0; k < 3; k++) seen[k]!.push(c[k]!)
     }
     if (seen[0]!.length) sea.set(seen.map((l) => l.sort((a, b) => a - b)[l.length >> 1]!))
-  }
-  const open = (u: number, v: number, out: Float32Array): void => {
-    const near = 1 - reach[chunkAt(u, v)]! / REACH
-    if (!near || !enlarged(u, v, out)) return out.set(sea)
-    for (let k = 0; k < 3; k++) out[k] = sea[k]! + (out[k]! - sea[k]!) * near
-  }
-  // A layer's colour at a point of the map (units), or false off its picture.
-  // The edge of a zone's picture is its torn frame: off the picture too. A picture clear in parts (a fill) is laid over
-  // the continent's, as much as it shows; off the picture where it is all clear.
-  const behind = new Float32Array(3)
-  const sample = (layer: number, u: number, v: number, out: Float32Array): boolean => {
-    if (layer === PAPER || layer === SEA) return open(u, v, out), true
-    const l = layers[layer], p = l?.picture, frame = l?.frame ?? FRAME
-    if (!p) return false
-    const px = ((u - l.tl.x) / (l.br.x - l.tl.x)) * p.width - 0.5, py = ((v - l.tl.y) / (l.br.y - l.tl.y)) * p.height - 0.5
-    if (px < frame || py < frame || px > p.width - 1 - frame || py > p.height - 1 - frame) return false
-    const x0 = Math.floor(px), y0 = Math.floor(py), x1 = Math.min(x0 + 1, p.width - 1), y1 = Math.min(y0 + 1, p.height - 1), fx = px - x0, fy = py - y0
-    if (!p.alpha) {
-      for (let k = 0; k < 3; k++) {
-        const a = p.rgb[(y0 * p.width + x0) * 3 + k]!, b = p.rgb[(y0 * p.width + x1) * 3 + k]!, c = p.rgb[(y1 * p.width + x0) * 3 + k]!, d = p.rgb[(y1 * p.width + x1) * 3 + k]!
-        out[k] = (a * (1 - fx) + b * fx) * (1 - fy) + (c * (1 - fx) + d * fx) * fy
-      }
-      return true
-    }
-    const at = [y0 * p.width + x0, y0 * p.width + x1, y1 * p.width + x0, y1 * p.width + x1], w = [(1 - fx) * (1 - fy), fx * (1 - fy), (1 - fx) * fy, fx * fy]
-    let shown = 0
-    for (let n = 0; n < 4; n++) shown += (w[n]! * p.alpha[at[n]!]!) / 255
-    if (shown < 1 / 255) return false
-    open(u, v, behind)
-    for (let k = 0; k < 3; k++) {
-      let c = 0
-      for (let n = 0; n < 4; n++) c += (w[n]! * p.rgb[at[n]! * 3 + k]! * p.alpha[at[n]!]!) / 255
-      out[k] = c + behind[k]! * (1 - shown)
-    }
-    return true
   }
 
   // The tone of each layer along each of its borders: the middle (median) colour of its band there. From the two
@@ -402,74 +549,20 @@ export function convertParchment(
       if (b) towards.set(key, new Float32Array([0, 1, 2].map((k) => (b[k]! - a[k]!) / 2)))
     }
   }
-  // What a chunk adds to its layer's colour: all of it at the border, none BAND away.
-  const shade = (i: number, out: Float32Array): boolean => {
-    const t = towards.get(pair(ground[i]!, across[i]!))
-    if (!t) return false
+  // What a chunk adds to its layer's colour: all of it at the border, none BAND away. Worked out once for each chunk.
+  for (let i = 0; i < ground.length; i++) {
+    const t = far[i]! < BAND && towards.get(pair(ground[i]!, across[i]!))
+    if (!t) continue
     const w = 1 - far[i]! / BAND
-    for (let k = 0; k < 3; k++) out[k] = t[k]! * w
-    return true
+    shaded[i] = 1
+    for (let k = 0; k < 3; k++) shading[i * 3 + k] = t[k]! * w
   }
 
   // Chunks far from any border, and their neighbours: a pixel among them is its layer's colour alone.
-  const calm = new Uint8Array(SIDE * SIDE)
   for (let i = 0; i < ground.length; i++) {
     const x = i % SIDE, y = Math.floor(i / SIDE)
     calm[i] = x >= 2 && y >= 2 && x < SIDE - 2 && y < SIDE - 2 && far[i] === BAND && [-2, -1, 0, 1, 2].every((d) => far[i + d * SIDE - 2] === BAND && far[i + d * SIDE + 2] === BAND && far[i - 2 * SIDE + d] === BAND && far[i + 2 * SIDE + d] === BAND) ? 1 : 0
   }
-  // A layer's colour; where it has none (off its picture) the zone around a city, or a fill of OpenMap (which paints its
-  // own coasts and shallows), or the picture beyond its nearest border, or the continent's picture.
-  const colour = (layer: number, i: number, u: number, v: number, out: Float32Array): void => {
-    if (layer >= 2 && (sample(layer, u, v, out) || (around.has(layer) && sample(around.get(layer)!, u, v, out)))) return
-    if (fills.some((fill) => fill !== layer && sample(fill, u, v, out))) return
-    if (layer >= 2 && beyond[i]! >= 2 && sample(beyond[i]!, u, v, out)) return
-    sample(layer < 2 ? layer : water[i] ? SEA : PAPER, u, v, out)
-  }
-
-  // One tile of a detailed zoom: each pixel the layers of the chunks around it, weighed by how close.
-  // Undefined for a tile all of the one colour of the open sea.
-  const detail = (zoom: number, column: number, row: number): Uint8Array | undefined => {
-    const scale = 2 ** zoom, rgb = new Uint8Array(TILE * TILE * 3)
-    const c = new Float32Array(3), s = new Float32Array(3), sum = new Float32Array(3)
-    const ids: number[] = [], weights: number[] = [], chunks: number[] = []
-    let land = false
-    for (let y = 0; y < TILE; y++) for (let x = 0; x < TILE; x++) {
-      const u = (column * TILE + x + 0.5) / scale, v = (row * TILE + y + 0.5) / scale, at = (y * TILE + x) * 3
-      const fx = u * PER_UNIT - 0.5, fy = v * PER_UNIT - 0.5, cx = Math.floor(fx), cy = Math.floor(fy)
-      const middle = Math.min(SIDE - 1, Math.max(0, Math.round(fy))) * SIDE + Math.min(SIDE - 1, Math.max(0, Math.round(fx)))
-      if (calm[middle]) {
-        colour(ground[middle]!, middle, u, v, c)
-        land ||= reach[middle]! < REACH
-        for (let k = 0; k < 3; k++) rgb[at + k] = Math.round(c[k]!)
-        continue
-      }
-      // The chunks whose middles are within two of the pixel, by a tent: the fade across a border.
-      sum.fill(0)
-      ids.length = weights.length = chunks.length = 0
-      let weight = 0
-      for (let dy = -1; dy <= 2; dy++) for (let dx = -1; dx <= 2; dx++) {
-        const gx = cx + dx, gy = cy + dy
-        if (gx < 0 || gy < 0 || gx >= SIDE || gy >= SIDE) continue
-        const w = Math.max(0, 1 - Math.abs(fx - gx) / 2) * Math.max(0, 1 - Math.abs(fy - gy) / 2)
-        if (!w) continue
-        const i = gy * SIDE + gx, n = ids.indexOf(ground[i]!)
-        if (n < 0) ids.push(ground[i]!), weights.push(w), chunks.push(i)
-        else weights[n] += w
-        if (far[i]! < BAND && shade(i, s)) {
-          for (let k = 0; k < 3; k++) sum[k] += s[k]! * w
-        }
-        weight += w
-      }
-      ids.forEach((id, n) => {
-        colour(id, chunks[n]!, u, v, c)
-        for (let k = 0; k < 3; k++) sum[k] += c[k]! * weights[n]!
-      })
-      land ||= reach[middle]! < REACH
-      for (let k = 0; k < 3; k++) rgb[at + k] = Math.max(0, Math.min(255, Math.round(sum[k]! / weight)))
-    }
-    return land ? rgb : undefined
-  }
-
   // Tiles only where some chunk is not of the one colour of the open sea; the rest, and the parts of a tile below with
   // nothing under them, that colour, which the map shows around the tiles too.
   const chunksPerTile = TILE / (2 ** PARCHMENT_ZOOM / PER_UNIT)
@@ -479,38 +572,43 @@ export function convertParchment(
   }
   const flat = new Uint8Array(TILE * TILE * 3)
   for (let i = 0; i < flat.length; i++) flat[i] = Math.round(sea[i % 3]!)
-  let made = 0, done = 0
-  const total = (2 ** PARCHMENT_ZOOM) ** 2
-  const tile = (zoom: number, column: number, row: number): Uint8Array | undefined => {
-    let rgb: Uint8Array | undefined
-    if (zoom === PARCHMENT_ZOOM) {
-      onProgress?.(++done, total)
-      rgb = wanted(column, row) ? detail(zoom, column, row) : undefined
-    } else {
-      const four = [0, 1, 2, 3].map((i) => tile(zoom + 1, column * 2 + (i & 1), row * 2 + (i >> 1)))
-      if (four.every((part) => !part)) return undefined
-      rgb = halve(join(four.map((part) => part ?? flat), TILE), TILE * 2)
+  const fileOf = (zoom: number, column: number, row: number): string => joinPath(folder, String(zoom), String(column), `${row}.png`)
+  const threads = start ? Array.from({ length: PAINTERS }, start) : []
+  try {
+    const here = painter(g).detail
+    const making = threads.length ? onThreads(threads, g) : (task: Task) => Promise.resolve(make(here, task))
+    const kept: Promise<unknown>[] = []
+    let made = 0, done = 0
+    const total = (2 ** PARCHMENT_ZOOM) ** 2
+    const tile = async (zoom: number, column: number, row: number): Promise<Uint8Array | undefined> => {
+      let rgb: Uint8Array | undefined
+      if (zoom === PARCHMENT_ZOOM) {
+        rgb = wanted(column, row) ? await making({ zoom, column, row, file: fileOf(zoom, column, row) }) : undefined
+        onProgress?.(++done, total)
+      } else {
+        const four = await Promise.all([0, 1, 2, 3].map((i) => tile(zoom + 1, column * 2 + (i & 1), row * 2 + (i >> 1))))
+        if (four.every((part) => !part)) return undefined
+        rgb = halve(join(four.map((part) => part ?? flat), TILE), TILE * 2)
+        kept.push(making({ zoom, column, row, file: fileOf(zoom, column, row), rgb }))
+      }
+      if (rgb) made++
+      return rgb
     }
-    if (rgb) {
-      made++
-      keep(joinPath(folder, String(zoom), String(column), `${row}.png`), () => encodePng(rgb, TILE, TILE, 3, true))
+    if (existsSync(joinPath(folder, MARKER))) rmSync(folder, { recursive: true, force: true })
+    await tile(0, 0, 0)
+    // Over the cities, closer zooms: every tile that holds some of a city's ground.
+    const closer: Record<number, number[][]> = {}
+    for (let zoom = PARCHMENT_ZOOM + 1; zoom <= CITY_ZOOM; zoom++) {
+      const side = TILE / (2 ** zoom / PER_UNIT), seen = new Set<number>()
+      for (let i = 0; i < ground.length; i++) if (around.has(ground[i]!)) seen.add(Math.floor(Math.floor(i / SIDE) / side) * 65536 + Math.floor((i % SIDE) / side))
+      closer[zoom] = [...seen].map((key) => [key % 65536, Math.floor(key / 65536)])
+      for (const [column, row] of closer[zoom]!) kept.push(making({ zoom, column: column!, row: row!, file: fileOf(zoom, column!, row!) }).then((rgb) => rgb && made++))
     }
-    return rgb
+    await Promise.all(kept)
+    mkdirSync(folder, { recursive: true })
+    writeFileSync(joinPath(folder, MARKER), JSON.stringify({ tiles: made, format: FORMAT, sea: [...sea].map(Math.round), closer }))
+    return made
+  } finally {
+    for (const t of threads) void t.terminate()
   }
-  if (existsSync(joinPath(folder, MARKER))) rmSync(folder, { recursive: true, force: true })
-  tile(0, 0, 0)
-  // Over the cities, closer zooms: every tile that holds some of a city's ground.
-  const closer: Record<number, number[][]> = {}
-  for (let zoom = PARCHMENT_ZOOM + 1; zoom <= CITY_ZOOM; zoom++) {
-    const side = TILE / (2 ** zoom / PER_UNIT), seen = new Set<number>()
-    for (let i = 0; i < ground.length; i++) if (around.has(ground[i]!)) seen.add(Math.floor(Math.floor(i / SIDE) / side) * 65536 + Math.floor((i % SIDE) / side))
-    closer[zoom] = [...seen].map((key) => [key % 65536, Math.floor(key / 65536)])
-    for (const [column, row] of closer[zoom]!) {
-      const rgb = detail(zoom, column!, row!)
-      if (rgb) (made++), keep(joinPath(folder, String(zoom), String(column), `${row}.png`), () => encodePng(rgb, TILE, TILE, 3, true))
-    }
-  }
-  mkdirSync(folder, { recursive: true })
-  writeFileSync(joinPath(folder, MARKER), JSON.stringify({ tiles: made, format: FORMAT, sea: [...sea].map(Math.round), closer }))
-  return made
 }
