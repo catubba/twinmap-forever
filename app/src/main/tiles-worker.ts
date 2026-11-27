@@ -32,7 +32,8 @@ import { gamePictures, itemIcons } from './item-icons'
 import { convertParchment, parchmentFolder, parchmentSea } from './parchment'
 import { convertWorld, dropOtherBuilds, finished, ICONS_FOLDER, MAPS_FILE, PLACES_FILE, tilesFolder, TRAVEL_FILE } from './tiles'
 
-const { gameFolder, base, nav } = workerData as { gameFolder: string; base: string; nav: string }
+// openmap: OpenMap's fills for the parchment, shipped beside the walking grid (scripts/import-openmap.js).
+const { gameFolder, base, nav, openmap } = workerData as { gameFolder: string; base: string; nav: string; openmap?: string }
 const tell = (status: TilesStatus): void => parentPort?.postMessage(status)
 /** In the folder of the build: the game's numbers of the keys the map was made with. */
 const KEYS_FILE = 'keys.json'
@@ -316,7 +317,7 @@ try {
     try {
       const files = open(), wdt = files.read(world.file), at = join(folder, world.name)
       const maps = JSON.parse(readFileSync(join(folder, MAPS_FILE), 'utf8')) as GameMap[]
-      const sea = wdt && convertParchment(wdt, (id, skipHidden) => files.read(id, skipHidden), table, maps, world.continent, at) ? parchmentSea(at) : null
+      const sea = wdt && convertParchment(wdt, (id, skipHidden) => files.read(id, skipHidden), table, maps, world.continent, at, openmap) ? parchmentSea(at) : null
       if (sea && last.state === 'ready') tell((last = { ...last, parchment: { ...parchment, [world.name]: (parchment[world.name] = sea) } }))
     } catch {
       // The map shows its tiles; tried again at the next start.

@@ -34,6 +34,10 @@
         "to": "nav"
       },
       {
+        "from": "resources/openmap",
+        "to": "openmap"
+      },
+      {
         "from": "../LICENSE",
         "to": "LICENSE.txt"
       }

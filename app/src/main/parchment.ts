@@ -4,8 +4,11 @@
 // Each zone's picture also paints its torn frame and a piece of its neighbours, so a zone is shown
 // only on its own ground: the area each chunk of the terrain (33 yards) belongs to, which the game's
 // tables lead to its zone. Sea chunks carry a zone too, so a zone keeps the sea before its coast.
-// Chunks of no zone near one are given to the nearest. Further out, the land of no zone (Gilneas) and the open sea are
-// the continent's own picture enlarged, as the game's map shows them; the sea fades to one colour far from any coast.
+// Chunks of no zone near one are given to the nearest. Further out, the land of no zone is OpenMap's fills painted by
+// hand for it (scripts/import-openmap.js), and Gilneas its own pictures; the rest of it and the open sea are the
+// continent's picture enlarged (OpenMap's, with the sea lettering taken off), as the game's map shows them; far from
+// any zone both fade to one colour, so the sea and an island of no zone are alike. Where a zone's picture does not reach
+// over its own ground, the fills too.
 // Across a border the two pictures fade into each other over a chunk or two, and along it each is shaded towards the
 // middle of the two, so zones painted in other tones meet without a step. A city is its own map on its own ground, and
 // where that map does not reach, the zone around it. Every explorable piece is painted, as if all were explored.
@@ -15,9 +18,10 @@
 // pixel.
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join as joinPath } from 'node:path'
+import { inflateSync } from 'node:zlib'
 import { decodeBlp, decodeBlpCutout } from '../shared/blp'
 import { unitsOfRect } from '../shared/geo'
-import type { GameMap } from '../shared/maps'
+import { UI_MAP_ASSIGNMENT_FILE, type GameMap } from '../shared/maps'
 import { halve, join } from '../shared/pixels'
 import { AREA_TABLE_FILE, UI_MAP_X_MAP_ART_FILE, WORLD_MAP_OVERLAY_FILE } from '../shared/places'
 import type { Table } from '../shared/wdc5'
@@ -29,7 +33,7 @@ import { keep, TILE } from './tiles'
 
 export const PARCHMENT_ZOOM = 5
 const MARKER = 'done.json'
-const FORMAT = 1
+const FORMAT = 2 // 1 had no fills of OpenMap
 // The game's tables of the pictures: their styles (size and tiles) and their tiles; those of the pieces.
 const UI_MAP_ART_FILE = 1957202, UI_MAP_ART_STYLE_LAYER_FILE = 1957208, UI_MAP_ART_TILE_FILE = 1957210, WORLD_MAP_OVERLAY_TILE_FILE = 1957212
 
@@ -49,6 +53,8 @@ const CITY = 2.5e6
 /** How wide the torn frame of a zone's picture, which is never shown. */
 const FRAME = 16 // pixels of a zone's picture
 const PAPER = 0, SEA = 1 // the two layers that are no zone; zones from 2
+/** The game's map of the whole world, on which OpenMap places its fills. */
+const WORLD_MAP = 947
 /**
  * Pictures the client has that no map of its tables places: the map of Gilneas, a land with no zone in Forever. Where
  * it lies (yards, x north and y west) and its files, as MapUtils by D4KiR (GPL-3.0) places it on the continent's map
@@ -78,11 +84,29 @@ export function parchmentSea(continentFolder: string): number[] | null {
   }
 }
 
-interface Picture { width: number; height: number; rgb: Uint8Array }
-interface Layer { picture?: Picture; tl: { x: number; y: number }; br: { x: number; y: number } }
+/** alpha: how much of each pixel shows, for a picture that is clear in parts (OpenMap's fills). */
+interface Picture { width: number; height: number; rgb: Uint8Array; alpha?: Uint8Array }
+/** frame: the pixels at its edges never shown (the torn frame of the game's maps), FRAME unless told. */
+interface Layer { picture?: Picture; tl: { x: number; y: number }; br: { x: number; y: number }; frame?: number }
+
+/** A picture kept by scripts/import-openmap.js, or undefined where there is none. */
+function keptPicture(file: string): Picture | undefined {
+  if (!existsSync(file)) return undefined
+  const b = readFileSync(file), width = b.readUInt16LE(0), height = b.readUInt16LE(2), channels = b[4]!, row = width * channels
+  const rows = inflateSync(b.subarray(5))
+  for (let i = row; i < rows.length; i++) rows[i] = (rows[i]! + rows[i - row]!) & 255
+  if (channels === 3) return { width, height, rgb: rows }
+  const rgb = new Uint8Array(width * height * 3), alpha = new Uint8Array(width * height)
+  for (let i = 0; i < alpha.length; i++) {
+    for (let k = 0; k < 3; k++) rgb[i * 3 + k] = rows[i * 4 + k]!
+    alpha[i] = rows[i * 4 + 3]!
+  }
+  return { width, height, rgb, alpha }
+}
 
 /**
- * Makes one continent's parchment. read: a game file by number. table: a table from its file.
+ * Makes one continent's parchment. read: a game file by number. table: a table from its file. openmap: the folder of
+ * what scripts/import-openmap.js keeps; without it the land of no zone is the continent's picture alone.
  * Gives the tiles made, or 0 when the game has not the tables of its pictures.
  */
 export function convertParchment(
@@ -92,6 +116,7 @@ export function convertParchment(
   maps: GameMap[],
   continent: number,
   continentFolder: string,
+  openmap?: string,
   onProgress?: (done: number, total: number) => void,
 ): number {
   const folder = parchmentFolder(continentFolder)
@@ -146,11 +171,35 @@ export function convertParchment(
   const own = new Map(zones.map((m, i) => [m.area, i + 2])) // top area -> layer
   const whole = maps.find((m) => m.level === 'continent' && m.continent === continent && m.rect)
   const layers: (Layer | undefined)[] = [undefined, whole && layerOf(whole), ...zones.map(layerOf)]
+  // The continent's picture as OpenMap cleaned it: without the giant letters of its name over the land and the sea.
+  const cleaned = whole && openmap ? keptPicture(joinPath(openmap, `${whole.id}.bin`)) : undefined
+  if (cleaned && layers[SEA]) layers[SEA].picture = cleaned
   const extras = EXTRA.filter((e) => e.continent === continent).map((e) => {
     const [tl, br] = unitsOfRect(e.rect)
     layers.push({ picture: drawn(e.width, e.height, e.files.map((file, n) => ({ file, x: (n % Math.ceil(e.width / TILE)) * TILE, y: Math.floor(n / Math.ceil(e.width / TILE)) * TILE, cutout: false }))), tl, br })
     return layers.length - 1
   })
+  // OpenMap's fills on this continent, each placed on the world's map as OpenMap places it (in fractions of that map):
+  // turned into yards by where the continent lies on it, as C_Map.GetMapRectOnMap does.
+  const fills: number[] = []
+  const listed = openmap && existsSync(joinPath(openmap, 'fills.json')) ? (JSON.parse(readFileSync(joinPath(openmap, 'fills.json'), 'utf8')) as { fills: { name: string; box: number[] }[] }).fills : []
+  const onWorld = listed.length ? tableOf(UI_MAP_ASSIGNMENT_FILE)?.rows.find((r) => r.int(4) === WORLD_MAP && r.int(6) === continent) : undefined
+  if (onWorld) {
+    // UiMin, UiMax (fractions of the map), then Region (yards: min x, y, z, max x, y, z).
+    const at = (u: number, v: number): { x: number; y: number } => {
+      const fu = (u - onWorld.float(0, 0)) / (onWorld.float(1, 0) - onWorld.float(0, 0)), fv = (v - onWorld.float(0, 1)) / (onWorld.float(1, 1) - onWorld.float(0, 1))
+      return { x: onWorld.float(2, 3) - fv * (onWorld.float(2, 3) - onWorld.float(2, 0)), y: onWorld.float(2, 4) - fu * (onWorld.float(2, 4) - onWorld.float(2, 1)) }
+    }
+    for (const { name, box } of listed) {
+      const [l, t, r, b] = box as [number, number, number, number]
+      if ((l + r) / 2 < onWorld.float(0, 0) || (l + r) / 2 > onWorld.float(1, 0) || (t + b) / 2 < onWorld.float(0, 1) || (t + b) / 2 > onWorld.float(1, 1)) continue
+      const picture = keptPicture(joinPath(openmap!, `${name}.bin`)), a = at(l, t), z = at(r, b)
+      if (!picture) continue
+      const [tl, br] = unitsOfRect({ minX: z.x, minY: z.y, maxX: a.x, maxY: a.y })
+      layers.push({ picture, tl, br, frame: 0 })
+      fills.push(layers.length - 1)
+    }
+  }
 
   // The ground: which layer each chunk shows. -1 for land of no zone (yet), SEA where there is no terrain.
   // A chunk whose ground is all under its liquid (or, with no liquid read, under the level of the sea) is water; its
@@ -204,10 +253,11 @@ export function convertParchment(
   }
   // Whether a picture (within its frame) covers a point of the map.
   const covers = (layer: number, u: number, v: number): boolean => {
-    const l = layers[layer], p = l?.picture
+    const l = layers[layer], p = l?.picture, frame = l?.frame ?? FRAME
     if (!p) return false
     const px = ((u - l.tl.x) / (l.br.x - l.tl.x)) * p.width, py = ((v - l.tl.y) / (l.br.y - l.tl.y)) * p.height
-    return px >= FRAME && py >= FRAME && px < p.width - FRAME && py < p.height - FRAME
+    if (px < frame || py < frame || px >= p.width - frame || py >= p.height - frame) return false
+    return !p.alpha || p.alpha[Math.floor(py) * p.width + Math.floor(px)]! >= 128
   }
   // A city: a map smaller than any zone (Stormwind, the biggest, is 2 million square yards; Redridge, the smallest zone,
   // 3), its middle inside a bigger zone, which draws the ground the city's map does not reach.
@@ -220,10 +270,10 @@ export function convertParchment(
     const zone = zones.find((z) => inside(city, z))
     if (zone) around.set(n + 2, zones.indexOf(zone) + 2)
   })
-  // The land of no zone a picture of EXTRA covers, and its water near the coast, is that picture's.
+  // The land of no zone a picture of EXTRA or a fill of OpenMap covers, and its water near the coast, is that picture's.
   for (let i = 0; i < ground.length; i++) {
     if (ground[i] !== -1 || (water[i] && shore[i] === COAST)) continue
-    const extra = extras.find((layer) => covers(layer, ((i % SIDE) + 0.5) / PER_UNIT, (Math.floor(i / SIDE) + 0.5) / PER_UNIT))
+    const extra = [...extras, ...fills].find((layer) => covers(layer, ((i % SIDE) + 0.5) / PER_UNIT, (Math.floor(i / SIDE) + 0.5) / PER_UNIT))
     if (extra !== undefined) ground[i] = extra
   }
   // A city keeps its harbour: its map draws it.
@@ -249,11 +299,26 @@ export function convertParchment(
     for (const i of edge) for (const j of neighbours(i)) if (far[j] === BAND && ground[j] === ground[i]) (far[j] = step), (across[j] = across[i]!), next.push(j)
     edge = next
   }
+  // For each chunk of a picture, the picture across its nearest border with another: what shows where its own does not
+  // reach (colour()). Not the sea's or the paper's across their borders, nor only up to BAND: either drew steps, chunk by
+  // chunk, between the neighbour's picture and the continent's.
+  const beyond = new Int16Array(SIDE * SIDE).fill(-1)
+  edge = []
+  for (let i = 0; i < ground.length; i++) {
+    const other = ground[i]! >= 2 ? neighbours(i).find((j) => ground[j]! >= 2 && ground[j] !== ground[i]) : undefined
+    if (other !== undefined) (beyond[i] = ground[other]!), edge.push(i)
+  }
+  while (edge.length) {
+    const next: number[] = []
+    for (const i of edge) for (const j of neighbours(i)) if (beyond[j] === -1 && ground[j] === ground[i]) (beyond[j] = beyond[i]!), next.push(j)
+    edge = next
+  }
 
-  // How far each chunk of open sea is from anything else, up to REACH.
+  // How far each chunk of open sea, or of land of no zone (paper), is from any picture, up to REACH: both fade to the one
+  // colour of the far sea, so an island of no zone far out (Gillijim's Isle) is sea, as on the game's map.
   const reach = new Uint8Array(SIDE * SIDE).fill(REACH)
   edge = []
-  for (let i = 0; i < ground.length; i++) if (ground[i] !== SEA) (reach[i] = 0), edge.push(i)
+  for (let i = 0; i < ground.length; i++) if (ground[i]! >= 2) (reach[i] = 0), edge.push(i)
   for (let step = 1; step < REACH && edge.length; step++) {
     const next: number[] = []
     for (const i of edge) for (const j of neighbours(i)) if (reach[j] === REACH) (reach[j] = step), next.push(j)
@@ -282,23 +347,38 @@ export function convertParchment(
     }
     if (seen[0]!.length) sea.set(seen.map((l) => l.sort((a, b) => a - b)[l.length >> 1]!))
   }
-  const open = (u: number, v: number, out: Float32Array, paper: boolean): void => {
-    const near = paper ? 1 : 1 - reach[chunkAt(u, v)]! / REACH
+  const open = (u: number, v: number, out: Float32Array): void => {
+    const near = 1 - reach[chunkAt(u, v)]! / REACH
     if (!near || !enlarged(u, v, out)) return out.set(sea)
     for (let k = 0; k < 3; k++) out[k] = sea[k]! + (out[k]! - sea[k]!) * near
   }
   // A layer's colour at a point of the map (units), or false off its picture.
-  // The edge of a zone's picture is its torn frame: off the picture too.
+  // The edge of a zone's picture is its torn frame: off the picture too. A picture clear in parts (a fill) is laid over
+  // the continent's, as much as it shows; off the picture where it is all clear.
+  const behind = new Float32Array(3)
   const sample = (layer: number, u: number, v: number, out: Float32Array): boolean => {
-    if (layer === PAPER || layer === SEA) return open(u, v, out, layer === PAPER), true
-    const l = layers[layer], p = l?.picture
+    if (layer === PAPER || layer === SEA) return open(u, v, out), true
+    const l = layers[layer], p = l?.picture, frame = l?.frame ?? FRAME
     if (!p) return false
     const px = ((u - l.tl.x) / (l.br.x - l.tl.x)) * p.width - 0.5, py = ((v - l.tl.y) / (l.br.y - l.tl.y)) * p.height - 0.5
-    if (px < FRAME || py < FRAME || px > p.width - 1 - FRAME || py > p.height - 1 - FRAME) return false
+    if (px < frame || py < frame || px > p.width - 1 - frame || py > p.height - 1 - frame) return false
     const x0 = Math.floor(px), y0 = Math.floor(py), x1 = Math.min(x0 + 1, p.width - 1), y1 = Math.min(y0 + 1, p.height - 1), fx = px - x0, fy = py - y0
+    if (!p.alpha) {
+      for (let k = 0; k < 3; k++) {
+        const a = p.rgb[(y0 * p.width + x0) * 3 + k]!, b = p.rgb[(y0 * p.width + x1) * 3 + k]!, c = p.rgb[(y1 * p.width + x0) * 3 + k]!, d = p.rgb[(y1 * p.width + x1) * 3 + k]!
+        out[k] = (a * (1 - fx) + b * fx) * (1 - fy) + (c * (1 - fx) + d * fx) * fy
+      }
+      return true
+    }
+    const at = [y0 * p.width + x0, y0 * p.width + x1, y1 * p.width + x0, y1 * p.width + x1], w = [(1 - fx) * (1 - fy), fx * (1 - fy), (1 - fx) * fy, fx * fy]
+    let shown = 0
+    for (let n = 0; n < 4; n++) shown += (w[n]! * p.alpha[at[n]!]!) / 255
+    if (shown < 1 / 255) return false
+    open(u, v, behind)
     for (let k = 0; k < 3; k++) {
-      const a = p.rgb[(y0 * p.width + x0) * 3 + k]!, b = p.rgb[(y0 * p.width + x1) * 3 + k]!, c = p.rgb[(y1 * p.width + x0) * 3 + k]!, d = p.rgb[(y1 * p.width + x1) * 3 + k]!
-      out[k] = (a * (1 - fx) + b * fx) * (1 - fy) + (c * (1 - fx) + d * fx) * fy
+      let c = 0
+      for (let n = 0; n < 4; n++) c += (w[n]! * p.rgb[at[n]! * 3 + k]! * p.alpha[at[n]!]!) / 255
+      out[k] = c + behind[k]! * (1 - shown)
     }
     return true
   }
@@ -337,11 +417,13 @@ export function convertParchment(
     const x = i % SIDE, y = Math.floor(i / SIDE)
     calm[i] = x >= 2 && y >= 2 && x < SIDE - 2 && y < SIDE - 2 && far[i] === BAND && [-2, -1, 0, 1, 2].every((d) => far[i + d * SIDE - 2] === BAND && far[i + d * SIDE + 2] === BAND && far[i - 2 * SIDE + d] === BAND && far[i + 2 * SIDE + d] === BAND) ? 1 : 0
   }
-  // A layer's colour; where it has none (off its picture) the zone around a city, or the layer across its border, or the
-  // continent's picture.
+  // A layer's colour; where it has none (off its picture) the zone around a city, or a fill of OpenMap (which paints its
+  // own coasts and shallows), or the picture beyond its nearest border, or the continent's picture.
   const colour = (layer: number, i: number, u: number, v: number, out: Float32Array): void => {
-    if (sample(layer, u, v, out) || (around.has(layer) && sample(around.get(layer)!, u, v, out)) || (across[i]! >= 2 && sample(across[i]!, u, v, out))) return
-    sample(water[i] ? SEA : PAPER, u, v, out)
+    if (layer >= 2 && (sample(layer, u, v, out) || (around.has(layer) && sample(around.get(layer)!, u, v, out)))) return
+    if (fills.some((fill) => fill !== layer && sample(fill, u, v, out))) return
+    if (layer >= 2 && beyond[i]! >= 2 && sample(beyond[i]!, u, v, out)) return
+    sample(layer < 2 ? layer : water[i] ? SEA : PAPER, u, v, out)
   }
 
   // One tile of a detailed zoom: each pixel the layers of the chunks around it, weighed by how close.
@@ -356,8 +438,7 @@ export function convertParchment(
       const fx = u * PER_UNIT - 0.5, fy = v * PER_UNIT - 0.5, cx = Math.floor(fx), cy = Math.floor(fy)
       const middle = Math.min(SIDE - 1, Math.max(0, Math.round(fy))) * SIDE + Math.min(SIDE - 1, Math.max(0, Math.round(fx)))
       if (calm[middle]) {
-        if (ground[middle] === SEA) sample(SEA, u, v, c)
-        else colour(ground[middle]!, middle, u, v, c)
+        colour(ground[middle]!, middle, u, v, c)
         land ||= reach[middle]! < REACH
         for (let k = 0; k < 3; k++) rgb[at + k] = Math.round(c[k]!)
         continue
