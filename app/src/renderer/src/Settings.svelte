@@ -147,6 +147,8 @@
         <p class="hint">{t('settings.graphics.treesHint')}</p>
         <label class="choice"><input type="checkbox" class="check" checked={graphics.objects} onchange={(e) => setGraphics({ objects: e.currentTarget.checked })} />{t('settings.graphics.objects')}</label>
         <p class="hint">{t('settings.graphics.objectsHint')}</p>
+        <label class="choice"><input type="checkbox" class="check" checked={graphics.ground} onchange={(e) => setGraphics({ ground: e.currentTarget.checked })} />{t('settings.graphics.ground')}</label>
+        <p class="hint">{t('settings.graphics.groundHint')}</p>
         <p class="hint">{t('settings.graphics.cost')}</p>
       </div>
       <!-- The graphics card is the computer's: a phone on the home network has none to set. -->

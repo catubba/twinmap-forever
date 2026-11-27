@@ -34,6 +34,7 @@ import { langFor, langNow, offerAll, offered, planned, setLang, t } from '../sha
 import { workspacesOf } from '../shared/workspaces'
 import { addonHearsFonts, addonsFolder, askLangOf, newsSinceOf, readSettings, setupStatus, writeSettings } from './setup'
 import { hear, installChannel, removeSlots, send as sendSignal, sendOld, sentParts } from './signal'
+import { groundAsked } from './ground'
 import { MAPS_FILE, servedFile } from './tiles'
 import { QUESTIE_ICONS } from '../shared/packs'
 import startTilesWorker from './tiles-worker?nodeWorker'
@@ -72,7 +73,7 @@ function findGameFolder(picked: string | undefined): string | null {
 
 // Makes the map tiles from the game's files, once per build of the game, and keeps the latest word on it.
 // The folder: TWINMAP_DATA when set (for trials), or Twinmap under the local application data.
-type Picture = 'items' | 'pictures'
+type Picture = 'items' | 'pictures' | 'ground'
 function startTiles(gameFolder: string | null): { status: () => TilesStatus; item: (kind: Picture, id: number) => Promise<boolean>; settled: () => Promise<void>; stop: () => void } {
   let status: TilesStatus = { state: 'looking' }
   if (!gameFolder) return { status: () => ({ state: 'no-game' }), item: () => Promise.resolve(false), settled: () => Promise.resolve(), stop: () => {} }
@@ -456,6 +457,9 @@ function createWindow(): void {
     const file = status.state === 'ready' ? servedFile(status.folder, path) : null
     let bytes = file ? await readFile(file).catch(() => null) : null
     if (item && file && !bytes) bytes = (await tiles.item(item[1] as Picture, Number(item[2]))) ? await readFile(file).catch(() => null) : null
+    // The ground's own textures of the 3D view are made the same way, the first time the view asks (ground.ts).
+    const ground = groundAsked(path)
+    if (ground !== null && file && !bytes) bytes = (await tiles.item('ground', ground)) ? await readFile(file).catch(() => null) : null
     if (item && !bytes) return { status: 404 }
     // Where the game has no picture there is no file. That is the sea, not a fault: an empty picture for
     // a tile and an empty answer for a block, so the page logs no error for it.

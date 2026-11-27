@@ -100,6 +100,9 @@ export default {
     // A switch: the other things the game places in the world, as listed under it.
     objects: 'Objects',
     objectsHint: 'Fences, carts, lamps, tents, braziers.',
+    // A switch: near the camera the ground of the 3D view is drawn with the game's own ground textures, not the blurred picture of the map.
+    ground: 'Ground texture up close',
+    groundHint: "Up close the ground is drawn with the game's own textures, so it stays sharp.",
     // A subtitle over the switch window.gpu.
     card: 'Graphics card',
   },

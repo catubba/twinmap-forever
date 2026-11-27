@@ -66,6 +66,8 @@ export default {
     treesHint: '茂密的森林会被疏化，角色周围不绘制树叶，地面和道路保持可见。',
     objects: '物件',
     objectsHint: '栅栏、推车、路灯、帐篷、火盆。',
+    ground: '近处地面纹理',
+    groundHint: '近处的地面使用游戏自身的纹理绘制，保持清晰。',
     card: '显卡',
   },
 

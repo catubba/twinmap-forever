@@ -1057,6 +1057,7 @@
         inside3d ??= new (await import('./inside3d')).Inside3d(terrain)
         terrain.showBuildings(graphics.buildings)
         terrain.showProps(graphics.trees, graphics.density, graphics.objects)
+        terrain.showGround(graphics.ground)
         inside3dSet()
         names3dSet()
         terrain.onFrame = onFrame
@@ -1100,6 +1101,10 @@
   $effect(() => {
     const { trees, density, objects } = graphics
     untrack(() => terrain?.showProps(trees, density, objects))
+  })
+  $effect(() => {
+    const on = graphics.ground
+    untrack(() => terrain?.showGround(on))
   })
   // Inside a dungeon there is no ground to show: back to 2D.
   $effect(() => {

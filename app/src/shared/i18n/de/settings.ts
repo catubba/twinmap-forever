@@ -65,6 +65,8 @@ export default {
     treesHint: 'Dichte Wälder werden ausgedünnt und um die Figur herum fehlen die Blätter: Boden und Wege bleiben sichtbar.',
     objects: 'Objekte',
     objectsHint: 'Zäune, Karren, Laternen, Zelte, Feuerschalen.',
+    ground: 'Bodentextur aus der Nähe',
+    groundHint: 'Aus der Nähe wird der Boden mit den Texturen des Spiels gezeichnet und bleibt scharf.',
     card: 'Grafikkarte',
   },
 

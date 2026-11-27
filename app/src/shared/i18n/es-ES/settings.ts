@@ -65,6 +65,8 @@ export default {
     treesHint: 'Los bosques densos se aclaran y no se dibujan hojas alrededor del personaje: el suelo y los caminos se ven.',
     objects: 'Objetos',
     objectsHint: 'Vallas, carros, farolas, tiendas, braseros.',
+    ground: 'Textura del suelo de cerca',
+    groundHint: 'De cerca, el suelo se dibuja con las texturas del juego y se ve nítido.',
     card: 'Tarjeta gráfica',
   },
 

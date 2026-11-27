@@ -17,6 +17,7 @@ import { STANDS_FILE, type Stands } from '../../shared/stands'
 import { DRY, TAR } from '../../shared/water'
 import { BLOCKS, BLOCK_YARDS } from '../../shared/world'
 import { Buildings } from './buildings3d'
+import { Ground } from './ground3d'
 import { Props } from './props3d'
 import type { Density } from '../../shared/props'
 import { ROOF_STEP } from './inside3d'
@@ -183,6 +184,8 @@ export class Terrain {
   private buildings: Buildings
   // The trees and objects (props3d.ts), the same way.
   private props: Props
+  /** The ground's own textures near the camera (ground3d.ts). */
+  private ground: Ground
   // Where things stand over the game's ground, while the buildings are on show (shared/stands.ts): of each block that
   // has any (its column times BLOCKS plus its row), the height of each of its cells, NaN where it is the ground.
   private stands: { cells: number; blocks: Map<number, Float32Array> } | null = null
@@ -279,6 +282,7 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
     this.scene.add(this.buildings.group)
     this.props = new Props(this.renderer, (x, z) => this.buildings.cutAt(x, z))
     this.scene.add(this.props.group)
+    this.ground = new Ground(this.renderer, this.s3tc)
     this.controls = new MapControls(this.camera, this.renderer.domElement)
     this.controls.enableDamping = true
     this.controls.zoomToCursor = true
@@ -338,6 +342,7 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
     this.folder = folder
     this.buildings.show(folder)
     this.props.show(folder)
+    this.ground.show(folder)
     this.stands = null
     this.standsAsked = -Infinity
     this.dirty = true
@@ -390,6 +395,12 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
   /** Which trees and objects are drawn (Settings > Graphics). */
   showProps(trees: boolean, density: Density, objects: boolean): void {
     this.props.turn(trees, density, objects)
+    this.dirty = true
+  }
+
+  /** Whether the ground has its own textures up close (Settings > Graphics). */
+  showGround(on: boolean): void {
+    this.ground.turn(on)
     this.dirty = true
   }
 
@@ -620,6 +631,7 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
     this.drop()
     this.buildings.turn(false)
     this.props.turn(false, 'some', false)
+    this.ground.dispose()
     this.controls.dispose()
     this.seen.dispose()
     this.renderer.dispose()
@@ -718,6 +730,7 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
     if (this.inside?.step(this.camera.position, Math.min(0.1, FRAME_MS / 1000 + 0.004))) this.dirty = true
     if (this.buildings.step(this.camera.position, this.controls.target, this.farthest(fog.far), this.height / 2 / Math.tan((FOV * Math.PI) / 360), this.character)) this.dirty = true
     if (this.props.step(this.controls.target, distance, this.arrow)) this.dirty = true
+    if (this.ground.step(this.camera.position, this.controls.target.y)) this.dirty = true
     this.askStands()
     this.inside?.hidePictures(this.buildings.under)
     if (this.dirty) {
@@ -1054,7 +1067,8 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
       ring.forEach((v, r) => (roof[N * N + r] = roof[v]!))
       ground.setAttribute('roofed', new THREE.BufferAttribute(roof, 1))
     }
-    const material = texture ? this.groundWith(texture, !!roofed) : this.materials.ground
+    // At a block and below the picture is the block's own, and so are the ground's textures.
+    const material = texture ? this.groundWith(texture, !!roofed, n.z >= BLOCK_ZOOM ? `${n.x >> (n.z - BLOCK_ZOOM)} ${n.y >> (n.z - BLOCK_ZOOM)}` : null) : this.materials.ground
     const group = new THREE.Group(),
       land = new THREE.Mesh(ground, material)
     if (roofed) land.renderOrder = -1 // see-through, yet before everything else that is: the ground is under it all
@@ -1162,14 +1176,22 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
   }
 
   // The ground's material with a picture: one a picture, shared by the nodes that use it; and one more where the ground can open over a room.
+  // block: the block the picture is the whole of, which then has its own textures up close (ground3d.ts).
   private withPicture = new WeakMap<THREE.Texture, THREE.MeshLambertMaterial>()
   private withRoof = new WeakMap<THREE.Texture, THREE.MeshLambertMaterial>()
-  private groundWith(texture: THREE.Texture, opens: boolean): THREE.MeshLambertMaterial {
+  private groundWith(texture: THREE.Texture, opens: boolean, block: string | null): THREE.MeshLambertMaterial {
     const kept = opens ? this.withRoof : this.withPicture
     let m = kept.get(texture)
     if (!m) {
       kept.set(texture, (m = new THREE.MeshLambertMaterial({ map: texture, side: THREE.DoubleSide, transparent: opens })))
-      if (opens) m.onBeforeCompile = (shader) => this.opening(shader)
+      if (opens || block) {
+        m.onBeforeCompile = (shader) => {
+          if (block) this.ground.into(shader, block)
+          if (opens) this.opening(shader)
+        }
+        // the two say what the program is: the function above reads the same for every material
+        m.customProgramCacheKey = () => `${block ? 'ground' : ''} ${opens ? 'opens' : ''}`
+      }
     }
     return m
   }

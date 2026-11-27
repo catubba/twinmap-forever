@@ -23,10 +23,12 @@ export const graphics = $state({
   trees: on('trees', starts),
   density: kept && DENSITY_NAMES.includes(kept) ? kept : inApp ? 'some' : ('few' as Density),
   objects: on('objects', starts),
+  /** The ground's own textures up close (M23-F8). */
+  ground: on('ground', starts),
 })
 
 export function setGraphics(to: Partial<typeof graphics>): void {
   Object.assign(graphics, to)
-  for (const key of ['buildings', 'trees', 'objects'] as const) localStorage.setItem(key, graphics[key] ? 'on' : 'off')
+  for (const key of ['buildings', 'trees', 'objects', 'ground'] as const) localStorage.setItem(key, graphics[key] ? 'on' : 'off')
   localStorage.setItem('density', graphics.density)
 }

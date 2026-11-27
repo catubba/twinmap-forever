@@ -65,6 +65,8 @@ export default {
     treesHint: "Les forêts denses sont éclaircies et aucune feuille n'est dessinée autour du personnage : le sol et les routes restent visibles.",
     objects: 'Objets',
     objectsHint: 'Clôtures, charrettes, lanternes, tentes, braseros.',
+    ground: 'Texture du sol de près',
+    groundHint: 'De près, le sol est dessiné avec les textures du jeu et reste net.',
     card: 'Carte graphique',
   },
 
