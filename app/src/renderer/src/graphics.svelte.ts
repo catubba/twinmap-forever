@@ -1,12 +1,14 @@
 // What the 3D view draws, as the player chose it in Settings > Graphics (M23-F1, design/ui.md section 6): each a switch,
-// kept by this window as the arrow is (arrow.svelte.ts), so a phone chooses its own. Where the view is drawn by the
-// processor (no graphics card) they start off: the 3D view of before. Trees and objects (M23-F7): on a computer some
-// trees, on a phone or tablet few (the starting values of M23-F6, to be measured in F5).
+// kept by this window as the arrow is (arrow.svelte.ts), so a phone chooses its own. They start on in the app with a
+// graphics card, whichever it is, and off where the view is drawn by the processor and on a phone or tablet: the 3D view
+// of before. Measured in M23-F5: a phone's card reads no DXT, and with the buildings on the view falls to 12-25 frames a
+// second with next to none of them shown; trees and objects alone halve its frames when the view moves.
 import type { Density } from '../../shared/props'
 import { inApp } from './web'
 
 // The test of terrain3d.ts: the browser refuses a context that needs the graphics card.
 const software = (): boolean => !document.createElement('canvas').getContext('webgl2', { failIfMajorPerformanceCaveat: true })
+const starts = (): boolean => inApp && !software()
 
 const DENSITY_NAMES: readonly Density[] = ['few', 'some', 'many']
 export { DENSITY_NAMES }
@@ -17,10 +19,10 @@ const on = (key: string, start: () => boolean): boolean => {
 }
 const kept = localStorage.getItem('density') as Density | null
 export const graphics = $state({
-  buildings: on('buildings', () => !software()),
-  trees: on('trees', () => !software()),
+  buildings: on('buildings', starts),
+  trees: on('trees', starts),
   density: kept && DENSITY_NAMES.includes(kept) ? kept : inApp ? 'some' : ('few' as Density),
-  objects: on('objects', () => !software()),
+  objects: on('objects', starts),
 })
 
 export function setGraphics(to: Partial<typeof graphics>): void {
