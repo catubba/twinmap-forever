@@ -5,7 +5,7 @@ import { app } from 'electron'
 import koffi, { type LibraryHandle } from 'koffi'
 import type { Edge, WindowHandle } from './capture'
 import type { Rect } from '../shared/window'
-import { clientPidFrom, commandLine, inWindow, isGame, monitorsFrom, coveredMonitorEdgeRect, parseSetup, programFrom, rgbFrom, stateOf, wineProgramPath } from './capture-linux-frame'
+import { clientPidFrom, commandLine, inWindow, isGame, monitorsFrom, coveredMonitorEdgeRect, parseSetup, problemList, programFrom, rgbFrom, stateOf, wineProgramPath } from './capture-linux-frame'
 
 type NativeFunction = ReturnType<LibraryHandle['func']>
 // Keep Koffi's pointer value for native calls/free; only addresses support arithmetic.
@@ -78,13 +78,10 @@ let resBindings: ReturnType<typeof bindRes> | null | undefined
 let randrBindings: ReturnType<typeof bindRandr> | null | undefined
 let monitorCache: { until: number; width: number; height: number; monitors: Rect[] } | undefined
 let checked: { id: number; until: number; info: WindowInfo | null } | undefined
-const problems = new Set<string>()
-
-function problem(message: string): void {
-  if (problems.has(message)) return
-  problems.add(message)
-  console.error(`Twinmap capture: ${message}`)
-}
+const problems = problemList((line) => console.error(line))
+const problem = problems.say
+/** The app's record hears every problem once, those before it listened included. */
+export const onProblem = problems.listen
 
 function copy(n: Native, pointer: NativePointer | null, length: number, offset = 0): Buffer {
   const bytes = Buffer.alloc(length)

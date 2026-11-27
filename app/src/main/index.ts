@@ -18,7 +18,7 @@ import { feedbackLink, sendFeedback } from '../shared/feedback'
 import { pageOf, setupComplete, setupPages, type SetupStatus } from '../shared/setup'
 import { tilesLine, type TilesStatus } from '../shared/tiles-status'
 import { placeWindow, WINDOW, ZOOMS, zoomStep } from '../shared/window'
-import { captureAllowed, findGameWindow, loadCapture, programOf, requestCapture, stopCapture } from './capture'
+import { captureAllowed, findGameWindow, loadCapture, onCaptureProblem, programOf, requestCapture, stopCapture } from './capture'
 import { readHdr } from './hdr'
 import { gameFolderFrom, gameInstallPaths, gameLocale, installedBuild } from './client-files'
 import { homeAddress, LAN_PORT, startLan, type Lan, type Served } from './lan'
@@ -1145,6 +1145,8 @@ void Promise.all([captureReady, app.whenReady()]).then(([captureError]) => {
   }
   record.say(`started: Twinmap ${app.getVersion()}${GPU ? '' : ', hardware acceleration off'}`)
   if (captureError) record.say(captureError)
+  // A started AppImage has no console: what keeps the reader from the game must reach the record.
+  onCaptureProblem((message) => record.say(`capture: ${message}`))
   if (!captureAllowed()) {
     // Asking makes macOS register Twinmap for the permission and may show its prompt; preflight alone never does.
     requestCapture()

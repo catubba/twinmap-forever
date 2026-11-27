@@ -183,3 +183,24 @@ export function rgbFrom(pixels: Buffer): Uint8Array {
   }
   return rgb
 }
+
+/**
+ * The reader's problems, each said once: on stderr, and to the one listening (the app's record), who
+ * first hears those said before it listened.
+ */
+export function problemList(write: (line: string) => void): { say: (message: string) => void; listen: (listener: (message: string) => void) => void } {
+  const said: string[] = []
+  let listener: ((message: string) => void) | undefined
+  return {
+    say: (message) => {
+      if (said.includes(message)) return
+      said.push(message)
+      write(`Twinmap capture: ${message}`)
+      listener?.(message)
+    },
+    listen: (next) => {
+      listener = next
+      for (const message of [...said]) next(message) // one said while these are told is told once, by say
+    },
+  }
+}
