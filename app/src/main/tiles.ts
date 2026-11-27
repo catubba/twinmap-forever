@@ -76,6 +76,9 @@ export function servedFile(base: string, path: string): string | null {
   if (building) return building[1] ? joinPath(base, 'buildings', `${building[1]}.bin`) : joinPath(base, 'buildings', 'tex', `${building[2]}.${building[3]}`)
   const placed = /^\/([a-z]+)\/buildings\.json$/.exec(path)
   if (placed) return joinPath(base, placed[1]!, 'buildings.json')
+  // Where things stand over the ground in the 3D view (stands.ts), a continent's.
+  const stands = /^\/([a-z]+)\/stands\.json$/.exec(path)
+  if (stands) return joinPath(base, stands[1]!, 'stands.json')
   // The trees and objects of the 3D view (props.ts): a model, a continent's list of blocks, the copies of a block.
   const model = /^\/buildings\/m2\/(\d{1,9})\.bin$/.exec(path)
   if (model) return joinPath(base, 'buildings', 'm2', `${model[1]}.bin`)

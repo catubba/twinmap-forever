@@ -22,6 +22,7 @@ import { WORLDS } from '../shared/world'
 import { gameLocale, installedBuild, openClientFiles, type ClientFiles } from './client-files'
 import { buildingsMade, buriedKey, makeBuildings } from './buildings'
 import { makeProps, propsMade } from './props'
+import { makeStands, standsMade } from './stands'
 import { EncryptedFileError } from './client-files'
 import { convertInteriors, ENCOUNTERS_FILE, finishedInteriors, INTERIORS_FILE, MAP_FILE, mapEntries, placedIn, ROOM_PICTURES_FILE, roomPictures } from './interiors'
 import { sentKeys } from './keys'
@@ -335,6 +336,19 @@ try {
   } catch (e) {
     // The 3D view goes without them; tried again at the next start.
     parentPort?.postMessage({ buildings: { problem: e instanceof Error ? e.message : String(e) } })
+  }
+  // Where things stand over the game's ground (stands.ts): the streets of the cities the buildings draw.
+  try {
+    if (!standsMade(folder, WORLDS.map((w) => w.name))) {
+      const started = Date.now()
+      const cells = makeStands(folder, WORLDS, (continent) => {
+        const data = navFrom(readFileSync(join(nav, `nav${continent}.json`), 'utf8'))
+        return data && walker(data)
+      })
+      parentPort?.postMessage({ buildings: { stands: cells, seconds: (Date.now() - started) / 1000 } })
+    }
+  } catch (e) {
+    parentPort?.postMessage({ buildings: { problem: `stands: ${e instanceof Error ? e.message : String(e)}` } })
   }
   // The trees and objects of the continents (props.ts), after the buildings, whose textures they share.
   const propsStarted = Date.now()

@@ -124,7 +124,7 @@ const NO_LINKS = new Int16Array(0)
  * points takes the height of either end when it is known: where floors lie over one another it
  * starts and ends on the one nearest that height, and not on whichever is cheapest to reach.
  */
-export type Walker = ((from: Yards, to: Yards, fromZ?: number, toZ?: number) => Walk | null) & { far: (from: Yards, tos: Yards[], reach: number) => (number | null)[]; track: () => Tracker; wander: (from: Yards, count: number, random: () => number) => [Yards, number][]; heights: (at: Yards) => number[]; stands: (at: Yards) => { z: number; floor: boolean }[] }
+export type Walker = ((from: Yards, to: Yards, fromZ?: number, toZ?: number) => Walk | null) & { far: (from: Yards, tos: Yards[], reach: number) => (number | null)[]; track: () => Tracker; wander: (from: Yards, count: number, random: () => number) => [Yards, number][]; heights: (at: Yards) => number[]; stands: (at: Yards) => { z: number; floor: boolean }[]; cells: number }
 
 /**
  * Where a character stands, point after point (yards of the world): its height, and how many
@@ -604,7 +604,7 @@ export function walker(nav: NavData): Walker {
     standing(Math.floor((x - nav.cx0 * BLOCK_YARDS) / cell), Math.floor((y - nav.cy0 * BLOCK_YARDS) / cell))
       .map((place) => ({ z: zOf(place), floor: place % KEY >= N }))
       .sort((a, b) => a.z - b.z)
-  return Object.assign(find, { far, track, wander, heights, stands })
+  return Object.assign(find, { far, track, wander, heights, stands, cells: C })
 }
 
 
