@@ -13,8 +13,9 @@ import type { Compass } from './compass'
 import { MapControls } from 'three/examples/jsm/controls/MapControls.js'
 import { BLOCK_ZOOM, HOLE, unpackLevels, type Levels } from '../../shared/levels'
 import { pictureOfBlock } from '../../shared/pixels'
+import { STANDS_FILE, type Stands } from '../../shared/stands'
 import { DRY, TAR } from '../../shared/water'
-import { BLOCK_YARDS } from '../../shared/world'
+import { BLOCKS, BLOCK_YARDS } from '../../shared/world'
 import { Buildings } from './buildings3d'
 import { Props } from './props3d'
 import type { Density } from '../../shared/props'
@@ -182,6 +183,11 @@ export class Terrain {
   private buildings: Buildings
   // The trees and objects (props3d.ts), the same way.
   private props: Props
+  // Where things stand over the game's ground, while the buildings are on show (shared/stands.ts): of each block that
+  // has any (its column times BLOCKS plus its row), the height of each of its cells, NaN where it is the ground.
+  private stands: { cells: number; blocks: Map<number, Float32Array> } | null = null
+  private standsAsked = -Infinity // in seconds
+  private streets = true
   private seen = new THREE.WebGLRenderTarget(2, 2, { depthTexture: new THREE.DepthTexture(2, 2) })
   private seenClear = false // not yet: a picture never drawn on reads as solid
   private roofs = {
@@ -332,12 +338,52 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
     this.folder = folder
     this.buildings.show(folder)
     this.props.show(folder)
+    this.stands = null
+    this.standsAsked = -Infinity
     this.dirty = true
+  }
+
+  // Where things stand over the ground of the continent, asked for until it is there: the app makes it after the buildings.
+  private askStands(): void {
+    const now = performance.now() / 1000
+    if (this.stands || !this.folder || now - this.standsAsked < 30) return
+    this.standsAsked = now
+    const folder = this.folder
+    void fetch(`${TILES}/${folder}/${STANDS_FILE}`)
+      .then((a) => (a.status === 200 ? (a.json() as Promise<Stands>) : null))
+      .catch(() => null)
+      .then((s) => {
+        if (!s || folder !== this.folder) return
+        const blocks = new Map<number, Float32Array>()
+        for (const [key, list] of Object.entries(s.blocks)) {
+          const [c, r] = key.split('-').map(Number) as [number, number], cells = new Float32Array(s.cells * s.cells).fill(NaN)
+          for (let k = 0; k < list.length; k += 2) cells[list[k]!] = list[k + 1]! / 4
+          blocks.set(c * BLOCKS + r, cells)
+        }
+        this.stands = { cells: s.cells, blocks }
+        this.dirty = true
+      })
+  }
+
+  /**
+   * The height of where one walks at a place when that is not the game's ground (the streets of a city, which are its
+   * building's), while the buildings are on show; null where things stand on the ground.
+   */
+  streetAt(x: number, z: number): number | null {
+    const s = this.streets ? this.stands : null,
+      c = Math.floor(x / BLOCK_YARDS),
+      r = Math.floor(z / BLOCK_YARDS),
+      cells = s?.blocks.get(c * BLOCKS + r)
+    if (!cells) return null
+    const size = BLOCK_YARDS / s!.cells,
+      high = cells[Math.floor((z - r * BLOCK_YARDS) / size) * s!.cells + Math.floor((x - c * BLOCK_YARDS) / size)]!
+    return Number.isNaN(high) ? null : high
   }
 
   /** Whether the buildings are drawn (Settings > Graphics). */
   showBuildings(on: boolean): void {
     this.buildings.turn(on)
+    this.streets = on
     this.dirty = true
   }
 
@@ -386,11 +432,13 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
     return !!floor && Number.isFinite(ground) && Math.abs(high - ground) < Math.abs(high - floor.y)
   }
 
-  // Where what lies on the ground at a place is put: on the ground, or on the floor of the room under it as it opens.
+  // Where what lies on the ground at a place is put: on the ground, on the floor of the room under it as it opens, or
+  // on the street over it where the ground of the game is not where one walks.
   private standAt(x: number, z: number): number {
     const ground = this.groundAt(x, z),
       floor = this.inside?.floorAt(x, z)
-    return floor && Number.isFinite(ground) ? ground + (floor.y - ground) * floor.open : ground
+    if (!Number.isFinite(ground)) return ground
+    return floor ? ground + (floor.y - ground) * floor.open : (this.streetAt(x, z) ?? ground)
   }
 
   /** The tiles of the ground are made again: what they must know of the inside has changed. */
@@ -448,7 +496,7 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
       step = Math.max(1, reach / 2000)
     const over = (t: number): number => {
       const g = this.groundAt(o.x + d.x * t, o.z + d.z * t)
-      return o.y + d.y * t - (Number.isFinite(g) ? g : 0)
+      return o.y + d.y * t - (Number.isFinite(g) ? (this.streetAt(o.x + d.x * t, o.z + d.z * t) ?? g) : 0)
     }
     // Along the ray in steps until it is under the ground, then halved down to where it meets it.
     for (let t = step; t <= reach; t += step) {
@@ -501,7 +549,7 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
 
   /** Puts the camera there at once. */
   look(at: Look): void {
-    const ground = this.groundAt(at.x, at.z)
+    const ground = this.standAt(at.x, at.z) // where the point looked at is held (hold): a street, the floor of an open room
     this.controls.target.set(at.x, Number.isFinite(ground) ? ground : this.controls.target.y, at.z)
     this.place(at.seen / 2 / Math.tan((FOV * Math.PI) / 360), at.polar, at.azimuth)
     this.dirty = true
@@ -670,6 +718,7 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
     if (this.inside?.step(this.camera.position, Math.min(0.1, FRAME_MS / 1000 + 0.004))) this.dirty = true
     if (this.buildings.step(this.camera.position, this.controls.target, this.farthest(fog.far), this.height / 2 / Math.tan((FOV * Math.PI) / 360), this.character)) this.dirty = true
     if (this.props.step(this.controls.target, distance, this.arrow)) this.dirty = true
+    this.askStands()
     this.inside?.hidePictures(this.buildings.under)
     if (this.dirty) {
       this.dirty = false
