@@ -1,6 +1,15 @@
 // The buildings of the continent on show in the 3D view (M23-F2), as main/buildings.ts makes them from the game's
-// files: each file read once and drawn at every place it stands, with the game's own textures. Those near the point
-// looked at are loaded, the others go. Turned on and off in Settings > Graphics (graphics.svelte.ts).
+// files: each file read once and drawn at every place it stands, with the game's own textures. Turned on and off in
+// Settings > Graphics (graphics.svelte.ts).
+//
+// Which are on show (M23-F3, shared/buildings.ts): those on the ground the view shows, round the point looked at, whose
+// radius is at least SHOW_PX pixels on the view, the widest first, under a roof of memory. So near the ground every
+// house is in, and from where the whole continent is seen only cities, castles and towers: a smaller one is by then
+// its own picture on the ground, where the game's minimap has it painted. One that comes or goes rises from the ground
+// or sinks into it, never at once. Counted on the whole of Eastern Kingdoms (design/buildings/far-measure.js): all of
+// them at full detail are 8.7 million triangles, 6,500 draws and 628 MB. The poorer version of a building far away is
+// its own shape with smaller textures: a file is read with its textures at most SMALL wide, and they are read again
+// whole when one of its buildings is FINE_PX wide on the view.
 //
 // A building inside the ground (Ironforge, Undercity, a mine; M23-F16) is drawn before the ground, which is see-through
 // where it is the roof of the rooms inside3d.ts opens: it is drawn without the ceilings of its rooms, and as the camera
@@ -9,18 +18,21 @@
 // and F16: the plane opens the cities, the ceilings left out open the mines, whose tunnels go up and down).
 import * as THREE from 'three'
 import { decodeDxtCutout } from '../../shared/blp'
-import { DXT_KIND, type BuildingHead, type Draw, type Placed } from '../../shared/buildings'
+import { DXT_KIND, onShow, type BuildingHead, type Draw, type Placed } from '../../shared/buildings'
 import { inflated } from './terrain3d'
-import { TILES } from './web'
+import { inApp, TILES } from './web'
 
-/** Yards from the camera to the point looked at past which no building is shown. */
-// ponytail: near only, all of them or none; F3 loads them by blocks with a poorer version far away.
-const FAR_VIEW = 2500
-/** Yards from the point looked at to the nearest of a building within which it is loaded: at least this, more as the view widens. */
-const NEAR = 700
+/** Bytes of buildings on the graphics card at most: past it the smallest on the view are left out. A phone on the home network has less room. */
+// ponytail: a file read whole stays so while a building of it is on show; make it small again if the roof is felt after flying low over many places.
+const ROOF = (inApp ? 400 : 128) * 2 ** 20
+/** Milliseconds a building takes to rise from the ground, or to sink into it. */
+const RISE = 400
+/** Of the roof, how much the files of no building on show may take: a view that widens and narrows again reads nothing twice. */
+const KEPT = 0.75
 const LOADING = 2
-/** Building files kept on the graphics card with no building on show. */
-const KEPT = 40
+/** Pixels of a building's radius on the view from which its textures are read whole, and how wide they are at most before. */
+const FINE_PX = 100
+const SMALL = 128
 /** A building with no texture, or one not read: the stone of the prototype's walls. */
 const STONE = 0x9a8f80
 /** Seconds before the list of a continent is asked again, while the app is still making it. */
@@ -36,10 +48,21 @@ interface File {
   state: 'loading' | 'in' | 'none'
   geometry?: THREE.BufferGeometry
   materials?: THREE.Material[]
-  textures?: THREE.Texture[]
+  textures?: THREE.Texture[] // the ones that are not arrays
+  layers?: ({ value: THREE.Texture } | null)[] // of each draw, its array of textures, as its materials read it
+  draws?: Draw[]
+  fine?: boolean // its textures whole, or being read so
   floor?: number
-  ceilings?: boolean[] // of each draw, whether it is the ceilings'
+  bytes?: number // on the graphics card
   used: number
+}
+
+// A building on show: how much of it is out of the ground (0 to 1), and whether it is rising or sinking.
+interface Standing {
+  mesh: THREE.Mesh
+  scale: number
+  grown: number
+  up: boolean
 }
 
 // A building inside the ground as it stands: its plane, its own materials that the plane cuts, where it is, its main floor and its top.
@@ -57,15 +80,19 @@ export class Buildings {
   readonly group = new THREE.Group()
   private folder = ''
   private list: Placed | null = null
-  private asked = 0 // when the list was last asked for, in seconds
+  private asked = -Infinity // when the list was last asked for, in seconds
   private files = new Map<string, File>() // by its name in the folder (shared/buildings.ts)
-  private shown = new Map<number, THREE.Mesh>() // by the building's place in the list
+  private shown = new Map<number, Standing>() // by the building's place in the list
+  private wanted: number[] = [] // the ones chosen, the widest on the view first
+  private sizes = new Map<string, number>() // the bytes of each file ever read: the choice counts them before it is read again
+  private perRadian = 0
+  private stepped = 0
   private cuts = new Map<number, Cut>() // the ones inside the ground, the same way
   private loading = 0
   private frame = 0
   private on = true
   private changed = false
-  private from = new THREE.Vector3(Infinity, 0, 0) // where the choice was last made
+  private from = new THREE.Vector3(Infinity, 0, 0) // where the camera was when the choice was last made
 
   constructor(private renderer: THREE.WebGLRenderer) {
     renderer.localClippingEnabled = true
@@ -91,7 +118,7 @@ export class Buildings {
     this.clear()
     this.folder = folder
     this.list = null
-    this.asked = 0
+    this.asked = -Infinity
   }
 
   /** Whether they are drawn at all. */
@@ -104,11 +131,13 @@ export class Buildings {
   }
 
   /**
-   * At each frame, with the point looked at, the camera's distance from it, the camera, and where the character stands
-   * while it is followed: true when the view must be drawn again.
+   * At each frame, with the camera, the point looked at, the yards from it to the farthest ground on the view, the
+   * pixels a radian of the view, and where the character stands while it is followed: true when the view must be drawn again.
    */
-  step(target: THREE.Vector3, distance: number, camera: THREE.Vector3, character: THREE.Vector3 | null): boolean {
+  step(camera: THREE.Vector3, target: THREE.Vector3, reach: number, perRadian: number, character: THREE.Vector3 | null): boolean {
     this.frame++
+    const now = performance.now(), dt = Math.min(100, now - this.stepped)
+    this.stepped = now
     const changed = this.changed
     this.changed = false
     if (!this.on || !this.folder) return changed
@@ -128,29 +157,41 @@ export class Buildings {
       }
       return changed
     }
-    // chosen again once the point looked at has moved a little, or the view has widened
-    const reach = distance > FAR_VIEW ? 0 : Math.max(NEAR, distance * 1.5)
-    if (Math.hypot(this.from.x - target.x, this.from.z - target.z) < 40 && Math.abs(this.from.y - reach) < 1) return this.cut(camera, character) || changed
-    this.from.set(target.x, reach, target.z)
-    const wanted = new Set<number>()
-    if (reach)
-      this.list.placed.forEach(([file, x, , z, , scale], i) => {
-        if (Math.hypot(x - target.x, z - target.z) - (this.list!.radius[file] ?? 0) * scale < reach) wanted.add(i)
-      })
-    let gone = false
-    for (const i of this.shown.keys())
-      if (!wanted.has(i)) {
+    // chosen again once the camera has moved a little
+    if (this.from.distanceTo(camera) > Math.max(10, reach * 0.01) || perRadian !== this.perRadian) {
+      this.from.copy(camera)
+      this.perRadian = perRadian
+      const chosen = onShow(this.list, camera, target, reach, perRadian, (i) => !!this.shown.get(i)?.up, (file) => this.sizes.get(file) ?? 0, ROOF)
+      this.wanted = chosen.map(([i]) => i)
+      const wanted = new Set(this.wanted), fine = new Set(chosen.filter(([, px]) => px >= FINE_PX).map(([i]) => this.list!.placed[i]![0]))
+      for (const [i, s] of this.shown) s.up = wanted.has(i)
+      for (const i of this.wanted) this.want(this.list.placed[i]![0], fine)
+      this.evict()
+      this.place()
+    }
+    const risen = this.rise(dt)
+    return this.cut(camera, character) || risen || changed
+  }
+
+  // Each building a step further out of the ground, or into it; one all in goes. True when one has moved.
+  private rise(dt: number): boolean {
+    let moved = false
+    for (const [i, s] of this.shown) {
+      if (s.up && s.grown === 1) continue
+      moved = true
+      s.grown = Math.min(1, Math.max(0, s.grown + (s.up ? dt : -dt) / RISE))
+      if (!s.up && s.grown === 0) {
         this.remove(i)
-        gone = true
+        continue
       }
-    for (const i of wanted) if (!this.shown.has(i)) this.want(this.list.placed[i]![0])
-    this.evict()
-    const placed = this.place()
-    return this.cut(camera, character) || placed || gone || changed
+      s.mesh.scale.y = s.scale * Math.max(0.001, s.grown * s.grown * (3 - 2 * s.grown))
+      s.mesh.updateMatrix()
+    }
+    return moved
   }
 
   private remove(i: number): void {
-    this.group.remove(this.shown.get(i)!)
+    this.group.remove(this.shown.get(i)!.mesh)
     this.shown.delete(i)
     for (const m of this.cuts.get(i)?.materials ?? []) m.dispose()
     this.cuts.delete(i)
@@ -176,23 +217,29 @@ export class Buildings {
     for (const i of [...this.shown.keys()]) this.remove(i)
     for (const [id, f] of this.files) if (f.state === 'in') this.drop(id, f)
     this.files.clear()
+    this.wanted = []
     this.from.set(Infinity, 0, 0)
   }
 
-  // A file wanted: read when it is not, a few at a time.
-  private want(id: string): void {
+  // A file wanted: read when it is not, a few at a time; its textures whole if it is one of the fine, also once it is in with small ones.
+  private want(id: string, fine: Set<string>): void {
     const f = this.files.get(id)
-    if (f) return void (f.used = this.frame)
+    if (f) {
+      f.used = this.frame
+      if (f.state === 'in' && !f.fine && fine.has(id)) this.refine(id, f)
+      return
+    }
     if (this.loading >= LOADING) return
-    const file: File = { state: 'loading', used: this.frame }
+    const file: File = { state: 'loading', used: this.frame, fine: fine.has(id) }
     this.files.set(id, file)
     this.loading++
     const folder = this.folder
-    void this.load(id)
+    void this.load(id, !!file.fine)
       .then((made) => {
         if (folder !== this.folder || this.files.get(id) !== file) return made?.dispose()
         if (!made) return void (file.state = 'none')
         Object.assign(file, made.parts, { state: 'in' })
+        this.sizes.set(id, made.parts.bytes!)
         this.from.set(Infinity, 0, 0) // and the ones waiting for it are put in place
       })
       .catch(() => (file.state = 'none'))
@@ -202,55 +249,79 @@ export class Buildings {
       })
   }
 
-  // Every wanted building whose file is in, put where it stands.
-  private place(): boolean {
-    if (!this.list) return false
-    let added = false
-    const target = this.from
-    if (!Number.isFinite(target.x)) return false
-    this.list.placed.forEach(([id, x, y, z, turn, scale, buried], i) => {
-      if (this.shown.has(i) || !(Math.hypot(x - target.x, z - target.z) - (this.list!.radius[id] ?? 0) * scale < target.y)) return
+  // The arrays of textures of a file in, read again whole, each put in place of the small one.
+  private refine(id: string, f: File): void {
+    if (this.loading >= LOADING) return
+    f.fine = true
+    this.loading++
+    const folder = this.folder
+    void Promise.all(f.draws!.map((d, k) => (f.layers![k] ? this.texture(d, true).catch(() => null) : null)))
+      .then((made) => {
+        const here = folder === this.folder && this.files.get(id) === f
+        made.forEach((t, k) => {
+          if (!t || !here) return void t?.dispose()
+          const u = f.layers![k]!
+          f.bytes! += weight(t) - weight(u.value)
+          u.value.dispose()
+          u.value = t
+        })
+        if (here) this.sizes.set(id, f.bytes!)
+      })
+      .finally(() => {
+        this.loading--
+        this.from.set(Infinity, 0, 0) // the next one waiting
+        this.changed = true
+      })
+  }
+
+  // Every wanted building whose file is in, put where it stands, all in the ground yet.
+  private place(): void {
+    for (const i of this.wanted) {
+      const [id, x, y, z, turn, scale, buried] = this.list!.placed[i]!
       const f = this.files.get(id)
-      if (f?.state !== 'in') return
-      f.used = this.frame
+      if (f?.state !== 'in' || this.shown.has(i)) continue
       let materials = f.materials!
       if (buried) {
         // its own materials, for its own plane; drawn before the ground, which may be see-through over it
         const plane = new THREE.Plane(new THREE.Vector3(0, -1, 0), 1e6),
           reach = (this.list!.radius[id] ?? 0) * scale
-        materials = materials.map((m, k) => Object.assign(m.clone(), { clippingPlanes: [plane], visible: !f.ceilings?.[k], onBeforeCompile: m.onBeforeCompile, customProgramCacheKey: m.customProgramCacheKey }))
+        materials = materials.map((m, k) => Object.assign(m.clone(), { clippingPlanes: [plane], visible: !f.draws![k]!.ceiling, onBeforeCompile: m.onBeforeCompile, customProgramCacheKey: m.customProgramCacheKey }))
         this.cuts.set(i, { plane, materials, x, z, reach, floor: y + (f.floor ?? 0) * scale, top: y + reach + 10 })
       }
       const mesh = new THREE.Mesh(f.geometry, materials)
       if (buried) mesh.renderOrder = -2
       mesh.position.set(x, y, z)
       mesh.rotation.y = turn
-      mesh.scale.setScalar(scale)
+      mesh.scale.set(scale, scale * 0.001, scale)
       mesh.updateMatrix()
       mesh.matrixAutoUpdate = false
       this.group.add(mesh)
-      this.shown.set(i, mesh)
-      added = true
-    })
-    return added
+      this.shown.set(i, { mesh, scale, grown: 0, up: true })
+    }
   }
 
-  // Past KEPT, the files of no building on show go from the graphics card, those unused the longest first.
+  // Past KEPT of the roof, the files of no building on show go from the graphics card, those unused the longest first.
   private evict(): void {
-    const inUse = new Set([...this.shown.values()].map((m) => m.geometry))
+    const inUse = new Set([...this.shown.values()].map((s) => s.mesh.geometry))
     const idle = [...this.files].filter(([, f]) => f.state === 'in' && !inUse.has(f.geometry!)).sort((a, b) => a[1].used - b[1].used)
-    for (const [id, f] of idle.slice(0, Math.max(0, idle.length - KEPT))) this.drop(id, f)
+    let held = 0
+    for (const f of this.files.values()) held += f.bytes ?? 0
+    for (let k = 0; k < idle.length && held > ROOF * KEPT; k++) {
+      held -= idle[k]![1].bytes ?? 0
+      this.drop(...idle[k]!)
+    }
   }
 
   private drop(id: string, f: File): void {
     f.geometry?.dispose()
     for (const m of f.materials ?? []) m.dispose()
     for (const t of f.textures ?? []) t.dispose()
+    for (const u of f.layers ?? []) u?.value.dispose()
     this.files.delete(id)
   }
 
-  // A building's file: its geometry, a material a draw, and the textures they use.
-  private async load(id: string): Promise<{ parts: Pick<File, 'geometry' | 'materials' | 'textures' | 'floor' | 'ceilings'>; dispose: () => void } | null> {
+  // A building's file: its geometry, a material a draw, and the textures they use, whole or small.
+  private async load(id: string, fine: boolean): Promise<{ parts: Pick<File, 'geometry' | 'materials' | 'textures' | 'layers' | 'draws' | 'floor' | 'bytes'>; dispose: () => void } | null> {
     const b = await inflated(`${TILES}/buildings/${id}.bin`)
     if (!b) return null
     const view = new DataView(b.buffer, b.byteOffset, b.byteLength), length = view.getUint32(0, true)
@@ -270,17 +341,25 @@ export class Buildings {
     const geometry = new THREE.BufferGeometry()
     geometry.setAttribute('position', new THREE.BufferAttribute(position, 3))
     geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2))
-    geometry.setAttribute('normal', new THREE.BufferAttribute(normal, 3))
+    // a byte a number is enough for where a wall looks: a quarter less of a building on the graphics card
+    const packed = new Int8Array(n * 3)
+    for (let k = 0; k < packed.length; k++) packed[k] = Math.round(normal[k]! * 127)
+    geometry.setAttribute('normal', new THREE.BufferAttribute(packed, 3, true))
     geometry.setAttribute('layer', new THREE.BufferAttribute(layer, 1))
     geometry.setIndex(new THREE.BufferAttribute(index, 1))
-    geometry.computeBoundingSphere()
+    geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(), head.radius) // as the file has it: from its origin
     const materials: THREE.Material[] = [],
-      textures: THREE.Texture[] = []
+      textures: THREE.Texture[] = [],
+      layers: ({ value: THREE.Texture } | null)[] = []
+    let bytes = position.byteLength + uv.byteLength + packed.byteLength + layer.byteLength + index.byteLength
     for (const d of head.draws) {
       geometry.addGroup(d.start, d.count, materials.length)
-      const t = await this.texture(d).catch(() => null)
-      if (t) textures.push(t)
-      materials.push(this.material(d, t))
+      const t = await this.texture(d, fine).catch(() => null),
+        array = t instanceof THREE.CompressedArrayTexture || t instanceof THREE.DataArrayTexture
+      if (t) bytes += weight(t)
+      if (t && !array) textures.push(t)
+      layers.push(t && array ? { value: t } : null)
+      materials.push(this.material(d, t, layers.at(-1)!))
     }
     // Once on the graphics card, the window keeps no copy.
     for (const a of [...Object.values(geometry.attributes), geometry.index])
@@ -288,18 +367,19 @@ export class Buildings {
         ;(this as { array: unknown }).array = null
       })
     return {
-      parts: { geometry, materials, textures, floor: head.floor, ceilings: head.draws.map((d) => !!d.ceiling) },
+      parts: { geometry, materials, textures, layers, draws: head.draws, floor: head.floor, bytes },
       dispose: () => {
         geometry.dispose()
         for (const m of materials) m.dispose()
         for (const t of textures) t.dispose()
+        for (const u of layers) u?.value.dispose()
       },
     }
   }
 
   // A draw's textures as one array texture (a layer each), DXT as the game keeps it where the card reads it, else its
-  // pixels; or the one PNG it has; null when it has none.
-  private async texture(d: Draw): Promise<THREE.Texture | null> {
+  // pixels; or the one PNG it has; null when it has none. fine: whole, else from the level at most SMALL wide.
+  private async texture(d: Draw, fine: boolean): Promise<THREE.Texture | null> {
     if (d.kind === 'none' || !d.textures.length) return null
     if (d.kind === 'png') {
       const answer = await fetch(`${TILES}/buildings/tex/${d.textures[0]}.png`)
@@ -326,10 +406,12 @@ export class Buildings {
       }),
     )
     const count = Math.min(...chains.map((c) => c.length)),
-      { width, height } = chains[0]![0]!
+      small = chains[0]!.findIndex((l) => Math.max(l.width, l.height) <= SMALL),
+      first = fine ? 0 : small < 0 || small >= count ? count - 1 : small,
+      { width, height } = chains[0]![first]!
     if (this.renderer.extensions.has('WEBGL_compressed_texture_s3tc')) {
       const mipmaps = []
-      for (let l = 0; l < count; l++) {
+      for (let l = first; l < count; l++) {
         const size = chains[0]![l]!.data.length,
           data = new Uint8Array(size * chains.length)
         chains.forEach((c, k) => data.set(c[l]!.data, k * size))
@@ -339,7 +421,7 @@ export class Buildings {
     }
     // A card that does not read DXT (a phone): the first level's pixels, the smaller ones made by the card.
     const data = new Uint8Array(width * height * 4 * chains.length)
-    chains.forEach((c, k) => data.set(decodeDxtCutout(c[0]!.data, width, height, DXT_KIND[d.kind]!, d.kind === 'dxt1a'), k * width * height * 4))
+    chains.forEach((c, k) => data.set(decodeDxtCutout(c[first]!.data, width, height, DXT_KIND[d.kind]!, d.kind === 'dxt1a'), k * width * height * 4))
     const t = new THREE.DataArrayTexture(data, width, height, chains.length)
     t.generateMipmaps = true
     t.minFilter = THREE.LinearMipmapLinearFilter
@@ -355,15 +437,14 @@ export class Buildings {
   }
 
   // A draw's material, lit by the sun of the view or by itself: as the prototype (design/terrain3d/city.html).
-  private material(d: Draw, t: THREE.Texture | null): THREE.Material {
-    const array = t instanceof THREE.CompressedArrayTexture || t instanceof THREE.DataArrayTexture
+  private material(d: Draw, t: THREE.Texture | null, layers: { value: THREE.Texture } | null): THREE.Material {
     // an array is sampled where the map is: the map a white pixel, for the texture coordinates the shader then has
-    const o = { color: t ? 0xffffff : STONE, map: array ? WHITE : t, side: THREE.DoubleSide, alphaTest: d.blend === 1 ? 0.5 : 0, transparent: d.blend === 2, depthWrite: d.blend < 2 }
+    const o = { color: t ? 0xffffff : STONE, map: layers ? WHITE : t, side: THREE.DoubleSide, alphaTest: d.blend === 1 ? 0.5 : 0, transparent: d.blend === 2, depthWrite: d.blend < 2 }
     const m = d.unlit ? new THREE.MeshBasicMaterial(o) : new THREE.MeshLambertMaterial(o)
-    if (!array) return m
+    if (!layers) return m
     // the layers of the array, by the layer of each point
     m.onBeforeCompile = (shader) => {
-      shader.uniforms.uLayers = { value: t }
+      shader.uniforms.uLayers = layers
       shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nattribute float layer;\nvarying float vLayer;').replace('#include <uv_vertex>', '#include <uv_vertex>\nvLayer = layer;')
       shader.fragmentShader = shader.fragmentShader
         .replace('#include <common>', '#include <common>\nuniform highp sampler2DArray uLayers;\nvarying float vLayer;')
@@ -372,6 +453,13 @@ export class Buildings {
     m.customProgramCacheKey = () => 'layers'
     return m
   }
+}
+
+// The bytes of a texture on the graphics card: its blocks as they are, or its pixels and their smaller copies.
+const weight = (t: THREE.Texture): number => {
+  if (t instanceof THREE.CompressedArrayTexture) return t.mipmaps.reduce((n, m) => n + m.data.length, 0)
+  const i = t.image as { width: number; height: number; depth?: number }
+  return (i.width * i.height * (i.depth ?? 1) * 16) / 3
 }
 
 /** The map of a material that samples an array instead. */

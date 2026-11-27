@@ -668,7 +668,7 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
     // After the arrow is turned for this frame, so the view turns with it in the same frame, not one behind.
     if (this.heading !== null && !this.turning) this.steer()
     if (this.inside?.step(this.camera.position, Math.min(0.1, FRAME_MS / 1000 + 0.004))) this.dirty = true
-    if (this.buildings.step(this.controls.target, distance, this.camera.position, this.character)) this.dirty = true
+    if (this.buildings.step(this.camera.position, this.controls.target, this.farthest(fog.far), this.height / 2 / Math.tan((FOV * Math.PI) / 360), this.character)) this.dirty = true
     if (this.props.step(this.controls.target, distance, this.arrow)) this.dirty = true
     this.inside?.hidePictures(this.buildings.under)
     if (this.dirty) {
@@ -680,6 +680,23 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
       this.evict()
     }
     this.onFrame()
+  }
+
+  // Yards from the point looked at to the farthest ground on the view: where the looks through its four corners meet
+  // the ground, taken as level as that point, or the fog; a fifth more for the hills. The same whichever way the view is turned.
+  private farthest(fog: number): number {
+    const c = this.camera.position,
+      t = this.controls.target,
+      ahead = this.camera.getWorldDirection(new THREE.Vector3()),
+      ray = new THREE.Vector3()
+    this.camera.updateMatrixWorld()
+    let reach = 0
+    for (const [x, y] of [[-1, 1], [1, 1], [-1, -1], [1, -1]] as const) {
+      ray.set(x, y, 0.5).unproject(this.camera).sub(c).normalize()
+      const far = Math.min(ray.y < -1e-3 ? (t.y - c.y) / ray.y : Infinity, fog / ray.dot(ahead))
+      reach = Math.max(reach, Math.hypot(c.x + ray.x * far - t.x, c.z + ray.z * far - t.z))
+    }
+    return reach * 1.2
   }
 
   private draw(): void {

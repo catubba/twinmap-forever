@@ -44,5 +44,37 @@ export interface Placed {
   radius: Record<string, number>
 }
 
+/** Pixels a building's radius is on the view when it comes on show, and those under which it goes again: smaller, it is left to the picture of the ground, where the game has it painted. */
+export const SHOW_PX = 14
+export const HIDE_PX = 11
+
+/**
+ * The buildings on show from a camera (M23-F3), by their place in the list: those on the ground the view shows (within
+ * reach yards of the point looked at: turning round it changes nothing) whose radius is wide enough on the view
+ * (perRadian: pixels a radian), the widest first, as long as their files fit under the roof (bytes: what a file takes on the graphics card, 0 for one not read yet; each file
+ * once). shown: whether a building is on show already, which then stays down to HIDE_PX. Each with its pixels.
+ */
+export function onShow(list: Placed, camera: { x: number; y: number; z: number }, target: { x: number; z: number }, reach: number, perRadian: number, shown: (i: number) => boolean, bytes: (file: string) => number, roof: number): [number, number][] {
+  const sized: [number, number][] = []
+  list.placed.forEach(([file, x, y, z, , scale], i) => {
+    const r = (list.radius[file] ?? 0) * scale, away = Math.hypot(x - camera.x, y - camera.y, z - camera.z)
+    if (Math.hypot(x - target.x, z - target.z) - r > reach) return
+    const px = (r / Math.max(away, r)) * perRadian
+    if (px >= (shown(i) ? HIDE_PX : SHOW_PX)) sized.push([i, px])
+  })
+  sized.sort((a, b) => b[1] - a[1])
+  const out: [number, number][] = [], counted = new Set<string>()
+  let room = roof
+  for (const one of sized) {
+    const file = list.placed[one[0]]![0]
+    if (!counted.has(file)) {
+      counted.add(file)
+      if ((room -= bytes(file)) < 0) break
+    }
+    out.push(one)
+  }
+  return out
+}
+
 /** The BLP number of each kind of DXT (0 DXT1, 1 DXT3, 7 DXT5), as decodeDxtCutout takes it. */
 export const DXT_KIND: Partial<Record<TexKind, number>> = { dxt1: 0, dxt1a: 0, dxt3: 1, dxt5: 7 }
