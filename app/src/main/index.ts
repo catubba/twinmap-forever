@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto'
 import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { copyFile, readFile, writeFile } from 'node:fs/promises'
 import { hostname, userInfo } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { keep, keptFrom } from '../shared/kept'
 import { burnt } from '../shared/hdr'
 import { modelFrom, pictureDue, portraitsFrom, wornKey, type Portraits, type PortraitsTold } from '../shared/portrait'
@@ -84,7 +84,7 @@ function startTiles(gameFolder: string | null): { status: () => TilesStatus; ite
     waiting = []
   }
   const base = process.env.TWINMAP_DATA ?? join(process.env.LOCALAPPDATA ?? app.getPath('userData'), 'Twinmap')
-  const worker = startTilesWorker({ workerData: { gameFolder, base, nav: navFolder() } })
+  const worker = startTilesWorker({ workerData: { gameFolder, base, nav: navFolder(), openmap: join(dirname(navFolder()), 'openmap') } })
   // The picture of an item, or of a spell by its file, the folder does not have yet is made by the worker, which has the game's archive (item-icons.ts).
   const items = new Map<string, ((made: boolean) => void)[]>()
   worker.on('message', (told: TilesStatus | { asked: string; made: boolean }) => {

@@ -15,7 +15,7 @@
   import { frame, layout, setMapRight } from './frame.svelte'
   import { arrow, setArrow } from './arrow.svelte'
   import { ARROW, ARROW_SIZES } from './look'
-  import { objectiveLooks, objectives, packs, questieHere, setObjectiveLook, setPack } from './packs.svelte'
+  import { mapLook, mapLooks, objectiveLooks, objectives, packs, questieHere, setMapLook, setObjectiveLook, setPack } from './packs.svelte'
   import { langNow, metresOn, metricOffered, num, t, type Key } from '../../shared/i18n'
 
   let { setup, tiles, onback, onfirstrun, onfeedback, onnews }: { setup: SetupStatus; tiles: TilesStatus | null; onback: () => void; onfirstrun: () => void; onfeedback: () => void; onnews: () => void } = $props()
@@ -119,6 +119,11 @@
         <label class="choice">{t('settings.layout.label')} <select class="field size" disabled={!layout.sided} value={layout.mapRight ? 'right' : 'left'} onchange={(e) => setMapRight(e.currentTarget.value === 'right')}><option value="left">{t('settings.layout.left')}</option><option value="right">{t('settings.layout.right')}</option></select></label>
         {#if !layout.sided}<p class="hint">{t('settings.layout.custom', { edit: t('app.layout.editKey') })}</p>
         {:else if !touch}<p class="hint">{t('settings.layout.hint')}</p>{/if}
+      </div>
+      <!-- The 2D map from the minimap's pictures or as the game's own map (M21-F6). -->
+      <div class="setting">
+        <label class="choice">{t('settings.mapLook.label')} <select class="field size" value={mapLook.look} onchange={(e) => setMapLook(e.currentTarget.value as typeof mapLook.look)}>{#each mapLooks as look (look)}<option value={look}>{t(`settings.mapLook.${look}`)}</option>{/each}</select></label>
+        <p class="hint">{t('settings.mapLook.hint')}</p>
       </div>
       <!-- The character's arrow, on the 2D map and on the 3D view: any colour, and a size of the one first drawn. -->
       <div class="setting">
