@@ -5,7 +5,7 @@ import { app } from 'electron'
 import koffi, { type LibraryHandle } from 'koffi'
 import type { Edge, WindowHandle } from './capture'
 import type { Rect } from '../shared/window'
-import { clientPidFrom, commandLine, inWindow, isGame, monitorsFrom, coveredMonitorEdgeRect, parseSetup, problemList, programFrom, rgbFrom, stateOf, windowlessGame, wineProgramPath } from './capture-linux-frame'
+import { clientPidFrom, commandLine, inWindow, isGame, monitorsFrom, coveredMonitorEdgeRect, parseSetup, problemList, programFrom, rgbFrom, stateOf, mayTellWindowless, windowlessGame, wineProgramPath } from './capture-linux-frame'
 
 type NativeFunction = ReturnType<LibraryHandle['func']>
 // Keep Koffi's pointer value for native calls/free; only addresses support arithmetic.
@@ -323,9 +323,8 @@ export function findGameWindow(): WindowHandle | null {
     return test ? executable === test || programFrom(args, executable) === test
       : isGame(args, executable, property(n, id, 'WM_CLASS', 8)?.toString('utf8').split('\0') ?? [])
   }, true)
-  // Without X-Resource a window's PID is the one _NET_WM_PID names, from inside a container maybe: the game's window may be there, unmatched.
-  if (native && native.res !== false && windowless(found !== null, performance.now(), gameRuns)) {
-    problem("the game runs with no window on this X display: Wine's Wayland driver draws it (PROTON_ENABLE_WAYLAND=1, or DISPLAY unset), or a gamescope of its own; the game must run on X11 or XWayland")
+  if (native && mayTellWindowless(!!test, native.res) && windowless(found !== null, performance.now(), gameRuns)) {
+    problem("the game has run 30 s with no window on this X display: Twinmap reads it on the same X11 or XWayland display only, not through Wine's Wayland driver (PROTON_ENABLE_WAYLAND=1, or DISPLAY unset) nor in a gamescope of its own")
   }
   return found
 }

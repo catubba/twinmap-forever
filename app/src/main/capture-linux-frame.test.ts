@@ -1,5 +1,5 @@
 import { expect, test, vi } from 'vitest'
-import { clientPidFrom, commandLine, inWindow, isGame, monitorsFrom, coveredMonitorEdgeRect, parseSetup, problemList, programFrom, rgbFrom, stateOf, edgeRect, windowlessGame, wineProgramPath } from './capture-linux-frame'
+import { clientPidFrom, commandLine, inWindow, isGame, monitorsFrom, coveredMonitorEdgeRect, parseSetup, problemList, programFrom, rgbFrom, stateOf, edgeRect, mayTellWindowless, windowlessGame, wineProgramPath } from './capture-linux-frame'
 import type { Rect } from '../shared/window'
 
 function monitorReply(monitors: (Rect & { outputs?: number[] })[]): Buffer {
@@ -288,6 +288,13 @@ test('looks for the running game at most every 10 s, and not while a window is f
   for (const now of [0, 3000, 6000, 9000, 12_000, 15_000]) look(false, now, runs)
   look(true, 21_000, runs)
   expect(runs).toHaveBeenCalledTimes(2) // at 0 and 12 s
+})
+
+test('tells of a game with no window neither in a trial of another program nor without X-Resource', () => {
+  expect(mayTellWindowless(false, true)).toBe(true)
+  expect(mayTellWindowless(false, undefined)).toBe(true) // no window on the display to ask X-Resource about
+  expect(mayTellWindowless(true, true)).toBe(false) // TWINMAP_CAPTURE_TEST_PROGRAM: the game's window is not looked for
+  expect(mayTellWindowless(false, false)).toBe(false)
 })
 
 test('translates the C drive using the process Wine prefix, ahead of Steam compat data', () => {

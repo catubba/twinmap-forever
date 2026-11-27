@@ -161,6 +161,13 @@ export function windowlessGame(after: number, every: number): (found: boolean, n
   }
 }
 
+/**
+ * Whether a game with no window found may be told of at all: not while a trial looks for a program of its
+ * own (TWINMAP_CAPTURE_TEST_PROGRAM), and not without X-Resource, as then a window's PID is the one
+ * _NET_WM_PID names, from inside a container maybe, and the game's window may be there unmatched.
+ */
+export const mayTellWindowless = (trial: boolean, res: boolean | undefined): boolean => !trial && res !== false
+
 export function stateOf(mapState: number | null, states: number[], hidden: number): 'gone' | 'minimized' | 'open' {
   return mapState === null ? 'gone' : mapState !== 2 || states.includes(hidden) ? 'minimized' : 'open'
 }
