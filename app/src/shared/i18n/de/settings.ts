@@ -32,6 +32,13 @@ export default {
     custom: 'Eure Anordnung legt die Karte fest: Verschiebt sie mit {edit}.',
   },
 
+  mapLook: {
+    label: '2D-Karte',
+    tiles: 'Minikarte',
+    parchment: 'Weltkarte',
+    hint: 'Als Weltkarte wird sie wie die Karte des Spiels gezeichnet, jede Zone wie erkundet, ohne die Ortsnamen von Twinmap. Die 3D-Ansicht bleibt bei der Minikarte.',
+  },
+
   arrow: {
     title: 'Pfeil',
     colour: 'Farbe',

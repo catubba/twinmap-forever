@@ -21,6 +21,15 @@ export function setObjectiveLook(to: (typeof objectiveLooks)[number]): void {
   localStorage.setItem('objective-look', to)
 }
 
+// The 2D map drawn from the minimap's pictures (our tiles) or as the game's own map (M21-F6, main/parchment.ts): kept by
+// this window, as the pack is.
+export const mapLooks = ['tiles', 'parchment'] as const
+export const mapLook = $state({ look: localStorage.getItem('map-look') === 'parchment' ? 'parchment' : ('tiles' as (typeof mapLooks)[number]) })
+export function setMapLook(to: (typeof mapLooks)[number]): void {
+  mapLook.look = to
+  localStorage.setItem('map-look', to)
+}
+
 const asked = new Set<string>()
 /** Whether the picture at this address came; the first time, it is asked for. */
 function came(url: string): boolean {

@@ -29,6 +29,7 @@ import { walker, type Walker } from './walk'
 import { MIDDLE_YARDS } from '../shared/inside'
 import { ICONS_MADE, writeIcons } from './icons'
 import { gamePictures, itemIcons } from './item-icons'
+import { convertParchment, parchmentFolder, parchmentSea } from './parchment'
 import { convertWorld, dropOtherBuilds, finished, ICONS_FOLDER, MAPS_FILE, PLACES_FILE, tilesFolder, TRAVEL_FILE } from './tiles'
 
 const { gameFolder, base, nav } = workerData as { gameFolder: string; base: string; nav: string }
@@ -69,7 +70,11 @@ try {
   } catch {
     // A map made before the app read the game's language, or none yet.
   }
-  if (madeIn !== locale) for (const made of [MAPS_FILE, PLACES_FILE, TRAVEL_FILE, INTERIORS_FILE, ITEMS_FILE, AH_NAMES_FILE, TRAINERS_FILE, SPELLS_FILE, TALENTS_FILE, GAME_NAMES_FILE]) rmSync(join(folder, made), { force: true })
+  if (madeIn !== locale) {
+    for (const made of [MAPS_FILE, PLACES_FILE, TRAVEL_FILE, INTERIORS_FILE, ITEMS_FILE, AH_NAMES_FILE, TRAINERS_FILE, SPELLS_FILE, TALENTS_FILE, GAME_NAMES_FILE]) rmSync(join(folder, made), { force: true })
+    // The game's map paints the names of the continents in its language: its parchment too (parchment.ts).
+    for (const world of WORLDS) rmSync(parchmentFolder(join(folder, world.name)), { recursive: true, force: true })
+  }
   // The game's archive is opened only when there is something to convert: it takes half a second
   // and a few hundred megabytes, and on most starts the tiles are already there.
   let client: ClientFiles | undefined
@@ -222,7 +227,14 @@ try {
   }
   // The names are made again in this language: said so, for the next start. (The insides, after, are made in it too.)
   writeFileSync(localeFile, locale)
-  const ready = { state: 'ready', folder, version: build.version, tiles, missing, seconds: (Date.now() - started) / 1000, converted } as const
+  // The continents whose parchment is made, each with the colour of its open sea.
+  const parchment: Record<string, number[]> = {}
+  for (const world of WORLDS) {
+    const sea = parchmentSea(join(folder, world.name))
+    if (sea) parchment[world.name] = sea
+  }
+  const ready = { state: 'ready', folder, version: build.version, tiles, missing, seconds: (Date.now() - started) / 1000, converted, parchment } as const
+  let last: TilesStatus = ready
   tell(ready)
   // The spells of the game, for the panels of what a character knows (shared/spells.ts): once for each build, and again for an
   // older format. After the map is ready, which they would hold back a few seconds; the panels ask until the file is there.
@@ -261,7 +273,7 @@ try {
   // The insides of buildings come after: the map of the continents is already usable.
   const insideStarted = Date.now()
   const interiors = (told: { maps: number; pieces: number; dropped: number; converted: boolean; problem?: string }): void =>
-    tell({ ...ready, interiors: { ...told, seconds: (Date.now() - insideStarted) / 1000 } })
+    tell((last = { ...ready, interiors: { ...told, seconds: (Date.now() - insideStarted) / 1000 } }))
   try {
     let inside = finishedInteriors(folder)
     const insideConverted = !inside
@@ -296,6 +308,19 @@ try {
   } catch (e) {
     // The map of the continents is there all the same.
     interiors({ maps: 0, pieces: 0, dropped: 0, converted: false, problem: e instanceof Error ? e.message : String(e) })
+  }
+  // The game's own map stitched into tiles (parchment.ts), a quarter of a minute a continent: last of all, as the map
+  // does without it until it is there. Told as each continent is made.
+  for (const world of WORLDS) {
+    if (parchment[world.name]) continue
+    try {
+      const files = open(), wdt = files.read(world.file), at = join(folder, world.name)
+      const maps = JSON.parse(readFileSync(join(folder, MAPS_FILE), 'utf8')) as GameMap[]
+      const sea = wdt && convertParchment(wdt, (id, skipHidden) => files.read(id, skipHidden), table, maps, world.continent, at) ? parchmentSea(at) : null
+      if (sea && last.state === 'ready') tell((last = { ...last, parchment: { ...parchment, [world.name]: (parchment[world.name] = sea) } }))
+    } catch {
+      // The map shows its tiles; tried again at the next start.
+    }
   }
 } catch (e) {
   tell({ state: 'failed', message: e instanceof Error ? e.message : String(e) })

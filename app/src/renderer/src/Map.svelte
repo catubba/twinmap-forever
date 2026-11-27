@@ -47,14 +47,16 @@
   import { ARRIVE, pinOfMark, removePin, renamePin, savedAt, savedFrom, savePin, yardsBetween, type SavedPin } from '../../shared/saved'
   import { markPart, sendState, type GameMark, type Inbox, type Pin } from '../../shared/send'
   import { companionPin, pin, pinSize, playerPin } from './marks'
-  import { objectives, questPin } from './packs.svelte'
+  import { mapLook, objectives, questPin } from './packs.svelte'
   import { COLOURS } from './look'
 
   // at: when the position was read off the game, in milliseconds.
   // insideReady: the rooms of the buildings are converted, and their list can be asked for.
-  let { pos, group = [], at: readAt, insideReady, quests = [], fixed = [], side, live = false, inbox = null, removed = [], set = [], gameFollows = null, journey = null, route = noRoute(), marked = [], onroute, onnpc, kills, death = null, skills, xpLevel, back = $bindable(null), looking = $bindable(null) }: { kills?: unknown; skills?: unknown; xpLevel?: number | null; death?: Death | null; back?: (DeathPlace & { name: string; door: boolean }) | null; looking?: { zone: string; where: string } | null; journey?: Journey | null; pos: Position | undefined; at: number | undefined; insideReady: boolean; quests?: QuestPin[]; fixed?: FixedPin[]; side?: string; live?: boolean; inbox?: Inbox | null; removed?: string[]; set?: GameMark[]; gameFollows?: Pin | null; route?: Route; marked?: number[]; onroute?: (stop: Stop) => void; onnpc?: (pin: FixedPin | null) => void; group?: Companion[] } = $props()
+  // parchment: the continents (by their folder) whose game map is made (main/parchment.ts), with the colour of its sea.
+  let { pos, group = [], at: readAt, insideReady, quests = [], fixed = [], side, live = false, inbox = null, removed = [], set = [], gameFollows = null, journey = null, route = noRoute(), marked = [], onroute, onnpc, kills, death = null, parchment, skills, xpLevel, back = $bindable(null), looking = $bindable(null) }: { parchment?: Record<string, number[]>; kills?: unknown; skills?: unknown; xpLevel?: number | null; death?: Death | null; back?: (DeathPlace & { name: string; door: boolean }) | null; looking?: { zone: string; where: string } | null; journey?: Journey | null; pos: Position | undefined; at: number | undefined; insideReady: boolean; quests?: QuestPin[]; fixed?: FixedPin[]; side?: string; live?: boolean; inbox?: Inbox | null; removed?: string[]; set?: GameMark[]; gameFollows?: Pin | null; route?: Route; marked?: number[]; onroute?: (stop: Stop) => void; onnpc?: (pin: FixedPin | null) => void; group?: Companion[] } = $props()
 
   const TOP_ZOOM = 7 // the detail of the game itself: the picture of a block is four tiles
+  const PARCHMENT_ZOOM = 5 // the detail of the game's map (main/parchment.ts): about 4 yards a pixel
   const BLANK = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=='
   const NAMES: Record<Continent, string> = { 0: t('map.continents.easternKingdoms'), 1: t('map.continents.kalimdor') }
   // Two cities lie wholly under a roof, though the game calls them outdoors (one can ride there).
@@ -381,16 +383,44 @@
   // everything at every zoom, stretched past their own detail: while the sharp tiles of a place are
   // still being read, the map shows it blurred, never black. The game's own blocks go on top, from
   // halfway between the two kinds of tile up.
+  // A continent chosen as the game's map (Settings > Appearance), once it is made, is its parchment instead: zoom 5 under
+  // everything, stretched above, and 6 and 7 over the cities, which have them only there; its sea all round. Its ground
+  // put again only when it changes. folder: none for a dungeon without ground.
+  let grounded = ''
   function ground(folder: string, opacity = 1): void {
     if (!map) return
+    const sea = opacity === 1 && mapLook.look === 'parchment' ? parchment?.[folder] : undefined, key = `${folder} ${opacity} ${sea}`
+    if (key === grounded) return
+    grounded = key
     for (const layer of shown) layer.remove()
-    shown = [
-      L.tileLayer(`${TILES}/${folder}/{z}/{x}/{y}.png`, { minZoom: 0, maxZoom: 9, maxNativeZoom: TOP_ZOOM - 2, bounds: WORLD_BOUNDS, errorTileUrl: BLANK, keepBuffer: 4, zIndex: 1, opacity }),
-      new BlockLayer({ world: folder, minZoom: TOP_ZOOM - 1.5, minNativeZoom: TOP_ZOOM - 1, maxNativeZoom: TOP_ZOOM, bounds: WORLD_BOUNDS, keepBuffer: 3, zIndex: 2, opacity }),
-    ]
+    holder.style.background = sea ? `rgb(${sea.join(',')})` : ''
+    const url = `${TILES}/${folder}/parchment/{z}/{x}/{y}.png`
+    shown = !folder
+      ? []
+      : sea
+        ? [
+            L.tileLayer(url, { minZoom: 0, maxZoom: 9, maxNativeZoom: PARCHMENT_ZOOM, bounds: WORLD_BOUNDS, errorTileUrl: BLANK, keepBuffer: 4, zIndex: 1 }),
+            L.tileLayer(url, { minZoom: PARCHMENT_ZOOM + 0.5, maxZoom: 9, minNativeZoom: PARCHMENT_ZOOM + 1, maxNativeZoom: TOP_ZOOM, bounds: WORLD_BOUNDS, errorTileUrl: BLANK, keepBuffer: 3, zIndex: 2 }),
+          ]
+        : [
+            L.tileLayer(`${TILES}/${folder}/{z}/{x}/{y}.png`, { minZoom: 0, maxZoom: 9, maxNativeZoom: TOP_ZOOM - 2, bounds: WORLD_BOUNDS, errorTileUrl: BLANK, keepBuffer: 4, zIndex: 1, opacity }),
+            new BlockLayer({ world: folder, minZoom: TOP_ZOOM - 1.5, minNativeZoom: TOP_ZOOM - 1, maxNativeZoom: TOP_ZOOM, bounds: WORLD_BOUNDS, keepBuffer: 3, zIndex: 2, opacity }),
+          ]
     // Under the 3D view no ground is drawn: its tiles would be read and decoded for nothing.
     if (!threeD) for (const layer of shown) layer.addTo(map)
   }
+
+  // The continent on show is its parchment: the game's map, which paints its own hills and names, so neither the relief
+  // nor our names go over it. Chosen or made while it is on show: its ground is put again.
+  const onParchment = $derived(mapLook.look === 'parchment' && !inside && !!parchment?.[WORLDS.find((w) => w.continent === continent)!.name])
+  $effect(() => {
+    void onParchment
+    untrack(() => {
+      if (inside || !maps.length) return
+      ground(WORLDS.find((w) => w.continent === continent)!.name)
+      layout()
+    })
+  })
 
   // The shaded relief of the continent on show (main/heights.ts), over its ground and under the
   // rooms, in soft light: its grey of level ground leaves the map as it is. Once the list of the
@@ -399,7 +429,7 @@
   $effect(() => {
     relief?.remove()
     const world = WORLDS.find((w) => w.continent === continent)
-    relief = maps.length > 0 && layers.relief && !inside && !threeD && world && map ? L.tileLayer(`${TILES}/${world.name}/shade/{z}/{x}/{y}.png`, { minZoom: 0, maxZoom: 9, maxNativeZoom: 6, bounds: WORLD_BOUNDS, errorTileUrl: BLANK, keepBuffer: 4, zIndex: 3, className: 'relief' }).addTo(map) : undefined
+    relief = maps.length > 0 && layers.relief && !inside && !onParchment && !threeD && world && map ? L.tileLayer(`${TILES}/${world.name}/shade/{z}/{x}/{y}.png`, { minZoom: 0, maxZoom: 9, maxNativeZoom: 6, bounds: WORLD_BOUNDS, errorTileUrl: BLANK, keepBuffer: 4, zIndex: 3, className: 'relief' }).addTo(map) : undefined
   })
 
   // Puts these rooms on the map, in place of the ones before.
@@ -497,7 +527,7 @@
   // A name fades in and out as it gains and loses its place.
   function layout(): void {
     if (!map) return
-    if (!layers.zones || inside) return void labels.remove()
+    if (!layers.zones || inside || onParchment) return void labels.remove()
     labels.addTo(map)
     const view = map, zoom = view.getZoom(), size = view.getSize(), boxes: NameBox[] = []
     // From far away the regions are written smaller, so that most of them fit on a whole continent.
@@ -619,11 +649,7 @@
   // wing: of a map with several, the one to put in view.
   function showInside(m: InteriorMap, wing?: string): void {
     if (!map) return
-    if (m.ground) ground(m.ground, GROUND_INSIDE)
-    else {
-      for (const layer of shown) layer.remove()
-      shown = []
-    }
+    ground(m.ground ?? '', GROUND_INSIDE)
     labels.clearLayers()
     named = []
     pins.clearLayers()

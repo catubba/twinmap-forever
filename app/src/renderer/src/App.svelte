@@ -512,7 +512,7 @@
 <div class="stash" inert bind:this={stashBox}>
   <div class="mapbox" style:--readout="{readoutWidth}px" use:section={'map'}>
     {#if mapReady}
-      <Map {pos} {group} {death} skills={char?.name ? sheets[char.name]?.pieces.skills : undefined} xpLevel={char ? (xp ? char.level : null) : undefined} bind:back kills={live ? link?.state.sections.kills : undefined} bind:looking at={link?.state.updatedAt.pos} bind:this={mapView} {insideReady} {quests} {fixed} side={char?.side} {live} {inbox} removed={live ? goneFrom(link?.state.sections.marks) : []} set={live ? setFrom(link?.state.sections.marks) : []} gameFollows={live ? followFrom(link?.state.sections.follow) : null} {journey} {route} marked={shopVendors} onroute={(stop) => setRoute(addStop(route, stop))} onnpc={(pin) => (npc = pin)} />
+      <Map {pos} {group} {death} parchment={tiles?.state === 'ready' ? tiles.parchment : undefined} skills={char?.name ? sheets[char.name]?.pieces.skills : undefined} xpLevel={char ? (xp ? char.level : null) : undefined} bind:back kills={live ? link?.state.sections.kills : undefined} bind:looking at={link?.state.updatedAt.pos} bind:this={mapView} {insideReady} {quests} {fixed} side={char?.side} {live} {inbox} removed={live ? goneFrom(link?.state.sections.marks) : []} set={live ? setFrom(link?.state.sections.marks) : []} gameFollows={live ? followFrom(link?.state.sections.follow) : null} {journey} {route} marked={shopVendors} onroute={(stop) => setRoute(addStop(route, stop))} onnpc={(pin) => (npc = pin)} />
     {:else if tiles}
       <div class="making" class:failed={tiles.state === 'failed' || tiles.state === 'no-game'}>
         <p>{tilesLine(tiles)}</p>

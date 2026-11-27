@@ -32,6 +32,13 @@ export default {
     custom: 'Votre disposition place la carte : déplacez-la avec {edit}.',
   },
 
+  mapLook: {
+    label: 'Carte 2D',
+    tiles: 'Minicarte',
+    parchment: 'Carte du monde',
+    hint: 'En carte du monde, elle est dessinée comme la carte du jeu, chaque zone comme explorée, sans les noms de lieux de Twinmap. La vue 3D garde la minicarte.',
+  },
+
   arrow: {
     title: 'Flèche',
     colour: 'Couleur',

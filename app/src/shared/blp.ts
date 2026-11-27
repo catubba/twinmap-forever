@@ -95,16 +95,17 @@ export function decodeBlpCutout(f: Buffer): Cutout {
     return { width, height, rgba }
   }
   const { rgb } = decodeBlp(f)
-  for (let i = 0; i < pixels; i++) rgba.set(rgb.subarray(i * 3, i * 3 + 3), i * 4)
+  for (let i = 0; i < pixels; i++) (rgba[i * 4] = rgb[i * 3]!), (rgba[i * 4 + 1] = rgb[i * 3 + 1]!), (rgba[i * 4 + 2] = rgb[i * 3 + 2]!)
   if (encoding === 1) {
     // After the pallet choices: a byte, a bit, or nothing a pixel.
     for (let i = 0; i < pixels && alphaBits; i++) rgba[i * 4 + 3] = alphaBits === 8 ? f[at + pixels + i]! : alphaBits === 1 ? ((f[at + pixels + (i >> 3)]! >> (i & 7)) & 1) * 255 : 255
     return { width, height, rgba }
   }
   const step = alphaKind === 0 ? 8 : 16
+  const alpha = new Array<number>(16), levels = new Array<number>(8)
   for (let by = 0, p = at; by < height; by += 4) {
     for (let bx = 0; bx < width; bx += 4, p += step) {
-      const alpha = new Array<number>(16).fill(255)
+      alpha.fill(255)
       if (alphaKind === 0) {
         // DXT1: with the first color not above the second, the fourth choice is a hole.
         const holes = alphaBits > 0 && f.readUInt16LE(p) <= f.readUInt16LE(p + 2), choice = f.readUInt32LE(p + 4)
@@ -114,10 +115,13 @@ export function decodeBlpCutout(f: Buffer): Cutout {
         for (let i = 0; i < 16; i++) alpha[i] = ((f[p + (i >> 1)]! >> ((i & 1) * 4)) & 15) * 17
       } else {
         // DXT5: two levels, and three bits a pixel choosing among them and the steps between.
-        const a0 = f[p]!, a1 = f[p + 1]!, levels = [a0, a1]
-        for (let i = 1; i <= 6; i++) levels.push(a0 > a1 ? Math.round(((7 - i) * a0 + i * a1) / 7) : i <= 4 ? Math.round(((5 - i) * a0 + i * a1) / 5) : i === 5 ? 0 : 255)
-        const bits = f.readUIntLE(p + 2, 6)
-        for (let i = 0; i < 16; i++) alpha[i] = levels[Math.floor(bits / 8 ** i) % 8]!
+        const a0 = f[p]!, a1 = f[p + 1]!
+        levels[0] = a0
+        levels[1] = a1
+        for (let i = 1; i <= 6; i++) levels[i + 1] = a0 > a1 ? Math.round(((7 - i) * a0 + i * a1) / 7) : i <= 4 ? Math.round(((5 - i) * a0 + i * a1) / 5) : i === 5 ? 0 : 255
+        // 48 bits, read as two halves of 24 (eight pixels each).
+        const low = f.readUIntLE(p + 2, 3), high = f.readUIntLE(p + 5, 3)
+        for (let i = 0; i < 8; i++) (alpha[i] = levels[(low >> (i * 3)) & 7]!), (alpha[i + 8] = levels[(high >> (i * 3)) & 7]!)
       }
       for (let i = 0; i < 16; i++) {
         const x = bx + (i & 3), y = by + (i >> 2)

@@ -56,9 +56,10 @@ test('a continent gets its heights and its relief, down to the tile of the whole
   }
 })
 
-test('the relief is served from its folder, and nothing beside it', () => {
+test('the relief and the parchment are served from their folders, and nothing beside them', () => {
   const base = join(tmpdir(), 'build')
+  expect(servedFile(base, '/azeroth/parchment/7/130/98.png')).toBe(join(base, 'azeroth', 'parchment', '7', '130', '98.png'))
   expect(servedFile(base, '/azeroth/shade/6/32/48.png')).toBe(shadeFile(join(base, 'azeroth'), 6, 32, 48))
   expect(servedFile(base, '/azeroth/levels/6/32/48.bin')).toBe(levelsFile(join(base, 'azeroth'), 6, 32, 48))
-  for (const path of ['/azeroth/shade/../6/1/1.png', '/azeroth/heights/32/48.bin', '/azeroth/shade/12/1/1.png', '/azeroth/levels/6/../1.bin', '/i33/levels/6/1/1.bin']) expect(servedFile(base, path), path).toBeNull()
+  for (const path of ['/azeroth/shade/../6/1/1.png', '/azeroth/heights/32/48.bin', '/azeroth/shade/12/1/1.png', '/azeroth/levels/6/../1.bin', '/i33/levels/6/1/1.bin', '/azeroth/parchment/../1/1/1.png', '/azeroth/parchment/done.json']) expect(servedFile(base, path), path).toBeNull()
 })
