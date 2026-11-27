@@ -51,14 +51,15 @@ describe('the floors of a dungeon', () => {
   })
 
   it('put a pin on the floor nearest to the height it is told, or at that height with no floor near it', () => {
-    expect(pinOn(floors, 110, 110, 16, 5)).toBe(15)
-    expect(pinOn(floors, 110, 110, 4, 5)).toBe(5)
+    expect(pinOn(floors, [hall], 110, 110, 16, all)).toBe(15)
+    expect(pinOn(floors, [hall], 110, 110, 4, all)).toBe(5)
     // a boss that swims 9 yards over the floor, one on a ledge the building does not have
-    expect(pinOn(floors, 104, 110, 14, 5)).toBe(14)
-    expect(pinOn(floors, 130, 110, 14, 5)).toBe(14)
-    // no height told: the floor nearest to the main one, the main one with no floor at all
-    expect(pinOn(floors, 110, 110, undefined, 13)).toBe(15)
-    expect(pinOn(floors, 130, 110, undefined, 13)).toBe(13)
+    expect(pinOn(floors, [hall], 104, 110, 14, all)).toBe(14)
+    expect(pinOn(floors, [hall], 130, 110, 14, all)).toBe(14)
+    // no height told: the lowest floor of the room the 2D map shows there, as the character coming there first
+    expect(pinOn(floors, [hall], 110, 110, undefined, all)).toBe(5)
+    expect(pinOn(floors, [hall], 130, 110, undefined, all)).toBeNull()
+    expect(pinOn(floors, [hall], 110, 110, undefined, () => undefined)).toBeUndefined()
   })
 
   it('look a few yards round a place with no floor under it', () => {
@@ -68,12 +69,24 @@ describe('the floors of a dungeon', () => {
   })
 
   it('count the ground of a dungeon that has one, and the floors of its other buildings', () => {
-    const onGround = { ...floors, also: (): number[] => [40] }
-    expect(floorsAt(onGround, 110, 110)).toEqual([40, 15, 5])
-    // in a room of the 2D map its lowest floor; in the open the highest of what is under the place, on a ground only
+    const onGround = { ...floors, ground: (): number => 40 }
+    expect(floorsAt({ ...onGround, also: (): number[] => [50] }, 110, 110)).toEqual([50, 40, 15, 5])
+    expect(floorsAt(onGround, 110, 110, false, true)).toEqual([15, 5])
+    // the ground a few yards under a floor of a building is covered by it, the paving of a courtyard: not walked
+    expect(floorsAt({ ...floors, ground: (): number => 2 }, 110, 110)).toEqual([15, 5])
+    expect(floorsAt({ ...floors, ground: (): number => -10 }, 110, 110)).toEqual([15, 5, -10])
+    // under the sky nothing that lies under the ground: rooms far under it are not where the character is
+    expect(floorsAt(onGround, 110, 110, true)).toEqual([40])
+    expect(standsOn(onGround, [hall], 110, 110, undefined, null, all, true)).toBe(40)
+    expect(standsOn(onGround, [hall], 110, 110, undefined, 14, all, true)).toBe(40)
+    // under a roof: the room's floor, whatever the ground over it, and then the nearest to before
     expect(standsOn(onGround, [hall], 110, 110, undefined, null, all)).toBe(5)
-    expect(standsOn(onGround, [], 110, 110, undefined, null, all)).toBe(40)
-    expect(standsOn(floors, [], 110, 110, undefined, null, all)).toBe(5)
+    expect(standsOn(onGround, [hall], 110, 110, undefined, 14, all)).toBe(15)
+    // a ground that crosses the room's box is not its floor: a floor of the building is
+    expect(standsOn({ ...floors, ground: (): number => 9 }, [hall], 110, 110, undefined, null, all, true)).toBe(15)
+    // in no room, the lowest of what is there
+    expect(standsOn(onGround, [], 110, 110, undefined, null, all, true)).toBe(40)
+    expect(standsOn(onGround, [], 110, 110, undefined, null, all)).toBe(5)
   })
 })
 

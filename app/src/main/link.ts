@@ -47,7 +47,7 @@ function withInside(state: GameState, found: (Inside & { at: number }) | null): 
   if (!found || !pos?.inst) return state
   // The app counts a facing anticlockwise from north, as the game does.
   const facing = found.facing === undefined ? pos.facing : (360 - found.facing) % 360
-  return { ...state, sections: { ...state.sections, pos: { ...pos, facing, inst: { ...pos.inst, ...worldOfYards(found), level: found.level } } }, updatedAt: { ...state.updatedAt, pos: Math.max(state.updatedAt.pos ?? 0, found.at) } }
+  return { ...state, sections: { ...state.sections, pos: { ...pos, facing, inst: { ...pos.inst, ...worldOfYards(found), level: found.level, ...(found.open ? { open: true } : {}) } } }, updatedAt: { ...state.updatedAt, pos: Math.max(state.updatedAt.pos ?? 0, found.at) } }
 }
 
 /**
@@ -82,7 +82,7 @@ export function startLink(
 
   const replay = process.env.TWINMAP_REPLAY ? replayed(process.env.TWINMAP_REPLAY) : null
   // For trials inside a dungeon without the game's minimap on a screen: TWINMAP_INSIDE names a file of places as the
-  // minimap would tell them (a list of { ms, u, v, facing, level }, ms from the start of the app), each held until the next.
+  // minimap would tell them (a list of { ms, u, v, facing, level, open }, ms from the start of the app), each held until the next.
   const walk = replay && process.env.TWINMAP_INSIDE ? (JSON.parse(readFileSync(process.env.TWINMAP_INSIDE, 'utf8')) as (Inside & { ms: number })[]) : null
   const walkFrom = Date.now()
 
@@ -92,7 +92,7 @@ export function startLink(
     let at: { x: number; y: number; size: number } | null = null
     const began = performance.now()
     const place = inside.look(game.state.sections.pos, (x, y, size) => ((at = { x: Math.round(x * stretch), y: Math.round(y * stretch), size: Math.round(size * stretch) }), readBox(window, at.x, at.y, at.size)), now)
-    found = place && (found && found.u === place.u && found.v === place.v && found.facing === place.facing && found.level === place.level ? found : { ...place, at: now })
+    found = place && (found && found.u === place.u && found.v === place.v && found.facing === place.facing && found.level === place.level && found.open === place.open ? found : { ...place, at: now })
     const told = inside.report(), report = told?.report ?? null
     if (report === said) return
     said = report
@@ -115,7 +115,7 @@ export function startLink(
       if (stand !== null) lookInside(stand, now)
       else if (walk) {
         const place = walk.filter((p) => p.ms <= now - walkFrom).at(-1) ?? null
-        found = place && (found && found.u === place.u && found.v === place.v ? found : { u: place.u, v: place.v, facing: place.facing, level: place.level, at: now })
+        found = place && (found && found.u === place.u && found.v === place.v ? found : { u: place.u, v: place.v, facing: place.facing, level: place.level, ...(place.open ? { open: true } : {}), at: now })
       }
       return
     }

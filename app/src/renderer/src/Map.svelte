@@ -1090,8 +1090,9 @@
           // a city inside the ground is cut over the floor of the character followed in it
           terrain!.arrow = body.at()
           terrain!.character = following ? terrain!.arrow : null
-          // in a dungeon the floor the arrow stands on is looked for among the rooms of the level the minimap tells
-          terrain!.rooms = inside && pos?.inst?.id === inside.id ? { pieces: inside.pieces, level: pos.inst.level } : null
+          // in a dungeon the floor the arrow stands on is looked for among the rooms of the level the minimap tells, and
+          // not under the ground while it shows the open; a pin with no height told lies on the floor of its room
+          terrain!.rooms = inside ? { pieces: inside.pieces, ...(pos?.inst?.id === inside.id ? { level: pos.inst.level, open: pos.inst.open } : {}) } : null
           return moved
         }
         pins3d ??= new Pins3d(map, terrain, pinsHost, terrainHost, arrow, () => turned, body, () => floorAt)
