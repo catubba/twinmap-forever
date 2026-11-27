@@ -65,6 +65,8 @@ export default {
     treesHint: '빽빽한 숲은 성기게 하고 캐릭터 주변에는 나뭇잎을 그리지 않아 땅과 길이 보입니다.',
     objects: '사물',
     objectsHint: '울타리, 수레, 가로등, 천막, 화로.',
+    ground: '가까운 땅 텍스처',
+    groundHint: '가까이에서는 게임의 텍스처로 땅을 그려 선명하게 보입니다.',
     card: '그래픽 카드',
   },
 

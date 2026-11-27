@@ -21,6 +21,9 @@ export const minimapTiles = (wdt: Buffer): Map<number, number> => blockFiles(wdt
 /** The terrain file (the "root ADT": shape and height of the ground) of each block that has one, the same way. */
 export const terrainFiles = (wdt: Buffer): Map<number, number> => blockFiles(wdt, 0)
 
+/** The file of the ground's own textures and their mixes (the "tex0": shared/ground.ts) of each block that has one, the same way. */
+export const groundFiles = (wdt: Buffer): Map<number, number> => blockFiles(wdt, 3)
+
 function blockFiles(wdt: Buffer, slot: number): Map<number, number> {
   const files = new Map<number, number>()
   // A .wdt is a run of chunks: a four letter tag written backwards, a size, the data.
