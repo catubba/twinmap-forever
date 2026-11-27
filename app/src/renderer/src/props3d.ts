@@ -45,7 +45,7 @@ export class Props {
   readonly group = new THREE.Group()
   private folder = ''
   private list: Set<string> | null = null
-  private asked = 0
+  private asked = -Infinity
   private blocks = new Map<string, Block>()
   private shown = new Set<string>() // the blocks wanted, by "column-row"
   private wanted = new Set<number>() // the models of their copies
@@ -73,7 +73,7 @@ export class Props {
     this.clear()
     this.folder = folder
     this.list = null
-    this.asked = 0
+    this.asked = -Infinity
   }
 
   /** What is drawn: trees (and how many of them), objects. */
