@@ -453,12 +453,13 @@
       return canvas
     },
   }) as unknown as new (options: L.GridLayerOptions & { picture: HTMLCanvasElement }) => L.GridLayer
-  function tinted(grid: Uint16Array, level: number): HTMLCanvasElement {
+  function tinted(grid: Uint16Array, level: number, parchment: boolean): HTMLCanvasElement {
     const side = Math.sqrt(grid.length), canvas = document.createElement('canvas'), image = new ImageData(side, side)
     canvas.width = canvas.height = side
     const colours = new Map<number, number[] | null>()
     const colourOf = (zone: number): number[] | null => {
-      const range = ZONE_LEVELS[zone], hex = range && COLOURS.levels[zoneDifficulty(range, level)]
+      const difficulty = ZONE_LEVELS[zone] && zoneDifficulty(ZONE_LEVELS[zone], level)
+      const hex = difficulty && (parchment && difficulty === 'red' ? COLOURS.levelsRedOnParchment : COLOURS.levels[difficulty])
       return hex ? [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)) : null
     }
     grid.forEach((zone, i) => {
@@ -477,7 +478,7 @@
     const world = WORLDS.find((w) => w.continent === continent), asked = ++tintFor, at = level, view = map, opacity = onParchment ? TINT_ON_PARCHMENT : TINT_OPACITY
     if (!(maps.length > 0 && layers.levels && !inside && !threeD && world && view && at)) return
     void zoneGrid(world.name).then((grid) => {
-      if (grid && asked === tintFor) tint = new TintLayer({ picture: tinted(grid, at), bounds: WORLD_BOUNDS, minZoom: 0, maxZoom: 9, keepBuffer: 4, zIndex: 4, opacity, className: 'tint' }).addTo(view)
+      if (grid && asked === tintFor) tint = new TintLayer({ picture: tinted(grid, at, onParchment), bounds: WORLD_BOUNDS, minZoom: 0, maxZoom: 9, keepBuffer: 4, zIndex: 4, opacity, className: 'tint' }).addTo(view)
     })
   })
 
