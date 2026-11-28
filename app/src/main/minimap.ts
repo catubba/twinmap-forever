@@ -5,7 +5,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { inflateSync } from 'node:zlib'
-import type { Position } from '../shared/game'
+import type { Far, Position } from '../shared/game'
 import { inPiece, roomPixels, type Interiors, type Piece } from '../shared/inside'
 import { facingOf, levelsOf, LIT, locate, readsMinimap, SHARED, SURE, viewHolds, widthsOf, type Box, type Found, type Levels, type Mosaic } from '../shared/minimap'
 import { ROOM_VIEWS } from '../shared/room-views'
@@ -169,6 +169,8 @@ export interface InsideReport {
   hid?: boolean
   /** The place found was let go: a room the game always draws from there is not on the minimap (viewHolds). */
   unlike?: boolean
+  /** The place the addon found from the flight masters at the same moment, when it sends one: for the samples of the participation programme. */
+  far?: Far
 }
 
 /**
@@ -215,7 +217,8 @@ export function startInside(tilesFolder: () => string | null, mosaics: (folder: 
         views = ROOM_VIEWS[dungeon]
       }
       const widths = widthsOf(mini)
-      const said = { dungeon, pictures: floors.length, zoom: mini.zoom, size: mini.size, widths, lostFor: now - (foundAt || enteredAt), ...(mini.hid === true ? { hid: true } : {}) }
+      const far = pos.inst.far
+      const said = { dungeon, pictures: floors.length, zoom: mini.zoom, size: mini.size, widths, lostFor: now - (foundAt || enteredAt), ...(mini.hid === true ? { hid: true } : {}), ...(far && [far.x, far.y, far.z, far.r].every(Number.isFinite) ? { far: { x: far.x, y: far.y, z: far.z, r: far.r } } : {}) }
       if (!floors.length) return (report = { ...said, why: 'no rooms' }), null
       const known = last && now - last.at <= KEPT ? last : null
       if (!known && now - searchedAt < LOST_FOR) return null
