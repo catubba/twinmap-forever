@@ -76,16 +76,19 @@ export interface Dungeon {
 
 /**
  * Every dungeon and raid behind the doors of the world map, by the game's names, and the wings of
- * the ones that have several on one map (Scarlet Monastery: Armory), by the names of the pins.
+ * the ones that have several on one map (Scarlet Monastery: Armory), by the names of the pins. Once
+ * each, at its first door; a wing with a door of its own (Dire Maul: North) at that door.
  */
 export function dungeonsOf(doors: Travel['doors']): Dungeon[] {
   const all: Dungeon[] = []
+  const placeOf = (door: Travel['doors'][number]) => ({ continent: door.continent, at: { x: door.x, y: door.y } })
   for (const door of doors) {
     door.maps?.forEach((id, i) => {
-      const raid = door.raid === true, place = { continent: door.continent, at: { x: door.x, y: door.y } }
-      all.push({ name: door.names[i] ?? door.names[0]!, id, raid, ...place })
+      if (all.some((d) => d.id === id)) return
+      const raid = door.raid === true
+      all.push({ name: door.names[i] ?? door.names[0]!, id, raid, ...placeOf(door) })
       const wings = DUNGEON_PINS.filter((d) => d.map === id)
-      if (wings.length > 1) for (const wing of wings) all.push({ name: wing.name, id, wing: wing.name, raid, ...place })
+      if (wings.length > 1) for (const wing of wings) all.push({ name: wing.name, id, wing: wing.name, raid, ...placeOf(doors.find((d) => d.wing === wing.name && d.maps?.includes(id)) ?? door) })
     })
   }
   return all

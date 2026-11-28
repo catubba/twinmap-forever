@@ -2,7 +2,7 @@
 // grow (both from the player's QuestieDB), the doors of the dungeons, the flight routes and the ships
 // and zeppelins (all from the game's own tables; the doors the tables do not give are in dungeon-doors.ts,
 // which of the game's ways are ships and zeppelins in VESSELS).
-import { DUNGEON_DOORS } from './dungeon-doors'
+import { DUNGEON_DOORS, FIRST_ENTRANCE, MORE_DOORS, type Entrance } from './dungeon-doors'
 import { unitsOfPlace, unitsOfWorld } from './geo'
 import type { Continent, GameMap } from './maps'
 import type { Table } from './wdc5'
@@ -113,12 +113,16 @@ export const VESSELS: { path: number; kind: 'ship' | 'zeppelin'; side: string; s
 
 /** A place on a continent, in map units (geo.ts). */
 interface Spot { continent: Continent; x: number; y: number }
-/** Told in the file of what travel() gives: one made by an older travel() is made again. 2: the doors of the dungeons Forever added. 3: which doors are of raids. 4: the maps behind each door. 5: the ships and zeppelins. */
-export const TRAVEL_FORMAT = 5
+/** Told in the file of what travel() gives: one made by an older travel() is made again. 2: the doors of the dungeons Forever added. 3: which doors are of raids. 4: the maps behind each door. 5: the ships and zeppelins. 6: the other doors of the dungeons that have more than one. */
+export const TRAVEL_FORMAT = 6
 export interface Travel {
   format?: number
-  /** Where one walks into a dungeon or a raid; several share a door. maps: the game's numbers of their maps, as names. raid: all behind it are raids. */
-  doors: (Spot & { names: string[]; maps?: number[]; raid?: true })[]
+  /**
+   * Where one walks into a dungeon or a raid; several share a door. maps: the game's numbers of their maps, as names. raid: all behind it are raids.
+   * A dungeon with more than one door has the one of the game's table first: where a ghost walks back in. wing: the wing a door more opens on.
+   * entrance: which door it is, where there are several.
+   */
+  doors: (Spot & { names: string[]; maps?: number[]; raid?: true; wing?: string; entrance?: Entrance })[]
   /** Where a flight starts and ends. */
   nodes: (Spot & { name: string; side: string })[]
   /** Flights, each a pair of places in `nodes`. */
@@ -144,10 +148,11 @@ const continentOf = (world: number | undefined): Continent | null => (world === 
  * The doors and the flights, from the tables of the maps, of the flight nodes and of the flight
  * paths. A map says where a ghost walks back in: that is its door. A dungeon reached through
  * another has none. The dungeons Forever added have none in the table either: theirs come from
- * dungeon-doors.ts, each placed on the map of its zone (zones: the game's maps, as gameMaps gives them).
+ * dungeon-doors.ts, each placed on the map of its zone (zones: the game's maps, as gameMaps gives them). So do the
+ * other doors of a dungeon that has more than one, after the one of the table.
  */
 export function travel(maps: Table, taxiNodes: Table, taxiPaths: Table, zones: GameMap[] = [], pathNodes?: Table, areas?: Table): Travel {
-  const doors: (Spot & { names: string[]; maps: number[]; at: [number, number]; raid: boolean })[] = []
+  const doors: (Spot & { names: string[]; maps: number[]; at: [number, number]; raid: boolean; wing?: string; entrance?: Entrance })[] = []
   const given = new Set<number>()
   for (const row of maps.rows) {
     const continent = continentOf(row.int(MAP_DOOR_WORLD)), kind = row.int(MAP_KIND), name = row.text(MAP_NAME)
@@ -167,6 +172,13 @@ export function travel(maps: Table, taxiNodes: Table, taxiPaths: Table, zones: G
     // The name as the game writes it, when the row of the map is one this PC can read.
     const name = maps.rows.find((row) => row.id === door.map)?.text(MAP_NAME) || door.name
     doors.push({ continent: zone.continent, ...unitsOfPlace(zone.rect, door.x * 100, door.y * 100), names: [name], maps: [door.map], at: [0, 0], raid: false })
+  }
+  for (const { map, continent, x, y, entrance, wing } of MORE_DOORS) {
+    const first = doors.find((d) => d.maps.includes(map))
+    if (!first) continue
+    if (FIRST_ENTRANCE[map] && first.maps.length === 1) first.entrance = FIRST_ENTRANCE[map]
+    const name = first.names[first.maps.indexOf(map)] ?? first.names[0]!
+    doors.push({ continent, ...unitsOfWorld(x, y), names: [name], maps: [map], at: [x, y], raid: first.raid, entrance, ...(wing ? { wing } : {}) })
   }
 
   // A node is one a player flies from when a side may use it and a path leaves it: the table also
