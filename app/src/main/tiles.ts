@@ -19,7 +19,7 @@ import { deflateSync } from 'node:zlib'
 import { decodeBlp, decodeDxt, dxt1Of } from '../shared/blp'
 import { BLOCK_PIXELS, BLOCKS, minimapTiles, WORLDS } from '../shared/world'
 import { crop, double, halve, join } from '../shared/pixels'
-import { groundAsked, groundBlock, groundList, groundPile } from './ground'
+import { groundAsked, groundBlock, groundList, groundPile, groundPlace } from './ground'
 import { encodePng } from './png'
 
 export const TILE = 256
@@ -91,10 +91,10 @@ export function servedFile(base: string, path: string): string | null {
   if (props) return props[2] ? joinPath(base, props[1]!, 'props', `${props[2]}-${props[3]}.bin`) : joinPath(base, props[1]!, 'props.json')
   const item = /^\/(items|pictures)\/(\d{1,7})\.png$/.exec(path)
   if (item) return joinPath(base, item[1]!, `${item[2]}.png`)
-  // The ground's own textures of the 3D view (ground.ts): a continent's list and pile, a block's layers and mixes.
+  // The ground's own textures of the 3D view (ground.ts): a continent's or a dungeon's list and pile, a block's layers and mixes.
   const ground = groundAsked(path)
   if (ground !== null) {
-    const world = WORLDS[ground < 0 ? -1 - ground : Math.floor(ground / (BLOCKS * BLOCKS))]!.name, block = ground % (BLOCKS * BLOCKS)
+    const world = groundPlace(ground < 0 ? -1 - ground : Math.floor(ground / (BLOCKS * BLOCKS))), block = ground % (BLOCKS * BLOCKS)
     return ground < 0 ? (path.endsWith('.json') ? groundList(base, world) : groundPile(base, world)) : groundBlock(base, world, block % BLOCKS, Math.floor(block / BLOCKS))
   }
   const m = /^\/(?:(maps|places|travel|interiors|caves|under|items|trainers|spells|talents|ah-names|game-names)\.json|rooms\/(\d{1,9})\.dxt|([a-z]+|i\d{1,5})\/(?:blocks\/(\d{1,2})\/(\d{1,2})\.dxt|(shade\/)?(\d)\/(\d{1,3})\/(\d{1,3})\.png))$/.exec(path)

@@ -5,7 +5,7 @@ import { inflateSync } from 'node:zlib'
 import { expect, test } from 'vitest'
 import { levelBytes, LEVELS, MIX_SIDE, TEXTURE_BYTES, unpackGround } from '../shared/ground'
 import type { ClientFiles } from './client-files'
-import { groundAsked, groundBlock, groundDxt1, groundList, groundMaker, groundPile, pileOf } from './ground'
+import { groundAsked, groundBlock, groundDxt1, groundList, groundMaker, groundPile, groundPlace, pileOf } from './ground'
 
 // a chunk of a game file: its tag written backwards, its size, its data
 const chunk = (tag: string, data: Buffer): Buffer => Buffer.concat([Buffer.from([...tag].reverse().join(''), 'latin1'), Buffer.from(new Uint32Array([data.length]).buffer), data])
@@ -73,6 +73,11 @@ test('the paths of the ground are told from the others', () => {
   expect(groundAsked('/azeroth/ground.json')).toBe(-1)
   expect(groundAsked('/kalimdor/ground/textures.bin')).toBe(-2)
   expect(groundAsked('/kalimdor/ground/40/31.bin')).toBe(4096 + 31 * 64 + 40)
+  expect(groundAsked('/i209/ground.json')).toBe(-1 - (2 + 209))
+  expect(groundAsked('/i209/ground/30/31.bin')).toBe((2 + 209) * 4096 + 31 * 64 + 30)
+  expect(groundPlace(2 + 209)).toBe('i209')
+  expect(groundPlace(1)).toBe('kalimdor')
+  expect(groundAsked('/i123456/ground.json')).toBeNull()
   expect(groundAsked('/nowhere/ground.json')).toBeNull()
   expect(groundAsked('/azeroth/ground/../x.bin')).toBeNull()
   expect(groundAsked('/azeroth/buildings.json')).toBeNull()
@@ -108,6 +113,14 @@ test("the ground is made when first asked for: a continent's textures, then a bl
     expect(make(2 * 64 + 3)).toBe(true)
     expect(reads).toBe(before)
     expect(make(5)).toBe(false)
+
+    // a dungeon's the same way, from its own world file, in its own folder
+    const dungeon = groundMaker(() => files, folder, (map) => (map === 209 ? 775971 : null))
+    expect(dungeon(-1 - (2 + 209))).toBe(true)
+    expect(JSON.parse(readFileSync(groundList(folder, 'i209'), 'utf8')).textures).toEqual([800, 900])
+    expect(dungeon((2 + 209) * 4096 + 2 * 64 + 3)).toBe(true)
+    expect(unpackGround(inflateSync(readFileSync(groundBlock(folder, 'i209', 3, 2))))!.textures).toEqual([900, 800])
+    expect(dungeon(-1 - (2 + 33))).toBe(false)
   } finally {
     rmSync(folder, { recursive: true, force: true })
   }
