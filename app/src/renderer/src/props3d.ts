@@ -34,7 +34,7 @@ interface Model {
   meshes?: THREE.InstancedMesh[]
   matrices?: THREE.InstancedBufferAttribute
   textures?: number[]
-  /** Its copies in buildings inside the ground: drawn apart, each cut at its building's height (cut), from where its building stands (at). */
+  /** Its copies in buildings inside the ground: drawn apart, each cut at its building's height: which of the buildings (Props.places) each copy stands in (cut), and all of them (at). */
   under?: { meshes: THREE.InstancedMesh[]; matrices: THREE.InstancedBufferAttribute; cut: THREE.InstancedBufferAttribute; at: number[] }
   used: number
 }
@@ -60,6 +60,11 @@ export class Props {
   private changed = false // the view must be drawn again
   private from = new THREE.Vector3(Infinity, 0, 0)
   private readonly center = { value: new THREE.Vector3() }
+  // The buildings inside the ground the copies drawn stand in (x and z, two numbers each) and the height each is cut at
+  // now, a pixel a building: one small texture sent to the card when a plane moves, where a height by copy was hundreds
+  // of arrays sent at each frame of a view that turns (M23-F22).
+  private places: number[] = []
+  private readonly heights = { value: heightsOf(16) }
 
   /**
    * cutAt: the height a building inside the ground is cut at now, null when it is not on show (Buildings.cutAt).
@@ -145,20 +150,19 @@ export class Props {
 
   // The copies inside the ground cut where their buildings are; true when one has moved.
   private cut(): boolean {
+    const a = this.heights.value.image.data as Float32Array
     let moved = false
+    for (let k = 0; k < this.places.length / 2; k++) {
+      const h = this.cutAt(this.places[k * 2]!, this.places[k * 2 + 1]!) ?? -1e9
+      if (Math.abs(a[k]! - h) < 0.05) continue
+      a[k] = h
+      moved = true
+    }
+    if (moved) this.heights.value.needsUpdate = true
     for (const m of this.models.values()) {
       const u = m.under
       if (!u || !u.meshes[0]!.count) continue
-      const a = u.cut.array as Float32Array
-      let shown = false
-      for (let i = 0; i < u.meshes[0]!.count; i++) {
-        const h = this.cutAt(u.at[i * 2]!, u.at[i * 2 + 1]!) ?? -1e9
-        shown ||= h > -1e9
-        if (Math.abs(a[i]! - h) < 0.05) continue
-        a[i] = h
-        moved = true
-      }
-      if (moved) u.cut.needsUpdate = true
+      const shown = u.at.some((k) => a[k]! > -1e9)
       for (const mesh of u.meshes) mesh.visible = shown
     }
     return moved
@@ -197,6 +201,7 @@ export class Props {
       if (b instanceof Map) for (const [file, list] of b) (copies.get(file) ?? copies.set(file, []).get(file)!).push(list)
     }
     this.wanted = new Set(copies.keys())
+    const places = new Map<string, number>()
     for (const [file, m] of this.models) {
       if (m.state !== 'in') continue
       const lists = copies.get(file) ?? []
@@ -208,17 +213,28 @@ export class Props {
       if (under.length) m.under ??= this.underOf(m)
       if (m.under) {
         m.under.matrices = this.fill(m.under.meshes, m.under.matrices, lists, under)
-        m.under.at = []
-        for (let k = 0; k < under.length; k += 2) m.under.at.push(lists[under[k + 1]!]![under[k]! + 13]!, lists[under[k + 1]!]![under[k]! + 14]!)
         if (m.under.cut.count < under.length / 2) {
           m.under.cut = new THREE.InstancedBufferAttribute(new Float32Array(m.under.matrices.count), 1)
           for (const mesh of m.under.meshes) mesh.geometry.setAttribute('cut', m.under.cut)
         }
-        ;(m.under.cut.array as Float32Array).fill(-1e9)
+        const a = m.under.cut.array as Float32Array
+        for (let k = 0; k < under.length; k += 2) {
+          const l = lists[under[k + 1]!]!, key = l[under[k]! + 13] + ' ' + l[under[k]! + 14]
+          a[k / 2] = places.get(key) ?? places.set(key, places.size).size - 1
+        }
+        m.under.at = [...new Set(a.subarray(0, under.length / 2))]
         m.under.cut.needsUpdate = true
       }
       if (open.length || under.length) m.used = this.frame
     }
+    // the heights are read again by cut(), at this same frame
+    this.places = [...places.keys()].flatMap((k) => k.split(' ').map(Number))
+    if (places.size > this.heights.value.image.width) {
+      this.heights.value.dispose()
+      this.heights.value = heightsOf(places.size * 2)
+    }
+    ;(this.heights.value.image.data as Float32Array).fill(-1e9)
+    this.heights.value.needsUpdate = true
     this.evict()
   }
 
@@ -245,8 +261,8 @@ export class Props {
     return matrices
   }
 
-  // A model's meshes for its copies inside the ground: its geometries with a height to cut at by copy, its materials
-  // cutting there, drawn before the ground as the buildings inside it.
+  // A model's meshes for its copies inside the ground: its geometries with the building of each copy, its materials
+  // cutting at the height of that building, drawn before the ground as the buildings inside it.
   private underOf(m: Model): NonNullable<Model['under']> {
     const matrices = new THREE.InstancedBufferAttribute(new Float32Array(16), 16), cut = new THREE.InstancedBufferAttribute(new Float32Array(1), 1)
     const meshes = m.meshes!.map((mesh) => {
@@ -259,9 +275,10 @@ export class Props {
       const before = material.onBeforeCompile
       material.onBeforeCompile = (shader, r) => {
         before.call(material, shader, r)
+        shader.uniforms.uHeights = this.heights
         shader.vertexShader = shader.vertexShader
-          .replace('#include <common>', '#include <common>\nattribute float cut;\nvarying float vCut;\nvarying float vHigh;')
-          .replace('#include <project_vertex>', '#include <project_vertex>\nvCut = cut;\nvHigh = (modelMatrix * instanceMatrix * vec4(transformed, 1.0)).y;')
+          .replace('#include <common>', '#include <common>\nattribute float cut;\nuniform sampler2D uHeights;\nvarying float vCut;\nvarying float vHigh;')
+          .replace('#include <project_vertex>', '#include <project_vertex>\nvCut = texelFetch(uHeights, ivec2(int(cut + 0.5), 0), 0).r;\nvHigh = (modelMatrix * instanceMatrix * vec4(transformed, 1.0)).y;')
         shader.fragmentShader = shader.fragmentShader
           .replace('#include <common>', '#include <common>\nvarying float vCut;\nvarying float vHigh;')
           .replace('void main() {', 'void main() {\n  if (vHigh > vCut) discard;')
@@ -436,4 +453,9 @@ export class Props {
     }
     return m
   }
+}
+
+// A texture of n heights, a pixel each, read as they are.
+function heightsOf(n: number): THREE.DataTexture {
+  return new THREE.DataTexture(new Float32Array(n), n, 1, THREE.RedFormat, THREE.FloatType)
 }
