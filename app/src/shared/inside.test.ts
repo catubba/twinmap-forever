@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { boxOf, buildingsAt, inPiece, killedIn, nameOfBoss, piecesIn, RARE_BOSSES, roomPixels, yardsInside, YARDS_PER_UNIT, type Piece, buriedBuildings } from './inside'
+import { boxOf, buildingsAt, inPiece, killedIn, nameOfBoss, partAt, partsOf, piecesIn, RARE_BOSSES, roomPixels, yardsInside, YARDS_PER_UNIT, type Piece, buriedBuildings } from './inside'
 import { DUNGEON_PINS } from './dungeon-pins'
 import { MORE_BOSS_PINS } from './more-boss-pins'
 
@@ -123,4 +123,16 @@ test('a building counts as under the ground when half of its floor has the terra
     room(5, 200, 99.5), // level with the ground, less than a yard under: not buried
   ]
   expect(buriedBuildings(pieces, groundAt)).toEqual([0, 2])
+})
+
+test('a map in groups of rooms far apart is in parts, the one with the most rooms first; near rooms are one part', () => {
+  const near = [piece({ u: 100 }), piece({ u: 600 }), piece({ u: 1200 })] // each under 1000 yards from the next
+  expect(partsOf(near)).toHaveLength(1)
+  expect(partsOf([])).toEqual([])
+  const far = [piece({ u: 5000 }), ...near, piece({ u: 5100 }), piece({ u: 5200 }), piece({ u: 5300 })]
+  const parts = partsOf(far)
+  expect(parts).toHaveLength(2)
+  expect(parts[0]![0]).toBeGreaterThan(4900) // the four rooms past 5000 come first
+  expect(partAt(parts, { u: 600, v: 100 })).toBe(1)
+  expect(partAt(parts, { u: 4000, v: 100 })).toBe(0) // in none: the nearest by its middle
 })

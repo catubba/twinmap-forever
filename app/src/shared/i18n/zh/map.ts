@@ -73,6 +73,8 @@ export default {
     levelsShown: '显示的层',
     everyRoom: '所有房间',
     roomsUpTo: '至第{level}层的房间',
+    parts: '部分',
+    partTip: '第{part}部分',
     zoomIn: '放大',
     zoomInTip: '放大（+）',
     zoomOut: '缩小',

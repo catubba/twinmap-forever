@@ -71,6 +71,8 @@ export default {
     levelsShown: 'Angezeigte Etagen',
     everyRoom: 'Alle Räume',
     roomsUpTo: 'Räume bis Etage {level}',
+    parts: 'Teile',
+    partTip: 'Teil {part}',
     zoomIn: 'Vergrößern',
     zoomInTip: 'Vergrößern (+)',
     zoomOut: 'Verkleinern',

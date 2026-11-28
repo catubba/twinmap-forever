@@ -70,6 +70,8 @@ export default {
     levelsShown: 'Étages affichés',
     everyRoom: 'Toutes les salles',
     roomsUpTo: 'Salles jusqu’à l’étage {level}',
+    parts: 'Parties',
+    partTip: 'Partie {part}',
     zoomIn: 'Zoom avant',
     zoomInTip: 'Zoom avant (+)',
     zoomOut: 'Zoom arrière',
