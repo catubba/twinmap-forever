@@ -26,6 +26,7 @@
 // others as on a continent. Of the first, what looks down is left out in the rooms in the open too: the vault over a
 // cave the game marks as open air (the bay of Deadmines) would hide all that is under it.
 import * as THREE from 'three'
+import { night } from './daylight3d'
 import { decodeDxtCutout } from '../../shared/blp'
 import { DUNGEON, DXT_KIND, onShow, type BuildingHead, type Draw, type Placed } from '../../shared/buildings'
 import { floorsAt, floorsOf, walkedOn, type Floors } from '../../shared/floors'
@@ -499,7 +500,7 @@ export class Buildings {
     // an array is sampled where the map is: the map a white pixel, for the texture coordinates the shader then has
     const o = { color: t ? 0xffffff : STONE, map: layers ? WHITE : t, side: THREE.DoubleSide, alphaTest: d.blend === 1 ? 0.5 : 0, transparent: d.blend === 2, depthWrite: d.blend < 2, clippingPlanes: [this.over] }
     const m = d.unlit ? new THREE.MeshBasicMaterial(o) : new THREE.MeshLambertMaterial(o)
-    if (!layers) return m
+    if (!layers) return d.glow && !d.unlit ? glows(m) : m
     // the layers of the array, by the layer of each point
     m.onBeforeCompile = (shader) => {
       shader.uniforms.uLayers = layers
@@ -509,8 +510,22 @@ export class Buildings {
         .replace('#include <map_fragment>', 'diffuseColor *= texture(uLayers, vec3(vMapUv, vLayer));')
     }
     m.customProgramCacheKey = () => 'layers'
-    return m
+    return d.glow && !d.unlit ? glows(m) : m
   }
+}
+
+// A material the game lights by itself at night (windows, lanterns): its texture shines as the night comes (daylight3d.ts).
+function glows(m: THREE.Material): THREE.Material {
+  const before = m.onBeforeCompile, key = m.customProgramCacheKey()
+  m.onBeforeCompile = (shader, renderer) => {
+    before.call(m, shader, renderer)
+    shader.uniforms.uNight = night
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform float uNight;')
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += diffuseColor.rgb * uNight;')
+  }
+  m.customProgramCacheKey = () => `${key} glow`
+  return m
 }
 
 // A material of a dungeon's building, made to leave out what looks down: the ceilings its file does not tell apart,

@@ -193,4 +193,8 @@ export default {
     raidIn: '团队副本，{zone}',
     foundIn: '{what}，{zone}',
   },
+  daylight: {
+    ring: '光照时间',
+    ringTip: '拖动以移动太阳。点击回到游戏时间。',
+  },
 }

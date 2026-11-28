@@ -21,6 +21,7 @@ const STUB = `
   -- The world the addon reads. A test changes it with lua().
   GAME = { width = 1920, height = 1080, zone = "Elwynn Forest", sub = "Goldshire", map = 1429, x = 0.4234, y = 0.6571, facing = 1.5708 }
   function GetTime() return now end
+  function GetGameTime() if GAME.hour then return GAME.hour, GAME.minute or 0 end end -- GAME.hour, GAME.minute: the hour of the game's day
   function GetLocale() return GAME.locale or "enUS" end -- the language of the game, as the game is installed
   function GetPhysicalScreenSize() return GAME.width, GAME.height end
   function GetZoneText() return GAME.zone end

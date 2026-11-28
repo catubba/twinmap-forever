@@ -112,6 +112,9 @@ export default {
     // A switch: near the camera the ground of the 3D view is drawn with the game's own ground textures, not the blurred picture of the map.
     ground: 'Ground texture up close',
     groundHint: "Up close the ground is drawn with the game's own textures, so it stays sharp.",
+    // A switch: the light of the 3D view follows the hour of the game's day; under it the hint.
+    daynight: 'Day and night',
+    daynightHint: "The light follows the hour of the game's day, and windows light up at night. The ring under the zone's name moves the sun; a click goes back to the game's hour.",
     // A switch, off at first: dungeons and raids in the 3D view. The name is the owner's, "(Experimental)" and all: it stays while the feature is being built.
     dungeons: '3D Dungeon (Experimental)',
     dungeonsHint: 'Dungeons and raids in the 3D view, their rooms open from above. Still being built: it may be wrong or slow.',

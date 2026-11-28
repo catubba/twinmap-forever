@@ -7,6 +7,7 @@
   import { arrow as arrowLook } from './arrow.svelte'
   import { graphics } from './graphics.svelte'
   import DungeonsAsk from './DungeonsAsk.svelte'
+  import DayRing from './DayRing.svelte'
   import type { Terrain } from './terrain3d'
   import type { Compass } from './compass'
   import { Arrow3d } from './arrow3d'
@@ -58,7 +59,7 @@
   // at: when the position was read off the game, in milliseconds.
   // insideReady: the rooms of the buildings are converted, and their list can be asked for.
   // parchment: the continents (by their folder) whose game map is made (main/parchment.ts), with the colour of its sea.
-  let { pos, group = [], at: readAt, insideReady, quests = [], fixed = [], side, live = false, inbox = null, removed = [], set = [], gameFollows = null, journey = null, route = noRoute(), marked = [], onroute, onnpc, onsettings, kills, death = null, parchment, skills, xpLevel, level, back = $bindable(null), looking = $bindable(null) }: { parchment?: Record<string, number[]>; kills?: unknown; skills?: unknown; xpLevel?: number | null; level?: number; death?: Death | null; back?: (DeathPlace & { name: string; door: boolean }) | null; looking?: { zone: string; where: string } | null; journey?: Journey | null; pos: Position | undefined; at: number | undefined; insideReady: boolean; quests?: QuestPin[]; fixed?: FixedPin[]; side?: string; live?: boolean; inbox?: Inbox | null; removed?: string[]; set?: GameMark[]; gameFollows?: Pin | null; route?: Route; marked?: number[]; onroute?: (stop: Stop) => void; onnpc?: (pin: FixedPin | null) => void; onsettings?: (category: string) => void; group?: Companion[] } = $props()
+  let { pos, group = [], at: readAt, insideReady, quests = [], fixed = [], side, live = false, inbox = null, removed = [], set = [], gameFollows = null, journey = null, route = noRoute(), marked = [], onroute, onnpc, onsettings, kills, death = null, parchment, gameTime = null, gameTimeAt, skills, xpLevel, level, back = $bindable(null), looking = $bindable(null) }: { parchment?: Record<string, number[]>; gameTime?: number | null; gameTimeAt?: number; kills?: unknown; skills?: unknown; xpLevel?: number | null; level?: number; death?: Death | null; back?: (DeathPlace & { name: string; door: boolean }) | null; looking?: { zone: string; where: string } | null; journey?: Journey | null; pos: Position | undefined; at: number | undefined; insideReady: boolean; quests?: QuestPin[]; fixed?: FixedPin[]; side?: string; live?: boolean; inbox?: Inbox | null; removed?: string[]; set?: GameMark[]; gameFollows?: Pin | null; route?: Route; marked?: number[]; onroute?: (stop: Stop) => void; onnpc?: (pin: FixedPin | null) => void; onsettings?: (category: string) => void; group?: Companion[] } = $props()
 
   const TOP_ZOOM = 7 // the detail of the game itself: the picture of a block is four tiles
   const PARCHMENT_ZOOM = 5 // the detail of the game's map (main/parchment.ts): about 4 yards a pixel
@@ -1036,6 +1037,7 @@
   let pinsHost: HTMLDivElement
   let compassHost: HTMLButtonElement
   let terrain: Terrain | undefined
+  let daylight = $state<Terrain['daylight'] | null>(null) // the terrain's, for the ring of the hour
   // What the 2D map lays on the ground, on the 3D view too (pins3d.ts).
   let pins3d: Pins3d | undefined
   // Where a point of the map is on screen, on the view on show: a label stays on its point in 3D too.
@@ -1196,6 +1198,8 @@
         terrain.showBuildings(graphics.buildings)
         terrain.showProps(graphics.trees, graphics.density, graphics.objects)
         terrain.showGround(graphics.ground)
+        terrain.showDaylight(graphics.daynight)
+        daylight = terrain.daylight
         inside3dSet()
         names3dSet()
         terrain.onFrame = onFrame
@@ -1244,6 +1248,15 @@
   $effect(() => {
     const on = graphics.ground
     untrack(() => terrain?.showGround(on))
+  })
+  $effect(() => {
+    const on = graphics.daynight
+    untrack(() => terrain?.showDaylight(on))
+  })
+  // The hour of the game's day, for the light of the 3D view: told each time the addon sends it.
+  $effect(() => {
+    const m = gameTime, at = gameTimeAt
+    if (m !== null && threeD) untrack(() => terrain?.daylight.tell(m, at ?? Date.now()))
   })
   // A dungeon the 3D view cannot show (one with a ground, or the option off): back to 2D. Else the view goes to it.
   $effect(() => {
@@ -2070,6 +2083,7 @@
 
 <div class="map" class:under={threeD} bind:this={holder}></div>
 <div class="terrain" class:on={threeD} bind:this={terrainHost}><div class="map pins3d" bind:this={pinsHost}></div></div>
+{#if threeD && daylight && graphics.daynight && !inside}<DayRing {daylight} />{/if}
 {#if counting && threeD}<p class="fps">{t('map.fps', { fps })}</p>{/if}
 {#if askDungeons}<DungeonsAsk onclose={() => (askDungeons = false)} onsettings={() => onsettings?.('graphics')} />{/if}
 <button class="compass" class:on={!!compass} class:turning bind:this={compassHost} tabindex={compass ? 0 : -1} aria-hidden={!compass} title={turning ? t('map.corner.northUpTip') : t('map.corner.turnTip')} aria-label={t('map.corner.turn')} aria-pressed={turning} onclick={() => setHeadingUp(!turning)}></button>

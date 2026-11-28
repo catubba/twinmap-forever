@@ -154,6 +154,8 @@
         <p class="hint">{t('settings.graphics.objectsHint')}</p>
         <label class="choice"><input type="checkbox" class="check" checked={graphics.ground} onchange={(e) => setGraphics({ ground: e.currentTarget.checked })} />{t('settings.graphics.ground')}</label>
         <p class="hint">{t('settings.graphics.groundHint')}</p>
+        <label class="choice"><input type="checkbox" class="check" checked={graphics.daynight} onchange={(e) => setGraphics({ daynight: e.currentTarget.checked })} />{t('settings.graphics.daynight')}</label>
+        <p class="hint">{t('settings.graphics.daynightHint')}</p>
         <label class="choice"><input type="checkbox" class="check" checked={graphics.dungeons} onchange={(e) => setGraphics({ dungeons: e.currentTarget.checked })} />{t('settings.graphics.dungeons')}</label>
         <p class="hint">{t('settings.graphics.dungeonsHint')}</p>
         <p class="hint">{t('settings.graphics.cost')}</p>

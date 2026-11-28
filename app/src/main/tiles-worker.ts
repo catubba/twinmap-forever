@@ -12,6 +12,7 @@ import { FACTS, gameItemFacts, type ItemFacts, ITEMS_FILE } from '../shared/item
 import { AH_NAMES_FILE, gameAhNames } from '../shared/ah'
 import { spellFacts, SPELLS_FILE, SPELLS_FORMAT } from '../shared/spells'
 import { talentFacts, TALENTS_FILE, TALENTS_FORMAT } from '../shared/talents'
+import { lightFacts, LIGHT_FILE, LIGHT_FORMAT } from '../shared/light'
 import { trainerFacts, TRAINERS_FILE, TRAINERS_FORMAT } from '../shared/trainers'
 import { gameMaps, UI_MAP_ASSIGNMENT_FILE, UI_MAP_FILE, type GameMap } from '../shared/maps'
 import { AREA_POI_FILE, AREA_TABLE_FILE, places, UI_MAP_X_MAP_ART_FILE, WORLD_MAP_OVERLAY_FILE } from '../shared/places'
@@ -70,7 +71,7 @@ try {
   } catch {
     // No list: a map made before the app opened anything, or none yet.
   }
-  if ([...keys.keys()].some((k) => !usedKeys.includes(k))) for (const made of [PLACES_FILE, TRAVEL_FILE, INTERIORS_FILE]) rmSync(join(folder, made), { force: true })
+  if ([...keys.keys()].some((k) => !usedKeys.includes(k))) for (const made of [PLACES_FILE, TRAVEL_FILE, INTERIORS_FILE, LIGHT_FILE]) rmSync(join(folder, made), { force: true })
   // The names of zones, places, flights, dungeons, bosses, items, categories and spells are read in the game's language,
   // English where a file has none in it: all made again when the player changes it. A folder that says none was made in English.
   const locale = gameLocale(gameFolder) ?? 'enUS', localeFile = join(folder, LOCALE_FILE)
@@ -293,6 +294,22 @@ try {
     }
   } catch {
     // Talents draws no tree; tried again at the next start.
+  }
+  // The game's lights by the hour of its day (shared/light.ts), for the 3D view, the same way.
+  try {
+    const lightFile = join(folder, LIGHT_FILE)
+    let format = 0
+    try {
+      format = (JSON.parse(readFileSync(lightFile, 'utf8')) as { format?: number }).format ?? 0
+    } catch {
+      // Not there yet.
+    }
+    if (format !== LIGHT_FORMAT) {
+      const facts = lightFacts(open())
+      if (facts) writeFileSync(lightFile, JSON.stringify(facts))
+    }
+  } catch {
+    // The view keeps the light of today; tried again at the next start.
   }
 
   // The insides of buildings come after: the map of the continents is already usable.

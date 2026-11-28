@@ -197,4 +197,8 @@ export default {
     raidIn: '공격대, {zone}',
     foundIn: '{what}, {zone}',
   },
+  daylight: {
+    ring: '빛의 시간',
+    ringTip: '끌어서 해를 옮깁니다. 클릭하면 게임 시간으로 돌아갑니다.',
+  },
 }

@@ -33,7 +33,7 @@ import { keep } from './tiles'
 
 export const BUILDINGS_FOLDER = 'buildings'
 export const PLACED_FILE = 'buildings.json'
-export const FORMAT = 5 // 1 was cut to what the sky sees; 2 kept of a city inside a mountain only its rooms in the open; 3 had no ceilings apart; 4 had no liquids
+export const FORMAT = 6 // 1 was cut to what the sky sees; 2 kept of a city inside a mountain only its rooms in the open; 3 had no ceilings apart; 4 had no liquids; 5 had no windows lit at night
 /** Pixels of a texture's widest level kept. */
 const TEX = 512
 
@@ -148,7 +148,7 @@ export function roomOf(f: Buffer): Room | null {
   return { pos, uv: uvs && uvs.length >= n * 2 ? uvs.subarray(0, n * 2) : new Float32Array(n * 2), normal, tris, batches, outdoor: (g.readUInt32LE(8) & 0x48) !== 0, ...(liquid ? { liquid } : {}) }
 }
 
-interface Material { texture: number; blend: number; unlit: boolean }
+interface Material { texture: number; blend: number; unlit: boolean; glow: boolean }
 export interface Texture { kind: TexKind; width: number; height: number; levels: number }
 
 /**
@@ -163,7 +163,7 @@ export function makeBuilding(file: Buffer, read: (id: number) => Buffer | null, 
   if (!head || !gfid) return null
   const rooms = head.readUInt32LE(4)
   const materials: Material[] = []
-  for (let at = 0; momt && at + 64 <= momt.length; at += 64) materials.push({ unlit: (momt.readUInt32LE(at) & 1) === 1, blend: momt.readUInt32LE(at + 8), texture: momt.readUInt32LE(at + 12) })
+  for (let at = 0; momt && at + 64 <= momt.length; at += 64) materials.push({ unlit: (momt.readUInt32LE(at) & 1) === 1, glow: (momt.readUInt32LE(at) & 0x10) !== 0, blend: momt.readUInt32LE(at + 8), texture: momt.readUInt32LE(at + 12) })
   // every room's points one after the other; the triangles by material
   // the triangles by material, and apart those of the ceilings (as negative materials, -1 - material)
   const pos: number[] = [], uv: number[] = [], normal: number[] = [], byMaterial = new Map<number, number[]>()
@@ -197,14 +197,14 @@ export function makeBuilding(file: Buffer, read: (id: number) => Buffer | null, 
     }
   }
   // the draws: materials of one look, their textures as layers
-  const looks = new Map<string, { kind: TexKind; blend: number; unlit: boolean; ceiling: boolean; textures: number[]; tris: number[]; liquid?: number }>()
+  const looks = new Map<string, { kind: TexKind; blend: number; unlit: boolean; glow?: boolean; ceiling: boolean; textures: number[]; tris: number[]; liquid?: number }>()
   for (const [key0, list] of byMaterial) {
     const ceiling = key0 < 0, m = ceiling ? -1 - key0 : key0
-    const mat = materials[m] ?? { texture: 0, blend: 0, unlit: false }, tex = mat.texture ? texture(mat.texture) : null
+    const mat = materials[m] ?? { texture: 0, blend: 0, unlit: false, glow: false }, tex = mat.texture ? texture(mat.texture) : null
     const blend = mat.blend === 1 ? 1 : mat.blend >= 2 ? 2 : 0, kind: TexKind = tex?.kind ?? 'none'
     // a PNG is a draw of its own; DXT ones of one kind, size and number of levels share an array
-    const key = (kind === 'png' ? `png ${mat.texture} ${blend} ${mat.unlit}` : `${kind} ${tex?.width}x${tex?.height} ${tex?.levels} ${blend} ${mat.unlit}`) + (ceiling ? ' ceiling' : '')
-    const look = looks.get(key) ?? looks.set(key, { kind, blend, unlit: mat.unlit, ceiling, textures: [], tris: [] }).get(key)!
+    const key = (kind === 'png' ? `png ${mat.texture} ${blend} ${mat.unlit}` : `${kind} ${tex?.width}x${tex?.height} ${tex?.levels} ${blend} ${mat.unlit}`) + (ceiling ? ' ceiling' : '') + (mat.glow ? ' glow' : '')
+    const look = looks.get(key) ?? looks.set(key, { kind, blend, unlit: mat.unlit, ...(mat.glow ? { glow: true } : {}), ceiling, textures: [], tris: [] }).get(key)!
     let layer = look.textures.indexOf(mat.texture)
     if (layer < 0 && kind !== 'none') layer = look.textures.push(mat.texture) - 1
     for (let k = 0; k < list.length; k += 3) look.tris.push(list[k]!, list[k + 1]!, list[k + 2]!, Math.max(0, layer))
@@ -233,7 +233,7 @@ export function makeBuilding(file: Buffer, read: (id: number) => Buffer | null, 
         index.push(v)
       }
     }
-    draws.push({ start, count: index.length - start, kind: look.kind, textures: look.textures, blend: look.blend, unlit: look.unlit, ...(look.ceiling ? { ceiling: true } : {}), ...(look.liquid ? { liquid: look.liquid } : {}) })
+    draws.push({ start, count: index.length - start, kind: look.kind, textures: look.textures, blend: look.blend, unlit: look.unlit, ...(look.ceiling ? { ceiling: true } : {}), ...(look.glow ? { glow: true } : {}), ...(look.liquid ? { liquid: look.liquid } : {}) })
   }
   if (!index.length) return null
   const n = used.length, p = new Float32Array(n * 3), q = new Float32Array(n * 2), r = new Float32Array(n * 3)

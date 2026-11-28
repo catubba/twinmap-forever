@@ -17,8 +17,9 @@ import { BLOCK_ZOOM, HOLE, unpackLevels, type Levels } from '../../shared/levels
 import { pictureOfBlock } from '../../shared/pixels'
 import { STANDS_FILE, type Stands } from '../../shared/stands'
 import { DRY, TAR } from '../../shared/water'
-import { BLOCKS, BLOCK_YARDS } from '../../shared/world'
+import { BLOCKS, BLOCK_YARDS, WORLDS } from '../../shared/world'
 import { Buildings, DUNGEON_CUT } from './buildings3d'
+import { Daylight } from './daylight3d'
 import { Ground } from './ground3d'
 import { Props } from './props3d'
 import type { Density } from '../../shared/props'
@@ -208,6 +209,8 @@ export class Terrain {
   private props: Props
   /** The ground's own textures near the camera (ground3d.ts). */
   private ground: Ground
+  /** The light by the hour of the game's day (M23-F10). */
+  readonly daylight: Daylight
   // Where things stand over the game's ground, while the buildings are on show (shared/stands.ts): of each block that
   // has any (its column times BLOCKS plus its row), the height of each of its cells, NaN where it is the ground.
   private stands: { cells: number; blocks: Map<number, Float32Array> } | null = null
@@ -259,10 +262,11 @@ export class Terrain {
     this.scene.fog = new THREE.Fog(SKY, 1, 2)
     this.renderer.autoClear = false // a frame is the inside, then the ground over it (draw)
     this.below.add(this.sunk)
-    // Half of the light from all round, half from a sun fixed to the north-west, 45 degrees up: level ground as bright as the minimap.
-    const sun = new THREE.DirectionalLight(0xffffff, (Math.PI * 0.5) / Math.sin(Math.PI / 4))
+    // Half of the light from all round, half from a sun to the north-west, 45 degrees up: level ground as bright as the
+    // minimap. That is noon: the hours of the game's day change it from there (daylight3d.ts).
+    const sun = new THREE.DirectionalLight(0xffffff, (Math.PI * 0.5) / Math.sin(Math.PI / 4)), ambient = new THREE.AmbientLight(0xffffff, Math.PI * 0.5)
     sun.position.set(-Math.SQRT1_2, 1, -Math.SQRT1_2)
-    this.scene.add(new THREE.AmbientLight(0xffffff, Math.PI * 0.5), sun)
+    this.scene.add(ambient, sun)
     this.materials = {
       ground: new THREE.MeshLambertMaterial({ side: THREE.DoubleSide, clippingPlanes: [this.over] }),
       pit: new THREE.MeshBasicMaterial({ color: PIT, clippingPlanes: [this.over] }),
@@ -310,6 +314,7 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
     ] as const) {
       this.scene.add(new THREE.Mesh(new THREE.PlaneGeometry(w, d).rotateX(-Math.PI / 2).translate(x + w / 2, 0, z + d / 2), this.materials.liquids[4]))
     }
+    this.daylight = new Daylight(ambient, sun, this.scene.fog as THREE.Fog, this.materials.liquids[4] as THREE.MeshBasicMaterial, SKY)
     this.buildings = new Buildings(this.renderer, this.over)
     this.scene.add(this.buildings.group)
     this.props = new Props(this.renderer, (x, z) => this.buildings.cutAt(x, z), this.over)
@@ -376,6 +381,7 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
     this.stood = null
     this.other = null
     ;(this.scene.fog as THREE.Fog).color.set(bare ? VOID : SKY)
+    this.daylight.again()
     this.buildings.show(folder, bare)
     this.props.show(folder)
     this.ground.show(folder)
@@ -437,6 +443,12 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
   /** Whether the ground has its own textures up close (Settings > Graphics). */
   showGround(on: boolean): void {
     this.ground.turn(on)
+    this.dirty = true
+  }
+
+  /** Whether the light follows the hour of the game's day (Settings > Graphics); off, the light of noon. */
+  showDaylight(on: boolean): void {
+    this.daylight.on = on
     this.dirty = true
   }
 
@@ -855,6 +867,8 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
     // a dungeon is cut over the character in it, followed or not: the view moved by hand stays on its floor
     if (this.buildings.step(this.camera.position, this.controls.target, this.farthest(fog.far), this.height / 2 / Math.tan((FOV * Math.PI) / 360), this.bare ? this.arrow : this.character)) this.dirty = true
     if (this.props.step(this.controls.target, distance, this.arrow)) this.dirty = true
+    // a dungeon keeps the light of today: the light of the day is the sky's
+    if (this.daylight.step(this.controls.target, this.bare ? null : (WORLDS.find((w) => w.name === this.folder)?.continent ?? null))) this.dirty = true
     // the ground over the character under a roof, cut as the dungeon is
     if (this.bare && this.arrow && !this.rooms?.open && this.roofed(this.arrow)) this.roofedAt = now
     const over = this.bare && this.arrow && now - this.roofedAt < ROOF_HELD ? this.arrow.y + DUNGEON_CUT : 1e6
@@ -917,7 +931,7 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
       r.setRenderTarget(null)
       this.seenClear = true
     }
-    r.setClearColor(this.bare ? VOID : SKY, 1)
+    r.setClearColor(this.bare ? VOID : this.daylight.sky, 1)
     r.clear()
     if (!this.seenClear) r.render(this.below, this.camera)
     r.render(this.scene, this.camera)
