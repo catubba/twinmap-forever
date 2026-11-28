@@ -16,7 +16,7 @@ import { gameMaps, UI_MAP_ASSIGNMENT_FILE, UI_MAP_FILE, type GameMap } from '../
 import { AREA_POI_FILE, AREA_TABLE_FILE, places, UI_MAP_X_MAP_ART_FILE, WORLD_MAP_OVERLAY_FILE } from '../shared/places'
 import { TAXI_NODES_FILE, TAXI_PATH_FILE, TAXI_PATH_NODE_FILE, travel, TRAVEL_FORMAT, type Travel } from '../shared/services'
 import type { TilesStatus } from '../shared/tiles-status'
-import { readTable } from '../shared/wdc5'
+import { readTable, type Table } from '../shared/wdc5'
 import { LIQUID_TYPE_FILE, liquidOfName, WATER } from '../shared/water'
 import { WORLDS } from '../shared/world'
 import { gameLocale, installedBuild, openClientFiles, type ClientFiles } from './client-files'
@@ -24,7 +24,7 @@ import { buildingsMade, buriedKey, makeBuildings } from './buildings'
 import { makeProps, propsMade } from './props'
 import { makeStands, standsMade } from './stands'
 import { EncryptedFileError } from './client-files'
-import { convertInteriors, ENCOUNTERS_FILE, finishedInteriors, INTERIORS_FILE, MAP_FILE, mapEntries, placedIn, ROOM_PICTURES_FILE, roomPictures } from './interiors'
+import { convertInteriors, dungeonWorldFile, ENCOUNTERS_FILE, finishedInteriors, INTERIORS_FILE, MAP_FILE, mapEntries, placedIn, ROOM_PICTURES_FILE, roomPictures } from './interiors'
 import { sentKeys } from './keys'
 import { convertHeights, heightsDone } from './heights'
 import { CAVES_FILE, makeCaves, makeUnder } from './caves'
@@ -84,7 +84,9 @@ try {
   // Asked while the map is being made, it is answered once the making is done.
   const table = (b: Buffer) => readTable(b, (keyName) => open().opens(keyName))
   // The ground's own textures of the 3D view, the same way (ground.ts), and the buildings and objects of a dungeon (dungeons.ts).
-  const makers = { items: itemIcons(open, folder), pictures: gamePictures(open, folder), ground: groundMaker(open, folder), dungeon: dungeonMaker(open, folder, table) }
+  let maps: Table | undefined
+  const dungeonWorld = (map: number): number | null => dungeonWorldFile((maps ??= table(open().read(MAP_FILE, true)!)), map)
+  const makers = { items: itemIcons(open, folder), pictures: gamePictures(open, folder), ground: groundMaker(open, folder, dungeonWorld), dungeon: dungeonMaker(open, folder, table) }
   parentPort?.on('message', (asked: { kind?: unknown; id?: unknown }) => {
     if ((asked.kind === 'items' || asked.kind === 'pictures' || asked.kind === 'ground' || asked.kind === 'dungeon') && typeof asked.id === 'number') parentPort?.postMessage({ asked: `${asked.kind}/${asked.id}`, made: makers[asked.kind](asked.id) })
   })

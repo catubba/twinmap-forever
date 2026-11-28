@@ -4,11 +4,13 @@
 //   <folder>/<continent>/ground.json           the files of the continent's ground textures, in the order of the pile
 //   <folder>/<continent>/ground/textures.bin   the pile: every texture as DXT1 with its smaller copies, deflated
 //   <folder>/<continent>/ground/<column>/<row>.bin   a block's layers and mixes (packGround), deflated
+// A dungeon with a ground of its own (dungeons.ts, M23-F29) has the same files in its folder, i<map>.
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { deflateSync } from 'node:zlib'
 import { decodeBlpCutout } from '../shared/blp'
 import { blockGround, GROUND_FORMAT, groundTextures, levelBytes, LEVELS, packGround, TEXTURE, TEXTURE_BYTES } from '../shared/ground'
+import { dungeonFolder } from '../shared/buildings'
 import { BLOCKS, groundFiles, WORLDS } from '../shared/world'
 import type { ClientFiles } from './client-files'
 
@@ -16,12 +18,15 @@ export const groundList = (folder: string, world: string): string => join(folder
 export const groundPile = (folder: string, world: string): string => join(folder, world, 'ground', 'textures.bin')
 export const groundBlock = (folder: string, world: string, column: number, row: number): string => join(folder, world, 'ground', String(column), `${row}.bin`)
 
-/** What a path of the ground asks for, as one number: a continent's textures (-1 less its place in WORLDS) or a block (the place times 4096, plus the block). null: not a path of the ground. */
+/** The folder of a place of the ground: a continent by its place in WORLDS, past them a dungeon by its map (WORLDS.length plus the map). */
+export const groundPlace = (place: number): string => (place < WORLDS.length ? WORLDS[place]!.name : dungeonFolder(place - WORLDS.length))
+
+/** What a path of the ground asks for, as one number: a place's textures (-1 less the place, groundPlace) or a block (the place times 4096, plus the block). null: not a path of the ground. */
 export function groundAsked(path: string): number | null {
-  const m = /^\/([a-z]+)\/ground(?:\.json|\/textures\.bin|\/(\d{1,2})\/(\d{1,2})\.bin)$/.exec(path)
-  const world = m ? WORLDS.findIndex((w) => w.name === m[1]) : -1
-  if (!m || world < 0) return null
-  return m[2] === undefined ? -1 - world : world * BLOCKS * BLOCKS + Number(m[3]) * BLOCKS + Number(m[2])
+  const m = /^\/([a-z]+|i(\d{1,5}))\/ground(?:\.json|\/textures\.bin|\/(\d{1,2})\/(\d{1,2})\.bin)$/.exec(path)
+  const place = !m ? -1 : m[2] !== undefined ? WORLDS.length + Number(m[2]) : WORLDS.findIndex((w) => w.name === m[1])
+  if (!m || place < 0) return null
+  return m[3] === undefined ? -1 - place : place * BLOCKS * BLOCKS + Number(m[4]) * BLOCKS + Number(m[3])
 }
 
 /**
@@ -101,8 +106,9 @@ export function pileOf(textures: Uint8Array[]): Uint8Array {
 /**
  * Makes what the view asks of the ground (groundAsked) where the folder does not have it yet: true when it is there
  * after. A continent's textures take a few seconds, every block of it being looked at for the ones it lists.
+ * dungeonWorld: the world file of a dungeon by its map, none where it has none.
  */
-export function groundMaker(files: () => ClientFiles, folder: string): (asked: number) => boolean {
+export function groundMaker(files: () => ClientFiles, folder: string, dungeonWorld: (map: number) => number | null = () => null): (asked: number) => boolean {
   const read = (id: number): Buffer | null => {
     try {
       return id ? files().read(id) : null
@@ -111,11 +117,11 @@ export function groundMaker(files: () => ClientFiles, folder: string): (asked: n
     }
   }
   const lists = new Map<number, Map<number, number>>()
-  const blocksOf = (world: number): Map<number, number> => {
-    let list = lists.get(world)
+  const blocksOf = (place: number): Map<number, number> => {
+    let list = lists.get(place)
     if (!list) {
-      const wdt = read(WORLDS[world]!.file)
-      lists.set(world, (list = wdt ? groundFiles(wdt) : new Map()))
+      const wdt = read((place < WORLDS.length ? WORLDS[place]!.file : dungeonWorld(place - WORLDS.length)) ?? 0)
+      lists.set(place, (list = wdt ? groundFiles(wdt) : new Map()))
     }
     return list
   }
@@ -126,8 +132,8 @@ export function groundMaker(files: () => ClientFiles, folder: string): (asked: n
   return (asked) => {
     try {
       if (asked < 0) {
-        const world = -1 - asked, name = WORLDS[world]?.name
-        if (!name) return false
+        const world = -1 - asked, name = groundPlace(world)
+        if (!blocksOf(world).size) return false
         if (existsSync(groundList(folder, name)) && existsSync(groundPile(folder, name))) return true
         const all = new Set<number>()
         for (const file of blocksOf(world).values()) for (const t of groundTextures(read(file) ?? new Uint8Array())) if (t) all.add(t)
@@ -136,8 +142,7 @@ export function groundMaker(files: () => ClientFiles, folder: string): (asked: n
         keep(groundList(folder, name), JSON.stringify({ format: GROUND_FORMAT, textures }))
         return true
       }
-      const world = Math.floor(asked / (BLOCKS * BLOCKS)), block = asked % (BLOCKS * BLOCKS), name = WORLDS[world]?.name
-      if (!name) return false
+      const world = Math.floor(asked / (BLOCKS * BLOCKS)), block = asked % (BLOCKS * BLOCKS), name = groundPlace(world)
       const file = groundBlock(folder, name, block % BLOCKS, Math.floor(block / BLOCKS))
       if (existsSync(file)) return true
       const tex0 = read(blocksOf(world).get(block) ?? 0), ground = tex0 && blockGround(tex0)
