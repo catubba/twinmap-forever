@@ -3,7 +3,7 @@ import { unitsOfRect, UNITS_PER_BLOCK, type Point } from './geo'
 import { distance, t } from './i18n'
 import type { Position } from './game'
 import type { Continent, GameMap, Rect } from './maps'
-import { BLOCK_YARDS } from './world'
+import { BLOCK_YARDS, BLOCKS } from './world'
 
 const YARDS_PER_UNIT = BLOCK_YARDS / UNITS_PER_BLOCK
 
@@ -13,15 +13,31 @@ export function placeOfUnits(rect: Rect, p: Point): Point {
   return { x: ((p.x - a.x) / (b.x - a.x)) * 100, y: ((p.y - a.y) / (b.y - a.y)) * 100 }
 }
 
-/** The zone a point is in. The maps of the zones overlap at their edges, and a city lies within its zone: the smallest wins. */
+// The zone of each chunk of a continent's land (main/zone-grid.ts), from the terrain itself, and the zones it holds.
+const lands = new Map<Continent, { grid: Uint16Array; zones: Set<number> }>()
+const CHUNKS = BLOCKS * 16 // to a side of a continent; a block is UNITS_PER_BLOCK units
+/** Once a continent's zones.bin is read: zoneAt then trusts it over the maps of the zones. */
+export const knowLand = (continent: Continent, grid: Uint16Array): void => void lands.set(continent, { grid, zones: new Set(grid) })
+
+/**
+ * The zone a point is in. The maps of the zones overlap, and a city lies within its zone: the smallest wins. On land
+ * whose zone is known (knowLand), that zone: Mulgore's map reaches far into Feralas. Still a zone with no land of its
+ * own, a city under the ground or a mountain (Undercity, Ironforge), wins where its map is.
+ */
 export function zoneAt(maps: GameMap[], continent: Continent, p: Point): { zone: GameMap; place: Point } | undefined {
+  const holds = (zone: GameMap): zone is GameMap & { rect: Rect } => {
+    if (zone.level !== 'zone' || zone.continent !== continent || !zone.rect) return false
+    const place = placeOfUnits(zone.rect, p)
+    return place.x >= 0 && place.x <= 100 && place.y >= 0 && place.y <= 100
+  }
+  const column = Math.floor((p.x / UNITS_PER_BLOCK) * 16), row = Math.floor((p.y / UNITS_PER_BLOCK) * 16)
+  const known = lands.get(continent), land = known && column >= 0 && column < CHUNKS && row >= 0 && row < CHUNKS ? known.grid[row * CHUNKS + column] : 0
+  const own = land ? maps.find((m) => m.id === land && holds(m)) : undefined
   let best: { zone: GameMap; place: Point; size: number } | undefined
   for (const zone of maps) {
-    if (zone.level !== 'zone' || zone.continent !== continent || !zone.rect) continue
-    const place = placeOfUnits(zone.rect, p)
-    if (place.x < 0 || place.x > 100 || place.y < 0 || place.y > 100) continue
+    if (!holds(zone) || (own && zone !== own && known!.zones.has(zone.id))) continue
     const size = (zone.rect.maxX - zone.rect.minX) * (zone.rect.maxY - zone.rect.minY)
-    if (!best || size < best.size) best = { zone, place, size }
+    if (!best || size < best.size) best = { zone, place: placeOfUnits(zone.rect, p), size }
   }
   return best
 }
