@@ -33,6 +33,13 @@ export default {
     custom: 'Tu disposición coloca el mapa: muévelo con {edit}.',
   },
 
+  mapLook: {
+    label: 'Mapa 2D',
+    tiles: 'Minimapa',
+    parchment: 'Mapa del mundo',
+    hint: 'Como mapa del mundo se dibuja igual que el mapa del juego, con cada zona explorada y sin los nombres de lugares de Twinmap. La vista 3D mantiene el minimapa.',
+  },
+
   arrow: {
     title: 'Flecha',
     colour: 'Color',

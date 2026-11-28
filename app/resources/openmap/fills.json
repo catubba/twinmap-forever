@@ -1,0 +1,141 @@
+{
+ "openmap": "v0.8.13",
+ "continents": [
+  1415,
+  1414
+ ],
+ "fills": [
+  {
+   "name": "G01",
+   "what": "dun-morogh-riverglades",
+   "box": [
+    0.671633,
+    0.406726,
+    0.864248,
+    0.641381
+   ],
+   "width": 1930,
+   "height": 1568
+  },
+  {
+   "name": "G02",
+   "what": "tanaris-silithus",
+   "box": [
+    0.111262,
+    0.684443,
+    0.251482,
+    0.862961
+   ],
+   "width": 1405,
+   "height": 1192
+  },
+  {
+   "name": "G03",
+   "what": "eastern-plaguelands-western-plaguelands",
+   "box": [
+    0.739747,
+    0.103208,
+    0.914397,
+    0.255154
+   ],
+   "width": 1750,
+   "height": 1015
+  },
+  {
+   "name": "G04",
+   "what": "stonetalon-mountains-the-barrens",
+   "box": [
+    0.116252,
+    0.372692,
+    0.185614,
+    0.5063
+   ],
+   "width": 695,
+   "height": 892
+  },
+  {
+   "name": "G05",
+   "what": "silverpine-forest-hillsbrad-foothills",
+   "box": [
+    0.654916,
+    0.338612,
+    0.729767,
+    0.429929
+   ],
+   "width": 750,
+   "height": 610
+  },
+  {
+   "name": "G06",
+   "what": "thousand-needles-feralas",
+   "box": [
+    0.163658,
+    0.643276,
+    0.278428,
+    0.722617
+   ],
+   "width": 1150,
+   "height": 530
+  },
+  {
+   "name": "G07",
+   "what": "winterspring-darkshore",
+   "box": [
+    0.205823,
+    0.193051,
+    0.329576,
+    0.282497
+   ],
+   "width": 1240,
+   "height": 597
+  },
+  {
+   "name": "G08",
+   "what": "ashenvale-azshara",
+   "box": [
+    0.224536,
+    0.333395,
+    0.315853,
+    0.406749
+   ],
+   "width": 915,
+   "height": 490
+  },
+  {
+   "name": "G09",
+   "what": "stranglethorn-vale-blasted-lands",
+   "box": [
+    0.71305,
+    0.68704,
+    0.795385,
+    0.787339
+   ],
+   "width": 825,
+   "height": 670
+  },
+  {
+   "name": "G10",
+   "what": "thousand-needles-dustwallow-marsh",
+   "box": [
+    0.234516,
+    0.629428,
+    0.314356,
+    0.735341
+   ],
+   "width": 800,
+   "height": 708
+  },
+  {
+   "name": "G11",
+   "what": "desolace-feralas",
+   "box": [
+    0.109017,
+    0.55383,
+    0.166652,
+    0.61109
+   ],
+   "width": 577,
+   "height": 383
+  }
+ ]
+}

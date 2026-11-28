@@ -44,6 +44,7 @@ export default {
       herbs: 'Травы',
       zones: 'Названия мест',
       relief: 'Рельеф',
+      levels: 'Уровни зон',
       caves: 'Пещеры',
       dungeons: 'Подземелья',
       routes: 'Маршруты полетов',

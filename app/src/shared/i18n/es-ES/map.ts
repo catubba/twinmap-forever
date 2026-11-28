@@ -43,6 +43,7 @@ export default {
       herbs: 'Hierbas',
       zones: 'Nombres de lugares',
       relief: 'Relieve',
+      levels: 'Nivel de las zonas',
       caves: 'Cuevas',
       dungeons: 'Mazmorras',
       routes: 'Rutas de vuelo',

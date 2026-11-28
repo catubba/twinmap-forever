@@ -33,6 +33,13 @@ export default {
     custom: '지도 위치는 직접 만든 배치를 따릅니다. {edit}에서 옮기십시오.',
   },
 
+  mapLook: {
+    label: '2D 지도',
+    tiles: '미니맵',
+    parchment: '세계 지도',
+    hint: '세계 지도는 게임 지도처럼 모든 지역을 탐험한 상태로, Twinmap의 장소 이름 없이 그립니다. 3D 보기는 미니맵을 그대로 씁니다.',
+  },
+
   arrow: {
     title: '화살표',
     colour: '색상',

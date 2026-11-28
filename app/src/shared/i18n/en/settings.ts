@@ -50,7 +50,16 @@ export default {
     custom: 'Your layout places the map: move it with {edit}.',
   },
 
-  // In Appearance, under the map's side: the character's arrow on the 2D map and on the 3D view (the Arrow of map.layers.names).
+  // In Appearance, under the map's side: a dropdown, the 2D map drawn from the game's minimap pictures or as the game's
+  // own world map, with the line under it. Minimap and World map as the game names them.
+  mapLook: {
+    label: '2D map',
+    tiles: 'Minimap',
+    parchment: 'World map',
+    hint: "World map draws it as the game's own map, every zone as explored, without Twinmap's place names. The 3D view keeps the minimap.",
+  },
+
+  // In Appearance, under the 2D map: the character's arrow on the 2D map and on the 3D view (the Arrow of map.layers.names).
   arrow: {
     // Its subtitle, short.
     title: 'Arrow',

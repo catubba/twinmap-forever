@@ -34,6 +34,13 @@ export default {
     custom: '地图的位置由你的布局决定：用{edit}来移动它。',
   },
 
+  mapLook: {
+    label: '2D地图',
+    tiles: '微缩地图',
+    parchment: '世界地图',
+    hint: '世界地图按游戏自己的地图绘制，所有区域都显示为已探索，不显示 Twinmap 的地名。3D视图仍使用微缩地图。',
+  },
+
   arrow: {
     title: '箭头',
     colour: '颜色',

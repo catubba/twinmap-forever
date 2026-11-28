@@ -82,6 +82,22 @@ test('a Shortest Path that breaks, or answers what is no journey, sends nothing 
   assert.deepEqual(told(odd), []);
 });
 
+test('a long name in Cyrillic is cut at 60 bytes between letters, never inside one', () => {
+  // From a ruRU report: 61 and 63 bytes, so cut at 60 they lost half of their last letter and the app dropped the block.
+  const long = ['Идти: РАЗЫСКИВАЕТСЯ: Марез Клобук', 'Идти: Принудительное разоружение', 'Идти: Сооружение автогиробуророек'];
+  const addon = enterWorld(SHORTEST_PATH);
+  addon.run(8);
+  addon.lua(`JOURNEY = { owner = "Questie", goal = { map = 1415, x = 0.5, y = 0.5, title = "${long[0]}" },
+    legs = { { mode = "walk", text = "${long[1]}", seconds = 10 }, { mode = "walk", text = "${long[2]}", seconds = 20 },
+      { mode = "walk", text = "Сохранение знаний", seconds = 30 } } }`);
+  addon.run(6);
+  const journey = told(addon).at(-1);
+  const cut = (s) => { let t = s; while (Buffer.byteLength(t) > 60) t = t.slice(0, -1); return t; };
+  assert.equal(journey.name, cut(long[0]));
+  assert.deepEqual(journey.legs.map((l) => l.text), [cut(long[1]), cut(long[2]), 'Сохранение знаний']);
+  assert.equal(journey.name, 'Идти: РАЗЫСКИВАЕТСЯ: Марез Клобу', 'one whole letter less, not half of one');
+});
+
 // What Twinmap follows is given to Shortest Path to guide. SP.calls: what it was asked, in order; SP.at: the
 // stop its journey is at; SP.ended: why the last one ended. It refuses in combat, as the real one does.
 const GUIDE = `

@@ -43,6 +43,7 @@ export default {
       herbs: 'Herbes',
       zones: 'Noms des lieux',
       relief: 'Relief',
+      levels: 'Niveau des zones',
       caves: 'Grottes',
       dungeons: 'Donjons',
       routes: 'Trajets aériens',

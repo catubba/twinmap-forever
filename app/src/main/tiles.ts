@@ -63,8 +63,8 @@ export const ICONS_FOLDER = 'icons'
  * The file the window may have for a path it asks, or null: only what the converters write, nothing
  * else on the disk. base: the folder of the build. path: as in "/azeroth/blocks/31/49.dxt". A
  * ground is a continent by its name or a dungeon by "i" and its number, with its shaded relief
- * under "shade/"; the rest is the lists, the pictures of the rooms (interiors.ts), of the items and
- * of the spells by their file (item-icons.ts).
+ * under "shade/" and the game's map under "parchment/"; the rest is the lists, the pictures of the
+ * rooms (interiors.ts), of the items and of the spells by their file (item-icons.ts).
  */
 export function servedFile(base: string, path: string): string | null {
   const icon = /^\/icons\/([a-z0-9-]{1,40})\.png$/.exec(path)
@@ -72,6 +72,9 @@ export function servedFile(base: string, path: string): string | null {
   // The ground of the 3D view (heights.ts): a continent's, or a dungeon's that has one (dungeons.ts).
   const levels = /^\/([a-z]+|i\d{1,5})\/levels\/(\d)\/(\d{1,2})\/(\d{1,2})\.bin$/.exec(path)
   if (levels) return joinPath(base, levels[1]!, 'levels', levels[2]!, levels[3]!, `${levels[4]}.bin`)
+  // The zone of each chunk of a continent (zone-grid.ts).
+  const zones = /^\/([a-z]+)\/zones\.bin$/.exec(path)
+  if (zones) return joinPath(base, zones[1]!, 'zones.bin')
   // The buildings of the 3D view (buildings.ts): a building's file, a texture, a continent's list.
   const building = /^\/buildings\/(?:(\d{1,9})\.bin|tex\/(\d{1,9})\.(bin|png))$/.exec(path)
   if (building) return building[1] ? joinPath(base, 'buildings', `${building[1]}.bin`) : joinPath(base, 'buildings', 'tex', `${building[2]}.${building[3]}`)
@@ -97,13 +100,13 @@ export function servedFile(base: string, path: string): string | null {
     const world = groundPlace(ground < 0 ? -1 - ground : Math.floor(ground / (BLOCKS * BLOCKS))), block = ground % (BLOCKS * BLOCKS)
     return ground < 0 ? (path.endsWith('.json') ? groundList(base, world) : groundPile(base, world)) : groundBlock(base, world, block % BLOCKS, Math.floor(block / BLOCKS))
   }
-  const m = /^\/(?:(maps|places|travel|interiors|caves|under|items|trainers|spells|talents|ah-names|game-names)\.json|rooms\/(\d{1,9})\.dxt|([a-z]+|i\d{1,5})\/(?:blocks\/(\d{1,2})\/(\d{1,2})\.dxt|(shade\/)?(\d)\/(\d{1,3})\/(\d{1,3})\.png))$/.exec(path)
+  const m = /^\/(?:(maps|places|travel|interiors|caves|under|items|trainers|spells|talents|ah-names|game-names)\.json|rooms\/(\d{1,9})\.dxt|([a-z]+|i\d{1,5})\/(?:blocks\/(\d{1,2})\/(\d{1,2})\.dxt|(shade\/|parchment\/)?(\d)\/(\d{1,3})\/(\d{1,3})\.png))$/.exec(path)
   if (!m) return null
   if (m[1]) return joinPath(base, `${m[1]}.json`)
   if (m[2]) return joinPath(base, 'rooms', `${m[2]}.dxt`)
   if (m[4] !== undefined) return blockFile(joinPath(base, m[3]!), Number(m[4]), Number(m[5]))
-  // The shaded relief (heights.ts): same tiles, its own folder.
-  return tileFile(joinPath(base, m[3]!, m[6] ? 'shade' : ''), Number(m[7]), Number(m[8]), Number(m[9]))
+  // The shaded relief (heights.ts) and the game's map (parchment.ts): same tiles, each its own folder.
+  return tileFile(joinPath(base, m[3]!, m[6]?.slice(0, -1) ?? ''), Number(m[7]), Number(m[8]), Number(m[9]))
 }
 
 /** What a finished folder holds, or null when the continent is not converted, or only in part, or in an older layout. */

@@ -11,9 +11,10 @@ export type TilesStatus =
   /**
    * The tiles are in the folder, made from this version of the game. interiors: the insides of
    * buildings (dungeons, raids, caves), absent while they are still being read; the map of the
-   * continents does not wait for them.
+   * continents does not wait for them. parchment: the continents (by their folder) whose game map is stitched into tiles
+   * (main/parchment.ts), each with the colour of its open sea; the others are still being made.
    */
-  | { state: 'ready'; folder: string; version: string; tiles: number; missing: number; seconds: number; converted: boolean; interiors?: InteriorsStatus }
+  | { state: 'ready'; folder: string; version: string; tiles: number; missing: number; seconds: number; converted: boolean; interiors?: InteriorsStatus; parchment?: Record<string, number[]> }
   | { state: 'failed'; message: string }
 
 export interface InteriorsStatus {

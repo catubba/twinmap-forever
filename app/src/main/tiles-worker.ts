@@ -2,6 +2,7 @@
 // stop the reading of the strip if it ran with it. Tells its progress in whole percents.
 import { existsSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { deflateSync } from 'node:zlib'
 import { parentPort, workerData } from 'node:worker_threads'
 import { GAME_NAMES_FILE, pairNames, wingNames } from '../shared/game-names'
 import { DUNGEON_PINS } from '../shared/dungeon-pins'
@@ -35,9 +36,13 @@ import { ICONS_MADE, writeIcons } from './icons'
 import { dungeonMaker } from './dungeons'
 import { groundMaker } from './ground'
 import { gamePictures, itemIcons } from './item-icons'
+import { convertParchment, parchmentFolder, parchmentSea } from './parchment'
+import startParchmentWorker from './parchment-worker?nodeWorker'
+import { zoneGrid, ZONES_FILE } from './zone-grid'
 import { convertWorld, dropOtherBuilds, finished, ICONS_FOLDER, MAPS_FILE, PLACES_FILE, tilesFolder, TRAVEL_FILE } from './tiles'
 
-const { gameFolder, base, nav } = workerData as { gameFolder: string; base: string; nav: string }
+// openmap: OpenMap's fills for the parchment, shipped beside the walking grid (scripts/import-openmap.js).
+const { gameFolder, base, nav, openmap } = workerData as { gameFolder: string; base: string; nav: string; openmap?: string }
 const tell = (status: TilesStatus): void => parentPort?.postMessage(status)
 /** In the folder of the build: the game's numbers of the keys the map was made with. */
 const KEYS_FILE = 'keys.json'
@@ -75,7 +80,11 @@ try {
   } catch {
     // A map made before the app read the game's language, or none yet.
   }
-  if (madeIn !== locale) for (const made of [MAPS_FILE, PLACES_FILE, TRAVEL_FILE, INTERIORS_FILE, ITEMS_FILE, AH_NAMES_FILE, TRAINERS_FILE, SPELLS_FILE, TALENTS_FILE, GAME_NAMES_FILE]) rmSync(join(folder, made), { force: true })
+  if (madeIn !== locale) {
+    for (const made of [MAPS_FILE, PLACES_FILE, TRAVEL_FILE, INTERIORS_FILE, ITEMS_FILE, AH_NAMES_FILE, TRAINERS_FILE, SPELLS_FILE, TALENTS_FILE, GAME_NAMES_FILE]) rmSync(join(folder, made), { force: true })
+    // The game's map paints the names of the continents in its language: its parchment too (parchment.ts).
+    for (const world of WORLDS) rmSync(parchmentFolder(join(folder, world.name)), { recursive: true, force: true })
+  }
   // The game's archive is opened only when there is something to convert: it takes half a second
   // and a few hundred megabytes, and on most starts the tiles are already there.
   let client: ClientFiles | undefined
@@ -142,6 +151,18 @@ try {
     const maps = JSON.parse(readFileSync(join(folder, MAPS_FILE), 'utf8')) as GameMap[]
     // Without the tables the map has the names of its zones only: no reason to refuse it.
     writeFileSync(join(folder, PLACES_FILE), JSON.stringify(poi && overlays && arts && areas ? places(table(poi), table(overlays), table(arts), table(areas), maps) : []))
+  }
+  // Which zone each chunk of land is, for the zones tinted by level (zone-grid.ts): about a second a continent, once for each build.
+  for (const world of WORLDS) {
+    const file = join(folder, world.name, ZONES_FILE)
+    if (existsSync(file)) continue
+    try {
+      const files = open(), wdt = files.read(world.file), areas = files.read(AREA_TABLE_FILE, true)
+      const maps = JSON.parse(readFileSync(join(folder, MAPS_FILE), 'utf8')) as GameMap[]
+      if (wdt && areas) writeFileSync(file, deflateSync(new Uint8Array(zoneGrid(wdt, (id) => files.read(id), table(areas), maps, world.continent).buffer)))
+    } catch {
+      // The zones are not tinted; tried again at the next start.
+    }
   }
   // The doors of the dungeons and the flight routes. Without the tables the map has none of them.
   let travelMade = false
@@ -231,7 +252,14 @@ try {
   }
   // The names are made again in this language: said so, for the next start. (The insides, after, are made in it too.)
   writeFileSync(localeFile, locale)
-  const ready = { state: 'ready', folder, version: build.version, tiles, missing, seconds: (Date.now() - started) / 1000, converted } as const
+  // The continents whose parchment is made, each with the colour of its open sea.
+  const parchment: Record<string, number[]> = {}
+  for (const world of WORLDS) {
+    const sea = parchmentSea(join(folder, world.name))
+    if (sea) parchment[world.name] = sea
+  }
+  const ready = { state: 'ready', folder, version: build.version, tiles, missing, seconds: (Date.now() - started) / 1000, converted, parchment } as const
+  let last: TilesStatus = ready
   tell(ready)
   // The spells of the game, for the panels of what a character knows (shared/spells.ts): once for each build, and again for an
   // older format. After the map is ready, which they would hold back a few seconds; the panels ask until the file is there.
@@ -270,7 +298,7 @@ try {
   // The insides of buildings come after: the map of the continents is already usable.
   const insideStarted = Date.now()
   const interiors = (told: { maps: number; pieces: number; dropped: number; converted: boolean; problem?: string }): void =>
-    tell({ ...ready, interiors: { ...told, seconds: (Date.now() - insideStarted) / 1000 } })
+    tell((last = { ...ready, interiors: { ...told, seconds: (Date.now() - insideStarted) / 1000 } }))
   try {
     let inside = finishedInteriors(folder)
     const insideConverted = !inside
@@ -396,6 +424,22 @@ try {
   } catch (e) {
     parentPort?.postMessage({ buildings: { problem: `props: ${e instanceof Error ? e.message : String(e)}` } })
   }
+  // The game's own map stitched into tiles (parchment.ts), a few seconds a continent: last of all, as the map does
+  // without it until it is there. Its tiles are painted on threads of their own (parchment-worker.ts), and meanwhile
+  // this one answers the pictures the window asks for. Told as each continent is made.
+  void (async () => {
+    for (const world of WORLDS) {
+      if (parchment[world.name]) continue
+      try {
+        const files = open(), wdt = files.read(world.file), at = join(folder, world.name)
+        const maps = JSON.parse(readFileSync(join(folder, MAPS_FILE), 'utf8')) as GameMap[]
+        const sea = wdt && (await convertParchment(wdt, (id, skipHidden) => files.read(id, skipHidden), table, maps, world.continent, at, openmap, undefined, () => startParchmentWorker({}))) ? parchmentSea(at) : null
+        if (sea && last.state === 'ready') tell((last = { ...last, parchment: { ...parchment, [world.name]: (parchment[world.name] = sea) } }))
+      } catch {
+        // The map shows its tiles; tried again at the next start.
+      }
+    }
+  })()
 } catch (e) {
   tell({ state: 'failed', message: e instanceof Error ? e.message : String(e) })
 }

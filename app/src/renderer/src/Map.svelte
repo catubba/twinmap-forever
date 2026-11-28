@@ -51,14 +51,17 @@
   import { ARRIVE, pinOfMark, removePin, renamePin, savedAt, savedFrom, savePin, yardsBetween, type SavedPin } from '../../shared/saved'
   import { markPart, sendState, type GameMark, type Inbox, type Pin } from '../../shared/send'
   import { companionPin, pin, pinSize, playerPin } from './marks'
-  import { objectives, questPin } from './packs.svelte'
+  import { mapLook, objectives, questPin } from './packs.svelte'
   import { COLOURS } from './look'
+  import { ZONE_LEVELS, zoneDifficulty } from '../../shared/zone-levels'
 
   // at: when the position was read off the game, in milliseconds.
   // insideReady: the rooms of the buildings are converted, and their list can be asked for.
-  let { pos, group = [], at: readAt, insideReady, quests = [], fixed = [], side, live = false, inbox = null, removed = [], set = [], gameFollows = null, journey = null, route = noRoute(), marked = [], onroute, onnpc, onsettings, kills, death = null, skills, xpLevel, back = $bindable(null), looking = $bindable(null) }: { kills?: unknown; skills?: unknown; xpLevel?: number | null; death?: Death | null; back?: (DeathPlace & { name: string; door: boolean }) | null; looking?: { zone: string; where: string } | null; journey?: Journey | null; pos: Position | undefined; at: number | undefined; insideReady: boolean; quests?: QuestPin[]; fixed?: FixedPin[]; side?: string; live?: boolean; inbox?: Inbox | null; removed?: string[]; set?: GameMark[]; gameFollows?: Pin | null; route?: Route; marked?: number[]; onroute?: (stop: Stop) => void; onnpc?: (pin: FixedPin | null) => void; onsettings?: (category: string) => void; group?: Companion[] } = $props()
+  // parchment: the continents (by their folder) whose game map is made (main/parchment.ts), with the colour of its sea.
+  let { pos, group = [], at: readAt, insideReady, quests = [], fixed = [], side, live = false, inbox = null, removed = [], set = [], gameFollows = null, journey = null, route = noRoute(), marked = [], onroute, onnpc, onsettings, kills, death = null, parchment, skills, xpLevel, level, back = $bindable(null), looking = $bindable(null) }: { parchment?: Record<string, number[]>; kills?: unknown; skills?: unknown; xpLevel?: number | null; level?: number; death?: Death | null; back?: (DeathPlace & { name: string; door: boolean }) | null; looking?: { zone: string; where: string } | null; journey?: Journey | null; pos: Position | undefined; at: number | undefined; insideReady: boolean; quests?: QuestPin[]; fixed?: FixedPin[]; side?: string; live?: boolean; inbox?: Inbox | null; removed?: string[]; set?: GameMark[]; gameFollows?: Pin | null; route?: Route; marked?: number[]; onroute?: (stop: Stop) => void; onnpc?: (pin: FixedPin | null) => void; onsettings?: (category: string) => void; group?: Companion[] } = $props()
 
   const TOP_ZOOM = 7 // the detail of the game itself: the picture of a block is four tiles
+  const PARCHMENT_ZOOM = 5 // the detail of the game's map (main/parchment.ts): about 4 yards a pixel
   const BLANK = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=='
   const NAMES: Record<Continent, string> = { 0: t('map.continents.easternKingdoms'), 1: t('map.continents.kalimdor') }
   // Two cities lie wholly under a roof, though the game calls them outdoors (one can ride there).
@@ -73,7 +76,7 @@
   const AREA_CELL = 0.1 // traced on cells of 13 yards
   const PIN_ZOOM = 3.5 // under this zoom the pins of a zone lie on each other: they are not shown
   const GATHER = 26 // pixels: from far, the quests to take (or to hand in) nearer than this to each other are one pin
-  const QUEST_ZOOM = 2 // the quests to take and to hand in are few: they are shown from farther, as the doors of the dungeons are
+  const QUEST_ZOOM = 2 // the quests and their objectives are shown from farther, as the doors of the dungeons are: from far, near ones are one pin
   const FAR = 3 // under this zoom the names of the regions are written small
   const EDGE = 14 // px from the edge of the map's box that a name keeps clear: the frame and a little air
   const GROUND_INSIDE = 0.45 // how bright the ground of a dungeon is: its rooms are what matters
@@ -385,16 +388,44 @@
   // everything at every zoom, stretched past their own detail: while the sharp tiles of a place are
   // still being read, the map shows it blurred, never black. The game's own blocks go on top, from
   // halfway between the two kinds of tile up.
+  // A continent chosen as the game's map (Settings > Appearance), once it is made, is its parchment instead: zoom 5 under
+  // everything, stretched above, and 6 and 7 over the cities, which have them only there; its sea all round. Its ground
+  // put again only when it changes. folder: none for a dungeon without ground.
+  let grounded = ''
   function ground(folder: string, opacity = 1): void {
     if (!map) return
+    const sea = opacity === 1 && mapLook.look === 'parchment' ? parchment?.[folder] : undefined, key = `${folder} ${opacity} ${sea}`
+    if (key === grounded) return
+    grounded = key
     for (const layer of shown) layer.remove()
-    shown = [
-      L.tileLayer(`${TILES}/${folder}/{z}/{x}/{y}.png`, { minZoom: 0, maxZoom: 9, maxNativeZoom: TOP_ZOOM - 2, bounds: WORLD_BOUNDS, errorTileUrl: BLANK, keepBuffer: 4, zIndex: 1, opacity }),
-      new BlockLayer({ world: folder, minZoom: TOP_ZOOM - 1.5, minNativeZoom: TOP_ZOOM - 1, maxNativeZoom: TOP_ZOOM, bounds: WORLD_BOUNDS, keepBuffer: 3, zIndex: 2, opacity }),
-    ]
+    holder.style.background = sea ? `rgb(${sea.join(',')})` : ''
+    const url = `${TILES}/${folder}/parchment/{z}/{x}/{y}.png`
+    shown = !folder
+      ? []
+      : sea
+        ? [
+            L.tileLayer(url, { minZoom: 0, maxZoom: 9, maxNativeZoom: PARCHMENT_ZOOM, bounds: WORLD_BOUNDS, errorTileUrl: BLANK, keepBuffer: 4, zIndex: 1 }),
+            L.tileLayer(url, { minZoom: PARCHMENT_ZOOM + 0.5, maxZoom: 9, minNativeZoom: PARCHMENT_ZOOM + 1, maxNativeZoom: TOP_ZOOM, bounds: WORLD_BOUNDS, errorTileUrl: BLANK, keepBuffer: 3, zIndex: 2 }),
+          ]
+        : [
+            L.tileLayer(`${TILES}/${folder}/{z}/{x}/{y}.png`, { minZoom: 0, maxZoom: 9, maxNativeZoom: TOP_ZOOM - 2, bounds: WORLD_BOUNDS, errorTileUrl: BLANK, keepBuffer: 4, zIndex: 1, opacity }),
+            new BlockLayer({ world: folder, minZoom: TOP_ZOOM - 1.5, minNativeZoom: TOP_ZOOM - 1, maxNativeZoom: TOP_ZOOM, bounds: WORLD_BOUNDS, keepBuffer: 3, zIndex: 2, opacity }),
+          ]
     // Under the 3D view no ground is drawn: its tiles would be read and decoded for nothing.
     if (!threeD) for (const layer of shown) layer.addTo(map)
   }
+
+  // The continent on show is its parchment: the game's map, which paints its own hills and names, so neither the relief
+  // nor our names go over it. Chosen or made while it is on show: its ground is put again.
+  const onParchment = $derived(mapLook.look === 'parchment' && !inside && !!parchment?.[WORLDS.find((w) => w.continent === continent)!.name])
+  $effect(() => {
+    void onParchment
+    untrack(() => {
+      if (inside || !maps.length) return
+      ground(WORLDS.find((w) => w.continent === continent)!.name)
+      layout()
+    })
+  })
 
   // The shaded relief of the continent on show (main/heights.ts), over its ground and under the
   // rooms, in soft light: its grey of level ground leaves the map as it is. Once the list of the
@@ -403,7 +434,56 @@
   $effect(() => {
     relief?.remove()
     const world = WORLDS.find((w) => w.continent === continent)
-    relief = maps.length > 0 && layers.relief && !inside && !threeD && world && map ? L.tileLayer(`${TILES}/${world.name}/shade/{z}/{x}/{y}.png`, { minZoom: 0, maxZoom: 9, maxNativeZoom: 6, bounds: WORLD_BOUNDS, errorTileUrl: BLANK, keepBuffer: 4, zIndex: 3, className: 'relief' }).addTo(map) : undefined
+    relief = maps.length > 0 && layers.relief && !inside && !onParchment && !threeD && world && map ? L.tileLayer(`${TILES}/${world.name}/shade/{z}/{x}/{y}.png`, { minZoom: 0, maxZoom: 9, maxNativeZoom: 6, bounds: WORLD_BOUNDS, errorTileUrl: BLANK, keepBuffer: 4, zIndex: 3, className: 'relief' }).addTo(map) : undefined
+  })
+
+  // The zones tinted by their levels for the character (shared/zone-levels.ts), each on its own land (main/zone-grid.ts):
+  // a picture of the continent at a pixel a chunk (33 yards), coloured again when the level changes, cut into the map's
+  // tiles and smoothed, so a border fades over a chunk. Under the names, over the ground and its relief
+  // (a zIndex over the relief's, so turning the relief off and on leaves it under). 2D only.
+  // Laid as a colour (.tint below): the ground keeps its light and takes the zone's colour, so a grey zone is grey and a
+  // yellow one yellow on red earth as on green grass. Chosen by the player on previews, over 30% laid as it is: 60% on
+  // the minimap's ground, 45% on the game's map, whose light paper takes a colour more brightly.
+  const TINT_OPACITY = 0.6, TINT_ON_PARCHMENT = 0.45
+  const ZONES = 'zones.bin' // main/zone-grid.ts
+  const zoneGrid = kept(2, (world: string) => inflated(`${TILES}/${world}/${ZONES}`).then((b) => b && new Uint16Array(b.buffer)))
+  const TintLayer = L.GridLayer.extend({
+    createTile(this: L.GridLayer & { options: { picture: HTMLCanvasElement } }, coords: L.Coords) {
+      const canvas = document.createElement('canvas'), picture = this.options.picture
+      canvas.width = canvas.height = 256
+      // A chunk past each side too: the smoothing at a tile's edge then matches the tile beside it.
+      const side = picture.width / 2 ** coords.z, scale = 256 / side
+      canvas.getContext('2d')!.drawImage(picture, coords.x * side - 1, coords.y * side - 1, side + 2, side + 2, -scale, -scale, 256 + 2 * scale, 256 + 2 * scale)
+      return canvas
+    },
+  }) as unknown as new (options: L.GridLayerOptions & { picture: HTMLCanvasElement }) => L.GridLayer
+  function tinted(grid: Uint16Array, level: number, parchment: boolean): HTMLCanvasElement {
+    const side = Math.sqrt(grid.length), canvas = document.createElement('canvas'), image = new ImageData(side, side)
+    canvas.width = canvas.height = side
+    const colours = new Map<number, number[] | null>()
+    const colourOf = (zone: number): number[] | null => {
+      const difficulty = ZONE_LEVELS[zone] && zoneDifficulty(ZONE_LEVELS[zone], level)
+      const hex = difficulty && (parchment && difficulty === 'red' ? COLOURS.levelsRedOnParchment : COLOURS.levels[difficulty])
+      return hex ? [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)) : null
+    }
+    grid.forEach((zone, i) => {
+      if (!zone) return
+      if (!colours.has(zone)) colours.set(zone, colourOf(zone))
+      const c = colours.get(zone)
+      if (c) image.data.set([c[0]!, c[1]!, c[2]!, 255], i * 4)
+    })
+    canvas.getContext('2d')!.putImageData(image, 0, 0)
+    return canvas
+  }
+  let tint: L.Layer | undefined, tintFor = 0
+  $effect(() => {
+    tint?.remove()
+    tint = undefined
+    const world = WORLDS.find((w) => w.continent === continent), asked = ++tintFor, at = level, view = map, opacity = onParchment ? TINT_ON_PARCHMENT : TINT_OPACITY
+    if (!(maps.length > 0 && layers.levels && !inside && !threeD && world && view && at)) return
+    void zoneGrid(world.name).then((grid) => {
+      if (grid && asked === tintFor) tint = new TintLayer({ picture: tinted(grid, at, onParchment), bounds: WORLD_BOUNDS, minZoom: 0, maxZoom: 9, keepBuffer: 4, zIndex: 4, opacity, className: 'tint' }).addTo(view)
+    })
   })
 
   // Puts these rooms on the map, in place of the ones before.
@@ -501,7 +581,7 @@
   // A name fades in and out as it gains and loses its place.
   function layout(): void {
     if (!map) return
-    if (!layers.zones || inside) return void labels.remove()
+    if (!layers.zones || inside || onParchment) return void labels.remove()
     labels.addTo(map)
     const view = map, zoom = view.getZoom(), size = view.getSize(), boxes: NameBox[] = []
     // From far away the regions are written smaller, so that most of them fit on a whole continent.
@@ -623,11 +703,7 @@
   // wing: of a map with several, the one to put in view.
   function showInside(m: InteriorMap, wing?: string): void {
     if (!map) return
-    if (m.ground) ground(m.ground, GROUND_INSIDE)
-    else {
-      for (const layer of shown) layer.remove()
-      shown = []
-    }
+    ground(m.ground ?? '', GROUND_INSIDE)
     labels.clearLayers()
     named = []
     pins.clearLayers()
@@ -1411,7 +1487,6 @@
     }
     // The objectives are many: those near each other that ask for the same thing are one pin, drawn by what they ask for,
     // with the number of quests it is for when more than one. A click on it goes nearer, where they part; on one alone, its label.
-    if (far !== null) return
     if (objectives.look === 'areas') {
       // Areas in the style of the game's map: the quest in front over the rest, which are dim. Its name on the area.
       for (const a of [...areas].sort((a, b) => Number(lit([a.quest])) - Number(lit([b.quest])))) {
@@ -1452,10 +1527,10 @@
         .addTo(questLayers.objectives)
     }
   })
-  // Not inside a dungeon, whose map is another; not from far, where they would cover the land: the objectives, which are many, go first.
+  // Not inside a dungeon, whose map is another; not from farther than a continent's zones, where they would cover the land.
   $effect(() => {
     for (const [id, group] of Object.entries(questLayers) as [keyof typeof questLayers, L.LayerGroup][]) {
-      if (map && layers[id] && !inside && zoom >= (id === 'objectives' ? PIN_ZOOM : QUEST_ZOOM)) group.addTo(map)
+      if (map && layers[id] && !inside && zoom >= QUEST_ZOOM) group.addTo(map)
       else group.remove()
     }
   })
@@ -2614,6 +2689,9 @@
 
   .map :global(.relief) {
     mix-blend-mode: soft-light;
+  }
+  .map :global(.tint) {
+    mix-blend-mode: color;
   }
   .map :global(.leaflet-container) {
     font: inherit;

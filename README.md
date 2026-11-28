@@ -75,7 +75,7 @@ The Mac app is signed and notarized by markus-barta, who builds it from the sour
 
 ## Linux
 
-Twinmap runs on Linux (x86-64), beside WoW: Forever under Wine or Proton, through Steam, Lutris or Wine itself. The game must run on X11 or XWayland, as it does by default under Wine.
+Twinmap runs on Linux (x86-64), beside WoW: Forever under Wine or Proton, through Steam, Lutris or Wine itself. The game must run on X11 or XWayland, on the same display as Twinmap, as Wine does by default whenever DISPLAY is set: not through Wine's Wayland driver (`PROTON_ENABLE_WAYLAND=1` in the Proton builds that have it) and not in a gamescope session of its own.
 
 1. [Download Twinmap for Linux](https://github.com/catubba/twinmap-forever/releases/latest/download/Twinmap-linux-x86_64.AppImage), make the file executable (`chmod +x Twinmap-linux-x86_64.AppImage`, or Properties > Executable in your file manager) and open it.
 2. Twinmap finds the running game, and its folder inside the Wine prefix, by itself. If it does not, choose the folder in Settings, Game and addons.
