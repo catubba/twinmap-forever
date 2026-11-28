@@ -78,6 +78,9 @@ export default {
     daynightHint: "La lumière suit l'heure du jour dans le jeu, et les fenêtres s'allument la nuit. L'anneau sous le nom de la zone déplace le soleil ; un clic revient à l'heure du jeu.",
     dungeons: 'Donjon 3D (expérimental)',
     dungeonsHint: 'Donjons et raids dans la vue 3D, salles ouvertes vues d’en haut. Encore en chantier : l’affichage peut être faux ou lent.',
+    memory: 'Mémoire de la carte graphique : {amount}',
+    amount: 'environ {mb} Mo',
+    costMb: '+{mb} Mo',
     card: 'Carte graphique',
   },
 

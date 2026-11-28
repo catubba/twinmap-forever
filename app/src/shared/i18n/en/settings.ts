@@ -118,6 +118,12 @@ export default {
     // A switch, off at first: dungeons and raids in the 3D view. The name is the owner's, "(Experimental)" and all: it stays while the feature is being built.
     dungeons: '3D Dungeon (Experimental)',
     dungeonsHint: 'Dungeons and raids in the 3D view, their rooms open from above. Still being built: it may be wrong or slow.',
+    // Under the switches of the 3D view, in the app only: how much of the graphics card's memory Twinmap takes with the
+    // switches on and the size of the view, worked out (graphics.svelte.ts). {amount}: settings.graphics.amount, drawn in gold.
+    memory: 'Graphics card memory: {amount}',
+    amount: 'about {mb} MB',
+    // Beside a switch that costs memory: how much it adds. {mb}: a whole number.
+    costMb: '+{mb} MB',
     // A subtitle over the switch window.gpu.
     card: 'Graphics card',
   },

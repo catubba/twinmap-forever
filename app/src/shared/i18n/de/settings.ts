@@ -78,6 +78,9 @@ export default {
     daynightHint: 'Das Licht folgt der Tageszeit im Spiel, nachts leuchten die Fenster. Der Ring unter dem Namen der Zone verschiebt die Sonne, ein Klick kehrt zur Spielzeit zurück.',
     dungeons: '3D-Dungeon (experimentell)',
     dungeonsHint: 'Dungeons und Schlachtzüge in der 3D-Ansicht, die Räume von oben offen. Noch im Aufbau: Die Darstellung kann falsch oder langsam sein.',
+    memory: 'Grafikspeicher: {amount}',
+    amount: 'etwa {mb} MB',
+    costMb: '+{mb} MB',
     card: 'Grafikkarte',
   },
 

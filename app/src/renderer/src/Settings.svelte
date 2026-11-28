@@ -16,8 +16,8 @@
   import { arrow, setArrow } from './arrow.svelte'
   import { ARROW, ARROW_SIZES } from './look'
   import { mapLook, mapLooks, objectiveLooks, objectives, packs, questieHere, setMapLook, setObjectiveLook, setPack } from './packs.svelte'
-  import { DENSITY_NAMES, graphics, setGraphics } from './graphics.svelte'
-  import { langNow, metresOn, metricOffered, num, t, type Key } from '../../shared/i18n'
+  import { cardMemory, COSTS, DENSITY_NAMES, graphics, setGraphics } from './graphics.svelte'
+  import { around, langNow, metresOn, metricOffered, num, t, type Key } from '../../shared/i18n'
 
   let { setup, tiles, onback, onfirstrun, onfeedback, onnews }: { setup: SetupStatus; tiles: TilesStatus | null; onback: () => void; onfirstrun: () => void; onfeedback: () => void; onnews: () => void } = $props()
 
@@ -77,7 +77,22 @@
   const map = $derived(
     !tiles || tiles.state === 'looking' ? t('settings.found.mapLooking') : tiles.state === 'no-game' ? t('settings.found.mapNoGame') : tiles.state === 'converting' ? t('settings.found.mapBuilding', { percent: tiles.percent }) : tiles.state === 'failed' ? t('settings.found.mapFailed', { message: tiles.message }) : t('settings.found.mapReady', { version: tiles.version }),
   )
+
+  // The pixels of the card the window has, which the costs were measured against (graphics.svelte.ts); read again as the
+  // window changes size.
+  let viewPixels = $state(0)
+  const readPixels = (): void => void (viewPixels = innerWidth * innerHeight * devicePixelRatio ** 2)
+  $effect(() => {
+    readPixels()
+    addEventListener('resize', readPixels)
+    return () => removeEventListener('resize', readPixels)
+  })
 </script>
+
+<!-- What a switch adds to the card's memory, beside it: in the app only, as the total. -->
+{#snippet cost(mb: number)}
+  {#if inApp}<span class="cost">{t('settings.graphics.costMb', { mb: num(mb) })}</span>{/if}
+{/snippet}
 
 <dialog bind:this={dialog} class="surface" aria-labelledby="settings-title" onclose={onback}>
   <nav aria-label={t('settings.categories.label')}>
@@ -143,21 +158,28 @@
       <!-- What the 3D view draws (M23, design/ui.md section 6): a switch each, kept by this window (graphics.svelte.ts). -->
       <div class="setting">
         <h3 class="sub">{t('settings.graphics.view3d')}</h3>
-        <label class="choice"><input type="checkbox" class="check" checked={graphics.buildings} onchange={(e) => setGraphics({ buildings: e.currentTarget.checked })} />{t('settings.graphics.buildings')}</label>
+        <label class="choice"><input type="checkbox" class="check" checked={graphics.buildings} onchange={(e) => setGraphics({ buildings: e.currentTarget.checked })} />{t('settings.graphics.buildings')}{@render cost(COSTS.buildings)}</label>
         <!-- Trees and objects (M23-F7): trees thinned and without leaves round the character, as many as chosen. -->
         <div class="line">
           <label class="choice"><input type="checkbox" class="check" checked={graphics.trees} onchange={(e) => setGraphics({ trees: e.currentTarget.checked })} />{t('settings.graphics.trees')}</label>
           <select class="field size" aria-label={t('settings.graphics.density')} value={graphics.density} disabled={!graphics.trees} onchange={(e) => setGraphics({ density: e.currentTarget.value as typeof graphics.density })}>{#each DENSITY_NAMES as d (d)}<option value={d}>{t(`settings.graphics.${d}`)}</option>{/each}</select>
+          {@render cost(COSTS.trees)}
         </div>
         <p class="hint">{t('settings.graphics.treesHint')}</p>
-        <label class="choice"><input type="checkbox" class="check" checked={graphics.objects} onchange={(e) => setGraphics({ objects: e.currentTarget.checked })} />{t('settings.graphics.objects')}</label>
+        <label class="choice"><input type="checkbox" class="check" checked={graphics.objects} onchange={(e) => setGraphics({ objects: e.currentTarget.checked })} />{t('settings.graphics.objects')}{@render cost(COSTS.objects)}</label>
         <p class="hint">{t('settings.graphics.objectsHint')}</p>
-        <label class="choice"><input type="checkbox" class="check" checked={graphics.ground} onchange={(e) => setGraphics({ ground: e.currentTarget.checked })} />{t('settings.graphics.ground')}</label>
+        <label class="choice"><input type="checkbox" class="check" checked={graphics.ground} onchange={(e) => setGraphics({ ground: e.currentTarget.checked })} />{t('settings.graphics.ground')}{@render cost(COSTS.ground)}</label>
         <p class="hint">{t('settings.graphics.groundHint')}</p>
         <label class="choice"><input type="checkbox" class="check" checked={graphics.daynight} onchange={(e) => setGraphics({ daynight: e.currentTarget.checked })} />{t('settings.graphics.daynight')}</label>
         <p class="hint">{t('settings.graphics.daynightHint')}</p>
         <label class="choice"><input type="checkbox" class="check" checked={graphics.dungeons} onchange={(e) => setGraphics({ dungeons: e.currentTarget.checked })} />{t('settings.graphics.dungeons')}</label>
         <p class="hint">{t('settings.graphics.dungeonsHint')}</p>
+        <!-- How much of the card's memory all this takes (M23-F20, design/ui.md section 6): in the app only, a phone's card
+             keeps its textures bigger (no DXT, M23-F21). -->
+        {#if inApp}
+          {@const [before, after] = around('settings.graphics.memory', 'amount')}
+          <p class="memory">{before}<b>{t('settings.graphics.amount', { mb: num(cardMemory(graphics, viewPixels)) })}</b>{after}</p>
+        {/if}
         <p class="hint">{t('settings.graphics.cost')}</p>
       </div>
       <!-- The graphics card is the computer's: a phone on the home network has none to set. -->
@@ -384,6 +406,20 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+  /* What a switch costs, beside its name: small and quiet. The total under them, its amount in gold. */
+  .cost {
+    font: var(--t-small);
+    color: var(--text-off);
+    font-variant-numeric: tabular-nums;
+  }
+  .memory {
+    margin: 6px 0 0;
+  }
+  .memory b {
+    font-weight: 500;
+    color: var(--gold);
+    font-variant-numeric: tabular-nums;
   }
   .hint {
     display: block;
