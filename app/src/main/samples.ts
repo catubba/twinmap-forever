@@ -71,7 +71,7 @@ export function startSamples(on: () => boolean): { take: (report: InsideReport |
       }
       // Only a look that read the screen: a place found, or none like enough.
       if (report && seen && !report.hid && (report.why === undefined || report.why === 'not sure') && Number.isInteger(report.zoom) && report.zoom! >= 0 && report.zoom! <= 5) {
-        const place = report.place, failed = !place || place.score < SURE
+        const place = report.place, far = report.far, failed = !place || place.score < SURE
         run ??= { id: randomBytes(8).toString('hex'), dungeon: report.dungeon, samples: [], rooms: new Map(), failedAt: -Infinity, found: 0, times: [] }
         const room = place ? `${report.picture} ${Math.floor(place.u / ROOM)} ${Math.floor(place.v / ROOM)}` : ''
         const due = failed ? now - run.failedAt >= FAILED_EVERY : run.found < MOST_FOUND && now - (run.rooms.get(room) ?? -Infinity) >= ROOM_EVERY
@@ -83,7 +83,14 @@ export function startSamples(on: () => boolean): { take: (report: InsideReport |
           const tenth = (n: number): string => String(Math.round(n * 10) / 10)
           run.times.push(now)
           run.samples.push({
-            fields: { n: String(run.samples.length), map: String(report.dungeon), zoom: String(report.zoom), ...(place ? { u: tenth(place.u), v: tenth(place.v), score: String(Math.round(Math.min(1, Math.max(0, place.score)) * 1000) / 1000) } : {}) },
+            fields: {
+              n: String(run.samples.length),
+              map: String(report.dungeon),
+              zoom: String(report.zoom),
+              ...(place ? { u: tenth(place.u), v: tenth(place.v), score: String(Math.round(Math.min(1, Math.max(0, place.score)) * 1000) / 1000) } : {}),
+              // Where the addon found the character from the flight masters at that moment, height included: the true place of the picture.
+              ...(far ? { x: tenth(far.x), y: tenth(far.y), z: tenth(far.z), r: tenth(Math.min(far.r, 999)) } : {}),
+            },
             png,
           })
         }

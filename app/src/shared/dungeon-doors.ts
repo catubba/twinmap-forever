@@ -44,13 +44,16 @@ export interface MoreDoor {
   entrance: Entrance
   /** The wing it opens on, by the name of its pins (dungeon-pins.ts). */
   wing?: string
+  /** Where it puts one who walks in, u and v in the yards of the dungeon's rooms: the entrance on the map of the dungeon. */
+  inside?: [number, number]
 }
 
 // Where the game puts one who walks out through each of these doors, a few yards from it: the target of the exits in
 // the areatrigger_teleport table of the CMaNGOS classic-db database (GNU General Public License, version 3; the
 // notice is in THIRD-PARTY-LICENSES). The doors of the wings of Dire Maul are where MapUtils has them too.
 export const MORE_DOORS: MoreDoor[] = [
-  { map: 70, continent: 0, x: -6619.97, y: -3765.74, entrance: 'back' }, // Uldaman Instance End, in Dustwind Gulch
+  // Uldaman Instance End, in Dustwind Gulch. In: the target of trigger 902 ("Uldaman Exit", the way in by the back), -212.95, 382.427.
+  { map: 70, continent: 0, x: -6619.97, y: -3765.74, entrance: 'back', inside: [16684.2, 17279.6] },
   { map: 349, continent: 1, x: -1182.8, y: 2877.43, entrance: 'purple' },
   { map: 349, continent: 1, x: -1468.2, y: 2614.21, entrance: 'orange' },
   { map: 429, continent: 1, x: -3520.24, y: 1078.4, entrance: 'north', wing: 'Dire Maul: North' },

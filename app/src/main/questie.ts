@@ -10,6 +10,8 @@ import { best, fold, wordsMatch, type Found } from '../shared/search'
 import type { ItemSources } from '../shared/tips'
 import { resourceOf, servicesOf, type FixedPin, type ServiceLayer } from '../shared/services'
 import { t, type Key } from '../shared/i18n'
+import { DUNGEON_TRAINERS } from '../shared/dungeon-trainers'
+import { professionWords } from '../shared/trainers'
 import { gameLocale } from './client-files'
 
 /** The file of QuestieDB this app reads, in a game folder. Questie without it gives the app nothing. */
@@ -270,7 +272,9 @@ export function doerIndex(db: Questie): Doer[] {
     const told = typeof sub === 'string' ? sub : ''
     // Someone friendly to no side serves no player; someone with no title and no service does nothing to look for.
     if (typeof name !== 'string' || !name || typeof side !== 'string' || !side || (!told && !layers.length)) continue
-    doers.push({ id, name, note: told || layers.map((layer) => t(SERVICE_NOTES[layer])).join(', '), lower: fold(`${told} ${layers.map((layer) => SERVICE_WORDS[layer]).join(' ')}`), side })
+    // A profession trainer is found by its profession and the ranks it teaches too: "artisan enchanting".
+    const words = layers.includes('trainers') ? professionWords(id) : ''
+    doers.push({ id, name, note: told || layers.map((layer) => t(SERVICE_NOTES[layer])).join(', '), lower: fold(`${told} ${layers.map((layer) => SERVICE_WORDS[layer]).join(' ')} ${words}`), side })
   }
   return doers
 }
@@ -288,14 +292,17 @@ const DOERS_FROM = 3 // letters typed before the search looks at what people do
 export function search(db: Questie, index: SearchIndex[], typed: string, most = 12, doers: Doer[] = []): Found[] {
   const text = (v: unknown): string => (typeof v === 'string' ? v : '')
   const numbers = (t: unknown): number[] => list(t).filter((n): n is number => typeof n === 'number')
-  const spot = (kind: 'Npc' | 'Object', id: number): { area: number; x: number; y: number } | null => {
+  const spot = (kind: 'Npc' | 'Object', id: number): { area: number; x: number; y: number; inside?: Found['inside'] } | null => {
     const places = db.places(kind, id), home = kind === 'Npc' ? db.get('Npc', id, NPC.zone) : undefined
     const area = typeof home === 'number' && places[home]?.length ? String(home) : Object.keys(places).find((a) => places[a]!.length)
     const first = area === undefined ? undefined : places[area]![0]
-    return first ? { area: +area!, x: first[0], y: first[1] } : null
+    if (first) return { area: +area!, x: first[0], y: first[1] }
+    // A trainer inside a dungeon: there, and in no zone.
+    const inside = kind === 'Npc' ? DUNGEON_TRAINERS[id] : undefined
+    return inside ? { area: 0, x: 0, y: 0, inside } : null
   }
   // The first of these that has a place, and its name.
-  const firstOf = (kind: 'Npc' | 'Object', ids: number[]): { where: { area: number; x: number; y: number }; name: string } | null => {
+  const firstOf = (kind: 'Npc' | 'Object', ids: number[]): { where: { area: number; x: number; y: number; inside?: Found['inside'] }; name: string } | null => {
     for (const id of ids) {
       const where = spot(kind, id)
       if (where) return { where, name: text(db.get(kind, id, kind === 'Npc' ? NPC.name : OBJECT.name)) }
@@ -367,8 +374,11 @@ export function fixedPins(db: Questie): FixedPin[] {
     const layers = typeof flags === 'number' ? servicesOf(flags) : []
     // Someone friendly to no side serves no player.
     if (!layers.length || typeof side !== 'string' || !side || typeof name !== 'string') continue
-    const panel = layers.includes('vendors') || layers.includes('trainers')
-    add('Npc', id, { name, ...(typeof sub === 'string' && sub ? { sub } : {}), layers, side, ...(panel && { npc: id }), ...(sold.has(id) && { sells: sold.get(id) }) })
+    const panel = layers.includes('vendors') || layers.includes('trainers'), inside = DUNGEON_TRAINERS[id]
+    const pin = { name, ...(typeof sub === 'string' && sub ? { sub } : {}), layers, side, ...(panel && { npc: id }), ...(sold.has(id) && { sells: sold.get(id) }) }
+    add('Npc', id, pin)
+    // A trainer inside a dungeon, where QuestieDB has no place: on the map of the dungeon only.
+    if (inside) pins.push({ area: 0, x: 0, y: 0, ...pin, inside })
   }
   for (const id of db.ids.Object) {
     // Told by the English name, shown in the game's language.
