@@ -157,6 +157,10 @@ test('the window is given only the files the converter writes', () => {
   expect(servedFile(base, '/azeroth/blocks/31/49.dxt')).toBe(join(base, 'azeroth', 'blocks', '31', '49.dxt'))
   expect(servedFile(base, '/kalimdor/5/12/7.png')).toBe(join(base, 'kalimdor', '5', '12', '7.png'))
   expect(servedFile(base, '/maps.json')).toBe(join(base, 'maps.json'))
+  // the ground's own textures of the 3D view
+  expect(servedFile(base, '/azeroth/ground.json')).toBe(join(base, 'azeroth', 'ground.json'))
+  expect(servedFile(base, '/kalimdor/ground/textures.bin')).toBe(join(base, 'kalimdor', 'ground', 'textures.bin'))
+  expect(servedFile(base, '/azeroth/ground/31/49.bin')).toBe(join(base, 'azeroth', 'ground', '31', '49.bin'))
   expect(servedFile(base, '/travel.json')).toBe(join(base, 'travel.json'))
   expect(servedFile(base, '/items.json')).toBe(join(base, 'items.json'))
   // The insides: the list, a room's picture, the ground of a dungeon.

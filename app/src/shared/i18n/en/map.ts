@@ -104,6 +104,10 @@ export default {
     // Tooltips on those buttons: the last shows every room; {level} is the number on the button.
     everyRoom: 'Every room',
     roomsUpTo: 'Rooms up to level {level}',
+    // Inside a dungeon in parts kilometres apart (the wings of Scarlet Monastery, Caverns of Time): a small tag before the buttons 1, 2, 3 that put each part in view. Short. Also the row of those buttons, read aloud.
+    parts: 'Parts',
+    // Tooltip on such a button, for a part with no name of its own; {part} is the number on the button.
+    partTip: 'Part {part}',
     // Inside a dungeon or a raid: a button beside its name that shows the usual way through it, the bosses numbered in order. Short.
     route: 'Route',
     // Its tooltip; the second for the dungeons World of Warcraft: Forever added, whose routes come from guides and videos.
@@ -118,10 +122,23 @@ export default {
     follow: 'Follow',
     // Its tooltip: F is the key that does it too.
     followTip: 'Follow your character (F)',
+    // Inside a dungeon, the 2D/3D switch pressed while "3D Dungeon (Experimental)" (settings.graphics.dungeons) is off: a small window, its title, its text, the button that opens Settings on Graphics, the one that closes it.
+    dungeonsOff: '3D dungeons are off',
+    dungeonsOffText: 'Dungeons in 3D are experimental. Turn on "3D Dungeon (Experimental)" in Settings to see this one in 3D.',
+    dungeonsOpen: 'Open Settings',
+    dungeonsLater: 'Not now',
   },
 
   // A note over the map when the character is somewhere the map has no picture of.
   offMap: 'This place is not on the map.',
+  // On the map in 3D, when the view stays under 30 frames a second while it moves; two buttons beside it. {fps}: a whole number.
+  slowView: 'The 3D view is slow here ({fps} frames a second).',
+  // Those buttons. {quality}: a step of Settings > Graphics > Quality, as settings.graphics.low, medium, high or custom write it.
+  lowerTo: 'Lower to {quality}',
+  keepQuality: 'Keep {quality}',
+  // On the map when the graphics card took the 3D view away, the app having set Quality to Low (settings.graphics.low); a button beside it opens Settings.
+  lostView: 'The graphics card ran out of memory: graphics set to Low.',
+  lostSettings: 'Settings',
   // Frames a second of the 3D view, shown only in trials.
   fps: '{fps} fps',
   // Why Send to game did nothing: the point clicked is in no zone.
@@ -278,5 +295,12 @@ export default {
     raidIn: 'Raid, {zone}',
     // {what}: what the player's QuestieDB says it is, as Innkeeper or Quest, level 12.
     foundIn: '{what}, {zone}',
+  },
+  // The ring of the hour under the zone's name in the 3D view (Map.svelte): the hour inside it, the sun on it.
+  daylight: {
+    // The ring, read aloud only.
+    ring: 'The hour of the light',
+    // Its tooltip: dragging the sun round the ring changes the hour of the light; a click follows the game's hour again.
+    ringTip: "Drag to move the sun. Click to go back to the game's hour.",
   },
 }

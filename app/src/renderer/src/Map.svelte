@@ -5,6 +5,10 @@
   import { TILES } from './web'
   import { layout as sides, setMapRight } from './frame.svelte'
   import { arrow as arrowLook } from './arrow.svelte'
+  import { graphics, setGraphics } from './graphics.svelte'
+  import { lower, QUALITIES, qualityOf, type Quality } from '../../shared/quality'
+  import DungeonsAsk from './DungeonsAsk.svelte'
+  import DayRing from './DayRing.svelte'
   import type { Terrain } from './terrain3d'
   import type { Compass } from './compass'
   import { Arrow3d } from './arrow3d'
@@ -15,17 +19,19 @@
   import 'leaflet/dist/leaflet.css'
   import 'leaflet-rotate' // after Leaflet: it adds turning the map to the L that Leaflet puts on the page
   import { onMount, untrack } from 'svelte'
+  import { dungeonFolder } from '../../shared/buildings'
   import { DUNGEON_PINS } from '../../shared/dungeon-pins'
   import { gameName, setGameNames } from '../../shared/game-names'
   import { NEW_DUNGEON_PINS } from '../../shared/new-dungeon-pins'
   import { MORE_BOSS_PINS } from '../../shared/more-boss-pins'
+  import { PIN_HEIGHTS } from '../../shared/pin-heights'
   import { DUNGEON_ROUTES } from '../../shared/dungeon-routes'
   import { FIRST_ENTRANCE, MORE_DOORS } from '../../shared/dungeon-doors'
   import type { Position } from '../../shared/game'
   import { coloursFor, type Companion } from '../../shared/group'
   import { clearOf, gathered, unitsOfPlace, unitsOfRect, type Point } from '../../shared/geo'
   import { addFix, BEHIND, PERIOD, TURN, turnAt, whereAt, type Fix, type Turn } from '../../shared/glide'
-  import { boxOf, buildingsAt, killedIn, nameOfBoss, piecesIn, RARE_BOSSES, roomPixels, yardsInside, YARDS_PER_UNIT, type Box, type InteriorMap, type Interiors, type Piece, type UnderRoom, type Yards } from '../../shared/inside'
+  import { boxOf, buildingsAt, killedIn, nameOfBoss, partAt, partsOf, piecesIn, RARE_BOSSES, roomPixels, yardsInside, YARDS_PER_UNIT, type Box, type InteriorMap, type Interiors, type Piece, type UnderRoom, type Yards } from '../../shared/inside'
   import type { Continent, GameMap } from '../../shared/maps'
   import { objectiveAreas, objectiveGroups, questXp, xpDrop, type QuestPin, type QuestReward } from '../../shared/quests'
   import { coins } from '../../shared/items'
@@ -56,7 +62,7 @@
   // at: when the position was read off the game, in milliseconds.
   // insideReady: the rooms of the buildings are converted, and their list can be asked for.
   // parchment: the continents (by their folder) whose game map is made (main/parchment.ts), with the colour of its sea.
-  let { pos, group = [], at: readAt, insideReady, quests = [], fixed = [], side, live = false, inbox = null, removed = [], set = [], gameFollows = null, journey = null, route = noRoute(), marked = [], onroute, onnpc, kills, death = null, parchment, skills, xpLevel, level, back = $bindable(null), looking = $bindable(null) }: { parchment?: Record<string, number[]>; kills?: unknown; skills?: unknown; xpLevel?: number | null; level?: number; death?: Death | null; back?: (DeathPlace & { name: string; door: boolean }) | null; looking?: { zone: string; where: string } | null; journey?: Journey | null; pos: Position | undefined; at: number | undefined; insideReady: boolean; quests?: QuestPin[]; fixed?: FixedPin[]; side?: string; live?: boolean; inbox?: Inbox | null; removed?: string[]; set?: GameMark[]; gameFollows?: Pin | null; route?: Route; marked?: number[]; onroute?: (stop: Stop) => void; onnpc?: (pin: FixedPin | null) => void; group?: Companion[] } = $props()
+  let { pos, group = [], at: readAt, insideReady, quests = [], fixed = [], side, live = false, inbox = null, removed = [], set = [], gameFollows = null, journey = null, route = noRoute(), marked = [], onroute, onnpc, onsettings, kills, death = null, parchment, gameTime = null, gameTimeAt, skills, xpLevel, level, back = $bindable(null), looking = $bindable(null), noted = false }: { noted?: boolean; parchment?: Record<string, number[]>; gameTime?: number | null; gameTimeAt?: number; kills?: unknown; skills?: unknown; xpLevel?: number | null; level?: number; death?: Death | null; back?: (DeathPlace & { name: string; door: boolean }) | null; looking?: { zone: string; where: string } | null; journey?: Journey | null; pos: Position | undefined; at: number | undefined; insideReady: boolean; quests?: QuestPin[]; fixed?: FixedPin[]; side?: string; live?: boolean; inbox?: Inbox | null; removed?: string[]; set?: GameMark[]; gameFollows?: Pin | null; route?: Route; marked?: number[]; onroute?: (stop: Stop) => void; onnpc?: (pin: FixedPin | null) => void; onsettings?: (category: string) => void; group?: Companion[] } = $props()
 
   const TOP_ZOOM = 7 // the detail of the game itself: the picture of a block is four tiles
   const PARCHMENT_ZOOM = 5 // the detail of the game's map (main/parchment.ts): about 4 yards a pixel
@@ -750,17 +756,20 @@
     // A boss: its skull, and its name written under it, there without the pointer on it. On a second
     // screen nobody hovers while playing. Those of the pins, then the ones the pins lacked.
     const all = [...dungeons.flatMap((d) => d.bosses), ...MORE_BOSS_PINS.filter(([map]) => map === m.id).map(([, name, u, v]) => [name, u, v] as const)]
+    // How high each stands, where that is known: the 3D view puts it on its own floor (pins3d.ts). The 2D map has no use for it.
+    const high = PIN_HEIGHTS[m.id] ?? {}
+    const pinAt = (u: number, v: number, name: string): L.LatLng => L.latLng(atYards({ u, v }).lat, atYards({ u, v }).lng, high[name])
     for (const [name, u, v] of all) {
       // A rare boss is not there in every run: a silver ring, and said in its name.
       const rare = RARE_BOSSES.has(nameOfBoss(name)), shown = gameName(name)
-      bossMarks.push({ name, rare, u, v, gone: false, marker: L.marker(atYards({ u, v }), { keyboard: false, icon: bossIcon(false, rare) }).bindTooltip(rare ? t('map.pins.rareBoss', { name: shown }) : shown, { permanent: true, direction: 'bottom', offset: [0, rare ? 11 : 9], className: 'boss-name' }).addTo(pins) })
+      bossMarks.push({ name, rare, u, v, gone: false, marker: L.marker(pinAt(u, v, name), { keyboard: false, icon: bossIcon(false, rare) }).bindTooltip(rare ? t('map.pins.rareBoss', { name: shown }) : shown, { permanent: true, direction: 'bottom', offset: [0, rare ? 11 : 9], className: 'boss-name' }).addTo(pins) })
     }
     // The entrances: each wing's, and the other doors of the map where the app knows where they put the player in
     // (Uldaman's back door). Where there are several, each is named as its door on the world map is.
     const first = FIRST_ENTRANCE[m.id], more = MORE_DOORS.filter((d) => d.map === m.id && d.inside)
     for (const d of dungeons) {
       if (d.entrance)
-        L.marker(atYards({ u: d.entrance[0], v: d.entrance[1] }), { keyboard: false, icon: doorIcon(m.kind === 'raid') })
+        L.marker(pinAt(d.entrance[0], d.entrance[1], d.name), { keyboard: false, icon: doorIcon(m.kind === 'raid') })
           .bindTooltip(dungeons.length > 1 ? t('map.pins.entranceOf', { name: gameName(d.name) }) : first && more.length ? t(`map.pins.doors.${first}`) : t('map.pins.entrance'), { direction: 'top', offset: [0, -13], className: 'tip' })
           .addTo(pins)
     }
@@ -769,11 +778,29 @@
         .bindTooltip(t(`map.pins.doors.${d.entrance}`), { direction: 'top', offset: [0, -13], className: 'tip' })
         .addTo(pins)
     bosses = bossMarks
+    // A map in parts far apart (partsOf): one at a time, the wing asked for, the character's or the one with the most
+    // rooms; the buttons beside its name go to the others. Its wings where the pins tell them, its groups of rooms else.
+    const apart = partsOf(m.pieces)
+    parts = apart.length < 2 ? [] : dungeons.length > 1 ? dungeons.map((d) => ({ box: d.bounds, name: d.name })) : apart.map((box) => ({ box }))
+    const here = pos?.inst?.id === m.id ? yardsInside(pos.inst) : undefined, asked = parts.findIndex((p) => p.name === wing)
+    partShown = asked >= 0 ? asked : here ? partAt(parts.map((p) => p.box), here) : 0
     const framed = dungeons.filter((d) => d.name === wing)
-    const box = dungeons.length
+    const box = parts.length
+      ? parts[partShown]!.box
+      : dungeons.length
       ? (framed.length ? framed : dungeons).reduce<Box>((all, d) => [Math.min(all[0], d.bounds[0]), Math.min(all[1], d.bounds[1]), Math.max(all[2], d.bounds[2]), Math.max(all[3], d.bounds[3])], [Infinity, Infinity, -Infinity, -Infinity])
       : boxOf(m.pieces)
     if (box) map.fitBounds(boundsOfBox(box), { animate: false }) // at once: the arrow is placed against this view
+  }
+
+  // The parts of the dungeon on show that lie far apart, framed one at a time, and the one in view; none for most.
+  let parts = $state.raw<{ box: Box; name?: string }[]>([])
+  let partShown = $state(0)
+  function showPart(i: number): void {
+    if (!map || !parts[i]) return
+    following = false
+    partShown = i
+    map.fitBounds(boundsOfBox(parts[i].box), { animate: false })
   }
 
   // The level the character is on shows by itself each time it changes; a level picked by hand stays until then.
@@ -988,6 +1015,7 @@
 
   // Where the character is on the map, or nothing: a place with no map, or one outside the two continents.
   let placed = false
+  let arriving: number | null = null // yards the 3D view showed when the character went into a dungeon, until its first place in it
   let under = '' // the buildings whose rooms are on show on a continent: the character is under their roof
   function place(jump = false): void {
     if (!map || !maps.length) return
@@ -1002,15 +1030,23 @@
     const inst = pos?.inst, dungeon = inst && interiors?.maps.find((m) => m.id === inst.id && m.kind !== 'world')
     if (inst && dungeon) {
       const entering = inside?.id !== dungeon.id
+      // Entered from the 3D view, the view stays as far from the arrow as it was outside (M23-F24).
+      if (entering) arriving = threeD && terrain ? terrain.looking().seen : null
       if (entering) showInside(dungeon)
       offMap = false
       placed = false // back in the world, the map goes to where the character comes out
       me = null
       const where = yardsInside(inst)
       if (!where) return void arrow.remove() // the game does not tell the place in here
-      // On the way in the whole dungeon is in view, and stays so while the arrow is well inside it.
-      if (entering) mark(atYards(where), true)
+      if (following && parts.length) partShown = partAt(parts.map((p) => p.box), where)
+      // On the way in the whole dungeon is in view, and stays so while the arrow is well inside it. In 3D the view
+      // goes with the arrow as it does outside: the cut is over the arrow's floor, and what is far from it is cut too.
+      if (threeD && terrain) {
+        if (arriving !== null) terrain.look({ ...terrain.looking(), seen: arriving })
+        point(atYards(where), entering || jump || arriving !== null)
+      } else if (entering) mark(atYards(where), true)
       else point(atYards(where), jump, true)
+      arriving = null
       return
     }
     const leaving = inside !== null
@@ -1054,6 +1090,7 @@
   let pinsHost: HTMLDivElement
   let compassHost: HTMLButtonElement
   let terrain: Terrain | undefined
+  let daylight = $state<Terrain['daylight'] | null>(null) // the terrain's, for the ring of the hour
   // What the 2D map lays on the ground, on the 3D view too (pins3d.ts).
   let pins3d: Pins3d | undefined
   // Where a point of the map is on screen, on the view on show: a label stays on its point in 3D too.
@@ -1095,7 +1132,15 @@
     terrain?.zoomAtCursor(!following)
   })
   let syncing = false // the 2D map is moved from the 3D view: not the other way round
-  const worldShown = (): string | undefined => (inside ? undefined : WORLDS.find((w) => w.continent === continent)?.name)
+  // A dungeon or a raid has a 3D view (M23-F23; with its ground, where it has one, since M23-F26), and shows it while
+  // "3D Dungeon (Experimental)" is on in Settings > Graphics.
+  const worldShown = (): string | undefined => (inside ? (graphics.dungeons ? dungeonFolder(inside.id) : undefined) : WORLDS.find((w) => w.continent === continent)?.name)
+  // The 2D/3D switch and its key. Inside a dungeon with the option off it asks instead, and Settings is one click away.
+  let askDungeons = $state(false)
+  function switch3d(): void {
+    if (inside && !graphics.dungeons && !threeD) askDungeons = true
+    else void view3d(!threeD)
+  }
   // Yards of ground from top to foot of the 2D map at a zoom, and back.
   const seenAt = (z: number): number => (map!.getSize().y / 2 ** z) * YARDS_PER_UNIT
   const zoomFor = (seen: number): number => Math.log2((map!.getSize().y * YARDS_PER_UNIT) / seen)
@@ -1128,7 +1173,46 @@
     counted++
     if (now - since >= 1000) ((fps = Math.round((counted * 1000) / (now - since))), (counted = 0), (since = now))
   }
-  function onFrame(): void {
+  // The view slow while it moves (M23-F34, design/ui.md section 6): under 30 frames a second for 10 seconds of moving
+  // in a row, a line proposes the step under the quality; the app never lowers it alone. Keep: never again for that
+  // quality, in this window. Frames apart by more than a quarter of a second are the view still, not slow.
+  let slow = $state<{ fps: number; from: Quality | 'custom'; to: Quality } | null>(null)
+  let movedMs = 0, movedFrames = 0, slowSeconds = 0, drewAt = 0
+  const keptSlow = (): string[] => JSON.parse(localStorage.getItem('slowKept') ?? '[]') as string[]
+  function watchSpeed(): void {
+    const now = performance.now(), gap = now - drewAt
+    drewAt = now
+    if (gap > 250) return
+    movedMs += gap
+    movedFrames++
+    if (movedMs < 1000) return
+    const fps = (movedFrames * 1000) / movedMs
+    movedMs = movedFrames = 0
+    slowSeconds = fps < 30 ? slowSeconds + 1 : 0
+    if (slowSeconds < 10 || slow) return
+    slowSeconds = 0
+    const from = qualityOf(graphics), to = lower(graphics)
+    if (to && !keptSlow().includes(from)) slow = { fps: Math.round(fps), from, to }
+  }
+  // The line goes once the quality is not the one it spoke of.
+  $effect(() => {
+    if (slow && qualityOf(graphics) !== slow.from) slow = null
+  })
+  // The graphics card took the view away (out of memory): Low at once, said by a line, and the 2D map. These lines sit
+  // over the one of App.svelte when it has one (noted), not on it.
+  let lost = $state(false)
+  function onLost(): void {
+    setGraphics(QUALITIES.low)
+    slow = null
+    lost = true
+    if (threeD) back2d()
+  }
+  // The line goes once the player is back in 3D.
+  $effect(() => {
+    if (threeD) lost = false
+  })
+  function onFrame(drew: boolean): void {
+    if (drew) watchSpeed()
     if (counting) count()
     pins3d!.draw()
     // The names: off with their layer; clear of the buttons and of the arrow, where it is on this view.
@@ -1146,15 +1230,33 @@
   // The rooms inside the ground of the continent on show, for the 3D view (inside3d.ts; under.json, main/caves.ts).
   let inside3d: Inside3d | undefined
   let underRooms: Record<string, UnderRoom[]> | undefined
-  let underOf = -1
+  let underOf = '' // the continent, or the dungeon by its folder, whose rooms the 3D view has
   function inside3dSet(): void {
+    // A dungeon has its own, where it has a ground they lie under (main/dungeons.ts): the continent's would be drawn at
+    // their own place in its square. Asked for with its buildings, which the app makes the first time, so only once the
+    // dungeon is on the 3D view; open from any distance.
+    if (inside) {
+      const folder = dungeonFolder(inside.id), pieces = inside.pieces
+      if (!inside3d || !threeD || !graphics.dungeons || underOf === folder) return
+      if (underOf) inside3d.set([], [])
+      underOf = folder
+      void fetch(`${TILES}/${folder}/under.json`)
+        .then((answer) => (answer.status === 200 ? (answer.json() as Promise<{ rooms: UnderRoom[] }>).then((made) => made.rooms ?? []) : []))
+        .catch(() => [])
+        .then((under) => {
+          if (underOf === folder && under.length) inside3d!.set(pieces, under, true)
+        })
+      return
+    }
     const world = interiors?.maps.find((m) => m.kind === 'world' && m.id === continent)
-    if (!inside3d || !world || !underRooms || underOf === continent) return
-    underOf = continent
+    if (!inside3d || !world || !underRooms || underOf === String(continent)) return
+    underOf = String(continent)
     inside3d.set(world.pieces, underRooms[continent] ?? [])
   }
   $effect(() => {
     void continent
+    void inside
+    void graphics.dungeons
     untrack(inside3dSet)
   })
   async function view3d(on: boolean): Promise<void> {
@@ -1174,21 +1276,34 @@
           // Heading up: the view turns as the arrow does, so the arrow stays pointing up. Clockwise from north there,
           // anticlockwise for OrbitControls.
           terrain!.heading = turning && body.pointing !== null ? (-body.pointing * Math.PI) / 180 : null
+          // a city inside the ground is cut over the floor of the character followed in it
+          terrain!.arrow = body.at()
+          terrain!.character = following ? terrain!.arrow : null
+          // in a dungeon the floor the arrow stands on is looked for among the rooms of the level the minimap tells, and
+          // not under the ground while it shows the open; a pin with no height told lies on the floor of its room
+          terrain!.rooms = inside ? { pieces: inside.pieces, ...(pos?.inst?.id === inside.id ? { level: pos.inst.level, open: pos.inst.open } : {}) } : null
           return moved
         }
         pins3d ??= new Pins3d(map, terrain, pinsHost, terrainHost, arrow, () => turned, body, () => floorAt)
         names3d ??= new Names3d(terrain, pinsHost)
         inside3d ??= new (await import('./inside3d')).Inside3d(terrain)
+        terrain.showBuildings(graphics.buildings)
+        terrain.showProps(graphics.trees, graphics.density, graphics.objects)
+        terrain.showGround(graphics.ground)
+        terrain.showDaylight(graphics.daynight)
+        daylight = terrain.daylight
         inside3dSet()
         names3dSet()
         terrain.onFrame = onFrame
+        terrain.onLost = onLost
       }
       // The view looks the way the 2D map is turned; the 2D map under it lies north up meanwhile, as its pins are copied from it.
       const azimuth = (map.getBearing() * Math.PI) / 180
       threeD = true
       map.setBearing(0)
       for (const layer of shown) layer.remove()
-      terrain.show(folder!)
+      terrain.show(folder!, !!inside)
+      inside3dSet()
       lookAsTheMap(0, azimuth)
       if (seen) terrain.start()
       await terrain.turn(tilted, azimuth)
@@ -1214,16 +1329,46 @@
     names3d?.clear()
     spinSoon()
   }
-  // Inside a dungeon there is no ground to show: back to 2D.
+  // The buildings of the 3D view, as Settings > Graphics has them: at once.
   $effect(() => {
-    if (inside && untrack(() => threeD)) back2d()
+    const on = graphics.buildings
+    untrack(() => terrain?.showBuildings(on))
+  })
+  $effect(() => {
+    const { trees, density, objects } = graphics
+    untrack(() => terrain?.showProps(trees, density, objects))
+  })
+  $effect(() => {
+    const on = graphics.ground
+    untrack(() => terrain?.showGround(on))
+  })
+  $effect(() => {
+    const on = graphics.daynight
+    untrack(() => terrain?.showDaylight(on))
+  })
+  // The hour of the game's day, for the light of the 3D view: told each time the addon sends it.
+  $effect(() => {
+    const m = gameTime, at = gameTimeAt
+    if (m !== null && threeD) untrack(() => terrain?.daylight.tell(m, at ?? Date.now()))
+  })
+  // A dungeon the 3D view cannot show (one with a ground, or the option off): back to 2D. Else the view goes to it.
+  $effect(() => {
+    void inside
+    void graphics.dungeons
+    untrack(() => {
+      if (!threeD || !terrain) return
+      const folder = worldShown()
+      if (!folder) return back2d()
+      terrain.show(folder, !!inside)
+      inside3dSet()
+    })
   })
 
   onMount(() => {
     const made = L.map(holder, { scrollWheelZoom: 'center', doubleClickZoom: 'center', touchZoom: 'center', zoomControl: false, crs: L.CRS.Simple, minZoom: 1, maxZoom: 9, zoomSnap: 0.5, zoomDelta: 0.5, wheelPxPerZoomLevel: 90, attributionControl: false, zoomAnimation: !still(), fadeAnimation: !still(), rotate: true, rotateControl: false, shiftKeyRotate: false, pitchDrag: false, touchRotate: false })
     map = made
     // For the trials (design/map-2d-rotate): the 2D map within reach of a script, when the page is told so.
-    if (localStorage.getItem('trial')) (window as unknown as { map2d: unknown }).map2d = made
+    if (localStorage.getItem('trial')) Object.assign(window, { map2d: made, openDungeon })
     void compassReady().then(() => compassAt(made.getBearing()))
     made.on('rotate', layoutSoon) // the names, upright, are fitted again as the map turns under them
     made.setView([-128, 128], 2)
@@ -1263,7 +1408,7 @@
       if (!threeD || syncing || !terrain) return
       const folder = worldShown()
       if (!folder) return back2d()
-      terrain.show(folder)
+      terrain.show(folder, !!inside)
       // The 3D view keeps its own distance, unless the 2D map was zoomed (+ and -): it moved only to follow.
       const l = terrain.looking()
       lookAsTheMap(l.polar, l.azimuth, zoomed2d ? undefined : l.seen)
@@ -2027,7 +2172,7 @@
     } else if (e.key === 'l' || e.key === 'L') layersOpen = !layersOpen
     else if (e.key === 'f' || e.key === 'F') follow()
     else if (e.key === 'm' || e.key === 'M') setMapRight(!sides.mapRight)
-    else if (e.key === '3' && !inside) void view3d(!threeD)
+    else if (e.key === '3') switch3d()
     else if (e.key === 'n' || e.key === 'N') setHeadingUp(!turning)
     else if (e.target === holder && e.key.startsWith('Arrow')) following = false // moved by hand, like a drag
     else if (e.key === ' ' && e.target === holder && map) {
@@ -2073,7 +2218,9 @@
 
 <div class="map" class:under={threeD} bind:this={holder}></div>
 <div class="terrain" class:on={threeD} bind:this={terrainHost}><div class="map pins3d" bind:this={pinsHost}></div></div>
+{#if threeD && daylight && graphics.daynight && !inside}<DayRing {daylight} />{/if}
 {#if counting && threeD}<p class="fps">{t('map.fps', { fps })}</p>{/if}
+{#if askDungeons}<DungeonsAsk onclose={() => (askDungeons = false)} onsettings={() => onsettings?.('graphics')} />{/if}
 <button class="compass" class:on={!!compass} class:turning bind:this={compassHost} tabindex={compass ? 0 : -1} aria-hidden={!compass} title={turning ? t('map.corner.northUpTip') : t('map.corner.turnTip')} aria-label={t('map.corner.turn')} aria-pressed={turning} onclick={() => setHeadingUp(!turning)}></button>
 {#if labelled}
   {#key labelled.units}
@@ -2128,9 +2275,7 @@
       <button class="btn" aria-pressed={!inside && continent === which} onclick={() => choose(which)}>{NAMES[which]}</button>
     {/each}
     <button class="btn" aria-expanded={layersOpen} aria-controls="layers" title={t('map.layers.buttonTip')} onclick={() => (layersOpen = !layersOpen)}>{t('map.layers.button')}</button>
-    {#if !inside}
-      <button class="view" role="switch" aria-checked={threeD} aria-label={t('map.corner.view3d')} title={t('map.corner.view3dTip')} onclick={() => view3d(!threeD)}><i class="knob"></i><span class="two">2D</span><span class="three">3D</span></button>
-    {/if}
+    <button class="view" role="switch" aria-checked={threeD} aria-label={t('map.corner.view3d')} title={t('map.corner.view3dTip')} onclick={switch3d}><i class="knob"></i><span class="two">2D</span><span class="three">3D</span></button>
   </div>
   {#if layersOpen}
     <div class="menus" in:fly={drop()} out:fade={gone}>
@@ -2190,11 +2335,19 @@
     </div>
     </div>
   {/if}
-  {#if inside && levels > 0}
+  {#if inside && levels > 0 && !threeD}
     <div class="line" role="group" aria-label={t('map.corner.levelsShown')}>
       <span class="tag">{t('map.corner.levels')}</span>
       {#each Array.from({ length: levels + 1 }, (_, i) => i) as level (level)}
         <button class="btn" aria-pressed={upTo === level} title={level === levels ? t('map.corner.everyRoom') : t('map.corner.roomsUpTo', { level: level + 1 })} onclick={() => showUpTo(level)}>{level + 1}</button>
+      {/each}
+    </div>
+  {/if}
+  {#if inside && parts.length > 1}
+    <div class="line" role="group" aria-label={t('map.corner.parts')}>
+      <span class="tag">{t('map.corner.parts')}</span>
+      {#each parts as part, i (i)}
+        <button class="btn" aria-pressed={partShown === i} title={part.name ? gameName(part.name) : t('map.corner.partTip', { part: i + 1 })} onclick={() => showPart(i)}>{i + 1}</button>
       {/each}
     </div>
   {/if}
@@ -2213,6 +2366,15 @@
 </div>
 {#if offMap}
   <p class="map-note" in:fly={drop(8)} out:fade={gone}>{t('map.offMap')}</p>
+{:else if lost}
+  <p class="map-note with-button" style:margin-bottom={noted ? '48px' : null} in:fly={drop(8)} out:fade={gone}>{t('map.lostView')} <button class="btn" onclick={() => ((lost = false), onsettings?.('graphics'))}>{t('map.lostSettings')}</button></p>
+{:else if slow && threeD}
+  {@const step = (q: Quality | 'custom'): string => t(`settings.graphics.${q}`)}
+  <p class="map-note with-button" style:margin-bottom={noted ? '48px' : null} in:fly={drop(8)} out:fade={gone}>
+    {t('map.slowView', { fps: num(slow.fps) })}
+    <button class="btn" onclick={() => setGraphics(QUALITIES[slow!.to])}>{t('map.lowerTo', { quality: step(slow.to) })}</button>
+    <button class="btn" onclick={() => (localStorage.setItem('slowKept', JSON.stringify([...keptSlow(), slow!.from])), (slow = null))}>{t('map.keepQuality', { quality: step(slow.from) })}</button>
+  </p>
 {/if}
 
 <style>

@@ -72,6 +72,8 @@ export default {
     levelsShown: 'Показанные этажи',
     everyRoom: 'Все комнаты',
     roomsUpTo: 'Комнаты до этажа {level}',
+    parts: 'Части',
+    partTip: 'Часть {part}',
     route: 'Маршрут',
     routeTip: 'Обычный путь, боссы по порядку',
     routeRoughTip: 'Обычный путь, боссы по порядку: примерно, по гайдам',
@@ -81,9 +83,18 @@ export default {
     zoomOutTip: 'Отдалить (-)',
     follow: 'Следовать',
     followTip: 'Следовать за персонажем (F)',
+    dungeonsOff: '3D-подземелья выключены',
+    dungeonsOffText: 'Подземелья в 3D пока экспериментальные. Включите «3D-подземелье (экспериментально)» в параметрах, чтобы увидеть это подземелье в 3D.',
+    dungeonsOpen: 'Открыть параметры',
+    dungeonsLater: 'Не сейчас',
   },
 
   offMap: 'Этого места нет на карте.',
+  slowView: 'Здесь 3D-вид работает медленно ({fps} кадр/с).',
+  lowerTo: 'Снизить до «{quality}»',
+  keepQuality: 'Оставить «{quality}»',
+  lostView: 'Видеокарте не хватило памяти: выбрано качество «Низкое».',
+  lostSettings: 'Параметры',
   // "кадр/с" needs no plural agreement with the number; shown only in trials.
   fps: '{fps} кадр/с',
   nothingToSend: 'Нечего отправлять.',
@@ -200,5 +211,9 @@ export default {
     raid: 'Рейд',
     raidIn: 'Рейд, {zone}',
     foundIn: '{what}, {zone}',
+  },
+  daylight: {
+    ring: 'Время освещения',
+    ringTip: 'Перетащите, чтобы сдвинуть солнце. Щёлкните, чтобы вернуться к игровому времени.',
   },
 }

@@ -148,8 +148,11 @@ export function buriedBuildings(pieces: Piece[], groundAt: (u: number, v: number
   return [...floors].filter(([, f]) => f.under >= f.all / 2).map(([building]) => building).sort((a, b) => a - b)
 }
 
-/** A room inside the ground, for the 3D view: its place in the list of the continent's pieces, the height of its floor, the yards of ground over it. */
-export type UnderRoom = [index: number, floor: number, roof: number]
+/**
+ * A room inside the ground, for the 3D view: its place in the list of the continent's pieces, the height of its floor,
+ * the yards of ground over it, and for a dungeon 1 in a building dug in rock (inRock), whose ground is cut round it, 0 else.
+ */
+export type UnderRoom = [index: number, floor: number, roof: number, rock?: 0 | 1]
 
 // The places of a piece asked about: a grid over it, a point every few yards.
 function* over(p: Piece, step: number): Generator<[number, number]> {
@@ -198,6 +201,87 @@ export function roofOf(p: Piece, floor: number, groundAt: (u: number, v: number)
   return under >= all / 4 ? roof : null
 }
 
+/**
+ * Whether a level sheet of a dungeon is a lid over its rooms and not a place (M23-F28): a room of the 2D map lies
+ * wholly under it. The game leaves such sheets over a dungeon that is all rooms, to hide the sky from inside: seen
+ * from above they hide the dungeon. box: the square of the map the sheet takes; level: its height, in yards.
+ */
+export function lidOver(pieces: Piece[], [u1, v1, u2, v2]: Box, level: number): boolean {
+  for (const p of piecesIn(pieces, [u1, v1, u2, v2])) {
+    if (p.top > level) continue
+    for (const [u, v] of over(p, 4)) if (u >= u1 && u < u2 && v >= v1 && v < v2) return true
+  }
+  return false
+}
+
+/** Yards the ground over a building's rooms is, in the middle, over their ceilings, from which the building is dug in rock. */
+export const ROCK_DEEP = 50
+/** The share of the area of a dungeon's rooms that lies inside the ground (roofOf), at least, for it to be dug in rock. */
+export const ROCK_UNDER = 0.8
+/**
+ * Dungeons inRock takes that are not dug in rock, by the game's number of the map (M23-F32). Demon Fall Canyon (2784):
+ * its caves lie under the canyon floor and the wood with its road, which the cut would take away, and from above they
+ * already show through the ground opened over them. Nothing measured tells it from Karazhan Crypts, which is cut: its
+ * rooms are as far under the ground (94 and 93% of their area), its bosses have no pins, the ground over the rooms has
+ * as many objects and as little rise, holes into the caves, few rooms in the open. Only the ground over its caves is
+ * not the continent's (Kalimdor's lies 147 yards lower there, Deadwind Pass over the crypts is the same), which tells
+ * a ground laid for the dungeon but not whether one walks it. Measures in design/dungeons3d (rock.ts, same.ts).
+ */
+export const NOT_IN_ROCK: ReadonlySet<number> = new Set([2784])
+/** Yards a boss stands under the ground over it, at least, to be in the rock and not on the ground. */
+const UNDER_GROUND = 20
+/** The ground round a room in rock is cut this many yards over its floor, as a dungeon's buildings are round the character (buildings3d.ts, DUNGEON_CUT). */
+export const ROCK_CUT = 12
+/** And it rises from there a yard a yard away from the room: the cut is a funnel round the rooms. */
+export const ROCK_SLOPE = 1
+
+/**
+ * The buildings of a dungeon dug in rock (M23-F30; measured in design/dungeons3d/rock.ts): the ground over their rooms
+ * lies, in the middle of a point every 4 yards of their pieces, ROCK_DEEP yards or more over their ceilings. None in a
+ * dungeon with less than ROCK_UNDER of its rooms inside the ground: one with rooms in the open is a place one walks,
+ * and its caves under that ground stay covered (Zul'Gurub's temples, the city of Scarlet Enclave, the ruins of
+ * Ahn'Qiraj: 32 to 56%, against 93 to 100% in Deadmines, Blackwing Lair and Karazhan Crypts). None either in a
+ * dungeon whose bosses stand on the ground more than under it: there the ground is the place one walks, and a
+ * building as deep under it is a cellar (Zul'Farrak, Ruins of Lordaeron over Undercity). The depth alone does not tell
+ * (Undercity lies 127 yards under the ruins), nor the objects on the ground (the dead trees over the crypts of
+ * Karazhan, the bare sand of Zul'Farrak). bosses: u, v and the height where it is known (pin-heights.ts); one with none
+ * is under the ground where a room with its ceiling under it is.
+ */
+export function inRock(pieces: Piece[], groundAt: (u: number, v: number) => number | null, bosses: [u: number, v: number, z?: number][]): Set<number> {
+  let on = 0, under = 0
+  for (const [u, v, z] of bosses) {
+    const ground = groundAt(u, v)
+    if (ground === null) continue
+    const deep = z === undefined ? pieces.some((p) => p.top < ground - UNDER_GROUND && inPiece(p, u, v)) : ground - z > UNDER_GROUND
+    if (deep) under++
+    else on++
+  }
+  if (on > under) return new Set()
+  const area = (list: Piece[]): number => list.reduce((n, p) => n + p.width * p.height, 0)
+  if (area(pieces.filter((p) => roofOf(p, p.bottom, groundAt) !== null)) < ROCK_UNDER * area(pieces)) return new Set()
+  const depths = new Map<number, number[]>()
+  for (const p of pieces)
+    for (const [u, v] of over(p, 4)) {
+      const ground = groundAt(u, v)
+      if (ground !== null) (depths.get(p.building) ?? depths.set(p.building, []).get(p.building)!).push(ground - p.top)
+    }
+  return new Set([...depths].filter(([, d]) => d.sort((a, b) => a - b)[d.length >> 1]! >= ROCK_DEEP).map(([building]) => building))
+}
+
+/**
+ * Where the ground round the rooms in rock is cut: ROCK_CUT over the floor of each, rising ROCK_SLOPE a yard away from
+ * its piece; Infinity where no room is near enough to cut anything. rooms: the pieces in rock with their floors.
+ */
+export function rockCut(rooms: { piece: Piece; floor: number }[], u: number, v: number): number {
+  let cut = Infinity
+  for (const { piece: p, floor } of rooms) {
+    const cos = Math.cos(p.angle), sin = Math.sin(p.angle), du = u - p.u, dv = v - p.v
+    const away = Math.hypot(Math.max(0, Math.abs(du * cos - dv * sin) - p.width / 2), Math.max(0, Math.abs(du * sin + dv * cos) - p.height / 2))
+    cut = Math.min(cut, floor + ROCK_CUT + away * ROCK_SLOPE)
+  }
+  return cut
+}
+
 /** What holds every piece, or null for none. */
 export function boxOf(pieces: Piece[]): Box | null {
   if (!pieces.length) return null
@@ -209,6 +293,34 @@ export function boxOf(pieces: Piece[]): Box | null {
     box[3] = Math.max(box[3], p.v + reach(p))
   }
   return box
+}
+
+/** Yards at least between two groups of rooms of a map for them to be framed one at a time: Caverns of Time, Nightmare Grove and Scarlet Monastery lie kilometres apart. */
+export const PART_GAP = 1000
+
+/**
+ * The parts of a map that lie apart: the box of each group of its rooms PART_GAP or more from all the others, the one
+ * with the most rooms first. One box for a dungeon in one piece, none for a map with no rooms.
+ */
+export function partsOf(pieces: Piece[]): Box[] {
+  // ponytail: every pair, n² for the 519 pieces of the largest map; a grid of cells if a map ever has thousands
+  const boxes = pieces.map((p): Box => [p.u - reach(p), p.v - reach(p), p.u + reach(p), p.v + reach(p)])
+  const group = pieces.map((_, i) => i)
+  const top = (i: number): number => (group[i] === i ? i : (group[i] = top(group[i]!)))
+  for (let i = 0; i < boxes.length; i++)
+    for (let j = i + 1; j < boxes.length; j++) {
+      const a = boxes[i]!, b = boxes[j]!
+      if (a[0] - PART_GAP < b[2] && b[0] - PART_GAP < a[2] && a[1] - PART_GAP < b[3] && b[1] - PART_GAP < a[3]) group[top(i)] = top(j)
+    }
+  const parts = new Map<number, Piece[]>()
+  pieces.forEach((p, i) => parts.set(top(i), [...(parts.get(top(i)) ?? []), p]))
+  return [...parts.values()].sort((a, b) => b.length - a.length).map((part) => boxOf(part)!)
+}
+
+/** Which of the boxes a place is in, or the nearest by its middle. */
+export function partAt(boxes: Box[], { u, v }: Yards): number {
+  const far = ([u1, v1, u2, v2]: Box): number => (u >= u1 && u <= u2 && v >= v1 && v <= v2 ? -1 : Math.hypot(u - (u1 + u2) / 2, v - (v1 + v2) / 2))
+  return boxes.reduce((best, box, i) => (far(box) < far(boxes[best]!) ? i : best), 0)
 }
 
 /**
@@ -232,4 +344,19 @@ export function roomPixels(dxt: Uint8Array, width: number, height: number): Uint
     }
   }
   return rgba
+}
+
+/**
+ * Whether a room's picture is solid at a place of the map, from its DXT1 blocks as roomPixels reads them: the room is
+ * there, not the see-through rest of its square picture. False outside the picture.
+ */
+export function solidAt(p: Piece, dxt: Uint8Array, u: number, v: number): boolean {
+  const at = inPiece(p, u, v)
+  if (!at) return false
+  // the picture's pixels from its bytes, half a byte each, as the 2D map reads it
+  const width = Math.round(Math.sqrt((dxt.length * 2 * p.width) / p.height)), scale = width / p.width
+  const x = Math.floor(at[0] * scale), y = Math.floor(at[1] * scale), block = ((y >> 2) * (width >> 2) + (x >> 2)) * 8
+  if (block + 8 > dxt.length) return false
+  const view = new DataView(dxt.buffer, dxt.byteOffset + block, 8)
+  return view.getUint16(0, true) > view.getUint16(2, true) || ((view.getUint32(4, true) >>> (((y & 3) * 4 + (x & 3)) * 2)) & 3) !== 3
 }

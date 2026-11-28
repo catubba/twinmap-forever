@@ -72,6 +72,8 @@ export default {
     levelsShown: 'Angezeigte Etagen',
     everyRoom: 'Alle Räume',
     roomsUpTo: 'Räume bis Etage {level}',
+    parts: 'Teile',
+    partTip: 'Teil {part}',
     route: 'Route',
     routeTip: 'Der übliche Weg hindurch, die Bosse der Reihe nach',
     routeRoughTip: 'Der übliche Weg hindurch, die Bosse der Reihe nach: ungefähr, aus Guides',
@@ -81,9 +83,18 @@ export default {
     zoomOutTip: 'Verkleinern (-)',
     follow: 'Folgen',
     followTip: 'Eurem Charakter folgen (F)',
+    dungeonsOff: '3D-Dungeons sind aus',
+    dungeonsOffText: 'Dungeons in 3D sind experimentell. Schaltet „3D-Dungeon (experimentell)“ in den Optionen ein, um diesen in 3D zu sehen.',
+    dungeonsOpen: 'Optionen öffnen',
+    dungeonsLater: 'Nicht jetzt',
   },
 
   offMap: 'Dieser Ort ist nicht auf der Karte.',
+  slowView: 'Die 3D-Ansicht ist hier langsam ({fps} FPS).',
+  lowerTo: 'Auf {quality} senken',
+  keepQuality: '{quality} beibehalten',
+  lostView: 'Der Grafikkarte ist der Speicher ausgegangen: Qualität auf Niedrig gestellt.',
+  lostSettings: 'Optionen',
   fps: '{fps} FPS',
   nothingToSend: 'Es gibt nichts zu senden.',
 
@@ -198,5 +209,9 @@ export default {
     raid: 'Schlachtzug',
     raidIn: 'Schlachtzug, {zone}',
     foundIn: '{what}, {zone}',
+  },
+  daylight: {
+    ring: 'Uhrzeit des Lichts',
+    ringTip: 'Ziehen, um die Sonne zu verschieben. Klicken, um zur Spielzeit zurückzukehren.',
   },
 }

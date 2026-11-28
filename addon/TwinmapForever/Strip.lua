@@ -245,6 +245,13 @@ end
 local SECTIONS = {
   { name = "pos", period = 0.25, build = BuildPos, combat = true, refresh = 10, first = true },
   { name = "char", period = 2, build = BuildChar },
+  -- The hour of the game's day, in minutes since midnight: the light of the app's 3D view follows it, and counts the
+  -- minutes between two sendings itself.
+  { name = "time", period = 15, build = function()
+    local h, m = Try(GetGameTime)
+    h, m = Num(h), Num(m)
+    if h and m then return { m = h * 60 + m } end
+  end },
 }
 ns.sections = SECTIONS -- other files add their own
 

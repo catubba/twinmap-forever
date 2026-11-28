@@ -11,10 +11,18 @@
 import * as THREE from 'three'
 import type { Compass } from './compass'
 import { MapControls } from 'three/examples/jsm/controls/MapControls.js'
+import { pinOn, standsOn, type Floors } from '../../shared/floors'
+import { solidAt, type Piece } from '../../shared/inside'
 import { BLOCK_ZOOM, HOLE, unpackLevels, type Levels } from '../../shared/levels'
 import { pictureOfBlock } from '../../shared/pixels'
+import { STANDS_FILE, type Stands } from '../../shared/stands'
 import { DRY, TAR } from '../../shared/water'
-import { BLOCK_YARDS } from '../../shared/world'
+import { BLOCKS, BLOCK_YARDS, WORLDS } from '../../shared/world'
+import { Buildings, DUNGEON_CUT } from './buildings3d'
+import { Daylight } from './daylight3d'
+import { Ground } from './ground3d'
+import { Props } from './props3d'
+import type { Density } from '../../shared/props'
 import { ROOF_STEP } from './inside3d'
 import { inApp, TILES } from './web'
 
@@ -36,6 +44,11 @@ const SHARPNESS = 1.5
 const KEPT = inApp ? 200 : 60 // a phone on the home network has less room on its graphics card
 const LOADING = 6
 const SKY = 0x7f97ab
+/** Yards between the floor the character stood on and the one under it now from which it is another floor, not the same one rising or falling, and the milliseconds it must last to be taken. */
+const FLOOR_STEP = 4
+const FLOOR_SETTLE = 500
+/** Round a dungeon with no ground of its own: the dark of the window (--stone-950). */
+const VOID = 0x0c0a08
 /** The dark of a hole in the ground: chosen by the user on 18 November 2026 over leaving it open to the sky. */
 const PIT = 0x14110d
 /** The open sea, where the world has no blocks: as the ocean looks over its bed. */
@@ -59,15 +72,25 @@ const OFF = 60
 const ROOF_KEPT = 0.05
 /** Yards past a room's roof, along the look, that the ground still opens for it. */
 const ROOF_MARGIN = 60
+/** Milliseconds the ground of a dungeon stays cut after it last hid the character in it from the camera. */
+const ROOF_HELD = 1500
+/** Places looked at between the camera and the character for ground that hides it. */
+const ROOF_LOOKS = 24
 /** How much of a room shows through a mountain that is not its roof. */
 const ROOF_GHOST = 0.1
+/** The height of the cut where the ground is not cut: over everything. */
+const UNCUT = 1e6
 
 /** What lies inside the ground (inside3d.ts), as the view asks it. */
 export interface Under {
   roofOver(x0: number, z0: number, x1: number, z1: number): ((x: number, z: number) => number) | null
   floorAt(x: number, z: number): { y: number; open: number } | null
+  /** How high the ground is cut at round the rooms of a dungeon dug in rock; Infinity where it is not (M23-F30). */
+  cutAt(x: number, z: number): number
   step(camera: THREE.Vector3, dt: number): boolean
   seenPass(on: boolean): void
+  /** Whether its pictures are left out of the view, the buildings being drawn whole (buildings3d.ts): they still open the ground. */
+  hidePictures(on: boolean): void
   readonly any: boolean
 }
 
@@ -157,10 +180,19 @@ export class Terrain {
   private frame = 0
   private dirty = true
   private folder = ''
+  /** A dungeon is on show, with a ground of its own or all buildings: no sea where it has no ground, and what stands in it stands on its buildings' floors, or on its ground. */
+  bare = false
+  /** In a dungeon: the pictures of its rooms, and of the character in it the level it is on and whether it is in the open, as the minimap tells them (Map.svelte): they tell the floor it stands on (shared/floors.ts). */
+  rooms: { pieces: Piece[]; level?: number; open?: boolean } | null = null
+  private solids = new Map<number, Uint8Array | null | undefined>() // the pictures of the rooms asked about, by file: undefined while one is read
+  private stood: number | null = null // the height the character last stood at in the dungeon on show
+  private other: { y: number; since: number } | null = null // another floor under it, and since when
   private turning: ((now: number) => void) | null = null
   private materials: {
     ground: THREE.MeshLambertMaterial
     pit: THREE.MeshBasicMaterial
+    // the same dark where the ground over a room opens: a building's floor that the cut of a city inside the ground (buildings3d.ts) shows
+    openPit: THREE.MeshLambertMaterial
     liquids: THREE.Material[]
   }
   private observer: ResizeObserver
@@ -171,6 +203,26 @@ export class Terrain {
   private below = new THREE.Scene()
   private sunk = new THREE.Group()
   private inside: Under | null = null
+  // The buildings of the continent (buildings3d.ts), in the scene with the ground.
+  private buildings: Buildings
+  // The trees and objects (props3d.ts), the same way.
+  private props: Props
+  /** The ground's own textures near the camera (ground3d.ts). */
+  private ground: Ground
+  /** The light by the hour of the game's day (M23-F10). */
+  readonly daylight: Daylight
+  // Where things stand over the game's ground, while the buildings are on show (shared/stands.ts): of each block that
+  // has any (its column times BLOCKS plus its row), the height of each of its cells, NaN where it is the ground.
+  private stands: { cells: number; blocks: Map<number, Float32Array> } | null = null
+  private standsAsked = -Infinity // in seconds
+  private streets = true
+  // With the character under a roof in a dungeon, the ground that hides it from the camera is cut away DUNGEON_CUT
+  // yards over its floor, with its water and all that stands on it, as the dungeon's own buildings are (buildings3d.ts;
+  // M23-F28): the rock Deadmines is dug in rises 300 yards over the mine and all round its bay, and the camera that
+  // follows the character is inside it. In the open, and where no ground hides it, the plane is far over everything.
+  // Held a moment after the ground last hid it: as the view turns past a gap it would come back for a frame.
+  private readonly over = new THREE.Plane(new THREE.Vector3(0, -1, 0), 1e6)
+  private roofedAt = -Infinity
   private seen = new THREE.WebGLRenderTarget(2, 2, { depthTexture: new THREE.DepthTexture(2, 2) })
   private seenClear = false // not yet: a picture never drawn on reads as solid
   private roofs = {
@@ -206,21 +258,27 @@ export class Terrain {
     // On a phone two points of the view a point of the page are enough: three are nine times the work of one.
     this.renderer.setPixelRatio(inApp ? devicePixelRatio : Math.min(devicePixelRatio, 2))
     host.append(this.renderer.domElement)
+    this.renderer.domElement.addEventListener('webglcontextlost', () => this.onLost())
+    // Given back: what the card held is gone, and the tiles kept no copy of it (onUpload in load): read again. Buildings,
+    // trees, objects and the ground's textures are off by then (Low, Map.svelte), and read again when turned on.
+    this.renderer.domElement.addEventListener('webglcontextrestored', () => (this.drop(), (this.dirty = true)))
     this.s3tc = this.renderer.extensions.has('WEBGL_compressed_texture_s3tc')
     this.scene.fog = new THREE.Fog(SKY, 1, 2)
     this.renderer.autoClear = false // a frame is the inside, then the ground over it (draw)
     this.below.add(this.sunk)
-    // Half of the light from all round, half from a sun fixed to the north-west, 45 degrees up: level ground as bright as the minimap.
-    const sun = new THREE.DirectionalLight(0xffffff, (Math.PI * 0.5) / Math.sin(Math.PI / 4))
+    // Half of the light from all round, half from a sun to the north-west, 45 degrees up: level ground as bright as the
+    // minimap. That is noon: the hours of the game's day change it from there (daylight3d.ts).
+    const sun = new THREE.DirectionalLight(0xffffff, (Math.PI * 0.5) / Math.sin(Math.PI / 4)), ambient = new THREE.AmbientLight(0xffffff, Math.PI * 0.5)
     sun.position.set(-Math.SQRT1_2, 1, -Math.SQRT1_2)
-    this.scene.add(new THREE.AmbientLight(0xffffff, Math.PI * 0.5), sun)
+    this.scene.add(ambient, sun)
     this.materials = {
-      ground: new THREE.MeshLambertMaterial({ side: THREE.DoubleSide }),
-      pit: new THREE.MeshBasicMaterial({ color: PIT }),
+      ground: new THREE.MeshLambertMaterial({ side: THREE.DoubleSide, clippingPlanes: [this.over] }),
+      pit: new THREE.MeshBasicMaterial({ color: PIT, clippingPlanes: [this.over] }),
+      openPit: Object.assign(new THREE.MeshLambertMaterial({ color: 0x000000, emissive: PIT, transparent: true, clippingPlanes: [this.over] }), { onBeforeCompile: (shader: THREE.WebGLProgramParametersWithUniforms) => this.opening(shader) }),
       // Water, lava, fel, tar: in the order water.ts numbers them, from 1; then the open sea.
       liquids: [
         // Its colour a vertex, by how deep it is (meshes). The sun shines on shallow water only: deep water is the open sea, which has no shine.
-        Object.assign(new THREE.MeshPhongMaterial({ vertexColors: true, specular: 0x8899aa, shininess: 60, transparent: true, depthWrite: false }), {
+        Object.assign(new THREE.MeshPhongMaterial({ vertexColors: true, specular: 0x8899aa, shininess: 60, transparent: true, depthWrite: false, clippingPlanes: [this.over] }), {
           onBeforeCompile: (shader: { fragmentShader: string }) => {
             shader.fragmentShader = shader.fragmentShader.replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
 reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
@@ -231,18 +289,21 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
           transparent: true,
           opacity: 0.9,
           depthWrite: false,
+          clippingPlanes: [this.over],
         }),
         new THREE.MeshBasicMaterial({
           color: 0x59c832,
           transparent: true,
           opacity: 0.8,
           depthWrite: false,
+          clippingPlanes: [this.over],
         }),
         new THREE.MeshLambertMaterial({
           color: 0x15110e,
           transparent: true,
           opacity: 0.9,
           depthWrite: false,
+          clippingPlanes: [this.over],
         }),
         new THREE.MeshBasicMaterial({ color: SEA }),
       ],
@@ -257,6 +318,12 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
     ] as const) {
       this.scene.add(new THREE.Mesh(new THREE.PlaneGeometry(w, d).rotateX(-Math.PI / 2).translate(x + w / 2, 0, z + d / 2), this.materials.liquids[4]))
     }
+    this.daylight = new Daylight(ambient, sun, this.scene.fog as THREE.Fog, this.materials.liquids[4] as THREE.MeshBasicMaterial, SKY)
+    this.buildings = new Buildings(this.renderer, this.over)
+    this.scene.add(this.buildings.group)
+    this.props = new Props(this.renderer, (x, z) => this.buildings.cutAt(x, z), this.over)
+    this.scene.add(this.props.group)
+    this.ground = new Ground(this.renderer, this.s3tc)
     this.controls = new MapControls(this.camera, this.renderer.domElement)
     this.controls.enableDamping = true
     this.controls.zoomToCursor = true
@@ -309,11 +376,83 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
     this.resize()
   }
 
-  /** The continent shown, by its folder; the tiles of another one go. */
-  show(folder: string): void {
+  /** The continent shown, by its folder, or a dungeon (bare: no sea; its ground, where it has one, is drawn as a continent's); the tiles of another one go. */
+  show(folder: string, bare = false): void {
     if (folder === this.folder) return
     this.drop()
     this.folder = folder
+    this.bare = bare
+    this.stood = null
+    this.other = null
+    ;(this.scene.fog as THREE.Fog).color.set(bare ? VOID : SKY)
+    this.daylight.again()
+    this.buildings.show(folder, bare)
+    this.props.show(folder)
+    this.ground.show(folder)
+    this.stands = null
+    this.standsAsked = -Infinity
+    this.dirty = true
+  }
+
+  // Where things stand over the ground of the continent, asked for until it is there: the app makes it after the buildings.
+  private askStands(): void {
+    const now = performance.now() / 1000
+    if (this.stands || !this.folder || now - this.standsAsked < 30) return
+    this.standsAsked = now
+    const folder = this.folder
+    void fetch(`${TILES}/${folder}/${STANDS_FILE}`)
+      .then((a) => (a.status === 200 ? (a.json() as Promise<Stands>) : null))
+      .catch(() => null)
+      .then((s) => {
+        if (!s || folder !== this.folder) return
+        const blocks = new Map<number, Float32Array>()
+        for (const [key, list] of Object.entries(s.blocks)) {
+          const [c, r] = key.split('-').map(Number) as [number, number], cells = new Float32Array(s.cells * s.cells).fill(NaN)
+          for (let k = 0; k < list.length; k += 2) cells[list[k]!] = list[k + 1]! / 4
+          blocks.set(c * BLOCKS + r, cells)
+        }
+        this.stands = { cells: s.cells, blocks }
+        this.dirty = true
+      })
+  }
+
+  /**
+   * The height of where one walks at a place when that is not the game's ground (the streets of a city, which are its
+   * building's), while the buildings are on show; null where things stand on the ground.
+   */
+  streetAt(x: number, z: number): number | null {
+    const s = this.streets ? this.stands : null,
+      c = Math.floor(x / BLOCK_YARDS),
+      r = Math.floor(z / BLOCK_YARDS),
+      cells = s?.blocks.get(c * BLOCKS + r)
+    if (!cells) return null
+    const size = BLOCK_YARDS / s!.cells,
+      high = cells[Math.floor((z - r * BLOCK_YARDS) / size) * s!.cells + Math.floor((x - c * BLOCK_YARDS) / size)]!
+    return Number.isNaN(high) ? null : high
+  }
+
+  /** Whether the buildings are drawn (Settings > Graphics). */
+  showBuildings(on: boolean): void {
+    this.buildings.turn(on)
+    this.streets = on
+    this.dirty = true
+  }
+
+  /** Which trees and objects are drawn (Settings > Graphics). */
+  showProps(trees: boolean, density: Density, objects: boolean): void {
+    this.props.turn(trees, density, objects)
+    this.dirty = true
+  }
+
+  /** Whether the ground has its own textures up close (Settings > Graphics). */
+  showGround(on: boolean): void {
+    this.ground.turn(on)
+    this.dirty = true
+  }
+
+  /** Whether the light follows the hour of the game's day (Settings > Graphics); off, the light of noon. */
+  showDaylight(on: boolean): void {
+    this.daylight.on = on
     this.dirty = true
   }
 
@@ -356,11 +495,87 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
     return !!floor && Number.isFinite(ground) && Math.abs(high - ground) < Math.abs(high - floor.y)
   }
 
-  // Where what lies on the ground at a place is put: on the ground, or on the floor of the room under it as it opens.
+  /**
+   * The height the character stands at in the dungeon on show, at a place: the floor under it nearest to the one it
+   * stood on when last asked. undefined before the dungeon's building is in, or while a room's picture is read.
+   */
+  floorIn(x: number, z: number): number | undefined {
+    const floors = this.bare ? this.floors() : null
+    if (!floors) return undefined
+    const on = standsOn(floors, this.rooms?.pieces ?? [], x, z, this.rooms?.level, this.stood, this.solid, this.rooms?.open)
+    if (on === undefined) return undefined
+    // Another floor than the one it stood on is taken once it has been the one for a while: the arrow glides between
+    // two places read (glide.ts) over whatever lies between them, a pit as well, and would be left at its bottom.
+    if (on !== null && this.stood !== null && Math.abs(on - this.stood) > FLOOR_STEP) {
+      const now = performance.now()
+      if (!this.other || Math.abs(this.other.y - on) > FLOOR_STEP) this.other = { y: on, since: now }
+      if (now - this.other.since < FLOOR_SETTLE) return this.stood
+    }
+    this.other = null
+    // no floor near: where it stood, or the dungeon's main floor
+    if (on !== null) this.stood = on
+    return on ?? this.stood ?? this.buildings.dungeonFloor ?? undefined
+  }
+
+  // Whether a room's picture is solid at a place: undefined while it is read, which draws the view again once it is in.
+  private solid = (p: Piece, u: number, v: number): boolean | undefined => {
+    if (!this.solids.has(p.file)) {
+      this.solids.set(p.file, undefined)
+      void inflated(`${TILES}/rooms/${p.file}.dxt`).then((dxt) => (this.solids.set(p.file, dxt), (this.dirty = true)))
+    }
+    const dxt = this.solids.get(p.file)
+    return dxt === undefined ? undefined : !!dxt && solidAt(p, dxt, u, v)
+  }
+
+  /**
+   * The height a pin of the dungeon on show lies at: on its own floor, not the character's (shared/floors.ts, pinOn).
+   * high: how high what it marks stands, where that is told. undefined out of a dungeon, before its building is in, or
+   * while the picture of its room is read.
+   */
+  pinAt(x: number, z: number, high?: number): number | undefined {
+    const floors = this.bare ? this.floors() : null
+    if (!floors) return undefined
+    const on = pinOn(floors, this.rooms?.pieces ?? [], x, z, high, this.solid)
+    // no floor there at all: the dungeon's main floor
+    return on === null ? (this.buildings.dungeonFloor ?? 0) : on
+  }
+
+  // Every height one stands at in the dungeon on show: the floors of its buildings drawn open and, where it has one,
+  // its ground. null while its buildings are being read, or before its ground has answered (its coarsest tiles are
+  // in, or there are none): a floor is not chosen among half of them.
+  private none = new Float32Array(0)
+  private noCells = new Map<number, number[]>()
+  private floors(): Floors | null {
+    for (let k = 0; k < 4 ** ROOT; k++) {
+      const state = this.nodes.get(keyOf(ROOT, k % 2 ** ROOT, k >> ROOT))?.state
+      if (state !== 'ready' && state !== 'empty') return null
+    }
+    if (this.buildings.floorsAt(0, 0) === null) return null
+    return {
+      triangles: this.none,
+      cells: this.noCells,
+      also: (x, z) => this.buildings.floorsAt(x, z)!,
+      ground: (x, z) => {
+        const ground = this.groundAt(x, z)
+        return Number.isFinite(ground) ? ground : null
+      },
+    }
+  }
+
+  /** Whether a height of the dungeon is on another floor than the character in it: cut away over it, or as far under it. */
+  offFloor(y: number): boolean {
+    return this.bare && !!this.arrow && Math.abs(y - this.arrow.y) > DUNGEON_CUT
+  }
+
+  // Where what lies on the ground at a place is put: on the ground, on the floor of the room under it as it opens, or
+  // on the street over it where the ground of the game is not where one walks.
   private standAt(x: number, z: number): number {
     const ground = this.groundAt(x, z),
       floor = this.inside?.floorAt(x, z)
-    return floor && Number.isFinite(ground) ? ground + (floor.y - ground) * floor.open : ground
+    // in a dungeon the floor the character stands on everywhere: the view is held at that height. With no character in it, its ground, or its main floor where it has none. Its pins lie each on its own floor (pinAt).
+    if (this.bare && this.arrow) return this.arrow.y
+    if (!Number.isFinite(ground)) return this.bare ? (this.buildings.dungeonFloor ?? ground) : ground
+    return floor ? ground + (floor.y - ground) * floor.open : (this.streetAt(x, z) ?? ground)
   }
 
   /** The tiles of the ground are made again: what they must know of the inside has changed. */
@@ -369,8 +584,14 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
     this.dirty = true
   }
 
-  /** Called at every frame while the view runs, once it is drawn: what lies over it follows. */
-  onFrame: () => void = () => {}
+  /** Called at every frame while the view runs, once it is drawn: what lies over it follows. drew: whether this frame drew the view, which it does while it moves. */
+  onFrame: (drew: boolean) => void = () => {}
+  /** Called when the graphics card takes the view's context away (its memory ran out, the card was reset). */
+  onLost: () => void = () => {}
+  /** Where the character stands while it is followed, in yards: a city inside the ground is cut over its floor (buildings3d.ts). */
+  character: THREE.Vector3 | null = null
+  /** Where the character's arrow stands, followed or not: no leaves round it (props3d.ts). */
+  arrow: THREE.Vector3 | null = null
   /** The azimuth the view keeps to by itself (the arrow's, heading up); null: left to the hand. */
   heading: number | null = null
 
@@ -380,7 +601,8 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
    * fog; and how far it is from the camera, in distances of the point looked at. lift: yards over
    * the ground, for what is written above its point (names3d.ts); above: over the ground also where a
    * room under it is open, as the name of a city in a mountain is. high: a height of its own, in
-   * yards, whatever the ground there (a flight's arc, pins3d.ts).
+   * yards, whatever the ground there (a flight's arc, pins3d.ts; a pin of a dungeon on its floor: under
+   * the ground, which is open over the rooms, it is seen through the opening, not hidden by it).
    */
   spot(x: number, z: number, lift = 0, above = false, high?: number): { x: number; y: number; shows: number; away: number } {
     const fog = this.scene.fog as THREE.Fog,
@@ -395,7 +617,9 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
     if (on.z > 1 || far >= fog.far) return { ...at, shows: 0, away }
     const clear = Math.min(1, (fog.far - far) / (fog.far - fog.near)),
       off = at.x < -OFF || at.y < -OFF || at.x > this.width + OFF || at.y > this.height + OFF // off the view: no hill looked for
-    return { ...at, shows: off || inRoom || !this.behindHill(p) ? clear : clear * HIDDEN, away }
+    // a pin of the dungeon on its floor in a room under the ground: the ground is open over the rooms and does not hide it
+    const sunk = high !== undefined && this.bare && !off && this.groundAt(x, z) > high + 2
+    return { ...at, shows: off || inRoom || sunk || !this.behindHill(p) ? clear : clear * HIDDEN, away }
   }
 
   /** The height spot() puts a point of the ground at, in yards (0 where there is no ground). */
@@ -414,7 +638,7 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
       step = Math.max(1, reach / 2000)
     const over = (t: number): number => {
       const g = this.groundAt(o.x + d.x * t, o.z + d.z * t)
-      return o.y + d.y * t - (Number.isFinite(g) ? g : 0)
+      return o.y + d.y * t - (Number.isFinite(g) ? (this.streetAt(o.x + d.x * t, o.z + d.z * t) ?? g) : 0)
     }
     // Along the ray in steps until it is under the ground, then halved down to where it meets it.
     for (let t = step; t <= reach; t += step) {
@@ -465,9 +689,20 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
     return behind
   }
 
+  // Whether ground the cut would take away stands between the camera and the character: higher than the cut, and
+  // over the line from the one to the other, the camera's own place first.
+  private roofed(a: THREE.Vector3): boolean {
+    const c = this.camera.position
+    for (let i = 0; i < ROOF_LOOKS; i++) {
+      const t = i / ROOF_LOOKS, ground = this.groundAt(c.x + (a.x - c.x) * t, c.z + (a.z - c.z) * t)
+      if (ground > a.y + DUNGEON_CUT && ground > c.y + (a.y - c.y) * t) return true
+    }
+    return false
+  }
+
   /** Puts the camera there at once. */
   look(at: Look): void {
-    const ground = this.groundAt(at.x, at.z)
+    const ground = this.standAt(at.x, at.z) // where the point looked at is held (hold): a street, the floor of an open room
     this.controls.target.set(at.x, Number.isFinite(ground) ? ground : this.controls.target.y, at.z)
     this.place(at.seen / 2 / Math.tan((FOV * Math.PI) / 360), at.polar, at.azimuth)
     this.dirty = true
@@ -536,6 +771,9 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
     this.stop()
     this.observer.disconnect()
     this.drop()
+    this.buildings.turn(false)
+    this.props.turn(false, 'some', false)
+    this.ground.dispose()
     this.controls.dispose()
     this.seen.dispose()
     this.renderer.dispose()
@@ -632,6 +870,22 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
     // After the arrow is turned for this frame, so the view turns with it in the same frame, not one behind.
     if (this.heading !== null && !this.turning) this.steer()
     if (this.inside?.step(this.camera.position, Math.min(0.1, FRAME_MS / 1000 + 0.004))) this.dirty = true
+    // a dungeon is cut over the character in it, followed or not: the view moved by hand stays on its floor
+    if (this.buildings.step(this.camera.position, this.controls.target, this.farthest(fog.far), this.height / 2 / Math.tan((FOV * Math.PI) / 360), this.bare ? this.arrow : this.character)) this.dirty = true
+    if (this.props.step(this.controls.target, distance, this.arrow)) this.dirty = true
+    // a dungeon keeps the light of today: the light of the day is the sky's
+    if (this.daylight.step(this.controls.target, this.bare ? null : (WORLDS.find((w) => w.name === this.folder)?.continent ?? null))) this.dirty = true
+    // the ground over the character under a roof, cut as the dungeon is
+    if (this.bare && this.arrow && !this.rooms?.open && this.roofed(this.arrow)) this.roofedAt = now
+    const over = this.bare && this.arrow && now - this.roofedAt < ROOF_HELD ? this.arrow.y + DUNGEON_CUT : 1e6
+    if (over !== this.over.constant) {
+      this.over.constant = over
+      this.dirty = true
+    }
+    if (this.ground.step(this.camera.position, this.controls.target.y)) this.dirty = true
+    this.askStands()
+    this.inside?.hidePictures(this.buildings.under)
+    const drew = this.dirty
     if (this.dirty) {
       this.dirty = false
       this.choose()
@@ -640,7 +894,24 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
       this.compass.render()
       this.evict()
     }
-    this.onFrame()
+    this.onFrame(drew)
+  }
+
+  // Yards from the point looked at to the farthest ground on the view: where the looks through its four corners meet
+  // the ground, taken as level as that point, or the fog; a fifth more for the hills. The same whichever way the view is turned.
+  private farthest(fog: number): number {
+    const c = this.camera.position,
+      t = this.controls.target,
+      ahead = this.camera.getWorldDirection(new THREE.Vector3()),
+      ray = new THREE.Vector3()
+    this.camera.updateMatrixWorld()
+    let reach = 0
+    for (const [x, y] of [[-1, 1], [1, 1], [-1, -1], [1, -1]] as const) {
+      ray.set(x, y, 0.5).unproject(this.camera).sub(c).normalize()
+      const far = Math.min(ray.y < -1e-3 ? (t.y - c.y) / ray.y : Infinity, fog / ray.dot(ahead))
+      reach = Math.max(reach, Math.hypot(c.x + ray.x * far - t.x, c.z + ray.z * far - t.z))
+    }
+    return reach * 1.2
   }
 
   private draw(): void {
@@ -667,7 +938,7 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
       r.setRenderTarget(null)
       this.seenClear = true
     }
-    r.setClearColor(SKY, 1)
+    r.setClearColor(this.bare ? VOID : this.daylight.sky, 1)
     r.clear()
     if (!this.seenClear) r.render(this.below, this.camera)
     r.render(this.scene, this.camera)
@@ -712,7 +983,8 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
       b = fz - i,
       h = found.grid.heights
     const v = (h[i * N + j]! * (1 - a) + h[i * N + j + 1]! * a) * (1 - b) + (h[(i + 1) * N + j]! * (1 - a) + h[(i + 1) * N + j + 1]! * a) * b
-    return v
+    // round the rooms of a dungeon dug in rock the ground is cut (inside3d.ts, cutAt): what is left there is the cut
+    return this.inside ? Math.min(v, this.inside.cutAt(x, z)) : v
   }
 
   // The finest node that is in, at each place, as one array: groundAt is asked thousands of times a
@@ -948,8 +1220,15 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
       for (let k = 0; k < N * N; k++) roof[k] = roofed(pos[k * 3]!, pos[k * 3 + 2]!)
       ring.forEach((v, r) => (roof[N * N + r] = roof[v]!))
       ground.setAttribute('roofed', new THREE.BufferAttribute(roof, 1))
+      // and how high it is cut, round the rooms of a dungeon dug in rock (M23-F30): every ground that can open is told,
+      // for its program reads it (one not told would be cut at 0)
+      const cut = new Float32Array(count)
+      for (let k = 0; k < N * N; k++) cut[k] = Math.min(UNCUT, this.inside!.cutAt(pos[k * 3]!, pos[k * 3 + 2]!))
+      ring.forEach((v, r) => (cut[N * N + r] = cut[v]! - skirt)) // the skirt goes with the ground over it
+      ground.setAttribute('cut', new THREE.BufferAttribute(cut, 1))
     }
-    const material = texture ? this.groundWith(texture, !!roofed) : this.materials.ground
+    // At a block and below the picture is the block's own, and so are the ground's textures.
+    const material = texture ? this.groundWith(texture, !!roofed, n.z >= BLOCK_ZOOM ? `${n.x >> (n.z - BLOCK_ZOOM)} ${n.y >> (n.z - BLOCK_ZOOM)}` : null) : this.materials.ground
     const group = new THREE.Group(),
       land = new THREE.Mesh(ground, material)
     if (roofed) land.renderOrder = -1 // see-through, yet before everything else that is: the ground is under it all
@@ -958,10 +1237,20 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
       const dark = new THREE.BufferGeometry()
       dark.setAttribute('position', ground.getAttribute('position'))
       dark.setIndex(pit)
-      group.add(new THREE.Mesh(dark, this.materials.pit))
+      const hole = new THREE.Mesh<THREE.BufferGeometry, THREE.Material>(dark, this.materials.pit)
+      if (roofed) {
+        dark.setAttribute('roofed', ground.getAttribute('roofed'))
+        dark.setAttribute('cut', ground.getAttribute('cut'))
+        hole.material = this.materials.openPit
+        hole.renderOrder = -1
+      }
+      group.add(hole)
     }
 
-    // Liquids: a square a liquid, at the levels of its corners, grouped by kind.
+    // Liquids: a square a liquid, at the levels of its corners, grouped by kind. In a dungeon, none over a room under
+    // the ground: the ground opens over it, and the water left there would hide it (the sea over Deadmines).
+    // Nor over the ground cut round a room in rock: it would be left in the air.
+    const drained = this.bare && roofed ? (a: number): boolean => [a, a + 1, a + N, a + N + 1].some((c) => roofed(pos[c * 3]!, pos[c * 3 + 2]!) >= 1 || g.water[c]! > this.inside!.cutAt(pos[c * 3]!, pos[c * 3 + 2]!)) : null
     const lpos = new Float32Array(N * N * 3),
       byKind: number[][] = [[], [], [], [], []],
       wet = new Uint8Array(N * N) // the points of the squares of water
@@ -970,14 +1259,15 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
       for (let j = 0; j < N - 1; j++) {
         const kind = g.kinds[i * (N - 1) + j]! & ~HOLE,
           a = i * N + j
-        // A square with no ground: open sea, at 0.
+        // A square with no ground: open sea, at 0. Not in a dungeon, which ends where its ground does.
         if (!ok(i, j) || !ok(i, j + 1) || !ok(i + 1, j) || !ok(i + 1, j + 1)) {
+          if (this.bare) continue
           for (const c of [a, a + 1, a + N, a + N + 1]) lpos[c * 3 + 1] = 0
           ;((low = Math.min(low, 0)), (high = Math.max(high, 0)))
           byKind[4]!.push(a, a + N, a + 1, a + 1, a + N, a + N + 1)
           continue
         }
-        if (kind === DRY || kind > TAR) continue
+        if (kind === DRY || kind > TAR || drained?.(a)) continue
         const corners = [a, a + 1, a + N, a + N + 1].map((c) => g.water[c]!)
         if (!corners.every(Number.isFinite)) continue
         high = Math.max(high, ...corners)
@@ -992,7 +1282,7 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
       for (let j = 0; j < N - 1; j++) {
         const a = i * N + j,
           corners = [a, a + 1, a + N, a + N + 1]
-        if ((g.kinds[i * (N - 1) + j]! & ~HOLE) !== DRY || !corners.every((c) => Number.isFinite(h[c]!))) continue
+        if ((g.kinds[i * (N - 1) + j]! & ~HOLE) !== DRY || !corners.every((c) => Number.isFinite(h[c]!)) || drained?.(a)) continue
         const level = Math.max(...corners.map((c) => (wet[c] ? lpos[c * 3 + 1]! : -Infinity)))
         if (corners.some((c) => h[c]! < level)) shore.push(a, level)
       }
@@ -1047,18 +1337,27 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
     const size = WORLD / 2 ** n.z,
       geo = new THREE.PlaneGeometry(size, size).rotateX(-Math.PI / 2).translate((n.x + 0.5) * size, 0, (n.y + 0.5) * size)
     n.box = new THREE.Box3(new THREE.Vector3(n.x * size, 0, n.y * size), new THREE.Vector3((n.x + 1) * size, 0, (n.y + 1) * size))
+    if (this.bare) return new THREE.Group()
     return new THREE.Group().add(new THREE.Mesh(geo, this.materials.liquids[4]))
   }
 
   // The ground's material with a picture: one a picture, shared by the nodes that use it; and one more where the ground can open over a room.
+  // block: the block the picture is the whole of, which then has its own textures up close (ground3d.ts).
   private withPicture = new WeakMap<THREE.Texture, THREE.MeshLambertMaterial>()
   private withRoof = new WeakMap<THREE.Texture, THREE.MeshLambertMaterial>()
-  private groundWith(texture: THREE.Texture, opens: boolean): THREE.MeshLambertMaterial {
+  private groundWith(texture: THREE.Texture, opens: boolean, block: string | null): THREE.MeshLambertMaterial {
     const kept = opens ? this.withRoof : this.withPicture
     let m = kept.get(texture)
     if (!m) {
-      kept.set(texture, (m = new THREE.MeshLambertMaterial({ map: texture, side: THREE.DoubleSide, transparent: opens })))
-      if (opens) m.onBeforeCompile = (shader) => this.opening(shader)
+      kept.set(texture, (m = new THREE.MeshLambertMaterial({ map: texture, side: THREE.DoubleSide, transparent: opens, clippingPlanes: [this.over] })))
+      if (opens || block) {
+        m.onBeforeCompile = (shader) => {
+          if (block) this.ground.into(shader, block)
+          if (opens) this.opening(shader)
+        }
+        // the two say what the program is: the function above reads the same for every material
+        m.customProgramCacheKey = () => `${block ? 'ground' : ''} ${opens ? 'opens' : ''}`
+      }
     }
     return m
   }
@@ -1068,12 +1367,15 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
   // room has over it, seen aslant, and a margin. Any other ground in front lets the room through as a ghost.
   private opening(shader: THREE.WebGLProgramParametersWithUniforms): void {
     Object.assign(shader.uniforms, this.roofs)
-    shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nattribute float roofed;\nvarying float vRoofed;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvRoofed = roofed;')
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nattribute float roofed, cut;\nvarying float vRoofed, vCut;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvRoofed = roofed;\nvCut = cut - (modelMatrix * vec4(transformed, 1.0)).y;')
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform sampler2D uSeen, uSeenDepth;\nuniform vec2 uSize;\nuniform float uNear, uFar, uDown;\nvarying float vRoofed;')
+      .replace('#include <common>', '#include <common>\nuniform sampler2D uSeen, uSeenDepth;\nuniform vec2 uSize;\nuniform float uNear, uFar, uDown;\nvarying float vRoofed, vCut;')
       .replace(
         '#include <dithering_fragment>',
         `#include <dithering_fragment>
+        if (vCut < 0.0) discard; // over the cut round a room in rock (M23-F30)
         vec2 at = gl_FragCoord.xy / uSize;
         vec4 behind = texture2D(uSeen, at);
         float gap = uNear * uFar / (uFar - texture2D(uSeenDepth, at).x * (uFar - uNear)) - vViewPosition.z;

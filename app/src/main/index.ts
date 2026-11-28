@@ -34,6 +34,8 @@ import { langFor, langNow, offerAll, offered, planned, setLang, t } from '../sha
 import { workspacesOf } from '../shared/workspaces'
 import { addonHearsFonts, addonsFolder, askLangOf, newsSinceOf, readSettings, setupStatus, writeSettings } from './setup'
 import { hear, installChannel, removeSlots, send as sendSignal, sendOld, sentParts } from './signal'
+import { dungeonAsked } from './dungeons'
+import { groundAsked } from './ground'
 import { MAPS_FILE, servedFile } from './tiles'
 import { QUESTIE_ICONS } from '../shared/packs'
 import startTilesWorker from './tiles-worker?nodeWorker'
@@ -72,7 +74,7 @@ function findGameFolder(picked: string | undefined): string | null {
 
 // Makes the map tiles from the game's files, once per build of the game, and keeps the latest word on it.
 // The folder: TWINMAP_DATA when set (for trials), or Twinmap under the local application data.
-type Picture = 'items' | 'pictures'
+type Picture = 'items' | 'pictures' | 'ground' | 'dungeon'
 function startTiles(gameFolder: string | null): { status: () => TilesStatus; item: (kind: Picture, id: number) => Promise<boolean>; settled: () => Promise<void>; stop: () => void } {
   let status: TilesStatus = { state: 'looking' }
   if (!gameFolder) return { status: () => ({ state: 'no-game' }), item: () => Promise.resolve(false), settled: () => Promise.resolve(), stop: () => {} }
@@ -87,7 +89,9 @@ function startTiles(gameFolder: string | null): { status: () => TilesStatus; ite
   const worker = startTilesWorker({ workerData: { gameFolder, base, nav: navFolder(), openmap: join(dirname(navFolder()), 'openmap') } })
   // The picture of an item, or of a spell by its file, the folder does not have yet is made by the worker, which has the game's archive (item-icons.ts).
   const items = new Map<string, ((made: boolean) => void)[]>()
-  worker.on('message', (told: TilesStatus | { asked: string; made: boolean }) => {
+  worker.on('message', (told: TilesStatus | { asked: string; made: boolean } | { buildings: { problem?: string } }) => {
+    // the buildings of the 3D view, made after the rest (buildings.ts): the view asks for them by itself
+    if ('buildings' in told) return void (told.buildings.problem && fault(`buildings: ${told.buildings.problem}`))
     if (!('asked' in told)) {
       if (told.state === 'failed') fault(`map: ${told.message}`)
       status = told
@@ -454,6 +458,13 @@ function createWindow(): void {
     const file = status.state === 'ready' ? servedFile(status.folder, path) : null
     let bytes = file ? await readFile(file).catch(() => null) : null
     if (item && file && !bytes) bytes = (await tiles.item(item[1] as Picture, Number(item[2]))) ? await readFile(file).catch(() => null) : null
+    // The ground's own textures of the 3D view are made the same way, the first time the view asks (ground.ts).
+    const ground = groundAsked(path)
+    if (ground !== null && file && !bytes) bytes = (await tiles.item('ground', ground)) ? await readFile(file).catch(() => null) : null
+    // So are the buildings and objects of a dungeon, the first time it is opened in 3D (dungeons.ts); and its lists are
+    // always asked of the one making, which knows those made before in a way since changed and makes them again
+    const dungeon = dungeonAsked(path)
+    if (dungeon !== null && file && (!bytes || path.endsWith('.json'))) bytes = (await tiles.item('dungeon', dungeon)) ? await readFile(file).catch(() => null) : bytes // a game not to be read keeps what it had
     if (item && !bytes) return { status: 404 }
     // Where the game has no picture there is no file. That is the sea, not a fault: an empty picture for
     // a tile and an empty answer for a block, so the page logs no error for it.

@@ -74,6 +74,8 @@ export default {
     levelsShown: '显示的层',
     everyRoom: '所有房间',
     roomsUpTo: '至第{level}层的房间',
+    parts: '部分',
+    partTip: '第{part}部分',
     route: '路线',
     routeTip: '常规路线，首领按顺序',
     routeRoughTip: '常规路线，首领按顺序：大致路线，据攻略',
@@ -84,9 +86,18 @@ export default {
     // The map follows the character: the game's FOLLOW, keeping 追踪 for the arrow on a point.
     follow: '跟随',
     followTip: '跟随你的角色（F）',
+    dungeonsOff: '3D地下城已关闭',
+    dungeonsOffText: '3D地下城为实验性功能。在设置中开启“3D地下城（实验性）”即可用3D查看此地下城。',
+    dungeonsOpen: '打开设置',
+    dungeonsLater: '以后再说',
   },
 
   offMap: '地图上没有这个地方。',
+  slowView: '此处 3D 视图较慢（{fps} fps）。',
+  lowerTo: '降到{quality}',
+  keepQuality: '保持{quality}',
+  lostView: '显卡内存不足：画质已设为低。',
+  lostSettings: '设置',
   // The game's FPS_ABBR.
   fps: '{fps} fps',
   nothingToSend: '没有可发送的内容。',
@@ -199,5 +210,9 @@ export default {
     raid: '团队副本',
     raidIn: '团队副本，{zone}',
     foundIn: '{what}，{zone}',
+  },
+  daylight: {
+    ring: '光照时间',
+    ringTip: '拖动以移动太阳。点击回到游戏时间。',
   },
 }

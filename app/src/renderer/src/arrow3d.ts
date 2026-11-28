@@ -155,6 +155,11 @@ export class Arrow3d {
   /** Where the arrow is on the view, in pixels, and how far round it reaches: told when it changes, null when there is none. For what is drawn over the view to leave it in front. */
   onscreen: ((at: { x: number; y: number; r: number } | null) => void) | null = null
 
+  /** Where the arrow stands, in yards, while there is one. */
+  at(): THREE.Vector3 | null {
+    return this.want && this.y !== null ? new THREE.Vector3(this.want.x, this.y, this.want.z) : null
+  }
+
   hide(): void {
     this.onscreen?.(null)
     this.want = null
@@ -164,8 +169,10 @@ export class Arrow3d {
   step(now: number): boolean {
     const dt = Math.max(0, Math.min(0.1, (now - this.last) / 1000))
     this.last = now
+    // In a dungeon that is all buildings there is no ground: the floor of the building the character stands on (M23-F24).
     const w = this.want,
-      ground = w ? this.terrain.groundAt(w.x, w.z) : NaN
+      inside = w && this.terrain.bare ? this.terrain.floorIn(w.x, w.z) : undefined,
+      ground = !w ? NaN : this.terrain.bare ? (inside ?? NaN) : this.terrain.groundAt(w.x, w.z)
     if (!w || !Number.isFinite(ground)) {
       this.y = this.pointing = null
       return this.show(false, '')
@@ -175,9 +182,14 @@ export class Arrow3d {
     this.pointing = turnAt(this.turn, now)
     // On a floor over the ground (a bridge): at its height and level. Else on the ground, as it slopes.
     // In a room under the ground, as it opens: down on its floor, level, and drawn with the rooms, before the ground.
-    const lifted = w.floor !== null && w.floor > ground + FLOOR,
-      room = w.floor !== null && w.floor < ground - FLOOR ? this.terrain.floorAt(w.x, w.z) : null,
-      y = lifted ? w.floor! : room ? ground + (w.floor! - ground) * room.open : ground
+    // In a city whose streets are its building's, on the street when the floor the character stands on is not known,
+    // or is told as the ground of the game, which there lies under the streets and no one stands on.
+    const street = this.terrain.streetAt(w.x, w.z),
+      floor = inside !== undefined ? inside : street !== null && (w.floor === null || Math.abs(w.floor - ground) <= FLOOR) ? street : w.floor,
+      lifted = inside !== undefined || (floor !== null && floor > ground + FLOOR),
+      room = !lifted && floor !== null && floor < ground - FLOOR ? this.terrain.floorAt(w.x, w.z) : null,
+      y = lifted ? floor! : room ? ground + (floor! - ground) * room.open : ground,
+      paved = lifted && (street !== null || inside !== undefined) // its shadow on the street or on the floor, not on the ground under it
     for (const o of [this.group, this.shadow, this.stem]) this.terrain.sink(o, !!room && room.open > 0.5)
     this.look(arrow.colour)
     const camera = this.terrain.camera,
@@ -206,11 +218,11 @@ export class Arrow3d {
     this.onscreen?.({ x: ((seen.x + 1) / 2) * width, y: ((1 - seen.y) / 2) * height, r: (LEAST * arrow.size * size) / least / 2 })
     this.gold.opacity = this.dark.opacity = w.opacity
     this.ghostly.opacity = GHOST * w.opacity
-    this.shadowy.opacity = SHADOW * w.opacity * (lifted ? 0.6 : 1)
+    this.shadowy.opacity = SHADOW * w.opacity * (lifted && !paved ? 0.6 : 1)
     for (let i = 0; i < this.sheet.count; i++) {
       const dx = this.flatSheet[i * 3]! * size * 1.5,
         dz = this.flatSheet[i * 3 + 2]! * size * 1.5
-      this.sheet.setXYZ(i, w.x + dx, room ? this.y + 0.05 : at(dx, dz) + 0.05 + (lifted ? 0 : this.y - ground), w.z + dz)
+      this.sheet.setXYZ(i, w.x + dx, room || paved ? this.y + 0.05 : at(dx, dz) + 0.05 + (lifted ? 0 : this.y - ground), w.z + dz)
     }
     this.sheet.needsUpdate = true
     // From afar, kept at its least size: a stem over it, to find it by.

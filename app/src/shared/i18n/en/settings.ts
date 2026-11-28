@@ -11,6 +11,8 @@ export default {
     general: 'General',
     // How the app looks: the layout of the map today; themes and icons later.
     appearance: 'Appearance',
+    // How much drawing costs: the switches of the 3D view, and the graphics card.
+    graphics: 'Graphics',
     // The game folder and what Twinmap found of the game and its addons.
     game: 'Game and addons',
     // Help improve Twinmap.
@@ -87,7 +89,54 @@ export default {
     hint: "Areas, as on the game's map, are drawn round the places where Questie puts each objective.",
   },
 
-  // In General: the app's window, switches, the text size and the hardware acceleration.
+  // In Graphics: what the 3D view draws, each a switch, and the hardware acceleration (window.gpu) under its own subtitle.
+  graphics: {
+    // At the top of Graphics: a dropdown that sets every switch of the 3D view at once (not the dungeons), its steps, and the hint under it.
+    quality: 'Quality',
+    low: 'Low',
+    medium: 'Medium',
+    high: 'High',
+    // Shown in that dropdown, never chosen, when the switches are set as none of the three steps has them.
+    custom: 'Custom',
+    qualityHint: 'Sets everything below at once. Change one of them and it becomes Custom.',
+    // A subtitle over the switches of what the 3D view draws.
+    view3d: '3D view',
+    // A switch: the towns, houses, towers and bridges of the game in the 3D view.
+    buildings: 'Buildings',
+    // Under the switches of the 3D view.
+    cost: 'Each one costs memory and graphics card time. Kept by this window: a phone or tablet keeps its own.',
+    // A switch: the trees of the game in the 3D view. Beside it a dropdown of how many (few, some, many).
+    trees: 'Trees',
+    // The name of that dropdown, read aloud only.
+    density: 'How many trees',
+    few: 'Few',
+    some: 'Some',
+    many: 'Many',
+    // Under the trees.
+    treesHint: 'Thick woods are thinned and no leaves are drawn round the character, so the ground and the roads show.',
+    // A switch: the other things the game places in the world, as listed under it.
+    objects: 'Objects',
+    objectsHint: 'Fences, carts, lamps, tents, braziers.',
+    // A switch: near the camera the ground of the 3D view is drawn with the game's own ground textures, not the blurred picture of the map.
+    ground: 'Ground texture up close',
+    groundHint: "Up close the ground is drawn with the game's own textures, so it stays sharp.",
+    // A switch: the light of the 3D view follows the hour of the game's day; under it the hint.
+    daynight: 'Day and night',
+    daynightHint: "The light follows the hour of the game's day, and windows light up at night. The ring under the zone's name moves the sun; a click goes back to the game's hour.",
+    // A switch, off at first: dungeons and raids in the 3D view. The name is the owner's, "(Experimental)" and all: it stays while the feature is being built.
+    dungeons: '3D Dungeon (Experimental)',
+    dungeonsHint: 'Dungeons and raids in the 3D view, their rooms open from above. Still being built: it may be wrong or slow.',
+    // Under the switches of the 3D view, in the app only: how much of the graphics card's memory Twinmap takes with the
+    // switches on and the size of the view, worked out (graphics.svelte.ts). {amount}: settings.graphics.amount, drawn in gold.
+    memory: 'Graphics card memory: {amount}',
+    amount: 'about {mb} MB',
+    // Beside a switch that costs memory: how much it adds. {mb}: a whole number.
+    costMb: '+{mb} MB',
+    // A subtitle over the switch window.gpu.
+    card: 'Graphics card',
+  },
+
+  // In General: the app's window, switches and the text size; the hardware acceleration (gpu) is in Graphics.
   window: {
     onTop: 'Keep Twinmap on top of other windows',
     // Followed by a list of sizes: 80%, 90%, 100%...
