@@ -78,6 +78,20 @@ test('a sample for each place not found, one a room where it is, and the run whe
   expect(startSamples(() => true).take(null, null, own, 0)).toBeNull()
 })
 
+test('the place the addon found from the flight masters goes with the sample, found or not', () => {
+  const samples = startSamples(() => true), far = { x: 104.37, y: -22.81, z: -31.62, r: 0.04 }
+  samples.take({ ...found(10), far }, box(), own, 0)
+  samples.take({ ...lost, far: { ...far, x: 140.02 } }, box(), own, 1000)
+  samples.take(lost, box(), own, 20_000) // an older addon, or a game that tells no distance
+  const run = samples.take(null, null, own, 30_000)!
+  expect(run.samples.map((s) => s.fields)).toEqual([
+    { n: '0', map: '36', zoom: '0', u: '10', v: '10', score: '0.9', x: '104.4', y: '-22.8', z: '-31.6', r: '0' },
+    { n: '1', map: '36', zoom: '0', x: '140', y: '-22.8', z: '-31.6', r: '0' },
+    { n: '2', map: '36', zoom: '0' },
+  ])
+  for (const sample of run.samples) expect(sampleFor(new URLSearchParams({ run: run.id, app: '0.20.0', build: '1.60.1.70959', locale: 'enUS', ...sample.fields }), sample.png)).toHaveProperty('key')
+})
+
 test('a run holds a hundred samples at most', () => {
   const samples = startSamples(() => true)
   for (let i = 0; i < 150; i++) samples.take(lost, box(), own, i * 10_000)

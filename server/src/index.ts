@@ -65,6 +65,8 @@ const FIELDS: Record<string, RegExp> = {
 }
 /** Where the app put the character and how sure it was: all three, or none when it found no place. */
 const FOUND: Record<string, RegExp> = { u: place, v: place, score: /^(0(\.\d{1,4})?|1)$/ }
+/** Where the addon found the character from the distances to the flight masters, height included, and how far those miss it: all four, or none from an older app or where the game tells no distance. */
+const FAR: Record<string, RegExp> = { x: place, y: place, z: place, r: /^\d{1,3}(\.\d)?$/ }
 export const SURE = 0.75 // SURE of app/src/shared/minimap.ts: a likeness under this is a place not found
 /** Whether a sample is one where the app found no sure place. */
 const lost = (fields: Record<string, string>): boolean => !(Number(fields.score) >= SURE)
@@ -161,10 +163,10 @@ const PNG = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 
 // Nothing here opens a sample; whoever reads them (design/) decodes with care.
 export function sampleFor(said: URLSearchParams, bytes: Uint8Array): { key: string; fields: Record<string, string> } | { error: string } {
   const fields = Object.fromEntries(said)
-  const found = Object.keys(FOUND).filter((name) => name in fields).length
-  if ([...said.keys()].length !== Object.keys(fields).length || (found !== 0 && found !== 3)) return { error: 'not a sample' }
-  if (Object.keys(fields).length !== Object.keys(FIELDS).length + found) return { error: 'not a sample' }
-  for (const [name, value] of Object.entries(fields)) if (!(FIELDS[name] ?? FOUND[name])?.test(value)) return { error: 'not a sample' }
+  const found = Object.keys(FOUND).filter((name) => name in fields).length, far = Object.keys(FAR).filter((name) => name in fields).length
+  if ([...said.keys()].length !== Object.keys(fields).length || (found !== 0 && found !== 3) || (far !== 0 && far !== 4)) return { error: 'not a sample' }
+  if (Object.keys(fields).length !== Object.keys(FIELDS).length + found + far) return { error: 'not a sample' }
+  for (const [name, value] of Object.entries(fields)) if (!(FIELDS[name] ?? FOUND[name] ?? FAR[name])?.test(value)) return { error: 'not a sample' }
   if (bytes.length < 24 || PNG.some((byte, i) => bytes[i] !== byte)) return { error: 'not a picture' }
   const sizes = new DataView(bytes.buffer, bytes.byteOffset), width = sizes.getUint32(16), height = sizes.getUint32(20)
   if (width !== height || width < 32 || width > 1024) return { error: 'not a minimap' }

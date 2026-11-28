@@ -188,6 +188,10 @@ local function BuildPos()
         if coveredAt and GetTime() - coveredAt < COVERED_FOR then inst.mini.hid = true end
       end
     end
+    -- With the participation programme on: the place found from the distances to the flight
+    -- masters (Distance.lua), yards of the instance, north, west and height, and how far off.
+    local fx, fy, fz, fr = Try(ns.Far)
+    if Num(fx) and Num(fy) and Num(fz) and Num(fr) then inst.far = { x = Round(fx, 0.1), y = Round(fy, 0.1), z = Round(fz, 0.1), r = Round(fr, 0.1) } end
     out.inst = inst
   end
   -- In a fight only this section goes out: the app says so, instead of showing the rest as fresh.
