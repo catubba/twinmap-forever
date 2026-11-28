@@ -71,7 +71,7 @@
   const AREA_CELL = 0.1 // traced on cells of 13 yards
   const PIN_ZOOM = 3.5 // under this zoom the pins of a zone lie on each other: they are not shown
   const GATHER = 26 // pixels: from far, the quests to take (or to hand in) nearer than this to each other are one pin
-  const QUEST_ZOOM = 2 // the quests to take and to hand in are few: they are shown from farther, as the doors of the dungeons are
+  const QUEST_ZOOM = 2 // the quests and their objectives are shown from farther, as the doors of the dungeons are: from far, near ones are one pin
   const FAR = 3 // under this zoom the names of the regions are written small
   const EDGE = 14 // px from the edge of the map's box that a name keeps clear: the frame and a little air
   const GROUND_INSIDE = 0.45 // how bright the ground of a dungeon is: its rooms are what matters
@@ -1346,7 +1346,6 @@
     }
     // The objectives are many: those near each other that ask for the same thing are one pin, drawn by what they ask for,
     // with the number of quests it is for when more than one. A click on it goes nearer, where they part; on one alone, its label.
-    if (far !== null) return
     if (objectives.look === 'areas') {
       // Areas in the style of the game's map: the quest in front over the rest, which are dim. Its name on the area.
       for (const a of [...areas].sort((a, b) => Number(lit([a.quest])) - Number(lit([b.quest])))) {
@@ -1387,10 +1386,10 @@
         .addTo(questLayers.objectives)
     }
   })
-  // Not inside a dungeon, whose map is another; not from far, where they would cover the land: the objectives, which are many, go first.
+  // Not inside a dungeon, whose map is another; not from farther than a continent's zones, where they would cover the land.
   $effect(() => {
     for (const [id, group] of Object.entries(questLayers) as [keyof typeof questLayers, L.LayerGroup][]) {
-      if (map && layers[id] && !inside && zoom >= (id === 'objectives' ? PIN_ZOOM : QUEST_ZOOM)) group.addTo(map)
+      if (map && layers[id] && !inside && zoom >= QUEST_ZOOM) group.addTo(map)
       else group.remove()
     }
   })
