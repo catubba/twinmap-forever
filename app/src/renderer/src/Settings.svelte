@@ -17,6 +17,7 @@
   import { ARROW, ARROW_SIZES } from './look'
   import { mapLook, mapLooks, objectiveLooks, objectives, packs, questieHere, setMapLook, setObjectiveLook, setPack } from './packs.svelte'
   import { cardMemory, COSTS, DENSITY_NAMES, graphics, setGraphics } from './graphics.svelte'
+  import { QUALITIES, QUALITY_NAMES, qualityOf, type Quality } from '../../shared/quality'
   import { around, langNow, metresOn, metricOffered, num, t, type Key } from '../../shared/i18n'
 
   let { setup, tiles, onback, onfirstrun, onfeedback, onnews }: { setup: SetupStatus; tiles: TilesStatus | null; onback: () => void; onfirstrun: () => void; onfeedback: () => void; onnews: () => void } = $props()
@@ -155,6 +156,11 @@
         <p class="hint">{t('settings.objectives.hint')}</p>
       </div>
     {:else if cat === 'graphics'}
+      <!-- Quality (M23-F34): sets the switches under it at once; one of them changed makes it Custom, which is not chosen. -->
+      <div class="setting">
+        <label class="choice">{t('settings.graphics.quality')}<select class="field size" value={qualityOf(graphics)} onchange={(e) => setGraphics(QUALITIES[e.currentTarget.value as Quality])}>{#each QUALITY_NAMES as q (q)}<option value={q}>{t(`settings.graphics.${q}`)}</option>{/each}<option value="custom" disabled>{t('settings.graphics.custom')}</option></select></label>
+        <p class="hint">{t('settings.graphics.qualityHint')}</p>
+      </div>
       <!-- What the 3D view draws (M23, design/ui.md section 6): a switch each, kept by this window (graphics.svelte.ts). -->
       <div class="setting">
         <h3 class="sub">{t('settings.graphics.view3d')}</h3>

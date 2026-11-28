@@ -62,6 +62,12 @@ export default {
   },
 
   graphics: {
+    quality: '画质',
+    low: '低',
+    medium: '中',
+    high: '高',
+    custom: '自定义',
+    qualityHint: '一次设置下面的所有项目。改动其中任何一项，就会变为自定义。',
     view3d: '3D视图',
     buildings: '建筑',
     cost: '每一项都会占用内存和显卡时间。只保存在此窗口：手机或平板各自保存自己的选择。',

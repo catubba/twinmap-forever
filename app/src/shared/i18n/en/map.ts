@@ -131,6 +131,14 @@ export default {
 
   // A note over the map when the character is somewhere the map has no picture of.
   offMap: 'This place is not on the map.',
+  // On the map in 3D, when the view stays under 30 frames a second while it moves; two buttons beside it. {fps}: a whole number.
+  slowView: 'The 3D view is slow here ({fps} frames a second).',
+  // Those buttons. {quality}: a step of Settings > Graphics > Quality, as settings.graphics.low, medium, high or custom write it.
+  lowerTo: 'Lower to {quality}',
+  keepQuality: 'Keep {quality}',
+  // On the map when the graphics card took the 3D view away, the app having set Quality to Low (settings.graphics.low); a button beside it opens Settings.
+  lostView: 'The graphics card ran out of memory: graphics set to Low.',
+  lostSettings: 'Settings',
   // Frames a second of the 3D view, shown only in trials.
   fps: '{fps} fps',
   // Why Send to game did nothing: the point clicked is in no zone.

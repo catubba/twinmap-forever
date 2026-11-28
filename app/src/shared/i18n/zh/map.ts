@@ -93,6 +93,11 @@ export default {
   },
 
   offMap: '地图上没有这个地方。',
+  slowView: '此处 3D 视图较慢（{fps} fps）。',
+  lowerTo: '降到{quality}',
+  keepQuality: '保持{quality}',
+  lostView: '显卡内存不足：画质已设为低。',
+  lostSettings: '设置',
   // The game's FPS_ABBR.
   fps: '{fps} fps',
   nothingToSend: '没有可发送的内容。',

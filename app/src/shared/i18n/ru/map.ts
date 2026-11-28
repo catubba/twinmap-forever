@@ -90,6 +90,11 @@ export default {
   },
 
   offMap: 'Этого места нет на карте.',
+  slowView: 'Здесь 3D-вид работает медленно ({fps} кадр/с).',
+  lowerTo: 'Снизить до «{quality}»',
+  keepQuality: 'Оставить «{quality}»',
+  lostView: 'Видеокарте не хватило памяти: выбрано качество «Низкое».',
+  lostSettings: 'Параметры',
   // "кадр/с" needs no plural agreement with the number; shown only in trials.
   fps: '{fps} кадр/с',
   nothingToSend: 'Нечего отправлять.',

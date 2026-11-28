@@ -61,6 +61,12 @@ export default {
   },
 
   graphics: {
+    quality: 'Qualität',
+    low: 'Niedrig',
+    medium: 'Mittel',
+    high: 'Hoch',
+    custom: 'Benutzerdefiniert',
+    qualityHint: 'Stellt alles darunter auf einmal ein. Wird eine Option geändert, steht hier Benutzerdefiniert.',
     view3d: '3D-Ansicht',
     buildings: 'Gebäude',
     cost: 'Jede Option kostet Speicher und Zeit der Grafikkarte. Gilt nur für dieses Fenster: Handy und Tablet haben ihre eigene Einstellung.',

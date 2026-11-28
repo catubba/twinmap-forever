@@ -5,7 +5,8 @@
   import { TILES } from './web'
   import { layout as sides, setMapRight } from './frame.svelte'
   import { arrow as arrowLook } from './arrow.svelte'
-  import { graphics } from './graphics.svelte'
+  import { graphics, setGraphics } from './graphics.svelte'
+  import { lower, QUALITIES, qualityOf, type Quality } from '../../shared/quality'
   import DungeonsAsk from './DungeonsAsk.svelte'
   import DayRing from './DayRing.svelte'
   import type { Terrain } from './terrain3d'
@@ -61,7 +62,7 @@
   // at: when the position was read off the game, in milliseconds.
   // insideReady: the rooms of the buildings are converted, and their list can be asked for.
   // parchment: the continents (by their folder) whose game map is made (main/parchment.ts), with the colour of its sea.
-  let { pos, group = [], at: readAt, insideReady, quests = [], fixed = [], side, live = false, inbox = null, removed = [], set = [], gameFollows = null, journey = null, route = noRoute(), marked = [], onroute, onnpc, onsettings, kills, death = null, parchment, gameTime = null, gameTimeAt, skills, xpLevel, level, back = $bindable(null), looking = $bindable(null) }: { parchment?: Record<string, number[]>; gameTime?: number | null; gameTimeAt?: number; kills?: unknown; skills?: unknown; xpLevel?: number | null; level?: number; death?: Death | null; back?: (DeathPlace & { name: string; door: boolean }) | null; looking?: { zone: string; where: string } | null; journey?: Journey | null; pos: Position | undefined; at: number | undefined; insideReady: boolean; quests?: QuestPin[]; fixed?: FixedPin[]; side?: string; live?: boolean; inbox?: Inbox | null; removed?: string[]; set?: GameMark[]; gameFollows?: Pin | null; route?: Route; marked?: number[]; onroute?: (stop: Stop) => void; onnpc?: (pin: FixedPin | null) => void; onsettings?: (category: string) => void; group?: Companion[] } = $props()
+  let { pos, group = [], at: readAt, insideReady, quests = [], fixed = [], side, live = false, inbox = null, removed = [], set = [], gameFollows = null, journey = null, route = noRoute(), marked = [], onroute, onnpc, onsettings, kills, death = null, parchment, gameTime = null, gameTimeAt, skills, xpLevel, level, back = $bindable(null), looking = $bindable(null), noted = false }: { noted?: boolean; parchment?: Record<string, number[]>; gameTime?: number | null; gameTimeAt?: number; kills?: unknown; skills?: unknown; xpLevel?: number | null; level?: number; death?: Death | null; back?: (DeathPlace & { name: string; door: boolean }) | null; looking?: { zone: string; where: string } | null; journey?: Journey | null; pos: Position | undefined; at: number | undefined; insideReady: boolean; quests?: QuestPin[]; fixed?: FixedPin[]; side?: string; live?: boolean; inbox?: Inbox | null; removed?: string[]; set?: GameMark[]; gameFollows?: Pin | null; route?: Route; marked?: number[]; onroute?: (stop: Stop) => void; onnpc?: (pin: FixedPin | null) => void; onsettings?: (category: string) => void; group?: Companion[] } = $props()
 
   const TOP_ZOOM = 7 // the detail of the game itself: the picture of a block is four tiles
   const PARCHMENT_ZOOM = 5 // the detail of the game's map (main/parchment.ts): about 4 yards a pixel
@@ -1172,7 +1173,46 @@
     counted++
     if (now - since >= 1000) ((fps = Math.round((counted * 1000) / (now - since))), (counted = 0), (since = now))
   }
-  function onFrame(): void {
+  // The view slow while it moves (M23-F34, design/ui.md section 6): under 30 frames a second for 10 seconds of moving
+  // in a row, a line proposes the step under the quality; the app never lowers it alone. Keep: never again for that
+  // quality, in this window. Frames apart by more than a quarter of a second are the view still, not slow.
+  let slow = $state<{ fps: number; from: Quality | 'custom'; to: Quality } | null>(null)
+  let movedMs = 0, movedFrames = 0, slowSeconds = 0, drewAt = 0
+  const keptSlow = (): string[] => JSON.parse(localStorage.getItem('slowKept') ?? '[]') as string[]
+  function watchSpeed(): void {
+    const now = performance.now(), gap = now - drewAt
+    drewAt = now
+    if (gap > 250) return
+    movedMs += gap
+    movedFrames++
+    if (movedMs < 1000) return
+    const fps = (movedFrames * 1000) / movedMs
+    movedMs = movedFrames = 0
+    slowSeconds = fps < 30 ? slowSeconds + 1 : 0
+    if (slowSeconds < 10 || slow) return
+    slowSeconds = 0
+    const from = qualityOf(graphics), to = lower(graphics)
+    if (to && !keptSlow().includes(from)) slow = { fps: Math.round(fps), from, to }
+  }
+  // The line goes once the quality is not the one it spoke of.
+  $effect(() => {
+    if (slow && qualityOf(graphics) !== slow.from) slow = null
+  })
+  // The graphics card took the view away (out of memory): Low at once, said by a line, and the 2D map. These lines sit
+  // over the one of App.svelte when it has one (noted), not on it.
+  let lost = $state(false)
+  function onLost(): void {
+    setGraphics(QUALITIES.low)
+    slow = null
+    lost = true
+    if (threeD) back2d()
+  }
+  // The line goes once the player is back in 3D.
+  $effect(() => {
+    if (threeD) lost = false
+  })
+  function onFrame(drew: boolean): void {
+    if (drew) watchSpeed()
     if (counting) count()
     pins3d!.draw()
     // The names: off with their layer; clear of the buttons and of the arrow, where it is on this view.
@@ -1255,6 +1295,7 @@
         inside3dSet()
         names3dSet()
         terrain.onFrame = onFrame
+        terrain.onLost = onLost
       }
       // The view looks the way the 2D map is turned; the 2D map under it lies north up meanwhile, as its pins are copied from it.
       const azimuth = (map.getBearing() * Math.PI) / 180
@@ -2325,6 +2366,15 @@
 </div>
 {#if offMap}
   <p class="map-note" in:fly={drop(8)} out:fade={gone}>{t('map.offMap')}</p>
+{:else if lost}
+  <p class="map-note with-button" style:margin-bottom={noted ? '48px' : null} in:fly={drop(8)} out:fade={gone}>{t('map.lostView')} <button class="btn" onclick={() => ((lost = false), onsettings?.('graphics'))}>{t('map.lostSettings')}</button></p>
+{:else if slow && threeD}
+  {@const step = (q: Quality | 'custom'): string => t(`settings.graphics.${q}`)}
+  <p class="map-note with-button" style:margin-bottom={noted ? '48px' : null} in:fly={drop(8)} out:fade={gone}>
+    {t('map.slowView', { fps: num(slow.fps) })}
+    <button class="btn" onclick={() => setGraphics(QUALITIES[slow!.to])}>{t('map.lowerTo', { quality: step(slow.to) })}</button>
+    <button class="btn" onclick={() => (localStorage.setItem('slowKept', JSON.stringify([...keptSlow(), slow!.from])), (slow = null))}>{t('map.keepQuality', { quality: step(slow.from) })}</button>
+  </p>
 {/if}
 
 <style>

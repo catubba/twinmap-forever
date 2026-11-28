@@ -89,6 +89,11 @@ export default {
   },
 
   offMap: 'Este lugar no está en el mapa.',
+  slowView: 'La vista 3D va lenta aquí ({fps} FPS).',
+  lowerTo: 'Bajar a {quality}',
+  keepQuality: 'Mantener {quality}',
+  lostView: 'La tarjeta gráfica se ha quedado sin memoria: calidad puesta en Baja.',
+  lostSettings: 'Opciones',
   fps: '{fps} FPS',
   nothingToSend: 'No hay nada que enviar.',
 

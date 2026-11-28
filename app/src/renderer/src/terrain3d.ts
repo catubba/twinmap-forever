@@ -258,6 +258,10 @@ export class Terrain {
     // On a phone two points of the view a point of the page are enough: three are nine times the work of one.
     this.renderer.setPixelRatio(inApp ? devicePixelRatio : Math.min(devicePixelRatio, 2))
     host.append(this.renderer.domElement)
+    this.renderer.domElement.addEventListener('webglcontextlost', () => this.onLost())
+    // Given back: what the card held is gone, and the tiles kept no copy of it (onUpload in load): read again. Buildings,
+    // trees, objects and the ground's textures are off by then (Low, Map.svelte), and read again when turned on.
+    this.renderer.domElement.addEventListener('webglcontextrestored', () => (this.drop(), (this.dirty = true)))
     this.s3tc = this.renderer.extensions.has('WEBGL_compressed_texture_s3tc')
     this.scene.fog = new THREE.Fog(SKY, 1, 2)
     this.renderer.autoClear = false // a frame is the inside, then the ground over it (draw)
@@ -580,8 +584,10 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
     this.dirty = true
   }
 
-  /** Called at every frame while the view runs, once it is drawn: what lies over it follows. */
-  onFrame: () => void = () => {}
+  /** Called at every frame while the view runs, once it is drawn: what lies over it follows. drew: whether this frame drew the view, which it does while it moves. */
+  onFrame: (drew: boolean) => void = () => {}
+  /** Called when the graphics card takes the view's context away (its memory ran out, the card was reset). */
+  onLost: () => void = () => {}
   /** Where the character stands while it is followed, in yards: a city inside the ground is cut over its floor (buildings3d.ts). */
   character: THREE.Vector3 | null = null
   /** Where the character's arrow stands, followed or not: no leaves round it (props3d.ts). */
@@ -879,6 +885,7 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
     if (this.ground.step(this.camera.position, this.controls.target.y)) this.dirty = true
     this.askStands()
     this.inside?.hidePictures(this.buildings.under)
+    const drew = this.dirty
     if (this.dirty) {
       this.dirty = false
       this.choose()
@@ -887,7 +894,7 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
       this.compass.render()
       this.evict()
     }
-    this.onFrame()
+    this.onFrame(drew)
   }
 
   // Yards from the point looked at to the farthest ground on the view: where the looks through its four corners meet
