@@ -149,6 +149,9 @@ test('a dungeon is dug in rock where the ground over its rooms is 50 yards or mo
   expect([...inRock([mine, cellar], groundAt, [[1100, 100, 40], [100, 100, 2], [110, 100, 3]])]).toEqual([0, 2])
   // a boss with none is under the ground where a room with its ceiling under the ground is
   expect([...inRock([mine, cellar], groundAt, [[100, 100], [2000, 100]])]).toEqual([0, 2])
+  // a dungeon with most of its rooms in the open: its cellars stay covered
+  const hall = piece({ u: 1200, bottom: 40, top: 60, width: 200, height: 200, building: 3 })
+  expect(inRock([mine, cellar, hall], groundAt, []).size).toBe(0)
 })
 
 test('the ground round a room in rock is cut over its floor, rising a yard a yard away from it', () => {
