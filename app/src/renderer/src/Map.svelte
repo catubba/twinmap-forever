@@ -20,6 +20,7 @@
   import { NEW_DUNGEON_PINS } from '../../shared/new-dungeon-pins'
   import { MORE_BOSS_PINS } from '../../shared/more-boss-pins'
   import { DUNGEON_ROUTES } from '../../shared/dungeon-routes'
+  import { FIRST_ENTRANCE, MORE_DOORS } from '../../shared/dungeon-doors'
   import type { Position } from '../../shared/game'
   import { coloursFor, type Companion } from '../../shared/group'
   import { clearOf, gathered, unitsOfPlace, unitsOfRect, type Point } from '../../shared/geo'
@@ -117,7 +118,9 @@
   // pin: the same point as the game names it, a zone map and a place on it; none where no zone is.
   let labelled = $state<{ units: Point; continent: Continent; title: string; where: string; spot: Point; box: Size; pin: { m: number; x: number; y: number } | null; plain?: boolean; notes?: string[]; dungeons?: { id: number; name: string; raid: boolean }[]; wing?: string; item?: number; npc?: FixedPin } | null>(null)
   // A vendor or a trainer labelled: its panel opens at the top of the side panel (NpcPanel.svelte).
-  const labelledNpc = $derived(labelled?.npc ?? null)
+  // A trainer inside a dungeon clicked or found (dungeon-trainers.ts): its panel opens as for a pin of the world map, with no label.
+  let insideNpc = $state<FixedPin | null>(null)
+  const labelledNpc = $derived(labelled?.npc ?? insideNpc)
   $effect(() => onnpc?.(labelledNpc))
   // Where the character is on the world map, for the distance on the label.
   let me = $state<{ units: Point; continent: Continent } | null>(null)
@@ -623,6 +626,7 @@
     if (!map) return
     ground(WORLDS.find((w) => w.continent === which)!.name)
     inside = null
+    insideNpc = null
     browsing = null
     if (labelled && labelled.continent !== which) labelled = null
     showRooms([])
@@ -696,6 +700,33 @@
     }
   })
 
+  // The trainers inside the dungeon on show (dungeon-trainers.ts), with the Trainers layer: the picture of the world map's
+  // trainers, and the name written under it, as a boss's. A click opens its panel.
+  const insideTrainers = L.layerGroup()
+  function trainerIcon(p: FixedPin): L.DivIcon {
+    const mark = document.createElement('div'), picture = new Image(24, 24)
+    picture.alt = ''
+    picture.onerror = () => (mark.innerHTML = pin('service'))
+    picture.src = `${TILES}/icons/${iconOf(p)}.png`
+    mark.append(picture)
+    return L.divIcon({ className: 'door trainer', iconSize: [24, 24], html: mark })
+  }
+  $effect(() => {
+    insideTrainers.clearLayers()
+    const m = inside
+    if (!map || !m || !layers.trainers) return void insideTrainers.remove()
+    for (const p of fixed) {
+      if (p.inside?.map !== m.id || !serves(p, side)) continue
+      const name = document.createElement('span')
+      name.append(p.name, document.createElement('br'), Object.assign(document.createElement('small'), { textContent: p.sub ?? t('app.now.trainer') }))
+      L.marker(atYards(p.inside), { keyboard: false, icon: trainerIcon(p) })
+        .bindTooltip(name, { permanent: true, direction: 'bottom', offset: [0, 11], className: 'boss-name trainer-name' })
+        .on('click', () => (insideNpc = { ...p }))
+        .addTo(insideTrainers)
+    }
+    insideTrainers.addTo(map)
+  })
+
   // Puts a dungeon or a raid on the map: its ground dimmed, its rooms, its bosses and its entrance.
   // wing: of a map with several, the one to put in view.
   function showInside(m: InteriorMap, wing?: string): void {
@@ -706,6 +737,7 @@
     pins.clearLayers()
     inside = m
     labelled = null
+    insideNpc = null
     showCities()
     showCaves()
     levels = Math.max(0, ...m.pieces.map((p) => p.level))
@@ -723,12 +755,19 @@
       const rare = RARE_BOSSES.has(nameOfBoss(name)), shown = gameName(name)
       bossMarks.push({ name, rare, u, v, gone: false, marker: L.marker(atYards({ u, v }), { keyboard: false, icon: bossIcon(false, rare) }).bindTooltip(rare ? t('map.pins.rareBoss', { name: shown }) : shown, { permanent: true, direction: 'bottom', offset: [0, rare ? 11 : 9], className: 'boss-name' }).addTo(pins) })
     }
+    // The entrances: each wing's, and the other doors of the map where the app knows where they put the player in
+    // (Uldaman's back door). Where there are several, each is named as its door on the world map is.
+    const first = FIRST_ENTRANCE[m.id], more = MORE_DOORS.filter((d) => d.map === m.id && d.inside)
     for (const d of dungeons) {
       if (d.entrance)
         L.marker(atYards({ u: d.entrance[0], v: d.entrance[1] }), { keyboard: false, icon: doorIcon(m.kind === 'raid') })
-          .bindTooltip(dungeons.length > 1 ? t('map.pins.entranceOf', { name: gameName(d.name) }) : t('map.pins.entrance'), { direction: 'top', offset: [0, -13], className: 'tip' })
+          .bindTooltip(dungeons.length > 1 ? t('map.pins.entranceOf', { name: gameName(d.name) }) : first && more.length ? t(`map.pins.doors.${first}`) : t('map.pins.entrance'), { direction: 'top', offset: [0, -13], className: 'tip' })
           .addTo(pins)
     }
+    for (const d of more)
+      L.marker(atYards({ u: d.inside![0], v: d.inside![1] }), { keyboard: false, icon: doorIcon(m.kind === 'raid') })
+        .bindTooltip(t(`map.pins.doors.${d.entrance}`), { direction: 'top', offset: [0, -13], className: 'tip' })
+        .addTo(pins)
     bosses = bossMarks
     const framed = dungeons.filter((d) => d.name === wing)
     const box = dungeons.length
@@ -809,8 +848,20 @@
    * Takes the map to a place and opens the label on it: for a row chosen in the panel, for a
    * result of the search. zoom: how near to look, when the map is farther than that.
    */
-  export function goTo(to: { continent: Continent; at: Point; title: string; where?: string; zoom?: number; whole?: GameMap; dungeon?: { id: number; wing?: string }; item?: number }): void {
+  export function goTo(to: { continent: Continent; at: Point; title: string; where?: string; zoom?: number; whole?: GameMap; dungeon?: { id: number; wing?: string; at?: Yards }; item?: number }): void {
     if (!map || !maps.length) return
+    // Someone inside a dungeon: its map, on that place, and the panel of the trainer standing there. Where the app has
+    // no rooms of the dungeon, its door on the world map.
+    if (to.dungeon?.at && openDungeon(to.dungeon.id, to.dungeon.wing)) {
+      following = false
+      const id = to.dungeon.id, there = fixed.find((p) => p.inside?.map === id && p.name === to.title)
+      // With the entrance it is walked to from: the one of its door, else the dungeon's.
+      const door = MORE_DOORS.find((d) => d.map === id && d.entrance === there?.inside?.door)?.inside ?? [...DUNGEON_PINS, ...NEW_DUNGEON_PINS].find((d) => d.map === id && d.entrance)?.entrance
+      if (door) map.fitBounds(L.latLngBounds([atYards(to.dungeon.at), atYards({ u: door[0], v: door[1] })]).pad(0.25), { animate: false })
+      else map.setView(atYards(to.dungeon.at), map.getZoom() + 1, { animate: false })
+      if (there) insideNpc = { ...there }
+      return
+    }
     following = false
     if (inside || continent !== to.continent) show(to.continent, false)
     const view = map
@@ -1236,7 +1287,7 @@
     // there is nothing to say of a point yet.
     made.on('click', (e) => {
       if (labelled) return void (labelled = null)
-      if (inside) return
+      if (inside) return void (insideNpc = null)
       if (holder.clientWidth < 640) layersOpen = false // on a narrow map the menu would lie over the label
       const units = { x: e.latlng.lng, y: -e.latlng.lat }, found = zoneAt(maps, continent, units)
       labelled = {
@@ -2662,6 +2713,10 @@
   .map :global(.boss) {
     border-radius: 50%;
     box-shadow: 0 0 10px 4px #a3201a99;
+  }
+  /* A trainer's name, and what it is under it: both under the middle of its picture. */
+  .map :global(.trainer-name) {
+    text-align: center;
   }
   .map :global(.boss-name) {
     padding: 0;
