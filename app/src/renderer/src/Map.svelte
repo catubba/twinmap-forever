@@ -438,8 +438,9 @@
   // tiles and smoothed, so a border fades over a chunk. Under the names, over the ground and its relief
   // (a zIndex over the relief's, so turning the relief off and on leaves it under). 2D only.
   // Laid as a colour (.tint below): the ground keeps its light and takes the zone's colour, so a grey zone is grey and a
-  // yellow one yellow on red earth as on green grass. Chosen by the player on a preview, over 30% laid as it is.
-  const TINT_OPACITY = 0.6
+  // yellow one yellow on red earth as on green grass. Chosen by the player on previews, over 30% laid as it is: 60% on
+  // the minimap's ground, 45% on the game's map, whose light paper takes a colour more brightly.
+  const TINT_OPACITY = 0.6, TINT_ON_PARCHMENT = 0.45
   const ZONES = 'zones.bin' // main/zone-grid.ts
   const zoneGrid = kept(2, (world: string) => inflated(`${TILES}/${world}/${ZONES}`).then((b) => b && new Uint16Array(b.buffer)))
   const TintLayer = L.GridLayer.extend({
@@ -473,10 +474,10 @@
   $effect(() => {
     tint?.remove()
     tint = undefined
-    const world = WORLDS.find((w) => w.continent === continent), asked = ++tintFor, at = level, view = map
+    const world = WORLDS.find((w) => w.continent === continent), asked = ++tintFor, at = level, view = map, opacity = onParchment ? TINT_ON_PARCHMENT : TINT_OPACITY
     if (!(maps.length > 0 && layers.levels && !inside && !threeD && world && view && at)) return
     void zoneGrid(world.name).then((grid) => {
-      if (grid && asked === tintFor) tint = new TintLayer({ picture: tinted(grid, at), bounds: WORLD_BOUNDS, minZoom: 0, maxZoom: 9, keepBuffer: 4, zIndex: 4, opacity: TINT_OPACITY, className: 'tint' }).addTo(view)
+      if (grid && asked === tintFor) tint = new TintLayer({ picture: tinted(grid, at), bounds: WORLD_BOUNDS, minZoom: 0, maxZoom: 9, keepBuffer: 4, zIndex: 4, opacity, className: 'tint' }).addTo(view)
     })
   })
 
