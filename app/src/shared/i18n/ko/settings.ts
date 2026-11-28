@@ -61,6 +61,12 @@ export default {
   },
 
   graphics: {
+    quality: '품질',
+    low: '낮음',
+    medium: '중간',
+    high: '높음',
+    custom: '사용자 지정',
+    qualityHint: '아래 항목을 한 번에 설정합니다. 하나라도 바꾸면 사용자 지정이 됩니다.',
     view3d: '3D 보기',
     buildings: '건물',
     cost: '각 항목은 메모리와 그래픽 카드 시간을 사용합니다. 이 창에만 저장되며, 휴대폰이나 태블릿은 따로 저장합니다.',

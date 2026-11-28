@@ -89,6 +89,11 @@ export default {
   },
 
   offMap: 'Ce lieu n’est pas sur la carte.',
+  slowView: 'La vue 3D est lente ici ({fps} i/s).',
+  lowerTo: 'Passer en {quality}',
+  keepQuality: 'Garder {quality}',
+  lostView: 'La carte graphique n’a plus de mémoire : qualité réglée sur Basse.',
+  lostSettings: 'Options',
   // Images per second, the usual French abbreviation; shown only in trials.
   fps: '{fps} i/s',
   nothingToSend: 'Il n’y a rien à envoyer.',

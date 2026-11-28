@@ -95,6 +95,11 @@ export default {
   },
 
   offMap: '이곳은 지도에 없습니다.',
+  slowView: '여기서는 3D 보기가 느립니다({fps} FPS).',
+  lowerTo: '{quality}으로 낮추기',
+  keepQuality: '{quality} 유지',
+  lostView: '그래픽 카드 메모리가 부족해 품질을 낮음으로 설정했습니다.',
+  lostSettings: '설정',
   fps: '{fps} FPS',
   nothingToSend: '보낼 것이 없습니다.',
 

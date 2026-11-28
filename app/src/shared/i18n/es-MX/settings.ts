@@ -61,6 +61,12 @@ export default {
   },
 
   graphics: {
+    quality: 'Calidad',
+    low: 'Baja',
+    medium: 'Media',
+    high: 'Alta',
+    custom: 'Personalizada',
+    qualityHint: 'Ajusta todo lo de abajo a la vez. Al cambiar una opción, pasa a Personalizada.',
     view3d: 'Vista 3D',
     buildings: 'Edificios',
     cost: 'Cada opción consume memoria y tiempo de la tarjeta gráfica. Se guarda en esta ventana: el celular o la tableta guardan su propia elección.',

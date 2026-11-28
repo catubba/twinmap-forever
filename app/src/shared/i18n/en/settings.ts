@@ -91,6 +91,14 @@ export default {
 
   // In Graphics: what the 3D view draws, each a switch, and the hardware acceleration (window.gpu) under its own subtitle.
   graphics: {
+    // At the top of Graphics: a dropdown that sets every switch of the 3D view at once (not the dungeons), its steps, and the hint under it.
+    quality: 'Quality',
+    low: 'Low',
+    medium: 'Medium',
+    high: 'High',
+    // Shown in that dropdown, never chosen, when the switches are set as none of the three steps has them.
+    custom: 'Custom',
+    qualityHint: 'Sets everything below at once. Change one of them and it becomes Custom.',
     // A subtitle over the switches of what the 3D view draws.
     view3d: '3D view',
     // A switch: the towns, houses, towers and bridges of the game in the 3D view.
