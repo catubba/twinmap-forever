@@ -224,6 +224,34 @@ export function boxOf(pieces: Piece[]): Box | null {
   return box
 }
 
+/** Yards at least between two groups of rooms of a map for them to be framed one at a time: Caverns of Time, Nightmare Grove and Scarlet Monastery lie kilometres apart. */
+export const PART_GAP = 1000
+
+/**
+ * The parts of a map that lie apart: the box of each group of its rooms PART_GAP or more from all the others, the one
+ * with the most rooms first. One box for a dungeon in one piece, none for a map with no rooms.
+ */
+export function partsOf(pieces: Piece[]): Box[] {
+  // ponytail: every pair, n² for the 519 pieces of the largest map; a grid of cells if a map ever has thousands
+  const boxes = pieces.map((p): Box => [p.u - reach(p), p.v - reach(p), p.u + reach(p), p.v + reach(p)])
+  const group = pieces.map((_, i) => i)
+  const top = (i: number): number => (group[i] === i ? i : (group[i] = top(group[i]!)))
+  for (let i = 0; i < boxes.length; i++)
+    for (let j = i + 1; j < boxes.length; j++) {
+      const a = boxes[i]!, b = boxes[j]!
+      if (a[0] - PART_GAP < b[2] && b[0] - PART_GAP < a[2] && a[1] - PART_GAP < b[3] && b[1] - PART_GAP < a[3]) group[top(i)] = top(j)
+    }
+  const parts = new Map<number, Piece[]>()
+  pieces.forEach((p, i) => parts.set(top(i), [...(parts.get(top(i)) ?? []), p]))
+  return [...parts.values()].sort((a, b) => b.length - a.length).map((part) => boxOf(part)!)
+}
+
+/** Which of the boxes a place is in, or the nearest by its middle. */
+export function partAt(boxes: Box[], { u, v }: Yards): number {
+  const far = ([u1, v1, u2, v2]: Box): number => (u >= u1 && u <= u2 && v >= v1 && v <= v2 ? -1 : Math.hypot(u - (u1 + u2) / 2, v - (v1 + v2) / 2))
+  return boxes.reduce((best, box, i) => (far(box) < far(boxes[best]!) ? i : best), 0)
+}
+
 /**
  * The pixels of a room's picture from its DXT1 blocks: red, green, blue and whether it is solid.
  * In a block whose first color is not the greater, the fourth choice is see-through: that is how

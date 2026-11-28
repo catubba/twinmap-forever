@@ -75,6 +75,8 @@ export default {
     levelsShown: '표시된 층',
     everyRoom: '모든 방',
     roomsUpTo: '{level}층까지의 방',
+    parts: '구역',
+    partTip: '{part}구역',
     zoomIn: '확대',
     zoomInTip: '확대 (+)',
     zoomOut: '축소',

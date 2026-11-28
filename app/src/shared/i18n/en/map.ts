@@ -102,6 +102,10 @@ export default {
     // Tooltips on those buttons: the last shows every room; {level} is the number on the button.
     everyRoom: 'Every room',
     roomsUpTo: 'Rooms up to level {level}',
+    // Inside a dungeon in parts kilometres apart (the wings of Scarlet Monastery, Caverns of Time): a small tag before the buttons 1, 2, 3 that put each part in view. Short. Also the row of those buttons, read aloud.
+    parts: 'Parts',
+    // Tooltip on such a button, for a part with no name of its own; {part} is the number on the button.
+    partTip: 'Part {part}',
     // Buttons with a plus and a minus, read aloud only; then their tooltips, with the keys that do it too.
     zoomIn: 'Zoom in',
     zoomInTip: 'Zoom in (+)',

@@ -27,7 +27,7 @@
   import { coloursFor, type Companion } from '../../shared/group'
   import { clearOf, gathered, unitsOfPlace, unitsOfRect, type Point } from '../../shared/geo'
   import { addFix, BEHIND, PERIOD, TURN, turnAt, whereAt, type Fix, type Turn } from '../../shared/glide'
-  import { boxOf, buildingsAt, killedIn, nameOfBoss, piecesIn, RARE_BOSSES, roomPixels, yardsInside, YARDS_PER_UNIT, type Box, type InteriorMap, type Interiors, type Piece, type UnderRoom, type Yards } from '../../shared/inside'
+  import { boxOf, buildingsAt, killedIn, nameOfBoss, partAt, partsOf, piecesIn, RARE_BOSSES, roomPixels, yardsInside, YARDS_PER_UNIT, type Box, type InteriorMap, type Interiors, type Piece, type UnderRoom, type Yards } from '../../shared/inside'
   import type { Continent, GameMap } from '../../shared/maps'
   import { objectiveAreas, objectiveGroups, questXp, xpDrop, type QuestPin, type QuestReward } from '../../shared/quests'
   import { coins } from '../../shared/items'
@@ -660,11 +660,29 @@
           .addTo(pins)
     }
     bosses = bossMarks
+    // A map in parts far apart (partsOf): one at a time, the wing asked for, the character's or the one with the most
+    // rooms; the buttons beside its name go to the others. Its wings where the pins tell them, its groups of rooms else.
+    const apart = partsOf(m.pieces)
+    parts = apart.length < 2 ? [] : dungeons.length > 1 ? dungeons.map((d) => ({ box: d.bounds, name: d.name })) : apart.map((box) => ({ box }))
+    const here = pos?.inst?.id === m.id ? yardsInside(pos.inst) : undefined, asked = parts.findIndex((p) => p.name === wing)
+    partShown = asked >= 0 ? asked : here ? partAt(parts.map((p) => p.box), here) : 0
     const framed = dungeons.filter((d) => d.name === wing)
-    const box = dungeons.length
+    const box = parts.length
+      ? parts[partShown]!.box
+      : dungeons.length
       ? (framed.length ? framed : dungeons).reduce<Box>((all, d) => [Math.min(all[0], d.bounds[0]), Math.min(all[1], d.bounds[1]), Math.max(all[2], d.bounds[2]), Math.max(all[3], d.bounds[3])], [Infinity, Infinity, -Infinity, -Infinity])
       : boxOf(m.pieces)
     if (box) map.fitBounds(boundsOfBox(box), { animate: false }) // at once: the arrow is placed against this view
+  }
+
+  // The parts of the dungeon on show that lie far apart, framed one at a time, and the one in view; none for most.
+  let parts = $state.raw<{ box: Box; name?: string }[]>([])
+  let partShown = $state(0)
+  function showPart(i: number): void {
+    if (!map || !parts[i]) return
+    following = false
+    partShown = i
+    map.fitBounds(boundsOfBox(parts[i].box), { animate: false })
   }
 
   // The level the character is on shows by itself each time it changes; a level picked by hand stays until then.
@@ -890,6 +908,7 @@
       me = null
       const where = yardsInside(inst)
       if (!where) return void arrow.remove() // the game does not tell the place in here
+      if (following && parts.length) partShown = partAt(parts.map((p) => p.box), where)
       // On the way in the whole dungeon is in view, and stays so while the arrow is well inside it. In 3D the view
       // goes with the arrow as it does outside: the cut is over the arrow's floor, and what is far from it is cut too.
       if (threeD && terrain) {
@@ -2094,6 +2113,14 @@
       <span class="tag">{t('map.corner.levels')}</span>
       {#each Array.from({ length: levels + 1 }, (_, i) => i) as level (level)}
         <button class="btn" aria-pressed={upTo === level} title={level === levels ? t('map.corner.everyRoom') : t('map.corner.roomsUpTo', { level: level + 1 })} onclick={() => showUpTo(level)}>{level + 1}</button>
+      {/each}
+    </div>
+  {/if}
+  {#if inside && parts.length > 1}
+    <div class="line" role="group" aria-label={t('map.corner.parts')}>
+      <span class="tag">{t('map.corner.parts')}</span>
+      {#each parts as part, i (i)}
+        <button class="btn" aria-pressed={partShown === i} title={part.name ? gameName(part.name) : t('map.corner.partTip', { part: i + 1 })} onclick={() => showPart(i)}>{i + 1}</button>
       {/each}
     </div>
   {/if}

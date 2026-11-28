@@ -71,6 +71,8 @@ export default {
     levelsShown: 'Показанные этажи',
     everyRoom: 'Все комнаты',
     roomsUpTo: 'Комнаты до этажа {level}',
+    parts: 'Части',
+    partTip: 'Часть {part}',
     zoomIn: 'Приблизить',
     zoomInTip: 'Приблизить (+)',
     zoomOut: 'Отдалить',

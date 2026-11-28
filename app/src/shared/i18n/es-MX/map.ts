@@ -70,6 +70,8 @@ export default {
     levelsShown: 'Pisos visibles',
     everyRoom: 'Todas las salas',
     roomsUpTo: 'Salas hasta el piso {level}',
+    parts: 'Partes',
+    partTip: 'Parte {part}',
     zoomIn: 'Acercar',
     zoomInTip: 'Acercar (+)',
     zoomOut: 'Alejar',
