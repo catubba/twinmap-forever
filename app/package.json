@@ -78,6 +78,9 @@
     "appImage": {
       "artifactName": "Twinmap-linux-x86_64.${ext}"
     },
+    "toolsets": {
+      "appimage": "1.0.3"
+    },
     "publish": {
       "provider": "github",
       "owner": "catubba",
