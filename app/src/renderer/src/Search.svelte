@@ -4,6 +4,7 @@
   // the field; one chosen takes the map to its place and opens its label there, a dungeon's on its door.
   import { TILES } from './web'
   import { unitsOfPlace, type Point } from '../../shared/geo'
+  import type { Yards } from '../../shared/inside'
   import type { Continent, GameMap } from '../../shared/maps'
   import { wayOf, whereIs } from '../../shared/now'
   import { best, dungeonsOf, fold, type Dungeon } from '../../shared/search'
@@ -16,7 +17,7 @@
   import { kept as keptByApp } from './kept.svelte'
   import { savedFrom } from '../../shared/saved'
 
-  export interface Place { continent: Continent; at: Point; title: string; where?: string; whole?: GameMap; dungeon?: { id: number; wing?: string }; item?: number }
+  export interface Place { continent: Continent; at: Point; title: string; where?: string; whole?: GameMap; dungeon?: { id: number; wing?: string; at?: Yards }; item?: number }
   // onadd: puts an item found on the shopping list of the character picked (M10-F4).
   let { ready, onpick, pos, side, onadd }: { ready: boolean; onpick: (place: Place) => void; pos?: { map?: number; x?: number; y?: number }; side?: string; onadd?: (item: number) => void } = $props()
 
@@ -42,11 +43,15 @@
   const myPins = $derived(keptPins.value.filter((p) => !p.temp).map((p) => ({ ...p, lower: fold(p.name) })))
   // The dungeons and raids, by the names of their maps, behind the doors of the world map.
   let dungeons = $state.raw<(Dungeon & { lower: string })[]>([])
+  let doors: Travel['doors'] = []
   $effect(() => {
     if (!ready || dungeons.length) return
     void fetch(`${TILES}/travel.json`)
       .then((answer) => answer.json() as Promise<Travel>)
-      .then((told) => (dungeons = dungeonsOf(told.doors).map((d) => ({ ...d, lower: fold(d.name) }))))
+      .then((told) => {
+        doors = told.doors
+        dungeons = dungeonsOf(told.doors).map((d) => ({ ...d, lower: fold(d.name) }))
+      })
       .catch(() => {})
   })
 
@@ -83,6 +88,15 @@
     )
     const named: Result[] = [], doers: Result[] = []
     for (const f of found) {
+      // Inside a dungeon: told by the dungeon and how far the door it is reached by is (Uldaman's back door), and opened on its map.
+      const dungeon = f.inside && dungeons.find((d) => d.id === f.inside!.map && !d.wing)
+      if (dungeon && f.inside && !(f.does && !serves(f, side))) {
+        const by = f.inside.door && doors.find((d) => d.maps?.includes(dungeon.id) && d.entrance === f.inside!.door)
+        const at = by ? { x: by.x, y: by.y } : dungeon.at, yards = me && me.continent === dungeon.continent ? wayOf(me.at, at).yards : undefined
+        const what = t('map.search.foundIn', { what: f.note, zone: dungeon.name })
+        ;(f.does ? doers : named).push({ continent: dungeon.continent, at, title: f.name, where: dungeon.name, note: by ? t('map.search.foundIn', { what, zone: t(`map.pins.doors.${by.entrance!}`) }) : what, yards, dungeon: { id: dungeon.id, at: { u: f.inside.u, v: f.inside.v } } })
+        continue
+      }
       const zone = byArea.get(f.area) // a place in a zone the app has no map of cannot be shown
       if (!zone || (f.does && !serves(f, side))) continue
       const at = unitsOfPlace(zone.rect!, f.x, f.y)

@@ -921,7 +921,11 @@ npc_trainer and npc_trainer_template tables of classic-db
 more than one door have the others on the world map (the back door of Uldaman,
 the two of Maraudon, those of the wings of Dire Maul): where the exits of the
 areatrigger_teleport table of classic-db put the player
-(app/src/shared/dungeon-doors.ts).
+(app/src/shared/dungeon-doors.ts), and where the back door of Uldaman puts the
+player inside it. Also in the app, where the two trainers of a profession who
+stand inside a dungeon (Annora in Uldaman, Henry Stern in Razorfen Downs) are on
+the map of their dungeon: their spawns in the creature table of classic-db
+(app/src/shared/dungeon-trainers.ts).
 ================================================================================
 
 The classic-db database is licensed under the GNU General Public License,

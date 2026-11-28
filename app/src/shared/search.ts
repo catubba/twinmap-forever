@@ -1,5 +1,6 @@
 // The search of the top row: what it finds, and how names are ranked against what was typed.
 import { DUNGEON_PINS } from './dungeon-pins'
+import type { InsidePlace } from './dungeon-trainers'
 import type { Point } from './geo'
 import type { Continent } from './maps'
 import type { Travel } from './services'
@@ -20,6 +21,8 @@ export interface Found {
   side?: string
   /** The item found, by the game's number: its picture is shown beside it. */
   item?: number
+  /** An NPC inside a dungeon (dungeon-trainers.ts): its map and its place there. area, x and y are 0. */
+  inside?: InsidePlace
 }
 
 /**
