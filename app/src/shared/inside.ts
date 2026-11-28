@@ -148,8 +148,11 @@ export function buriedBuildings(pieces: Piece[], groundAt: (u: number, v: number
   return [...floors].filter(([, f]) => f.under >= f.all / 2).map(([building]) => building).sort((a, b) => a - b)
 }
 
-/** A room inside the ground, for the 3D view: its place in the list of the continent's pieces, the height of its floor, the yards of ground over it. */
-export type UnderRoom = [index: number, floor: number, roof: number]
+/**
+ * A room inside the ground, for the 3D view: its place in the list of the continent's pieces, the height of its floor,
+ * the yards of ground over it, and for a dungeon 1 in a building dug in rock (inRock), whose ground is cut round it, 0 else.
+ */
+export type UnderRoom = [index: number, floor: number, roof: number, rock?: 0 | 1]
 
 // The places of a piece asked about: a grid over it, a point every few yards.
 function* over(p: Piece, step: number): Generator<[number, number]> {
@@ -209,6 +212,57 @@ export function lidOver(pieces: Piece[], [u1, v1, u2, v2]: Box, level: number): 
     for (const [u, v] of over(p, 4)) if (u >= u1 && u < u2 && v >= v1 && v < v2) return true
   }
   return false
+}
+
+/** Yards the ground over a building's rooms is, in the middle, over their ceilings, from which the building is dug in rock. */
+export const ROCK_DEEP = 50
+/** Yards a boss stands under the ground over it, at least, to be in the rock and not on the ground. */
+const UNDER_GROUND = 20
+/** The ground round a room in rock is cut this many yards over its floor, as a dungeon's buildings are round the character (buildings3d.ts, DUNGEON_CUT). */
+export const ROCK_CUT = 12
+/** And it rises from there a yard a yard away from the room: the cut is a funnel round the rooms. */
+export const ROCK_SLOPE = 1
+
+/**
+ * The buildings of a dungeon dug in rock (M23-F30; measured in design/dungeons3d/rock.ts): the ground over their rooms
+ * lies, in the middle of a point every 4 yards of their pieces, ROCK_DEEP yards or more over their ceilings. None in a
+ * dungeon whose bosses stand on the ground more than under it: there the ground is the place one walks, and a
+ * building as deep under it is a cellar (Zul'Farrak, Ruins of Lordaeron over Undercity). The depth alone does not tell
+ * (Undercity lies 127 yards under the ruins), nor the objects on the ground (the dead trees over the crypts of
+ * Karazhan, the bare sand of Zul'Farrak). bosses: u, v and the height where it is known (pin-heights.ts); one with none
+ * is under the ground where a room with its ceiling under it is.
+ */
+export function inRock(pieces: Piece[], groundAt: (u: number, v: number) => number | null, bosses: [u: number, v: number, z?: number][]): Set<number> {
+  let on = 0, under = 0
+  for (const [u, v, z] of bosses) {
+    const ground = groundAt(u, v)
+    if (ground === null) continue
+    const deep = z === undefined ? pieces.some((p) => p.top < ground - UNDER_GROUND && inPiece(p, u, v)) : ground - z > UNDER_GROUND
+    if (deep) under++
+    else on++
+  }
+  if (on > under) return new Set()
+  const depths = new Map<number, number[]>()
+  for (const p of pieces)
+    for (const [u, v] of over(p, 4)) {
+      const ground = groundAt(u, v)
+      if (ground !== null) (depths.get(p.building) ?? depths.set(p.building, []).get(p.building)!).push(ground - p.top)
+    }
+  return new Set([...depths].filter(([, d]) => d.sort((a, b) => a - b)[d.length >> 1]! >= ROCK_DEEP).map(([building]) => building))
+}
+
+/**
+ * Where the ground round the rooms in rock is cut: ROCK_CUT over the floor of each, rising ROCK_SLOPE a yard away from
+ * its piece; Infinity where no room is near enough to cut anything. rooms: the pieces in rock with their floors.
+ */
+export function rockCut(rooms: { piece: Piece; floor: number }[], u: number, v: number): number {
+  let cut = Infinity
+  for (const { piece: p, floor } of rooms) {
+    const cos = Math.cos(p.angle), sin = Math.sin(p.angle), du = u - p.u, dv = v - p.v
+    const away = Math.hypot(Math.max(0, Math.abs(du * cos - dv * sin) - p.width / 2), Math.max(0, Math.abs(du * sin + dv * cos) - p.height / 2))
+    cut = Math.min(cut, floor + ROCK_CUT + away * ROCK_SLOPE)
+  }
+  return cut
 }
 
 /** What holds every piece, or null for none. */

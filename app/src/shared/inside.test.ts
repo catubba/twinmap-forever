@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { boxOf, buildingsAt, inPiece, killedIn, nameOfBoss, partAt, partsOf, piecesIn, RARE_BOSSES, roomPixels, yardsInside, YARDS_PER_UNIT, type Piece, buriedBuildings } from './inside'
+import { boxOf, buildingsAt, inPiece, killedIn, nameOfBoss, partAt, partsOf, piecesIn, RARE_BOSSES, roomPixels, yardsInside, YARDS_PER_UNIT, type Piece, buriedBuildings, inRock, rockCut, ROCK_CUT } from './inside'
 import { DUNGEON_PINS } from './dungeon-pins'
 import { MORE_BOSS_PINS } from './more-boss-pins'
 
@@ -135,4 +135,25 @@ test('a map in groups of rooms far apart is in parts, the one with the most room
   expect(parts[0]![0]).toBeGreaterThan(4900) // the four rooms past 5000 come first
   expect(partAt(parts, { u: 600, v: 100 })).toBe(1)
   expect(partAt(parts, { u: 4000, v: 100 })).toBe(0) // in none: the nearest by its middle
+})
+
+test('a dungeon is dug in rock where the ground over its rooms is 50 yards or more over their ceilings, unless its bosses stand on the ground', () => {
+  // the ground: 300 high west of u = 1000 (rock over a mine), 40 east of it (a land over cellars)
+  const groundAt = (u: number): number | null => (u < 1000 ? 300 : 40)
+  // the mine and the cellar 220 and 60 yards under, a hall 30
+  const mine = piece({ u: 100, bottom: 0, top: 80, building: 0 }), shallow = piece({ u: 200, bottom: 100, top: 270, building: 1 })
+  const cellar = piece({ u: 1100, bottom: -60, top: -20, building: 2 })
+  expect([...inRock([mine, shallow, cellar], groundAt, [])]).toEqual([0, 2])
+  // bosses with a height: on the ground more than under it, nothing is in rock
+  expect(inRock([mine, cellar], groundAt, [[1100, 100, 40], [1150, 100, 38], [100, 100, 2]]).size).toBe(0)
+  expect([...inRock([mine, cellar], groundAt, [[1100, 100, 40], [100, 100, 2], [110, 100, 3]])]).toEqual([0, 2])
+  // a boss with none is under the ground where a room with its ceiling under the ground is
+  expect([...inRock([mine, cellar], groundAt, [[100, 100], [2000, 100]])]).toEqual([0, 2])
+})
+
+test('the ground round a room in rock is cut over its floor, rising a yard a yard away from it', () => {
+  const rooms = [{ piece: piece({ u: 100, v: 100, width: 20, height: 20 }), floor: 10 }]
+  expect(rockCut(rooms, 105, 95)).toBe(10 + ROCK_CUT)
+  expect(rockCut(rooms, 140, 100)).toBeCloseTo(10 + ROCK_CUT + 30)
+  expect(rockCut([], 100, 100)).toBe(Infinity)
 })
