@@ -1592,7 +1592,7 @@
       L.marker(at(door), { keyboard: false, zIndexOffset: 200, icon: doorIcon(door.raid === true) })
         .bindTooltip(door.names.join(', '), { direction: 'top', offset: [0, -13], className: 'tip' })
         .on('click', () => {
-          labelPin({ x: door.x, y: door.y }, door.names.join(', '), [t('map.pins.entrance')], undefined, behindDoor(door))
+          labelPin({ x: door.x, y: door.y }, door.names.join(', '), [t('map.pins.entrance')], undefined, behindDoor(door), door.wing)
         })
         .addTo(travelLayers.dungeons)
     }
