@@ -435,7 +435,8 @@
 
   // The zones tinted by their levels for the character (shared/zone-levels.ts), each on its own land (main/zone-grid.ts):
   // a picture of the continent at a pixel a chunk (33 yards), coloured again when the level changes, cut into the map's
-  // tiles and smoothed, so a border fades over a chunk. Under the names, over the ground and its relief. 2D only.
+  // tiles and smoothed, so a border fades over a chunk. Under the names, over the ground and its relief
+  // (a zIndex over the relief's, so turning the relief off and on leaves it under). 2D only.
   // Laid as a colour (.tint below): the ground keeps its light and takes the zone's colour, so a grey zone is grey and a
   // yellow one yellow on red earth as on green grass. Chosen by the player on a preview, over 30% laid as it is.
   const TINT_OPACITY = 0.6
@@ -475,7 +476,7 @@
     const world = WORLDS.find((w) => w.continent === continent), asked = ++tintFor, at = level, view = map
     if (!(maps.length > 0 && layers.levels && !inside && !threeD && world && view && at)) return
     void zoneGrid(world.name).then((grid) => {
-      if (grid && asked === tintFor) tint = new TintLayer({ picture: tinted(grid, at), bounds: WORLD_BOUNDS, minZoom: 0, maxZoom: 9, keepBuffer: 4, zIndex: 3, opacity: TINT_OPACITY, className: 'tint' }).addTo(view)
+      if (grid && asked === tintFor) tint = new TintLayer({ picture: tinted(grid, at), bounds: WORLD_BOUNDS, minZoom: 0, maxZoom: 9, keepBuffer: 4, zIndex: 4, opacity: TINT_OPACITY, className: 'tint' }).addTo(view)
     })
   })
 
