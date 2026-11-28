@@ -218,6 +218,16 @@ export function lidOver(pieces: Piece[], [u1, v1, u2, v2]: Box, level: number): 
 export const ROCK_DEEP = 50
 /** The share of the area of a dungeon's rooms that lies inside the ground (roofOf), at least, for it to be dug in rock. */
 export const ROCK_UNDER = 0.8
+/**
+ * Dungeons inRock takes that are not dug in rock, by the game's number of the map (M23-F32). Demon Fall Canyon (2784):
+ * its caves lie under the canyon floor and the wood with its road, which the cut would take away, and from above they
+ * already show through the ground opened over them. Nothing measured tells it from Karazhan Crypts, which is cut: its
+ * rooms are as far under the ground (94 and 93% of their area), its bosses have no pins, the ground over the rooms has
+ * as many objects and as little rise, holes into the caves, few rooms in the open. Only the ground over its caves is
+ * not the continent's (Kalimdor's lies 147 yards lower there, Deadwind Pass over the crypts is the same), which tells
+ * a ground laid for the dungeon but not whether one walks it. Measures in design/dungeons3d (rock.ts, same.ts).
+ */
+export const NOT_IN_ROCK: ReadonlySet<number> = new Set([2784])
 /** Yards a boss stands under the ground over it, at least, to be in the rock and not on the ground. */
 const UNDER_GROUND = 20
 /** The ground round a room in rock is cut this many yards over its floor, as a dungeon's buildings are round the character (buildings3d.ts, DUNGEON_CUT). */
