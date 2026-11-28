@@ -71,6 +71,10 @@ const OFF = 60
 const ROOF_KEPT = 0.05
 /** Yards past a room's roof, along the look, that the ground still opens for it. */
 const ROOF_MARGIN = 60
+/** Milliseconds the ground of a dungeon stays cut after it last hid the character in it from the camera. */
+const ROOF_HELD = 1500
+/** Places looked at between the camera and the character for ground that hides it. */
+const ROOF_LOOKS = 24
 /** How much of a room shows through a mountain that is not its roof. */
 const ROOF_GHOST = 0.1
 
@@ -205,6 +209,13 @@ export class Terrain {
   private stands: { cells: number; blocks: Map<number, Float32Array> } | null = null
   private standsAsked = -Infinity // in seconds
   private streets = true
+  // With the character under a roof in a dungeon, the ground that hides it from the camera is cut away DUNGEON_CUT
+  // yards over its floor, with its water and all that stands on it, as the dungeon's own buildings are (buildings3d.ts;
+  // M23-F28): the rock Deadmines is dug in rises 300 yards over the mine and all round its bay, and the camera that
+  // follows the character is inside it. In the open, and where no ground hides it, the plane is far over everything.
+  // Held a moment after the ground last hid it: as the view turns past a gap it would come back for a frame.
+  private readonly over = new THREE.Plane(new THREE.Vector3(0, -1, 0), 1e6)
+  private roofedAt = -Infinity
   private seen = new THREE.WebGLRenderTarget(2, 2, { depthTexture: new THREE.DepthTexture(2, 2) })
   private seenClear = false // not yet: a picture never drawn on reads as solid
   private roofs = {
@@ -249,13 +260,13 @@ export class Terrain {
     sun.position.set(-Math.SQRT1_2, 1, -Math.SQRT1_2)
     this.scene.add(new THREE.AmbientLight(0xffffff, Math.PI * 0.5), sun)
     this.materials = {
-      ground: new THREE.MeshLambertMaterial({ side: THREE.DoubleSide }),
-      pit: new THREE.MeshBasicMaterial({ color: PIT }),
-      openPit: Object.assign(new THREE.MeshLambertMaterial({ color: 0x000000, emissive: PIT, transparent: true }), { onBeforeCompile: (shader: THREE.WebGLProgramParametersWithUniforms) => this.opening(shader) }),
+      ground: new THREE.MeshLambertMaterial({ side: THREE.DoubleSide, clippingPlanes: [this.over] }),
+      pit: new THREE.MeshBasicMaterial({ color: PIT, clippingPlanes: [this.over] }),
+      openPit: Object.assign(new THREE.MeshLambertMaterial({ color: 0x000000, emissive: PIT, transparent: true, clippingPlanes: [this.over] }), { onBeforeCompile: (shader: THREE.WebGLProgramParametersWithUniforms) => this.opening(shader) }),
       // Water, lava, fel, tar: in the order water.ts numbers them, from 1; then the open sea.
       liquids: [
         // Its colour a vertex, by how deep it is (meshes). The sun shines on shallow water only: deep water is the open sea, which has no shine.
-        Object.assign(new THREE.MeshPhongMaterial({ vertexColors: true, specular: 0x8899aa, shininess: 60, transparent: true, depthWrite: false }), {
+        Object.assign(new THREE.MeshPhongMaterial({ vertexColors: true, specular: 0x8899aa, shininess: 60, transparent: true, depthWrite: false, clippingPlanes: [this.over] }), {
           onBeforeCompile: (shader: { fragmentShader: string }) => {
             shader.fragmentShader = shader.fragmentShader.replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
 reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
@@ -266,18 +277,21 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
           transparent: true,
           opacity: 0.9,
           depthWrite: false,
+          clippingPlanes: [this.over],
         }),
         new THREE.MeshBasicMaterial({
           color: 0x59c832,
           transparent: true,
           opacity: 0.8,
           depthWrite: false,
+          clippingPlanes: [this.over],
         }),
         new THREE.MeshLambertMaterial({
           color: 0x15110e,
           transparent: true,
           opacity: 0.9,
           depthWrite: false,
+          clippingPlanes: [this.over],
         }),
         new THREE.MeshBasicMaterial({ color: SEA }),
       ],
@@ -292,9 +306,9 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
     ] as const) {
       this.scene.add(new THREE.Mesh(new THREE.PlaneGeometry(w, d).rotateX(-Math.PI / 2).translate(x + w / 2, 0, z + d / 2), this.materials.liquids[4]))
     }
-    this.buildings = new Buildings(this.renderer)
+    this.buildings = new Buildings(this.renderer, this.over)
     this.scene.add(this.buildings.group)
-    this.props = new Props(this.renderer, (x, z) => this.buildings.cutAt(x, z))
+    this.props = new Props(this.renderer, (x, z) => this.buildings.cutAt(x, z), this.over)
     this.scene.add(this.props.group)
     this.ground = new Ground(this.renderer, this.s3tc)
     this.controls = new MapControls(this.camera, this.renderer.domElement)
@@ -653,6 +667,17 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
     return behind
   }
 
+  // Whether ground the cut would take away stands between the camera and the character: higher than the cut, and
+  // over the line from the one to the other, the camera's own place first.
+  private roofed(a: THREE.Vector3): boolean {
+    const c = this.camera.position
+    for (let i = 0; i < ROOF_LOOKS; i++) {
+      const t = i / ROOF_LOOKS, ground = this.groundAt(c.x + (a.x - c.x) * t, c.z + (a.z - c.z) * t)
+      if (ground > a.y + DUNGEON_CUT && ground > c.y + (a.y - c.y) * t) return true
+    }
+    return false
+  }
+
   /** Puts the camera there at once. */
   look(at: Look): void {
     const ground = this.standAt(at.x, at.z) // where the point looked at is held (hold): a street, the floor of an open room
@@ -826,6 +851,13 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
     // a dungeon is cut over the character in it, followed or not: the view moved by hand stays on its floor
     if (this.buildings.step(this.camera.position, this.controls.target, this.farthest(fog.far), this.height / 2 / Math.tan((FOV * Math.PI) / 360), this.bare ? this.arrow : this.character)) this.dirty = true
     if (this.props.step(this.controls.target, distance, this.arrow)) this.dirty = true
+    // the ground over the character under a roof, cut as the dungeon is
+    if (this.bare && this.arrow && !this.rooms?.open && this.roofed(this.arrow)) this.roofedAt = now
+    const over = this.bare && this.arrow && now - this.roofedAt < ROOF_HELD ? this.arrow.y + DUNGEON_CUT : 1e6
+    if (over !== this.over.constant) {
+      this.over.constant = over
+      this.dirty = true
+    }
     if (this.ground.step(this.camera.position, this.controls.target.y)) this.dirty = true
     this.askStands()
     this.inside?.hidePictures(this.buildings.under)
@@ -1283,7 +1315,7 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
     const kept = opens ? this.withRoof : this.withPicture
     let m = kept.get(texture)
     if (!m) {
-      kept.set(texture, (m = new THREE.MeshLambertMaterial({ map: texture, side: THREE.DoubleSide, transparent: opens })))
+      kept.set(texture, (m = new THREE.MeshLambertMaterial({ map: texture, side: THREE.DoubleSide, transparent: opens, clippingPlanes: [this.over] })))
       if (opens || block) {
         m.onBeforeCompile = (shader) => {
           if (block) this.ground.into(shader, block)
