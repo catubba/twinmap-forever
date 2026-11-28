@@ -38,7 +38,7 @@ test('the bosses of the routes stand where our skulls are', () => {
   }
   off.sort((a, b) => a - b)
   expect(off.length).toBeGreaterThan(200)
-  expect(off[off.length >> 1]).toBeLessThan(20) // 15.6 yards with Forever Dungeon Routes 1.3.16
+  expect(off[off.length >> 1]).toBeLessThan(20) // 15.6 yards with Forever Dungeon Routes 1.4.0
   expect(off[Math.floor(off.length * 0.75)]).toBeLessThan(50)
 })
 
