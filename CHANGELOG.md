@@ -2,6 +2,33 @@
 
 What changed in each version of Twinmap, newest first. The section of a version is also the text of its release on GitHub and of the addon's file on CurseForge.
 
+## 1.0.0 - 2026-11-28
+
+### New
+
+- **Graphics, a new tab of Settings.** Everything the 3D view draws has a switch here: Buildings, Trees (Few, Some or Many), Objects, Ground texture up close, Day and night and 3D Dungeon (Experimental), each with what it costs in graphics card memory and the total under them. Quality sets them all at once, Low, Medium or High: a PC with a graphics card starts on High, a phone, a tablet or a PC without one on Low. When the 3D view stays slow, a line on the map offers the Quality below; if the graphics card runs out of memory, Twinmap goes to Low by itself and says so. Use hardware acceleration has moved here from General.
+- **Appearance, the look of your map.** New in Settings, Appearance: 2D map draws the map from the game's minimap pictures, or as the game's own World map, every zone as explored and stitched to the next, the cities up close. Appearance keeps the rest of how Twinmap looks: the side of the map, your arrow's colour and size, the map icons and the objectives as areas. Thanks to Stalioot.
+- **The game's world in 3D.** The 3D view draws what the game draws, from its own files on your PC, nothing downloaded: the buildings up to the whole continent, rising from the ground as they load; Ironforge, Undercity and the caves under the ground, cut open over their floors; the trees, thinned so the roads show, and the fences, carts, lamps and tents; the water in Stormwind's canals and the lava in Ironforge; the game's own ground up close. In Stormwind and Orgrimmar your arrow and the pins stand on the streets. The light follows the hour of the game's day and windows light up at night; drag the ring under the zone's name to move the sun.
+- **Dungeons and raids in 3D (Experimental).** Tick 3D Dungeon (Experimental) in Settings, Graphics, and the 3D button works inside dungeons and raids too: their rooms open from above, your arrow and the pins on the floor they stand on. It is still being built and may be wrong or slow.
+- **Zone levels.** Tick Zone levels in Filters, World, and every zone of the 2D map is tinted by its levels against your character's, in the game's colours: red, orange, yellow, green, then grey once it gives no more XP. Thanks to Stalioot.
+- **The way through a dungeon.** Inside a dungeon or a raid, the Route button beside its name draws the usual way through it, from the entrance to the last boss, the bosses numbered in order. The routes come from Forever Dungeon Routes.
+- **Every door of a dungeon.** The world map now shows Uldaman's back door, Maraudon's purple and orange doors, and a door for each wing of Dire Maul. Thanks to Stalioot.
+- **Trainers inside dungeons.** The Artisan Enchanting trainer in Uldaman and a Cooking trainer in Razorfen Downs are on the map of their dungeon, and Search finds them. Search also finds any profession trainer by its profession and rank, in English: try "artisan enchanting". Thanks to Stalioot.
+
+### Changed
+
+- **Quest objectives from farther out.** Objectives now show from the same zoom as the quests to take.
+- **Professions in a narrow panel.** The professions on top take only the room they need, so all of them show and the recipes get the rest. Thanks to Stalioot.
+- **Linux: no FUSE 2.** The AppImage no longer needs FUSE 2. Thanks to lkshrk.
+- **Linux: why the game is not seen.** When Twinmap cannot read the game, twinmap.log says why; when the game has no window on the X display (Wine's Wayland driver, a gamescope of its own), Twinmap says so and what to turn off. Thanks to markus-barta.
+
+### Fixed
+
+- **Zone names at the edges.** A point is named after the zone of the land under it, not after a bigger map that reaches over it: the doors of Dire Maul are in Feralas, not Mulgore. Thanks to Stalioot.
+- **Flight lines in 3D.** They curve smoothly from one flight master to the other, without spikes over the mountains and Undercity.
+- **Professions in Chinese.** Two recipe headings with the same name no longer stop the map and the arrow.
+- **Shortest Path in Russian.** A long quest name in Cyrillic no longer loses the route.
+
 ## 0.19.0 - 2026-11-26
 
 ### New
