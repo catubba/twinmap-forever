@@ -132,6 +132,19 @@ export default {
     lessXp: 'reduced',
     // On the door of a dungeon, and on the entrance inside its map.
     entrance: 'Entrance',
+    // On the label of a door of a dungeon that has several, in place of Entrance: which door it is. The dungeon's name is the
+    // title above. front, back: Uldaman's two. purple, orange: Maraudon's two sides, as players call them. north, west, east:
+    // the doors of the wings of Dire Maul; eastBack: the back door of its east wing, far from the others.
+    doors: {
+      front: 'Front entrance',
+      back: 'Back entrance',
+      purple: 'Purple entrance',
+      orange: 'Orange entrance',
+      north: 'North entrance',
+      west: 'West entrance',
+      east: 'East entrance',
+      eastBack: 'East back entrance',
+    },
     // On a dock, where a ship or a zeppelin goes from there. {place}: the game's name of each place, with commas.
     shipTo: 'Ship to {place}',
     zeppelinTo: 'Zeppelin to {place}',

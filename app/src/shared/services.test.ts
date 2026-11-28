@@ -1,6 +1,8 @@
 import { expect, test } from 'vitest'
 import { unitsOfPlace, unitsOfWorld } from './geo'
+import { deathPlaces } from './death'
 import type { GameMap } from './maps'
+import { dungeonsOf } from './search'
 import { gatherColour, iconOf, panelFor, resourceOf, serves, servicesOf, travel, TRAVEL_FORMAT, VESSELS, type FixedLayer, type FixedPin } from './services'
 import type { Row, Table } from './wdc5'
 
@@ -110,6 +112,30 @@ test('doors and flights come from the tables of the maps and of the flight paths
   expect(told.nodes.map((n) => `${n.continent} ${n.name} ${n.side}`)).toEqual(['0 Stormwind, Elwynn A', '0 Sentinel Hill, Westfall A', '0 Undercity, Tirisfal H', '1 Orgrimmar, Durotar H'])
   expect(told.nodes[0]).toMatchObject(unitsOfWorld(-8833, 479))
   expect(told.routes).toEqual([[0, 1]])
+})
+
+test('a dungeon with more than one door has them all, the one of the table first', () => {
+  const maps = table([
+    { id: 70, cols: { 1: 'Uldaman', 6: [-6060.2, -2955.0, 0], 8: 1, 17: 0 } },
+    { id: 429, cols: { 1: 'La Masacre', 6: [-3908.0, 1130.0, 0], 8: 1, 17: 1 } }, // in the game's language
+  ])
+  const doors = travel(maps, table([]), table([])).doors
+  expect(doors.filter((d) => d.maps?.includes(70))).toEqual([
+    { continent: 0, ...unitsOfWorld(-6060.2, -2955.0), names: ['Uldaman'], maps: [70], entrance: 'front' },
+    { continent: 0, ...unitsOfWorld(-6619.97, -3765.74), names: ['Uldaman'], maps: [70], entrance: 'back' }, // in Dustwind Gulch
+  ])
+  // Dire Maul: the table's, then a door for each wing, by the name of its pins; East has a back door too.
+  expect(doors.filter((d) => d.maps?.includes(429)).map((d) => `${d.names[0]} ${d.entrance ?? ''} ${d.wing ?? ''}`)).toEqual(['La Masacre  ', 'La Masacre north Dire Maul: North', 'La Masacre west Dire Maul: West', 'La Masacre east Dire Maul: East', 'La Masacre eastBack Dire Maul: East'])
+  // A ghost walks back in at the door of the table, not at the back door.
+  expect(deathPlaces({ ghost: true, inst: 70 }, [], doors).back).toEqual({ continent: 0, at: unitsOfWorld(-6060.2, -2955.0), name: 'Uldaman', door: true })
+  // Searched, a dungeon is found once, at the door of the table; a wing at its own door.
+  const found = dungeonsOf(doors)
+  expect(found.filter((d) => d.id === 70)).toEqual([{ name: 'Uldaman', id: 70, raid: false, continent: 0, at: unitsOfWorld(-6060.2, -2955.0) }])
+  expect(found.filter((d) => d.id === 429).map((d) => d.name)).toEqual(['La Masacre', 'Dire Maul: East', 'Dire Maul: North', 'Dire Maul: West'])
+  expect(found.find((d) => d.name === 'Dire Maul: North')!.at).toEqual(unitsOfWorld(-3520.24, 1078.4))
+  expect(found.find((d) => d.name === 'Dire Maul: East')!.at).toEqual(unitsOfWorld(-3738.62, 934.522))
+  // A dungeon the table gives no door for gets none of these.
+  expect(travel(table([]), table([]), table([])).doors).toEqual([])
 })
 
 test('ships and zeppelins come from the points of their ways, each stop named as the game names its area', () => {

@@ -820,7 +820,7 @@
     // A dungeon: its door, labelled as a click on it labels it; Dungeon Map opens the wing that was found.
     const door = to.dungeon && travel.doors.find((d) => d.continent === to.continent && d.x === to.at.x && d.y === to.at.y)
     if (door) {
-      labelPin(to.at, door.names.join(', '), [t('map.pins.entrance')], found, behindDoor(door), to.dungeon!.wing)
+      labelPin(to.at, door.names.join(', '), [doorName(door)], found, behindDoor(door), to.dungeon!.wing)
       return
     }
     labelled = {
@@ -1585,6 +1585,8 @@
   // The maps behind a door the app has the rooms of: a button each on its label.
   const behindDoor = (door: Travel['doors'][number]): { id: number; name: string; raid: boolean }[] =>
     (door.maps ?? []).flatMap((id, i) => (interiors?.maps.some((m) => m.id === id) ? [{ id, name: door.names[i] ?? door.names[0]!, raid: door.raid === true }] : []))
+  // Which door it is, for a dungeon with several (Back entrance); else Entrance.
+  const doorName = (door: Travel['doors'][number]): string => (door.entrance ? t(`map.pins.doors.${door.entrance}`) : t('map.pins.entrance'))
   $effect(() => {
     for (const group of Object.values(travelLayers)) group.clearLayers()
     for (const door of travel.doors) {
@@ -1592,7 +1594,7 @@
       L.marker(at(door), { keyboard: false, zIndexOffset: 200, icon: doorIcon(door.raid === true) })
         .bindTooltip(door.names.join(', '), { direction: 'top', offset: [0, -13], className: 'tip' })
         .on('click', () => {
-          labelPin({ x: door.x, y: door.y }, door.names.join(', '), [t('map.pins.entrance')], undefined, behindDoor(door))
+          labelPin({ x: door.x, y: door.y }, door.names.join(', '), [doorName(door)], undefined, behindDoor(door), door.wing)
         })
         .addTo(travelLayers.dungeons)
     }
