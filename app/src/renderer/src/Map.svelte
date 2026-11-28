@@ -32,7 +32,7 @@
   import { WORLDS } from '../../shared/world'
   import { groupName, LAYER_GROUPS, layerName, layersFrom, type LayerId } from '../../shared/layers'
   import { fitNames, tierRank, tierShows, type Avoid, type NameBox, type NameTier, type Place } from '../../shared/places'
-  import { placeText, wayTo, zoneAt, type Size } from '../../shared/point-label'
+  import { knowLand, placeText, wayTo, zoneAt, type Size } from '../../shared/point-label'
   import { num, t } from '../../shared/i18n'
   import { fade, fly } from 'svelte/transition'
   import Glyph from './Glyph.svelte'
@@ -480,6 +480,10 @@
     void zoneGrid(world.name).then((grid) => {
       if (grid && asked === tintFor) tint = new TintLayer({ picture: tinted(grid, at, onParchment), bounds: WORLD_BOUNDS, minZoom: 0, maxZoom: 9, keepBuffer: 4, zIndex: 4, opacity, className: 'tint' }).addTo(view)
     })
+  })
+  // The same zones name the points of the map, the labels, the search and the pins (zoneAt): both continents, as a search finds on either.
+  $effect(() => {
+    if (maps.length) for (const world of WORLDS) void zoneGrid(world.name).then((grid) => grid && knowLand(world.continent, grid))
   })
 
   // Puts these rooms on the map, in place of the ones before.

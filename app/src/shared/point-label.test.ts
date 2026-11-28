@@ -1,8 +1,8 @@
 import { expect, test } from 'vitest'
-import { unitsOfPlace } from './geo'
+import { unitsOfPlace, unitsOfWorld } from './geo'
 import { layersFrom } from './layers'
 import type { GameMap } from './maps'
-import { labelPlace, placeOfUnits, wayTo, zoneAt } from './point-label'
+import { knowLand, labelPlace, placeOfUnits, wayTo, zoneAt } from './point-label'
 
 const DUN_MOROGH = { minX: -7160.4, minY: -3122.9, maxX: -3877.1, maxY: 1802.1 }
 const IRONFORGE = { minX: -5096.8, minY: -1504.2, maxX: -4569.2, maxY: -713.6 }
@@ -22,6 +22,29 @@ test('a point is in the smallest zone that holds it: the city, not the zone arou
   expect(kharanos.place.x).toBeCloseTo(46.6)
   expect(zoneAt(MAPS, 1, unitsOfPlace(DUN_MOROGH, 46.6, 52.2))).toBeUndefined()
   expect(zoneAt(MAPS, 0, { x: 1, y: 1 })).toBeUndefined()
+})
+
+test('on land whose zone is known, the zone of the land: not a smaller map that reaches over it, but still a city under a mountain', () => {
+  // Mulgore's map reaches into Feralas, over the doors of the wings of Dire Maul.
+  const FERALAS = { minX: -7000, minY: -1508.3, maxX: -2366.7, maxY: 5441.7 }, MULGORE = { minX: -3835.4, minY: -3675, maxX: 266.7, maxY: 2479.2 }
+  const kalimdor = [{ ...zone(1412, 'Mulgore', MULGORE), continent: 1 }, { ...zone(1444, 'Feralas', FERALAS), continent: 1 }] as GameMap[]
+  const door = unitsOfWorld(-3520, 1078), chunk = (p: { x: number; y: number }): number => Math.floor(p.y * 4) * 1024 + Math.floor(p.x * 4)
+  expect(zoneAt(kalimdor, 1, door)?.zone.name).toBe('Mulgore')
+  const land = new Uint16Array(1024 * 1024)
+  land[chunk(door)] = 1444
+  land[chunk(unitsOfPlace(MULGORE, 50, 50))] = 1412 // Mulgore has land of its own, not here
+  knowLand(1, land)
+  const found = zoneAt(kalimdor, 1, door)!
+  expect(found.zone.name).toBe('Feralas')
+  expect(found.place).toEqual(placeOfUnits(FERALAS, door))
+  expect(found.place.x).toBeCloseTo(62.8, 0)
+  // Water, no zone's: the maps decide as before.
+  expect(zoneAt(kalimdor, 1, unitsOfWorld(-3520, 1200))?.zone.name).toBe('Mulgore')
+  // Ironforge's land is Dun Morogh's: the city has none of its own, and still wins where its map is.
+  const ironforge = unitsOfPlace(IRONFORGE, 55.8, 48.4), azeroth = new Uint16Array(1024 * 1024)
+  azeroth[chunk(ironforge)] = 1426
+  knowLand(0, azeroth)
+  expect(zoneAt(MAPS, 0, ironforge)?.zone.name).toBe('Ironforge')
 })
 
 test('distance, direction in words and time on foot', () => {
