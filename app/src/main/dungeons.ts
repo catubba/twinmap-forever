@@ -24,7 +24,7 @@ import { dungeonFolder, type Placed } from '../shared/buildings'
 import { groundTextures } from '../shared/ground'
 import { blockHeights } from '../shared/heights'
 import { DUNGEON_PINS } from '../shared/dungeon-pins'
-import { inRock, lidOver, piecesIn, rockCut, roofOf, type Box, type Piece, type UnderRoom } from '../shared/inside'
+import { inRock, lidOver, NOT_IN_ROCK, piecesIn, rockCut, roofOf, type Box, type Piece, type UnderRoom } from '../shared/inside'
 import { MORE_BOSS_PINS } from '../shared/more-boss-pins'
 import { NEW_DUNGEON_PINS } from '../shared/new-dungeon-pins'
 import { PIN_HEIGHTS } from '../shared/pin-heights'
@@ -39,8 +39,8 @@ import { dungeonWorldFile, finishedInteriors, MAP_FILE, placedIn } from './inter
 import { makeProps, PROPS_FILE } from './props'
 
 export const UNDER_FILE = 'under.json'
-/** Which rule told the rooms in rock (shared/inside.ts, inRock): a dungeon made with another is made again. 2: M23-F30 with ROCK_UNDER. */
-export const ROCK_RULE = 2
+/** Which rule told the rooms in rock (shared/inside.ts, inRock): a dungeon made with another is made again. 2: M23-F30 with ROCK_UNDER; 3: NOT_IN_ROCK. */
+export const ROCK_RULE = 3
 
 /**
  * The dungeon a path asks something made here of, by the game's number of its map; null for any other path. Its list
@@ -144,7 +144,7 @@ export function dungeonMaker(files: () => ClientFiles, folder: string, table: (b
         const placed = placedIn(wdt, read), groundAt = groundOf(join(folder, name))
         rooms = new Set([...new Set(pieces.map((p) => p.building))].flatMap((n) => (placed[n] ? [buriedKey(placed[n].file, placed[n].u, placed[n].v)] : [])))
         // a map with no boss is a land one walks (Deadwind Pass, over the crypts of Karazhan), not a dungeon dug in
-        const rock = named?.bosses.length ? inRock(pieces, groundAt, bossesOf(map)) : new Set<number>(), cutRound: { piece: Piece; floor: number }[] = []
+        const rock = named?.bosses.length && !NOT_IN_ROCK.has(map) ? inRock(pieces, groundAt, bossesOf(map)) : new Set<number>(), cutRound: { piece: Piece; floor: number }[] = []
         // ponytail: a room's floor is taken as the bottom of its box, which a pit under it lowers: the ground then opens a little wider than the room asks
         const under = pieces.flatMap((p, index): UnderRoom[] => {
           const roof = roofOf(p, p.bottom, groundAt)
