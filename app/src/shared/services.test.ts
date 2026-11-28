@@ -121,11 +121,11 @@ test('a dungeon with more than one door has them all, the one of the table first
   ])
   const doors = travel(maps, table([]), table([])).doors
   expect(doors.filter((d) => d.maps?.includes(70))).toEqual([
-    { continent: 0, ...unitsOfWorld(-6060.2, -2955.0), names: ['Uldaman'], maps: [70] },
-    { continent: 0, ...unitsOfWorld(-6619.97, -3765.74), names: ['Uldaman'], maps: [70] }, // the back door, in Dustwind Gulch
+    { continent: 0, ...unitsOfWorld(-6060.2, -2955.0), names: ['Uldaman'], maps: [70], entrance: 'front' },
+    { continent: 0, ...unitsOfWorld(-6619.97, -3765.74), names: ['Uldaman'], maps: [70], entrance: 'back' }, // in Dustwind Gulch
   ])
   // Dire Maul: the table's, then a door for each wing, by the name of its pins; East has a back door too.
-  expect(doors.filter((d) => d.maps?.includes(429)).map((d) => `${d.names[0]} ${d.wing ?? ''}`)).toEqual(['La Masacre ', 'La Masacre Dire Maul: North', 'La Masacre Dire Maul: West', 'La Masacre Dire Maul: East', 'La Masacre Dire Maul: East'])
+  expect(doors.filter((d) => d.maps?.includes(429)).map((d) => `${d.names[0]} ${d.entrance ?? ''} ${d.wing ?? ''}`)).toEqual(['La Masacre  ', 'La Masacre north Dire Maul: North', 'La Masacre west Dire Maul: West', 'La Masacre east Dire Maul: East', 'La Masacre eastBack Dire Maul: East'])
   // A ghost walks back in at the door of the table, not at the back door.
   expect(deathPlaces({ ghost: true, inst: 70 }, [], doors).back).toEqual({ continent: 0, at: unitsOfWorld(-6060.2, -2955.0), name: 'Uldaman', door: true })
   // Searched, a dungeon is found once, at the door of the table; a wing at its own door.
