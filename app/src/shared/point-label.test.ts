@@ -62,4 +62,6 @@ test('saved layer choices: off stays off, everything else is on, rubbish is igno
   const kept = layersFrom(JSON.stringify({ zones: false, arrow: true, gone: false }))
   expect([kept.zones, kept.arrow, kept.bosses]).toEqual([false, true, true])
   expect('gone' in kept).toBe(false)
+  // A layer marked off starts unticked, and keeps what the player chose.
+  expect([layersFrom(null).levels, layersFrom(JSON.stringify({ levels: true })).levels]).toEqual([false, true])
 })

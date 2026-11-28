@@ -30,11 +30,10 @@ import { UI_MAP_ASSIGNMENT_FILE, type GameMap } from '../shared/maps'
 import { halve, join } from '../shared/pixels'
 import { AREA_TABLE_FILE, UI_MAP_X_MAP_ART_FILE, WORLD_MAP_OVERLAY_FILE } from '../shared/places'
 import type { Table } from '../shared/wdc5'
-import { SIDE as GRID } from '../shared/heights'
-import { blockWater, WATER } from '../shared/water'
-import { BLOCKS, terrainFiles } from '../shared/world'
+import { BLOCKS } from '../shared/world'
 import { encodePng } from './png'
 import { keep, TILE } from './tiles'
+import { terrainChunks } from './zone-grid'
 
 export const PARCHMENT_ZOOM = 5
 const MARKER = 'done.json'
@@ -401,36 +400,10 @@ export async function convertParchment(
     return a
   }
   const ground = shared(Int16Array, SIDE * SIDE).fill(SEA), water = shared(Uint8Array, SIDE * SIDE).fill(1)
-  const blocks = terrainFiles(wdt)
-  for (const [block, file] of blocks) {
-    const adt = read(file)
-    if (!adt) continue
-    const row = Math.floor(block / BLOCKS), column = block % BLOCKS
-    const liquids = blockWater(adt, () => WATER)
-    for (let at = 0; at + 8 <= adt.length; ) {
-      const tag = adt.toString('latin1', at, at + 4), size = adt.readUInt32LE(at + 4)
-      if (tag === 'KNCM') {
-        const h = at + 8, x = adt.readUInt32LE(h + 4), y = adt.readUInt32LE(h + 8)
-        if (x < 16 && y < 16) {
-          const i = (row * 16 + y) * SIDE + column * 16 + x, z = adt.readFloatLE(h + 0x70)
-          let highest = -Infinity
-          for (let sub = h + 128; sub + 8 <= at + 8 + size; sub += 8 + adt.readUInt32LE(sub + 4)) {
-            if (adt.toString('latin1', sub, sub + 4) !== 'TVCM' || adt.readUInt32LE(sub + 4) < 145 * 4) continue
-            for (let v = 0; v < 145; v++) highest = Math.max(highest, z + adt.readFloatLE(sub + 8 + v * 4))
-            break
-          }
-          let level = -Infinity
-          if (liquids) for (let r = y * 8; r <= y * 8 + 8; r++) for (let c = x * 8; c <= x * 8 + 8; c++) {
-            const l = liquids.levels[r * GRID + c]!
-            if (l > level) level = l
-          }
-          water[i] = highest < (liquids ? level : 0) ? 1 : 0
-          ground[i] = own.get(top(adt.readUInt32LE(h + 0x34))) ?? -1
-        }
-      }
-      at += 8 + size
-    }
-  }
+  terrainChunks(wdt, read, (i, area, wet) => {
+    water[i] = wet ? 1 : 0
+    ground[i] = own.get(top(area)) ?? -1
+  })
   const near = [-1, 1, -SIDE, SIDE]
   const neighbours = (i: number): number[] => near.map((d) => i + d).filter((j) => j >= 0 && j < ground.length && (Math.abs((j % SIDE) - (i % SIDE)) <= 1))
   // How far each water chunk is from land, up to COAST: a zone's water further out is open sea, as is water of no zone.

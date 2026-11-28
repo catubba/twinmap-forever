@@ -62,6 +62,8 @@ export default {
       zones: 'Place names',
       // The shading of hills and valleys.
       relief: 'Relief',
+      // Each zone tinted by its levels against the character's, in the game's colours of difficulty (red, orange, yellow, green, grey).
+      levels: 'Zone levels',
       caves: 'Caves',
       // The doors of the dungeons on the world map.
       dungeons: 'Dungeons',
