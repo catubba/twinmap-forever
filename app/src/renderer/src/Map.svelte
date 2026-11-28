@@ -436,7 +436,9 @@
   // The zones tinted by their levels for the character (shared/zone-levels.ts), each on its own land (main/zone-grid.ts):
   // a picture of the continent at a pixel a chunk (33 yards), coloured again when the level changes, cut into the map's
   // tiles and smoothed, so a border fades over a chunk. Under the names, over the ground and its relief. 2D only.
-  const TINT_OPACITY = 0.3
+  // Laid as a colour (.tint below): the ground keeps its light and takes the zone's colour, so a grey zone is grey and a
+  // yellow one yellow on red earth as on green grass. Chosen by the player on a preview, over 30% laid as it is.
+  const TINT_OPACITY = 0.6
   const ZONES = 'zones.bin' // main/zone-grid.ts
   const zoneGrid = kept(2, (world: string) => inflated(`${TILES}/${world}/${ZONES}`).then((b) => b && new Uint16Array(b.buffer)))
   const TintLayer = L.GridLayer.extend({
@@ -2587,6 +2589,9 @@
 
   .map :global(.relief) {
     mix-blend-mode: soft-light;
+  }
+  .map :global(.tint) {
+    mix-blend-mode: color;
   }
   .map :global(.leaflet-container) {
     font: inherit;
