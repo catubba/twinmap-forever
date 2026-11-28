@@ -24,7 +24,7 @@
   const one = $derived(list.find((p) => p.line === chosen) ?? list[0])
   const matches = (r: Recipe): boolean => r.name.toLowerCase().includes(typed.trim().toLowerCase())
   const known = $derived(one ? one.known.filter(matches) : [])
-  const groups = $derived(one ? one.groups.map((g) => ({ name: g.name, recipes: g.recipes.filter(matches) })).filter((g) => g.recipes.length) : [])
+  const groups = $derived(one ? one.groups.map((g) => ({ ...g, recipes: g.recipes.filter(matches) })).filter((g) => g.recipes.length) : [])
   const unknown = $derived(one ? one.unknown.filter(matches) : [])
   const picture = (r: Recipe): string => (r.item ? `${TILES}/items/${r.item}.png` : `${TILES}/pictures/${r.icon}.png`)
 </script>
@@ -75,7 +75,7 @@
           {#if one.known.length}
             <h4>{t('items.professions.known')}<small>{one.known.length}</small></h4>
             <p class="key"><i class="optimal">{t('items.professions.optimal')}</i><i class="medium">{t('items.professions.medium')}</i><i class="easy">{t('items.professions.easy')}</i><i class="trivial">{t('items.professions.trivial')}</i></p>
-            {#each groups as g (g.name)}
+            {#each groups as g (g.id)}
               {#if g.name}<h5>{g.name}</h5>{/if}
               <ul>{#each g.recipes as r (r.spell)}{@render recipe(r)}{/each}</ul>
             {/each}

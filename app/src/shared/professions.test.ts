@@ -33,6 +33,11 @@ test('professions from the sheet: known recipes the hardest first under the head
   expect(eng!.unknown.map((r) => [r.name, r.yellow, r.icon, r.item])).toEqual([['Rough Boomstick', 80, 3, 0]])
   expect(herb).toMatchObject({ crafts: false, known: [], unknown: [] })
   expect(cook).toMatchObject({ secondary: true, seen: false, listed: false, unknown: [] })
-  expect(cook!.groups).toEqual([{ name: '', recipes: cook!.known }])
+  expect(cook!.groups).toEqual([{ id: 0, name: '', recipes: cook!.known }])
   expect(professionsOf({}, facts)).toEqual([])
+})
+
+test('two headings with the same name stay two groups, told apart by their number', () => {
+  const pieces = { skills: [[202, 35, 75], [2941, 35, 75]], recipes: { known: [3918, 3919], seen: [202], listed: [3918, 3919], cats: [[2515, 'Parts', 2], [2516, 'Parts', 1]] } }
+  expect(professionsOf(pieces, facts)[0]!.groups.map((g) => [g.id, g.name, g.recipes.map((r) => r.name)])).toEqual([[2516, 'Parts', ['Rough Dynamite']], [2515, 'Parts', ['Rough Blasting Powder']]])
 })
