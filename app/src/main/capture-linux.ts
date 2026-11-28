@@ -1,11 +1,11 @@
 // XCB reports errors per request, so a game closing during a read cannot end the app.
-import { readFileSync, readlinkSync, realpathSync } from 'node:fs'
+import { readdirSync, readFileSync, readlinkSync, realpathSync } from 'node:fs'
 import { endianness } from 'node:os'
 import { app } from 'electron'
 import koffi, { type LibraryHandle } from 'koffi'
 import type { Edge, WindowHandle } from './capture'
 import type { Rect } from '../shared/window'
-import { clientPidFrom, commandLine, inWindow, isGame, monitorsFrom, coveredMonitorEdgeRect, parseSetup, problemList, programFrom, rgbFrom, stateOf, wineProgramPath } from './capture-linux-frame'
+import { clientPidFrom, commandLine, inWindow, isGame, monitorsFrom, coveredMonitorEdgeRect, parseSetup, problemList, programFrom, rgbFrom, stateOf, mayTellWindowless, windowlessGame, wineProgramPath } from './capture-linux-frame'
 
 type NativeFunction = ReturnType<LibraryHandle['func']>
 // Keep Koffi's pointer value for native calls/free; only addresses support arithmetic.
@@ -304,13 +304,29 @@ export const findWindowOf = (program: RegExp): WindowHandle | null => windowOf((
   return program.test(programFrom(args, executable) ?? '')
 })
 
+/** Whether the game runs: its program in a command line of the running processes, as Wine and Proton write it. */
+function gameRuns(): boolean {
+  let ids: string[]
+  try { ids = readdirSync('/proc') } catch { return false }
+  return ids.some((id) => {
+    if (!/^\d+$/.test(id)) return false
+    try { return isGame(commandLine(readFileSync(`/proc/${id}/cmdline`)), null, []) } catch { return false }
+  })
+}
+
+const windowless = windowlessGame(30_000, 10_000) // ms the game runs with no window before it is said, ms between looks
+
 export function findGameWindow(): WindowHandle | null {
   const test = !app.isPackaged && process.env.TWINMAP_CAPTURE_TEST_PROGRAM
-  return windowOf((n, id) => {
+  const found = windowOf((n, id) => {
     const { args, executable } = processOf(n, id)
     return test ? executable === test || programFrom(args, executable) === test
       : isGame(args, executable, property(n, id, 'WM_CLASS', 8)?.toString('utf8').split('\0') ?? [])
   }, true)
+  if (native && mayTellWindowless(!!test, native.res) && windowless(found !== null, performance.now(), gameRuns)) {
+    problem("the game has run 30 s with no window on this X display: Twinmap reads it on the same X11 or XWayland display only, not through Wine's Wayland driver (PROTON_ENABLE_WAYLAND=1, or DISPLAY unset) nor in a gamescope of its own")
+  }
+  return found
 }
 
 function windowInfo(n: Native, id: number): WindowInfo | null {
