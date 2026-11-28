@@ -191,4 +191,8 @@ export default {
     raidIn: 'Banda, {zone}',
     foundIn: '{what}, {zone}',
   },
+  daylight: {
+    ring: 'Hora de la luz',
+    ringTip: 'Arrastra para mover el sol. Haz clic para volver a la hora del juego.',
+  },
 }

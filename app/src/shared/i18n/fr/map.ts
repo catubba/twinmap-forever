@@ -192,4 +192,8 @@ export default {
     raidIn: 'Raid, {zone}',
     foundIn: '{what}, {zone}',
   },
+  daylight: {
+    ring: 'Heure de la lumière',
+    ringTip: "Faites glisser pour déplacer le soleil. Cliquez pour revenir à l'heure du jeu.",
+  },
 }

@@ -100,7 +100,7 @@ export function servedFile(base: string, path: string): string | null {
     const world = groundPlace(ground < 0 ? -1 - ground : Math.floor(ground / (BLOCKS * BLOCKS))), block = ground % (BLOCKS * BLOCKS)
     return ground < 0 ? (path.endsWith('.json') ? groundList(base, world) : groundPile(base, world)) : groundBlock(base, world, block % BLOCKS, Math.floor(block / BLOCKS))
   }
-  const m = /^\/(?:(maps|places|travel|interiors|caves|under|items|trainers|spells|talents|ah-names|game-names)\.json|rooms\/(\d{1,9})\.dxt|([a-z]+|i\d{1,5})\/(?:blocks\/(\d{1,2})\/(\d{1,2})\.dxt|(shade\/|parchment\/)?(\d)\/(\d{1,3})\/(\d{1,3})\.png))$/.exec(path)
+  const m = /^\/(?:(maps|places|travel|interiors|caves|under|items|trainers|spells|talents|light|ah-names|game-names)\.json|rooms\/(\d{1,9})\.dxt|([a-z]+|i\d{1,5})\/(?:blocks\/(\d{1,2})\/(\d{1,2})\.dxt|(shade\/|parchment\/)?(\d)\/(\d{1,3})\/(\d{1,3})\.png))$/.exec(path)
   if (!m) return null
   if (m[1]) return joinPath(base, `${m[1]}.json`)
   if (m[2]) return joinPath(base, 'rooms', `${m[2]}.dxt`)

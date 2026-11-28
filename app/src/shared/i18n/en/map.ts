@@ -270,4 +270,11 @@ export default {
     // {what}: what the player's QuestieDB says it is, as Innkeeper or Quest, level 12.
     foundIn: '{what}, {zone}',
   },
+  // The ring of the hour under the zone's name in the 3D view (Map.svelte): the hour inside it, the sun on it.
+  daylight: {
+    // The ring, read aloud only.
+    ring: 'The hour of the light',
+    // Its tooltip: dragging the sun round the ring changes the hour of the light; a click follows the game's hour again.
+    ringTip: "Drag to move the sun. Click to go back to the game's hour.",
+  },
 }

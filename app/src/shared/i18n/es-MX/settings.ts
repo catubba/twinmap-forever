@@ -74,6 +74,8 @@ export default {
     objectsHint: 'Cercas, carretas, faroles, tiendas, braseros.',
     ground: 'Textura del suelo de cerca',
     groundHint: 'De cerca, el suelo se dibuja con las texturas del juego y se ve nítido.',
+    daynight: 'Día y noche',
+    daynightHint: 'La luz sigue la hora del día en el juego y por la noche se encienden las ventanas. El anillo bajo el nombre de la zona mueve el sol; un clic vuelve a la hora del juego.',
     dungeons: 'Calabozo 3D (experimental)',
     dungeonsHint: 'Calabozos y bandas en la vista 3D, con las salas abiertas desde arriba. Aún en construcción: puede verse mal o ir lenta.',
     card: 'Tarjeta gráfica',

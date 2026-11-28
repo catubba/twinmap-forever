@@ -192,4 +192,8 @@ export default {
     raidIn: 'Schlachtzug, {zone}',
     foundIn: '{what}, {zone}',
   },
+  daylight: {
+    ring: 'Uhrzeit des Lichts',
+    ringTip: 'Ziehen, um die Sonne zu verschieben. Klicken, um zur Spielzeit zurückzukehren.',
+  },
 }

@@ -13,6 +13,8 @@ export interface Draw {
   blend: number
   /** Lit by itself, not by the sun. */
   unlit: boolean
+  /** Lit by itself at night, as the game lights it (a material's flag 0x10, "SIDN"): windows, lanterns. */
+  glow?: boolean
   /** Ceilings of rooms under a roof: left out of a building inside the ground. */
   ceiling?: boolean
   /** The building's own liquid, with no texture: what it is, as shared/water.ts numbers them (the canals of Stormwind, the lava of Ironforge). */

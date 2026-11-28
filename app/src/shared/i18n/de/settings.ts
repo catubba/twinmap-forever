@@ -74,6 +74,8 @@ export default {
     objectsHint: 'Zäune, Karren, Laternen, Zelte, Feuerschalen.',
     ground: 'Bodentextur aus der Nähe',
     groundHint: 'Aus der Nähe wird der Boden mit den Texturen des Spiels gezeichnet und bleibt scharf.',
+    daynight: 'Tag und Nacht',
+    daynightHint: 'Das Licht folgt der Tageszeit im Spiel, nachts leuchten die Fenster. Der Ring unter dem Namen der Zone verschiebt die Sonne, ein Klick kehrt zur Spielzeit zurück.',
     dungeons: '3D-Dungeon (experimentell)',
     dungeonsHint: 'Dungeons und Schlachtzüge in der 3D-Ansicht, die Räume von oben offen. Noch im Aufbau: Die Darstellung kann falsch oder langsam sein.',
     card: 'Grafikkarte',
