@@ -1,6 +1,7 @@
 <script lang="ts">
   // The main screen: the top row with the state of the link, the map in its frame, and the Now panel.
   import { experience, linkStatus, type LinkSnapshot } from '../../shared/link'
+  import { minutesFrom } from '../../shared/light'
   import { groupFrom } from '../../shared/group'
   import { deathFrom, type Place as DeathPlace } from '../../shared/death'
   import { feedbackDetails } from '../../shared/feedback'
@@ -512,7 +513,7 @@
 <div class="stash" inert bind:this={stashBox}>
   <div class="mapbox" style:--readout="{readoutWidth}px" use:section={'map'}>
     {#if mapReady}
-      <Map {pos} {group} {death} level={char?.level} parchment={tiles?.state === 'ready' ? tiles.parchment : undefined} skills={char?.name ? sheets[char.name]?.pieces.skills : undefined} xpLevel={char ? (xp ? char.level : null) : undefined} bind:back kills={live ? link?.state.sections.kills : undefined} bind:looking at={link?.state.updatedAt.pos} bind:this={mapView} {insideReady} {quests} {fixed} side={char?.side} {live} {inbox} removed={live ? goneFrom(link?.state.sections.marks) : []} set={live ? setFrom(link?.state.sections.marks) : []} gameFollows={live ? followFrom(link?.state.sections.follow) : null} {journey} {route} marked={shopVendors} onroute={(stop) => setRoute(addStop(route, stop))} onnpc={(pin) => (npc = pin)} />
+      <Map {pos} {group} {death} noted={!!(setup?.gameFolder && !setup.addon) || (paused && mapReady) || (!!status?.line && mapReady)} level={char?.level} parchment={tiles?.state === 'ready' ? tiles.parchment : undefined} gameTime={live ? minutesFrom(link?.state.sections.time) : null} gameTimeAt={link?.state.updatedAt.time} skills={char?.name ? sheets[char.name]?.pieces.skills : undefined} xpLevel={char ? (xp ? char.level : null) : undefined} bind:back kills={live ? link?.state.sections.kills : undefined} bind:looking at={link?.state.updatedAt.pos} bind:this={mapView} {insideReady} {quests} {fixed} side={char?.side} {live} {inbox} removed={live ? goneFrom(link?.state.sections.marks) : []} set={live ? setFrom(link?.state.sections.marks) : []} gameFollows={live ? followFrom(link?.state.sections.follow) : null} {journey} {route} marked={shopVendors} onroute={(stop) => setRoute(addStop(route, stop))} onnpc={(pin) => (npc = pin)} onsettings={(category) => (sessionStorage.setItem('settings', category), (onSettings = true))} />
     {:else if tiles}
       <div class="making" class:failed={tiles.state === 'failed' || tiles.state === 'no-game'}>
         <p>{tilesLine(tiles)}</p>

@@ -130,6 +130,9 @@ test('what is not a sample is refused, and nothing is kept', async () => {
     [sample({ ...SAID, run: '../../count/x' }), 400],
     [sample({ ...SAID, u: '1', v: '2' }), 400],
     [sample({ ...SAID, u: '1', v: '2', score: '7' }), 400],
+    [sample({ ...SAID, x: '104.4', y: '22.8', z: '-31.6' }), 400], // the place from the flight masters: all four or none
+    [sample({ ...SAID, x: '104.4', y: '22.8', z: '-31.6', r: '-1' }), 400],
+    [sample({ ...SAID, x: 'far', y: '22.8', z: '-31.6', r: '0.1' }), 400],
     [new Request(`https://api.twinmap.app/sample?${new URLSearchParams(SAID)}&map=1`, { method: 'POST', body: png(238) }), 400],
   ] as const) {
     const samples = bucket()

@@ -57,8 +57,19 @@ export interface Instance {
   y?: number
   /** The level the character is on, from 0, where rooms lie over rooms: found by the app from the minimap, not sent by the game. */
   level?: number
+  /** True while the minimap shows the open ground of the dungeon, no room: the character is under the sky. Found by the app, as the level. */
+  open?: boolean
   /** Where the minimap is on the game's window: sent inside dungeons and raids only, where the app finds the place from it (minimap.ts). */
   mini?: MinimapPlace
+  /** With the participation programme on, inside dungeons and raids: the place the addon found from the distances to the flight masters (Distance.lua), yards of the instance, x to the north, y to the west, z the height, r how far the distances miss it. */
+  far?: Far
+}
+
+export interface Far {
+  x: number
+  y: number
+  z: number
+  r: number
 }
 
 export interface ProtocolMismatch {

@@ -2,7 +2,10 @@ import { expect, test } from 'vitest'
 import { gameFolderFrom, openClientFiles, registryInstallPath } from '../main/client-files'
 import { sentKeys } from '../main/keys'
 import type { Sheet } from './sheet'
-import { classTrainer, professionTrainer, trainerFacts, trainerReads, type TrainerFacts, type TrainerRead } from './trainers'
+import { MORE_DOORS } from './dungeon-doors'
+import { DUNGEON_PINS } from './dungeon-pins'
+import { DUNGEON_TRAINERS } from './dungeon-trainers'
+import { classTrainer, professionTrainer, professionWords, trainerFacts, trainerReads, type TrainerFacts, type TrainerRead } from './trainers'
 
 const FACTS: TrainerFacts = {
   format: 1,
@@ -133,3 +136,22 @@ test.skipIf(!real)("the real game lists the warlock's spells by level, and Sprin
   expect([197, 186].map((l) => facts.lines[l])).toEqual(['Tailoring', 'Mining'])
   expect(Object.keys(facts.crafts).length).toBeGreaterThan(2000)
 }, 60_000)
+
+test('a profession trainer is searched by its profession and the ranks it teaches', () => {
+  expect(professionWords(11073)).toBe('Enchanting Apprentice Journeyman Expert Artisan') // Annora gives every rank
+  expect(professionWords(8696)).toBe('Cooking') // Henry Stern: a recipe, no rank
+  expect(professionWords(1)).toBe('')
+})
+
+test('each trainer inside a dungeon teaches a profession and stands within the map of its dungeon', () => {
+  const within = (map: number, u: number, v: number): boolean => DUNGEON_PINS.some((d) => d.map === map && u >= d.bounds[0] && u <= d.bounds[2] && v >= d.bounds[1] && v <= d.bounds[3])
+  for (const [npc, { map, u, v, door }] of Object.entries(DUNGEON_TRAINERS)) {
+    expect(professionWords(+npc)).not.toBe('')
+    expect(within(map, u, v)).toBe(true)
+    // The door it is reached by: one the map of the dungeon shows inside.
+    if (door) {
+      const inside = MORE_DOORS.find((d) => d.map === map && d.entrance === door)?.inside
+      expect(inside && within(map, ...inside)).toBe(true)
+    }
+  }
+})

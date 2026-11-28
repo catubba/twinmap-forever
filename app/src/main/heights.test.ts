@@ -61,5 +61,7 @@ test('the relief and the parchment are served from their folders, and nothing be
   expect(servedFile(base, '/azeroth/parchment/7/130/98.png')).toBe(join(base, 'azeroth', 'parchment', '7', '130', '98.png'))
   expect(servedFile(base, '/azeroth/shade/6/32/48.png')).toBe(shadeFile(join(base, 'azeroth'), 6, 32, 48))
   expect(servedFile(base, '/azeroth/levels/6/32/48.bin')).toBe(levelsFile(join(base, 'azeroth'), 6, 32, 48))
-  for (const path of ['/azeroth/shade/../6/1/1.png', '/azeroth/heights/32/48.bin', '/azeroth/shade/12/1/1.png', '/azeroth/levels/6/../1.bin', '/i33/levels/6/1/1.bin', '/azeroth/parchment/../1/1/1.png', '/azeroth/parchment/done.json']) expect(servedFile(base, path), path).toBeNull()
+  for (const path of ['/azeroth/shade/../6/1/1.png', '/azeroth/heights/32/48.bin', '/azeroth/shade/12/1/1.png', '/azeroth/levels/6/../1.bin', '/azeroth/parchment/../1/1/1.png', '/azeroth/parchment/done.json']) expect(servedFile(base, path), path).toBeNull()
+  // a dungeon that has a ground has its 3D tiles too (dungeons.ts)
+  expect(servedFile(base, '/i33/levels/6/1/1.bin')).toBe(levelsFile(join(base, 'i33'), 6, 1, 1))
 })

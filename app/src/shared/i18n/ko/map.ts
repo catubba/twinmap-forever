@@ -76,6 +76,11 @@ export default {
     levelsShown: '표시된 층',
     everyRoom: '모든 방',
     roomsUpTo: '{level}층까지의 방',
+    parts: '구역',
+    partTip: '{part}구역',
+    route: '경로',
+    routeTip: '일반적인 진행 경로, 우두머리 순서대로',
+    routeRoughTip: '일반적인 진행 경로, 우두머리 순서대로: 대략적, 공략 기준',
     zoomIn: '확대',
     zoomInTip: '확대 (+)',
     zoomOut: '축소',
@@ -83,9 +88,18 @@ export default {
     // The map follows the character: "따라가기", keeping "추적" for the game's arrow on a point.
     follow: '따라가기',
     followTip: '캐릭터 따라가기 (F)',
+    dungeonsOff: '3D 던전이 꺼져 있습니다',
+    dungeonsOffText: "3D 던전은 실험적 기능입니다. 이 던전을 3D로 보려면 설정에서 '3D 던전 (실험적)'을 켜세요.",
+    dungeonsOpen: '설정 열기',
+    dungeonsLater: '나중에',
   },
 
   offMap: '이곳은 지도에 없습니다.',
+  slowView: '여기서는 3D 보기가 느립니다({fps} FPS).',
+  lowerTo: '{quality}으로 낮추기',
+  keepQuality: '{quality} 유지',
+  lostView: '그래픽 카드 메모리가 부족해 품질을 낮음으로 설정했습니다.',
+  lostSettings: '설정',
   fps: '{fps} FPS',
   nothingToSend: '보낼 것이 없습니다.',
 
@@ -200,5 +214,9 @@ export default {
     raid: '공격대',
     raidIn: '공격대, {zone}',
     foundIn: '{what}, {zone}',
+  },
+  daylight: {
+    ring: '빛의 시간',
+    ringTip: '끌어서 해를 옮깁니다. 클릭하면 게임 시간으로 돌아갑니다.',
   },
 }

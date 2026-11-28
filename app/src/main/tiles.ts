@@ -17,8 +17,9 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, w
 import { dirname, join as joinPath } from 'node:path'
 import { deflateSync } from 'node:zlib'
 import { decodeBlp, decodeDxt, dxt1Of } from '../shared/blp'
-import { BLOCK_PIXELS, BLOCKS, minimapTiles } from '../shared/world'
+import { BLOCK_PIXELS, BLOCKS, minimapTiles, WORLDS } from '../shared/world'
 import { crop, double, halve, join } from '../shared/pixels'
+import { groundAsked, groundBlock, groundList, groundPile, groundPlace } from './ground'
 import { encodePng } from './png'
 
 export const TILE = 256
@@ -68,15 +69,38 @@ export const ICONS_FOLDER = 'icons'
 export function servedFile(base: string, path: string): string | null {
   const icon = /^\/icons\/([a-z0-9-]{1,40})\.png$/.exec(path)
   if (icon) return joinPath(base, ICONS_FOLDER, `${icon[1]}.png`)
-  // The ground of the 3D view (heights.ts), a continent's only.
-  const levels = /^\/([a-z]+)\/levels\/(\d)\/(\d{1,2})\/(\d{1,2})\.bin$/.exec(path)
+  // The ground of the 3D view (heights.ts): a continent's, or a dungeon's that has one (dungeons.ts).
+  const levels = /^\/([a-z]+|i\d{1,5})\/levels\/(\d)\/(\d{1,2})\/(\d{1,2})\.bin$/.exec(path)
   if (levels) return joinPath(base, levels[1]!, 'levels', levels[2]!, levels[3]!, `${levels[4]}.bin`)
   // The zone of each chunk of a continent (zone-grid.ts).
   const zones = /^\/([a-z]+)\/zones\.bin$/.exec(path)
   if (zones) return joinPath(base, zones[1]!, 'zones.bin')
+  // The buildings of the 3D view (buildings.ts): a building's file, a texture, a continent's list.
+  const building = /^\/buildings\/(?:(\d{1,9})\.bin|tex\/(\d{1,9})\.(bin|png))$/.exec(path)
+  if (building) return building[1] ? joinPath(base, 'buildings', `${building[1]}.bin`) : joinPath(base, 'buildings', 'tex', `${building[2]}.${building[3]}`)
+  // a continent's, or a dungeon's by "i" and its number (dungeons.ts)
+  const placed = /^\/([a-z]+|i\d{1,5})\/buildings\.json$/.exec(path)
+  if (placed) return joinPath(base, placed[1]!, 'buildings.json')
+  // Where things stand over the ground in the 3D view (stands.ts), a continent's.
+  const stands = /^\/([a-z]+)\/stands\.json$/.exec(path)
+  if (stands) return joinPath(base, stands[1]!, 'stands.json')
+  // The rooms of a dungeon that lie under its ground (dungeons.ts).
+  const under = /^\/(i\d{1,5})\/under\.json$/.exec(path)
+  if (under) return joinPath(base, under[1]!, 'under.json')
+  // The trees and objects of the 3D view (props.ts): a model, a continent's list of blocks, the copies of a block.
+  const model = /^\/buildings\/m2\/(\d{1,9})\.bin$/.exec(path)
+  if (model) return joinPath(base, 'buildings', 'm2', `${model[1]}.bin`)
+  const props = /^\/([a-z]+|i\d{1,5})\/props(?:\.json|\/(\d{1,2})-(\d{1,2})\.bin)$/.exec(path)
+  if (props) return props[2] ? joinPath(base, props[1]!, 'props', `${props[2]}-${props[3]}.bin`) : joinPath(base, props[1]!, 'props.json')
   const item = /^\/(items|pictures)\/(\d{1,7})\.png$/.exec(path)
   if (item) return joinPath(base, item[1]!, `${item[2]}.png`)
-  const m = /^\/(?:(maps|places|travel|interiors|caves|under|items|trainers|spells|talents|ah-names|game-names)\.json|rooms\/(\d{1,9})\.dxt|([a-z]+|i\d{1,5})\/(?:blocks\/(\d{1,2})\/(\d{1,2})\.dxt|(shade\/|parchment\/)?(\d)\/(\d{1,3})\/(\d{1,3})\.png))$/.exec(path)
+  // The ground's own textures of the 3D view (ground.ts): a continent's or a dungeon's list and pile, a block's layers and mixes.
+  const ground = groundAsked(path)
+  if (ground !== null) {
+    const world = groundPlace(ground < 0 ? -1 - ground : Math.floor(ground / (BLOCKS * BLOCKS))), block = ground % (BLOCKS * BLOCKS)
+    return ground < 0 ? (path.endsWith('.json') ? groundList(base, world) : groundPile(base, world)) : groundBlock(base, world, block % BLOCKS, Math.floor(block / BLOCKS))
+  }
+  const m = /^\/(?:(maps|places|travel|interiors|caves|under|items|trainers|spells|talents|light|ah-names|game-names)\.json|rooms\/(\d{1,9})\.dxt|([a-z]+|i\d{1,5})\/(?:blocks\/(\d{1,2})\/(\d{1,2})\.dxt|(shade\/|parchment\/)?(\d)\/(\d{1,3})\/(\d{1,3})\.png))$/.exec(path)
   if (!m) return null
   if (m[1]) return joinPath(base, `${m[1]}.json`)
   if (m[2]) return joinPath(base, 'rooms', `${m[2]}.dxt`)

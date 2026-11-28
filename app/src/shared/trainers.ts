@@ -221,6 +221,17 @@ export interface ProfessionRank {
   level: number
 }
 
+/** The words a profession trainer is searched by, in English as the game's own: its profession, and each rank it teaches ("enchanting artisan"). */
+export function professionWords(npc: number): string {
+  return Object.entries(PROFESSION_TRAINERS)
+    .flatMap(([profession, p]) => {
+      const gives = p.trainers[npc] ?? 0
+      if (!gives && !p.teach.some(([who]) => who.includes(npc))) return []
+      return [profession, ...p.ranks.filter((_, i) => gives & (1 << i)).map(([rank]) => rank)]
+    })
+    .join(' ')
+}
+
 /** What a profession trainer teaches: its profession, the ranks it gives and its recipes by skill needed; null for an NPC that is none. */
 export function professionTrainer(npc: number, facts: TrainerFacts, reads: Reads): { profession: string; skill: number; ranks: ProfessionRank[]; rows: TrainerRow[] } | null {
   for (const [profession, p] of Object.entries(PROFESSION_TRAINERS)) {

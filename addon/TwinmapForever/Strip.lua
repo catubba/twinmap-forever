@@ -188,6 +188,10 @@ local function BuildPos()
         if coveredAt and GetTime() - coveredAt < COVERED_FOR then inst.mini.hid = true end
       end
     end
+    -- With the participation programme on: the place found from the distances to the flight
+    -- masters (Distance.lua), yards of the instance, north, west and height, and how far off.
+    local fx, fy, fz, fr = Try(ns.Far)
+    if Num(fx) and Num(fy) and Num(fz) and Num(fr) then inst.far = { x = Round(fx, 0.1), y = Round(fy, 0.1), z = Round(fz, 0.1), r = Round(fr, 0.1) } end
     out.inst = inst
   end
   -- In a fight only this section goes out: the app says so, instead of showing the rest as fresh.
@@ -241,6 +245,13 @@ end
 local SECTIONS = {
   { name = "pos", period = 0.25, build = BuildPos, combat = true, refresh = 10, first = true },
   { name = "char", period = 2, build = BuildChar },
+  -- The hour of the game's day, in minutes since midnight: the light of the app's 3D view follows it, and counts the
+  -- minutes between two sendings itself.
+  { name = "time", period = 15, build = function()
+    local h, m = Try(GetGameTime)
+    h, m = Num(h), Num(m)
+    if h and m then return { m = h * 60 + m } end
+  end },
 }
 ns.sections = SECTIONS -- other files add their own
 

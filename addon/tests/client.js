@@ -21,6 +21,7 @@ const STUB = `
   -- The world the addon reads. A test changes it with lua().
   GAME = { width = 1920, height = 1080, zone = "Elwynn Forest", sub = "Goldshire", map = 1429, x = 0.4234, y = 0.6571, facing = 1.5708 }
   function GetTime() return now end
+  function GetGameTime() if GAME.hour then return GAME.hour, GAME.minute or 0 end end -- GAME.hour, GAME.minute: the hour of the game's day
   function GetLocale() return GAME.locale or "enUS" end -- the language of the game, as the game is installed
   function GetPhysicalScreenSize() return GAME.width, GAME.height end
   function GetZoneText() return GAME.zone end
@@ -268,7 +269,32 @@ const STUB = `
   C_Minimap = { GetViewRadius = function() return GAME.miniRadius end }
   function GetCVar(name) return GAME.cvars and GAME.cvars[name] end
   UiMapPoint = { CreateFromCoordinates = function(map, x, y) return { m = map, x = x, y = y } end }
-  C_SuperTrack = { SetSuperTrackedUserWaypoint = function(on) TRACKED = on end }
+  -- The super-track: PINNED = { kind, id } the map pin followed, QUEST the quest. GAME.far = { x, y, z } the character's
+  -- place in yards of the instance: the distance to the flight master pinned, told as the game tells it, the
+  -- one pinned before for the first 50 ms after a switch. GAME.secret: the distance is a secret value.
+  C_SuperTrack = {
+    SetSuperTrackedUserWaypoint = function(on) TRACKED = on end,
+    IsSuperTrackingUserWaypoint = function() return TRACKED == true end,
+    SetSuperTrackedMapPin = function(kind, id) PINNED_BEFORE, PINNED, PINNED_AT = PINNED, { kind, id }, now end,
+    GetSuperTrackedMapPin = function() if PINNED then return PINNED[1], PINNED[2] end end,
+    ClearSuperTrackedMapPin = function() PINNED = nil end,
+    SetSuperTrackedQuestID = function(quest) QUEST = quest end,
+    GetSuperTrackedQuestID = function() return QUEST or 0 end,
+  }
+  C_Navigation = {
+    GetDistance = function()
+      if GAME.secret then return SECRET end
+      local pin = PINNED and now - (PINNED_AT or 0) < 0.05 and PINNED_BEFORE or PINNED
+      if not (GAME.far and pin) then return 0 end
+      for _, n in ipairs(FLIGHT_MASTERS or {}) do
+        if n[1] == pin[2] then return math.sqrt((GAME.far.x - n[2]) ^ 2 + (GAME.far.y - n[3]) ^ 2 + (GAME.far.z - n[4]) ^ 2) end
+      end
+      return 0
+    end,
+  }
+  SECRET = setmetatable({}, { __tostring = function() return "secret" end })
+  function issecretvalue(v) return v == SECRET end
+  SuperTrackedFrame = { alpha = 1, SetAlpha = function(self, a) self.alpha = a end }
   LEVELS = {} -- every channel value a texture was given, as a key
   -- The game's world map: GAME.mapOpen, and GAME.shown the map on it. Its canvas is 1000 by 600.
   function hooksecurefunc() end

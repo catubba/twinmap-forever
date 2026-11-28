@@ -5,7 +5,7 @@
 // Away from it they go again. How it looks and every number here were chosen by the user on the
 // prototype design/terrain3d/inside.html and are written in design/ui.md, section 4.
 import * as THREE from 'three'
-import { roomPixels, type Piece, type UnderRoom } from '../../shared/inside'
+import { rockCut, roomPixels, ROCK_SLOPE, type Piece, type UnderRoom } from '../../shared/inside'
 import { inflated, type Terrain } from './terrain3d'
 import { TILES } from './web'
 
@@ -30,12 +30,15 @@ const UNDER_ROUND = 152
 const UNDER_SQUARE = 8
 /** The roof of a room is told to the ground in a byte: this many yards a step. */
 export const ROOF_STEP = 4
+/** Yards between two heights of the cut round the rooms in rock (M23-F30): the ground is cut between them as they lie. */
+const CUT_CELL = 8
 
 interface Room {
   piece: Piece
   floor: number
   roof: number
   y: number
+  rock: boolean
 }
 
 interface Building {
@@ -86,20 +89,40 @@ export class Inside3d {
   private group = new THREE.Group()
   private s3tc: boolean
   private shown = ''
+  private hidden = false
+  private always = false
+  // The height the ground is cut at round the rooms of a dungeon dug in rock (shared/inside.ts, rockCut), every CUT_CELL
+  // yards from x0, z0 as far as the funnel reaches; null for a dungeon with none.
+  private cut: { x0: number; z0: number; nx: number; nz: number; heights: Float32Array } | null = null
 
   constructor(private terrain: Terrain) {
     this.s3tc = terrain.s3tc
     terrain.under(this.group, this)
   }
 
-  /** The rooms inside the ground of the continent on show: its pieces, and which of them with their floor and roof (under.json). */
-  set(pieces: Piece[], under: UnderRoom[]): void {
+  /**
+   * The rooms inside the ground of the continent on show: its pieces, and which of them with their floor and roof
+   * (under.json). always: of a dungeon (M23-F26), which is open from any distance: its rooms are what the view is of.
+   */
+  set(pieces: Piece[], under: UnderRoom[], always = false): void {
+    this.always = always
     for (const b of this.buildings) this.unload(b)
     this.opened = []
     const by = new Map<number, Room[]>()
-    for (const [index, floor, roof] of under) {
+    for (const [index, floor, roof, rock] of under) {
       const piece = pieces[index]
-      if (piece) (by.get(piece.building) ?? by.set(piece.building, []).get(piece.building)!).push({ piece, floor, roof, y: floor })
+      if (piece) (by.get(piece.building) ?? by.set(piece.building, []).get(piece.building)!).push({ piece, floor, roof, y: floor, rock: rock === 1 })
+    }
+    this.cut = null
+    const rock = [...by.values()].flat().filter((r) => r.rock)
+    if (rock.length) {
+      // the funnel meets the ground over a room at most its roof away from it; and no farther than the ground can open
+      const far = (r: Room): number => reach(r.piece) + Math.min(ROOF_REACH, r.roof / ROCK_SLOPE)
+      const x0 = Math.floor(Math.min(...rock.map((r) => r.piece.u - far(r)))), z0 = Math.floor(Math.min(...rock.map((r) => r.piece.v - far(r))))
+      const nx = Math.ceil((Math.max(...rock.map((r) => r.piece.u + far(r))) - x0) / CUT_CELL) + 1, nz = Math.ceil((Math.max(...rock.map((r) => r.piece.v + far(r))) - z0) / CUT_CELL) + 1
+      const heights = new Float32Array(nx * nz)
+      for (let i = 0; i < nz; i++) for (let j = 0; j < nx; j++) heights[i * nx + j] = rockCut(rock, x0 + j * CUT_CELL, z0 + i * CUT_CELL)
+      this.cut = { x0, z0, nx, nz, heights }
     }
     this.buildings = [...by.values()].map((rooms) => {
       // Lowest first, the larger first: one over another at the same height is a little over it.
@@ -143,6 +166,16 @@ export class Inside3d {
     }
   }
 
+  /** How high the ground is cut at over a place, round the rooms of a dungeon dug in rock; Infinity where it is not. */
+  cutAt(x: number, z: number): number {
+    const c = this.cut
+    if (!c) return Infinity
+    const fx = (x - c.x0) / CUT_CELL, fz = (z - c.z0) / CUT_CELL
+    if (!(fx >= 0 && fz >= 0 && fx < c.nx - 1 && fz < c.nz - 1)) return Infinity
+    const j = Math.floor(fx), i = Math.floor(fz), a = fx - j, b = fz - i, h = c.heights, k = i * c.nx + j
+    return (h[k]! * (1 - a) + h[k + 1]! * a) * (1 - b) + (h[k + c.nx]! * (1 - a) + h[k + c.nx + 1]! * a) * b
+  }
+
   /** The floor of an open room over a place, and how open its building is; null where there is none. The highest, where rooms lie over one another. */
   floorAt(x: number, z: number): { y: number; open: number } | null {
     let found: { y: number; open: number } | null = null
@@ -160,7 +193,7 @@ export class Inside3d {
     this.opened = []
     for (const b of this.buildings) {
       const far = Math.hypot(Math.max(b.x0 - camera.x, 0, camera.x - b.x1), Math.max(b.low - camera.y, 0, camera.y - b.high), Math.max(b.z0 - camera.z, 0, camera.z - b.z1))
-      const want = 1 - Math.min(1, Math.max(0, (far - NEAR) / (NEAR * 0.25)))
+      const want = this.always ? 1 : 1 - Math.min(1, Math.max(0, (far - NEAR) / (NEAR * 0.25)))
       if (want > 0 && b.state === 'out') void this.load(b)
       if (b.state !== 'in') continue
       b.open += (want - b.open) * Math.min(1, dt * 6)
@@ -190,6 +223,13 @@ export class Inside3d {
   /** For the picture the ground asks, and back: each room and wall tells its roof instead of showing itself. */
   seenPass(on: boolean): void {
     for (const b of this.buildings) b.group?.children.forEach((c, i) => ((c as THREE.Mesh).material = (on ? b.seen! : b.shown!)[i]!))
+    // the pictures left out of the view still tell the ground where to open; the walls of earth round them stay
+    for (const b of this.buildings) b.group?.children.forEach((c) => c.userData.picture && (c.visible = on || !this.hidden))
+  }
+
+  /** Whether the pictures are left out of the view: the buildings are drawn whole (buildings3d.ts). */
+  hidePictures(on: boolean): void {
+    this.hidden = on
   }
 
   private async load(b: Building): Promise<void> {
@@ -237,6 +277,7 @@ export class Inside3d {
       geo.setIndex([0, 2, 1, 1, 2, 3])
       const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map, transparent: true, alphaTest: 0.4, side: THREE.DoubleSide, fog: false, opacity: 0 }))
       mesh.position.set(p.u, r.y + 0.2, p.v)
+      mesh.userData.picture = true
       mesh.rotation.y = p.angle
       group.add(mesh)
       shown.push(mesh.material)

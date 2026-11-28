@@ -70,3 +70,18 @@ test('the full name goes out with the level, as the sheet calls the character', 
   addon.run(10);
   assert.deepEqual(blocks(addon, 'char'), [{ level: 13, name: 'Catubbio Sucameli' }]);
 });
+
+test("the hour of the game's day goes out in minutes, and again when it changes", () => {
+  const addon = enterWorld('GAME.hour, GAME.minute = 20, 31');
+  addon.run(10);
+  assert.deepEqual(blocks(addon, 'time'), [{ m: 1231 }]);
+  addon.lua('GAME.hour, GAME.minute = 20, 32');
+  addon.run(20);
+  assert.deepEqual(blocks(addon, 'time').at(-1), { m: 1232 });
+});
+
+test("without the game's hour, no hour is sent", () => {
+  const addon = enterWorld();
+  addon.run(20);
+  assert.deepEqual(blocks(addon, 'time'), []);
+});

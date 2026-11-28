@@ -11,7 +11,7 @@ import { BLOCK_YARDS, WORLDS } from '../shared/world'
 import { heightsFile } from './heights'
 
 // The height of the terrain of a continent over a place, from its heights as the converter keeps them; null where there is none.
-function groundOf(folder: string): (u: number, v: number) => number | null {
+export function groundOf(folder: string): (u: number, v: number) => number | null {
   const blocks = new Map<number, Float32Array | null>()
   return (u, v) => {
     const column = Math.floor(u / BLOCK_YARDS), row = Math.floor(v / BLOCK_YARDS), key = row * 64 + column

@@ -5,7 +5,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { inflateSync } from 'node:zlib'
-import type { Position } from '../shared/game'
+import type { Far, Position } from '../shared/game'
 import { inPiece, roomPixels, type Interiors, type Piece } from '../shared/inside'
 import { facingOf, levelsOf, LIT, locate, readsMinimap, SHARED, SURE, viewHolds, widthsOf, type Box, type Found, type Levels, type Mosaic } from '../shared/minimap'
 import { ROOM_VIEWS } from '../shared/room-views'
@@ -142,6 +142,8 @@ export interface Inside {
   facing?: number
   /** The level the character is on, from 0, in a dungeon with rooms over rooms; missing in one with a single level, and in the open. */
   level?: number
+  /** True when the place was found on the picture of the open ground: the character is under no roof (the 3D view then puts it on nothing that lies under the ground, shared/floors.ts). */
+  open?: boolean
 }
 
 /** What the last look at the minimap came to, for whoever has to find out why the arrow is not there: written with the measures of the link. */
@@ -169,6 +171,8 @@ export interface InsideReport {
   hid?: boolean
   /** The place found was let go: a room the game always draws from there is not on the minimap (viewHolds). */
   unlike?: boolean
+  /** The place the addon found from the flight masters at the same moment, when it sends one: for the samples of the participation programme. */
+  far?: Far
 }
 
 /**
@@ -202,7 +206,7 @@ export function startInside(tilesFolder: () => string | null, mosaics: (folder: 
         last = null
         return null
       }
-      const fresh = (): Inside | null => (last && now - last.at <= KEPT ? { u: last.u, v: last.v, facing: last.facing, level: last.level } : null)
+      const fresh = (): Inside | null => (last && now - last.at <= KEPT ? { u: last.u, v: last.v, facing: last.facing, level: last.level, ...(last.open ? { open: true } : {}) } : null)
       if (now - lookedAt < EVERY) return fresh()
       lookedAt = now
       if (pos.inst.id !== dungeon) {
@@ -215,7 +219,8 @@ export function startInside(tilesFolder: () => string | null, mosaics: (folder: 
         views = ROOM_VIEWS[dungeon]
       }
       const widths = widthsOf(mini)
-      const said = { dungeon, pictures: floors.length, zoom: mini.zoom, size: mini.size, widths, lostFor: now - (foundAt || enteredAt), ...(mini.hid === true ? { hid: true } : {}) }
+      const far = pos.inst.far
+      const said = { dungeon, pictures: floors.length, zoom: mini.zoom, size: mini.size, widths, lostFor: now - (foundAt || enteredAt), ...(mini.hid === true ? { hid: true } : {}), ...(far && [far.x, far.y, far.z, far.r].every(Number.isFinite) ? { far: { x: far.x, y: far.y, z: far.z, r: far.r } } : {}) }
       if (!floors.length) return (report = { ...said, why: 'no rooms' }), null
       const known = last && now - last.at <= KEPT ? last : null
       if (!known && now - searchedAt < LOST_FOR) return null
@@ -268,7 +273,7 @@ export function startInside(tilesFolder: () => string | null, mosaics: (folder: 
       const facing = Math.hypot(du, dv) >= RUNNING ? ((Math.atan2(du, -dv) * 180) / Math.PI + 360) % 360 : (facingOf(box) ?? last?.facing)
       // In the open no level is told: the map keeps the one it shows.
       const level = floors[picture]!.mosaic.level
-      last = { u: place.u, v: place.v, facing, at: now, level, picture, across }
+      last = { u: place.u, v: place.v, facing, at: now, level, picture, across, ...(floors[picture]!.mosaic.open ? { open: true } : {}) }
       lostTries = 0
       foundAt = now
       report = { ...said, scores, picture, across, level, place: { u: place.u, v: place.v, score: place.score }, lostFor: 0 }

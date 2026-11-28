@@ -12,23 +12,30 @@ import { FACTS, gameItemFacts, type ItemFacts, ITEMS_FILE } from '../shared/item
 import { AH_NAMES_FILE, gameAhNames } from '../shared/ah'
 import { spellFacts, SPELLS_FILE, SPELLS_FORMAT } from '../shared/spells'
 import { talentFacts, TALENTS_FILE, TALENTS_FORMAT } from '../shared/talents'
+import { lightFacts, LIGHT_FILE, LIGHT_FORMAT } from '../shared/light'
 import { trainerFacts, TRAINERS_FILE, TRAINERS_FORMAT } from '../shared/trainers'
 import { gameMaps, UI_MAP_ASSIGNMENT_FILE, UI_MAP_FILE, type GameMap } from '../shared/maps'
 import { AREA_POI_FILE, AREA_TABLE_FILE, places, UI_MAP_X_MAP_ART_FILE, WORLD_MAP_OVERLAY_FILE } from '../shared/places'
 import { TAXI_NODES_FILE, TAXI_PATH_FILE, TAXI_PATH_NODE_FILE, travel, TRAVEL_FORMAT, type Travel } from '../shared/services'
 import type { TilesStatus } from '../shared/tiles-status'
-import { readTable } from '../shared/wdc5'
+import { readTable, type Table } from '../shared/wdc5'
 import { LIQUID_TYPE_FILE, liquidOfName, WATER } from '../shared/water'
 import { WORLDS } from '../shared/world'
 import { gameLocale, installedBuild, openClientFiles, type ClientFiles } from './client-files'
-import { convertInteriors, ENCOUNTERS_FILE, finishedInteriors, INTERIORS_FILE, MAP_FILE, mapEntries, ROOM_PICTURES_FILE, roomPictures } from './interiors'
+import { buildingsMade, buriedKey, makeBuildings } from './buildings'
+import { makeProps, propsMade } from './props'
+import { makeStands, standsMade } from './stands'
+import { EncryptedFileError } from './client-files'
+import { convertInteriors, dungeonWorldFile, ENCOUNTERS_FILE, finishedInteriors, INTERIORS_FILE, MAP_FILE, mapEntries, placedIn, ROOM_PICTURES_FILE, roomPictures } from './interiors'
 import { sentKeys } from './keys'
 import { convertHeights, heightsDone } from './heights'
-import { makeCaves, makeUnder } from './caves'
+import { CAVES_FILE, makeCaves, makeUnder } from './caves'
 import { navFrom } from '../shared/nav-data'
 import { walker, type Walker } from './walk'
 import { MIDDLE_YARDS } from '../shared/inside'
 import { ICONS_MADE, writeIcons } from './icons'
+import { dungeonMaker } from './dungeons'
+import { groundMaker } from './ground'
 import { gamePictures, itemIcons } from './item-icons'
 import { convertParchment, parchmentFolder, parchmentSea } from './parchment'
 import startParchmentWorker from './parchment-worker?nodeWorker'
@@ -64,7 +71,7 @@ try {
   } catch {
     // No list: a map made before the app opened anything, or none yet.
   }
-  if ([...keys.keys()].some((k) => !usedKeys.includes(k))) for (const made of [PLACES_FILE, TRAVEL_FILE, INTERIORS_FILE]) rmSync(join(folder, made), { force: true })
+  if ([...keys.keys()].some((k) => !usedKeys.includes(k))) for (const made of [PLACES_FILE, TRAVEL_FILE, INTERIORS_FILE, LIGHT_FILE]) rmSync(join(folder, made), { force: true })
   // The names of zones, places, flights, dungeons, bosses, items, categories and spells are read in the game's language,
   // English where a file has none in it: all made again when the player changes it. A folder that says none was made in English.
   const locale = gameLocale(gameFolder) ?? 'enUS', localeFile = join(folder, LOCALE_FILE)
@@ -85,11 +92,14 @@ try {
   const open = (): ClientFiles => (client ??= openClientFiles(gameFolder, keys, locale))
   // The picture of an item, or of a spell by its file, when a screen asks for one the folder does not have yet (item-icons.ts).
   // Asked while the map is being made, it is answered once the making is done.
-  const makers = { items: itemIcons(open, folder), pictures: gamePictures(open, folder) }
-  parentPort?.on('message', (asked: { kind?: unknown; id?: unknown }) => {
-    if ((asked.kind === 'items' || asked.kind === 'pictures') && typeof asked.id === 'number') parentPort?.postMessage({ asked: `${asked.kind}/${asked.id}`, made: makers[asked.kind](asked.id) })
-  })
   const table = (b: Buffer) => readTable(b, (keyName) => open().opens(keyName))
+  // The ground's own textures of the 3D view, the same way (ground.ts), and the buildings and objects of a dungeon (dungeons.ts).
+  let maps: Table | undefined
+  const dungeonWorld = (map: number): number | null => dungeonWorldFile((maps ??= table(open().read(MAP_FILE, true)!)), map)
+  const makers = { items: itemIcons(open, folder), pictures: gamePictures(open, folder), ground: groundMaker(open, folder, dungeonWorld), dungeon: dungeonMaker(open, folder, table) }
+  parentPort?.on('message', (asked: { kind?: unknown; id?: unknown }) => {
+    if ((asked.kind === 'items' || asked.kind === 'pictures' || asked.kind === 'ground' || asked.kind === 'dungeon') && typeof asked.id === 'number') parentPort?.postMessage({ asked: `${asked.kind}/${asked.id}`, made: makers[asked.kind](asked.id) })
+  })
   const progress = (percent: number): void => {
     if (Math.floor(percent) !== told) tell({ state: 'converting', percent: Math.floor(percent) })
     told = Math.floor(percent)
@@ -285,6 +295,22 @@ try {
   } catch {
     // Talents draws no tree; tried again at the next start.
   }
+  // The game's lights by the hour of its day (shared/light.ts), for the 3D view, the same way.
+  try {
+    const lightFile = join(folder, LIGHT_FILE)
+    let format = 0
+    try {
+      format = (JSON.parse(readFileSync(lightFile, 'utf8')) as { format?: number }).format ?? 0
+    } catch {
+      // Not there yet.
+    }
+    if (format !== LIGHT_FORMAT) {
+      const facts = lightFacts(open())
+      if (facts) writeFileSync(lightFile, JSON.stringify(facts))
+    }
+  } catch {
+    // The view keeps the light of today; tried again at the next start.
+  }
 
   // The insides of buildings come after: the map of the continents is already usable.
   const insideStarted = Date.now()
@@ -324,6 +350,96 @@ try {
   } catch (e) {
     // The map of the continents is there all the same.
     interiors({ maps: 0, pieces: 0, dropped: 0, converted: false, problem: e instanceof Error ? e.message : String(e) })
+  }
+  // The buildings of the continents for the 3D view (buildings.ts): minutes the first time, after all the rest. The view
+  // asks for them until they are there.
+  const buildingsStarted = Date.now()
+  try {
+    if (!buildingsMade(folder, WORLDS.map((w) => w.name))) {
+      const files = open()
+      // a file the server has sent no key for is a building the view does without
+      const read = (id: number): Buffer | null => {
+        try {
+          return files.read(id)
+        } catch (e) {
+          if (e instanceof EncryptedFileError) return null
+          throw e
+        }
+      }
+      // the buildings inside the ground (caves.json, by their place in the list of interiors.ts): their halls are the pictures of the rooms
+      let caves: Record<string, number[]> = {}
+      try {
+        caves = (JSON.parse(readFileSync(join(folder, CAVES_FILE), 'utf8')) as { worlds: Record<string, number[]> }).worlds
+      } catch {
+        // none known: all drawn whole
+      }
+      // what each liquid of the buildings is, by its name in the game's table, as for the ground; without the table, all water
+      const liquids = new Map<number, number>()
+      try {
+        for (const row of table(files.read(LIQUID_TYPE_FILE)!).rows) liquids.set(row.id, liquidOfName(row.text(0)))
+      } catch {
+        // all water
+      }
+      const made = makeBuildings(
+        WORLDS.map((w) => {
+          const wdt = read(w.file)!, list = placedIn(wdt, read)
+          return { name: w.name, wdt, buried: new Set((caves[w.continent] ?? []).flatMap((n) => (list[n] ? [buriedKey(list[n].file, list[n].u, list[n].v)] : []))) }
+        }),
+        read,
+        folder,
+        (type) => liquids.get(type) ?? WATER,
+      )
+      parentPort?.postMessage({ buildings: { ...made, seconds: (Date.now() - buildingsStarted) / 1000 } })
+    }
+  } catch (e) {
+    // The 3D view goes without them; tried again at the next start.
+    parentPort?.postMessage({ buildings: { problem: e instanceof Error ? e.message : String(e) } })
+  }
+  // Where things stand over the game's ground (stands.ts): the streets of the cities the buildings draw.
+  try {
+    if (!standsMade(folder, WORLDS.map((w) => w.name))) {
+      const started = Date.now()
+      const cells = makeStands(folder, WORLDS, (continent) => {
+        const data = navFrom(readFileSync(join(nav, `nav${continent}.json`), 'utf8'))
+        return data && walker(data)
+      })
+      parentPort?.postMessage({ buildings: { stands: cells, seconds: (Date.now() - started) / 1000 } })
+    }
+  } catch (e) {
+    parentPort?.postMessage({ buildings: { problem: `stands: ${e instanceof Error ? e.message : String(e)}` } })
+  }
+  // The trees and objects of the continents (props.ts), after the buildings, whose textures they share.
+  const propsStarted = Date.now()
+  try {
+    if (!propsMade(folder, WORLDS.map((w) => w.name))) {
+      const files = open()
+      const read = (id: number): Buffer | null => {
+        try {
+          return files.read(id)
+        } catch (e) {
+          if (e instanceof EncryptedFileError) return null
+          throw e
+        }
+      }
+      // the buildings inside the ground, as for the buildings: their copies are cut as they are
+      let caves: Record<string, number[]> = {}
+      try {
+        caves = (JSON.parse(readFileSync(join(folder, CAVES_FILE), 'utf8')) as { worlds: Record<string, number[]> }).worlds
+      } catch {
+        // none known
+      }
+      const made = makeProps(
+        WORLDS.map((w) => {
+          const wdt = read(w.file)!, list = placedIn(wdt, read)
+          return { name: w.name, wdt, buried: new Set((caves[w.continent] ?? []).flatMap((n) => (list[n] ? [buriedKey(list[n].file, list[n].u, list[n].v)] : []))) }
+        }),
+        read,
+        folder,
+      )
+      parentPort?.postMessage({ buildings: { props: made, seconds: (Date.now() - propsStarted) / 1000 } })
+    }
+  } catch (e) {
+    parentPort?.postMessage({ buildings: { problem: `props: ${e instanceof Error ? e.message : String(e)}` } })
   }
   // The game's own map stitched into tiles (parchment.ts), a few seconds a continent: last of all, as the map does
   // without it until it is there. Its tiles are painted on threads of their own (parchment-worker.ts), and meanwhile

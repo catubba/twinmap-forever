@@ -3,6 +3,7 @@
 // and zeppelins (all from the game's own tables; the doors the tables do not give are in dungeon-doors.ts,
 // which of the game's ways are ships and zeppelins in VESSELS).
 import { DUNGEON_DOORS, FIRST_ENTRANCE, MORE_DOORS, type Entrance } from './dungeon-doors'
+import type { InsidePlace } from './dungeon-trainers'
 import { unitsOfPlace, unitsOfWorld } from './geo'
 import type { Continent, GameMap } from './maps'
 import type { Table } from './wdc5'
@@ -73,6 +74,8 @@ export interface FixedPin {
   /** Of ore and herbs: the kind (a key of HERBS or ORES) and the skill it asks. Missing for a vein of no kind listed. */
   kind?: string
   need?: number
+  /** A trainer inside a dungeon (dungeon-trainers.ts): its map and its place there. It has no place on a zone (area 0). */
+  inside?: InsidePlace
 }
 
 /**
