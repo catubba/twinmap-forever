@@ -61,10 +61,14 @@ export class Props {
   private from = new THREE.Vector3(Infinity, 0, 0)
   private readonly center = { value: new THREE.Vector3() }
 
-  /** cutAt: the height a building inside the ground is cut at now, null when it is not on show (Buildings.cutAt). */
+  /**
+   * cutAt: the height a building inside the ground is cut at now, null when it is not on show (Buildings.cutAt).
+   * over: the plane all that stands on the ground is cut by, with the ground (terrain3d.ts: the roof of a dungeon's room).
+   */
   constructor(
     private renderer: THREE.WebGLRenderer,
     private cutAt: (x: number, z: number) => number | null,
+    private over: THREE.Plane,
   ) {}
 
   /** The continent shown, by its folder. */
@@ -251,6 +255,7 @@ export class Props {
       g.setIndex(mesh.geometry.index)
       g.setAttribute('cut', cut)
       const material = (mesh.material as THREE.Material).clone()
+      material.clippingPlanes = null // cut with its building, by the height above: a clone would keep the plane as it is now
       const before = material.onBeforeCompile
       material.onBeforeCompile = (shader, r) => {
         before.call(material, shader, r)
@@ -413,6 +418,7 @@ export class Props {
       transparent: added || blended || p.opacity < 0.99,
       depthWrite: p.blend <= 1,
       blending: added ? THREE.AdditiveBlending : THREE.NormalBlending,
+      clippingPlanes: [this.over],
     }
     const m = p.flags & 1 ? new THREE.MeshBasicMaterial(o) : new THREE.MeshLambertMaterial(o)
     if (tree && p.blend === 1) {

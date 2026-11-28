@@ -16,16 +16,18 @@
 //   buildings/tex/                  the textures, shared with the buildings (buildings.ts)
 //   <continent>/props/<c>-<r>.bin   the copies of a block, deflated (KEPT_BITS)
 //   <continent>/props.json          the blocks that have copies (PropBlocks), written last
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+// A dungeon's are made the same way when it is first opened in 3D (dungeons.ts), without the lid the game leaves over its rooms (isLid).
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { deflateSync } from 'node:zlib'
+import { lidOver, type Piece } from '../shared/inside'
 import { COPY, DENSITIES, KEPT_BITS, TREE_RADIUS, type Density, type PropBlocks, type PropHead, type PropPiece } from '../shared/props'
 import { BLOCKS, BLOCK_YARDS } from '../shared/world'
 import { BUILDINGS_FOLDER, buriedKey, textureKeeper, type Texture } from './buildings'
 import { keep } from './tiles'
 
 export const PROPS_FILE = 'props.json'
-const FORMAT = 2 // 1 had no copies of the rooms under a roof of the buildings inside the ground
+const FORMAT = 3 // 1 had no copies of the rooms under a roof of the buildings inside the ground; 2 did not tell how low and how tall a model stands
 const M2 = 'm2'
 
 function* chunks(b: Buffer, from = 0): Generator<{ tag: string; data: Buffer }> {
@@ -64,7 +66,7 @@ export function makeModel(f: Buffer, read: (id: number) => Buffer | null, textur
   }
   const [nb, ob] = [u32(skin, 36), u32(skin, 40)], [ni, oi] = [u32(skin, 12), u32(skin, 16)], osv = u32(skin, 8), oss = u32(skin, 32)
   const pieces: { piece: PropPiece; data: number[]; idx: number[] }[] = []
-  let radius = 0
+  let radius = 0, low = Infinity, high = -Infinity
   for (let b = 0; b < nb; b++) {
     const at = ob + b * 24
     if (u16(skin, at + 12) !== 0) continue // the first layer of a material only
@@ -91,6 +93,8 @@ export function makeModel(f: Buffer, read: (id: number) => Buffer | null, textur
         const uv = coord < 0 ? [0.5 + 0.5 * nx, 0.5 - 0.5 * ny] : [f32(a + 32 + (coord === 1 ? 8 : 0)), f32(a + 36 + (coord === 1 ? 8 : 0))]
         data.push(-y, z, -x, -ny, nz, -nx, uv[0]!, uv[1]!)
         radius = Math.max(radius, Math.hypot(x, y, z))
+        low = Math.min(low, z)
+        high = Math.max(high, z)
       }
       idx.push(i)
     }
@@ -99,7 +103,7 @@ export function makeModel(f: Buffer, read: (id: number) => Buffer | null, textur
     pieces.push({ piece: { points: local.size, indices: idx.length - (idx.length % 3), texture: tex ? id : 0, kind: tex?.kind ?? 'none', blend: u16(md, om + material * 4 + 2), flags: u16(md, om + material * 4), opacity: Number(opacity.toFixed(3)) }, data, idx: idx.slice(0, idx.length - (idx.length % 3)) })
   }
   if (!pieces.length) return null
-  const head: PropHead = { radius: Math.ceil(radius), tree: radius >= TREE_RADIUS && pieces.some((p) => p.piece.blend === 1), pieces: pieces.map((p) => p.piece) }
+  const head: PropHead = { radius: Math.ceil(radius), tree: radius >= TREE_RADIUS && pieces.some((p) => p.piece.blend === 1), low: Number(low.toFixed(2)), tall: Number((high - low).toFixed(2)), pieces: pieces.map((p) => p.piece) }
   const json = Buffer.from(JSON.stringify(head)), pad = (b: Buffer): Buffer => Buffer.concat([b, Buffer.alloc((4 - (b.length % 4)) % 4)])
   const body = Buffer.concat([Buffer.from(new Uint32Array([json.length]).buffer), pad(json), ...pieces.flatMap((p) => [Buffer.from(new Float32Array(p.data).buffer), pad(Buffer.from(new Uint16Array(p.idx).buffer))])])
   return { head, body }
@@ -127,11 +131,28 @@ const inBuilding = (px: number, py: number, pz: number, x: number, y: number, z:
   px, py, pz,
 ]
 
-/** A copy: the model's file, its matrix into the view's yards, and where its building stands when it is inside the ground (cut as it is). */
+/** A copy: the model's file, its matrix into the view's yards, where its building stands when it is inside the ground (cut as it is), and whether a block places it, not a building. */
 export interface Copy {
   file: number
   m: M
   under?: [number, number]
+  block?: true
+}
+
+/** Yards a sheet reaches from where it stands from which it can be a lid (a carpet of grass reaches 45), and the yards a sheet is tall at most. */
+const LID_REACH = 100
+const SHEET = 1
+
+/**
+ * Whether a copy the blocks place is a lid over the rooms of a dungeon (M23-F28): a wide level sheet with a room of
+ * the 2D map wholly under it. The game hides the sky of Deadmines with one, 1,400 yards wide, 160 yards over the
+ * mine: from above it hides the mine. Measured on the 38 dungeons with a ground (design/dungeons3d/cover.ts): of
+ * 188,422 copies it is the only one. model: the copy's (PropHead); rooms: the pieces of the dungeon's 2D map.
+ */
+export function isLid(c: Copy, model: { radius: number; low: number; tall: number }, rooms: Piece[]): boolean {
+  const s = Math.hypot(c.m[0]!, c.m[1]!, c.m[2]!), reach = model.radius * s
+  if (!c.block || model.tall * s > SHEET || reach < LID_REACH) return false
+  return lidOver(rooms, [c.m[9]! - reach, c.m[11]! - reach, c.m[9]! + reach, c.m[11]! + reach], c.m[10]! + model.low * s)
 }
 
 /**
@@ -197,7 +218,7 @@ export function copiesOf(wdt: Buffer, read: (id: number) => Buffer | null, burie
       blockSeen.add(mddf.readUInt32LE(at + 4))
       // ponytail: the turn round the up of the world only, as the buildings; a copy leaning on a slope stands straight
       const turn = ((mddf.readFloatLE(at + 24) - 180) * Math.PI) / 180
-      out.push({ file: mddf.readUInt32LE(at), m: standingAt(mddf.readFloatLE(at + 8), mddf.readFloatLE(at + 12), mddf.readFloatLE(at + 16), turn, mddf.readUInt16LE(at + 32) / 1024 || 1) })
+      out.push({ file: mddf.readUInt32LE(at), m: standingAt(mddf.readFloatLE(at + 8), mddf.readFloatLE(at + 12), mddf.readFloatLE(at + 16), turn, mddf.readUInt16LE(at + 32) / 1024 || 1), block: true })
     }
     if (modf) ofBuildings(modf, 0)
   }
@@ -257,32 +278,37 @@ export function propsMade(folder: string, worlds: string[]): boolean {
 /**
  * Makes the trees and objects of the continents given, in the folder of the build: each model once, kept as it is made
  * (an interrupted run resumes), the copies of each continent by block, its list last. read: a game file by number, null
- * when there is none or the server has not sent its key. Gives what was made.
+ * when there is none or the server has not sent its key. rooms: of a dungeon, the pieces of its 2D map: a lid over
+ * them is left out. Gives what was made.
  */
-export function makeProps(worlds: { name: string; wdt: Buffer; buried?: Set<string> | 'all' }[], read: (id: number) => Buffer | null, folder: string): { models: number; copies: number } {
+export function makeProps(worlds: { name: string; wdt: Buffer; buried?: Set<string> | 'all'; rooms?: Piece[] }[], read: (id: number) => Buffer | null, folder: string): { models: number; copies: number } {
   const dir = join(folder, BUILDINGS_FOLDER), m2 = join(dir, M2)
   if (formatOf(folder) !== FORMAT) {
     rmSync(m2, { recursive: true, force: true })
-    for (const w of worlds) {
-      rmSync(join(folder, w.name, PROPS_FILE), { force: true })
-      rmSync(join(folder, w.name, 'props'), { recursive: true, force: true })
+    // every list made in the other format goes, not only the ones made now: a continent's, and those of the dungeons
+    // opened so far, which are made again when next opened (dungeons.ts)
+    for (const d of readdirSync(folder, { withFileTypes: true })) {
+      if (!d.isDirectory()) continue
+      rmSync(join(folder, d.name, PROPS_FILE), { force: true })
+      rmSync(join(folder, d.name, 'props'), { recursive: true, force: true })
     }
     mkdirSync(m2, { recursive: true })
     writeFileSync(join(m2, 'format.json'), JSON.stringify({ format: FORMAT }))
   }
   const texture = textureKeeper(dir, read)
-  // each model's radius and whether it is a tree, or null for one with nothing to draw
-  const models = new Map<number, { radius: number; tree: boolean } | null>()
-  const model = (file: number): { radius: number; tree: boolean } | null => {
+  // each model's radius, how it stands and whether it is a tree, or null for one with nothing to draw
+  type Kept = Pick<PropHead, 'radius' | 'tree' | 'low' | 'tall'>
+  const models = new Map<number, Kept | null>()
+  const model = (file: number): Kept | null => {
     if (models.has(file)) return models.get(file)!
     const out = join(m2, `${file}.bin`), none = join(m2, `${file}.none`)
-    let made: { radius: number; tree: boolean } | null = null
-    if (existsSync(out)) made = JSON.parse(readFileSync(out + '.json', 'utf8')) as { radius: number; tree: boolean }
+    let made: Kept | null = null
+    if (existsSync(out)) made = JSON.parse(readFileSync(out + '.json', 'utf8')) as Kept
     else if (!existsSync(none)) {
       const f = read(file), b = f && makeModel(f, read, texture)
       if (!b) keep(none, () => Buffer.alloc(0))
       else {
-        made = { radius: b.head.radius, tree: b.head.tree }
+        made = { radius: b.head.radius, tree: b.head.tree, low: b.head.low, tall: b.head.tall }
         // what it is beside it first, so a model kept is never without it
         writeFileSync(out + '.json', JSON.stringify(made))
         keep(out, () => deflateSync(b.body))
@@ -294,9 +320,9 @@ export function makeProps(worlds: { name: string; wdt: Buffer; buried?: Set<stri
   let copies = 0
   for (const w of worlds) {
     const all = copiesOf(w.wdt, read, w.buried).filter((c) => model(c.file))
-    // giants (Darnassus' trees, wider than 100 yards) are never drawn: from above they are a roof over the city
+    // giants (Darnassus' trees, wider than 100 yards) are never drawn: from above they are a roof over the city; nor is a lid over a dungeon's rooms
     const scale = (c: { m: M }): number => Math.hypot(c.m[0]!, c.m[1]!, c.m[2]!)
-    const shown = all.filter((c) => !(models.get(c.file)!.tree && models.get(c.file)!.radius * scale(c) > 100))
+    const shown = all.filter((c) => !(models.get(c.file)!.tree && models.get(c.file)!.radius * scale(c) > 100) && !(w.rooms && isLid(c, models.get(c.file)!, w.rooms)))
     const trees = shown.filter((c) => models.get(c.file)!.tree)
     const bits = thinned(trees.map((c) => ({ x: c.m[9]!, z: c.m[11]!, crown: 0.6 * models.get(c.file)!.radius * scale(c) })))
     const kept = new Map<Copy, number>(trees.map((c, i) => [c, bits[i]!]))

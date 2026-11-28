@@ -28,6 +28,9 @@ export interface PropHead {
   radius: number
   /** A tree: leaves cut out by alpha, at least TREE_RADIUS wide. Its leaves open round the character. */
   tree: boolean
+  /** Over its origin, the lowest of its points, and how tall it stands from there. */
+  low: number
+  tall: number
   pieces: PropPiece[]
 }
 

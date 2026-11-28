@@ -198,6 +198,19 @@ export function roofOf(p: Piece, floor: number, groundAt: (u: number, v: number)
   return under >= all / 4 ? roof : null
 }
 
+/**
+ * Whether a level sheet of a dungeon is a lid over its rooms and not a place (M23-F28): a room of the 2D map lies
+ * wholly under it. The game leaves such sheets over a dungeon that is all rooms, to hide the sky from inside: seen
+ * from above they hide the dungeon. box: the square of the map the sheet takes; level: its height, in yards.
+ */
+export function lidOver(pieces: Piece[], [u1, v1, u2, v2]: Box, level: number): boolean {
+  for (const p of piecesIn(pieces, [u1, v1, u2, v2])) {
+    if (p.top > level) continue
+    for (const [u, v] of over(p, 4)) if (u >= u1 && u < u2 && v >= v1 && v < v2) return true
+  }
+  return false
+}
+
 /** What holds every piece, or null for none. */
 export function boxOf(pieces: Piece[]): Box | null {
   if (!pieces.length) return null

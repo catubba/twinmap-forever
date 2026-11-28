@@ -9,24 +9,27 @@
 // all, so not with the map either. A block the game never painted (no texture of its own: the grey sheet over
 // Deadmines, with its water) is left out, and a ground that is one level sheet is no ground (Scarlet Monastery;
 // Razorfen Downs, Alcaz Prison and The Hall of Thanes have no painted block at all): those are made as the ones that
-// are all buildings. On a ground, only the buildings with rooms on the 2D map are drawn open, the others stand as on a continent; and the
+// are all buildings. What covers the rooms seen from above is left out too (M23-F28; measured in
+// design/dungeons3d/cover.ts): a level sheet with a room of the 2D map wholly under it is a lid, not a place, be it a
+// painted block all at one height (the grey slab over the hive of Ahn'Qiraj Temple, the only one of 1,090 blocks) or
+// an object of the blocks (props.ts, isLid: the sheet over Deadmines). On a ground, only the buildings with rooms on the 2D map are drawn open, the others stand as on a continent; and the
 // rooms that lie under the ground are listed, for the view to open the ground over them (inside3d.ts):
 //   i<map>/under.json    of its pieces (interiors.json) those inside the ground: [index, floor, yards of ground over it]
-import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { dungeonFolder, type Placed } from '../shared/buildings'
 import { groundTextures } from '../shared/ground'
 import { blockHeights } from '../shared/heights'
-import { roofOf, type UnderRoom } from '../shared/inside'
+import { lidOver, piecesIn, roofOf, type Box, type Piece, type UnderRoom } from '../shared/inside'
 import type { Table } from '../shared/wdc5'
 import { LIQUID_TYPE_FILE, liquidOfName, WATER } from '../shared/water'
-import { BLOCKS, groundFiles, terrainFiles } from '../shared/world'
+import { BLOCK_YARDS, BLOCKS, groundFiles, terrainFiles } from '../shared/world'
 import { buriedKey, FORMAT, makeBuildings, PLACED_FILE } from './buildings'
 import { groundOf } from './caves'
 import type { ClientFiles } from './client-files'
 import { convertHeights } from './heights'
 import { dungeonWorldFile, finishedInteriors, MAP_FILE, placedIn } from './interiors'
-import { makeProps } from './props'
+import { makeProps, PROPS_FILE } from './props'
 
 export const UNDER_FILE = 'under.json'
 
@@ -42,19 +45,27 @@ export function dungeonAsked(path: string): number | null {
 
 /**
  * The ground of a dungeon worth showing: the terrain files of its blocks that the game painted (a block with no
- * texture of its own is a sheet left there, not a place), or none when what is left is all at one level, which is
- * what the game leaves under a dungeon that is all buildings.
+ * texture of its own is a sheet left there, not a place) and that are not a lid over its rooms (painted, yet all at
+ * one level with a room of the 2D map wholly under it), or none when what is left is all at one level, which is what
+ * the game leaves under a dungeon that is all buildings. rooms: the pieces of its 2D map.
  */
-export function paintedGround(wdt: Buffer, read: (id: number) => Buffer | null): Set<number> {
+export function paintedGround(wdt: Buffer, read: (id: number) => Buffer | null, rooms: Piece[] = []): Set<number> {
   const textures = groundFiles(wdt), painted = new Set<number>()
   let low = Infinity, high = -Infinity
   for (const [block, file] of terrainFiles(wdt)) {
     const tex0 = read(textures.get(block) ?? 0)
     if (!tex0 || !groundTextures(tex0).length) continue
+    const column = block % BLOCKS, row = Math.floor(block / BLOCKS)
+    const box: Box = [column * BLOCK_YARDS, row * BLOCK_YARDS, (column + 1) * BLOCK_YARDS, (row + 1) * BLOCK_YARDS]
+    // its heights are read only where they decide something: while all so far is one level, or with rooms in its square
+    if (high - low <= 1 || piecesIn(rooms, box).length) {
+      const adt = read(file), heights = adt && blockHeights(adt, column, row)
+      let from = Infinity, to = -Infinity
+      for (const h of heights ?? []) if (!Number.isNaN(h)) ((from = Math.min(from, h)), (to = Math.max(to, h)))
+      if (to - from <= 1 && lidOver(rooms, box, from)) continue
+      ;((low = Math.min(low, from)), (high = Math.max(high, to)))
+    }
     painted.add(file)
-    if (high - low > 1) continue
-    const adt = read(file), heights = adt && blockHeights(adt, block % BLOCKS, Math.floor(block / BLOCKS))
-    for (const h of heights ?? []) if (!Number.isNaN(h)) ((low = Math.min(low, h)), (high = Math.max(high, h)))
   }
   return high - low > 1 ? painted : new Set()
 }
@@ -78,10 +89,11 @@ export function dungeonMaker(files: () => ClientFiles, folder: string, table: (b
     try {
       if (made.has(map)) return true
       const name = dungeonFolder(map), list = join(folder, name, PLACED_FILE)
-      // a list of another format is of buildings made again since, for the continents: its files are gone
+      // a list of another format is of buildings made again since, for the continents: its files are gone; and so
+      // with its objects, whose list goes when they are made in another format (props.ts)
       const done = (): boolean => {
         try {
-          if ((JSON.parse(readFileSync(list, 'utf8')) as Placed).format !== FORMAT) return false
+          if ((JSON.parse(readFileSync(list, 'utf8')) as Placed).format !== FORMAT || !existsSync(join(folder, name, PROPS_FILE))) return false
           made.add(map)
           return true
         } catch {
@@ -102,14 +114,16 @@ export function dungeonMaker(files: () => ClientFiles, folder: string, table: (b
         }
       }
       const liquid = (type: number): number => liquids!.get(type) ?? WATER
-      // its ground, where it has one: the heights and the 3D tiles, and which rooms lie under it
-      const ground = paintedGround(wdt, read)
+      // its ground, where it has one: the heights and the 3D tiles, and which rooms lie under it. What was made of it
+      // before goes: a block left out now would stay
+      const pieces = finishedInteriors(folder)?.maps.find((m) => m.id === map)?.pieces ?? [], ground = paintedGround(wdt, read, pieces)
+      for (const old of ['heights', 'shade', 'levels', UNDER_FILE]) rmSync(join(folder, name, old), { recursive: true, force: true })
       let rooms: Set<string> | undefined
       if (ground.size) {
         // a terrain file is asked for by its number: those of the blocks left out are not there
         const terrain = new Set(terrainFiles(wdt).values())
         convertHeights(wdt, (id) => (terrain.has(id) && !ground.has(id) ? null : read(id)), join(folder, name), undefined, liquid)
-        const pieces = finishedInteriors(folder)?.maps.find((m) => m.id === map)?.pieces ?? [], placed = placedIn(wdt, read), groundAt = groundOf(join(folder, name))
+        const placed = placedIn(wdt, read), groundAt = groundOf(join(folder, name))
         rooms = new Set([...new Set(pieces.map((p) => p.building))].flatMap((n) => (placed[n] ? [buriedKey(placed[n].file, placed[n].u, placed[n].v)] : [])))
         // ponytail: a room's floor is taken as the bottom of its box, which a pit under it lowers: the ground then opens a little wider than the room asks
         const under = pieces.flatMap((p, index): UnderRoom[] => {
@@ -121,7 +135,7 @@ export function dungeonMaker(files: () => ClientFiles, folder: string, table: (b
         renameSync(file + '.part', file)
       }
       // the objects first: the list of the buildings, written last, is what the view waits for
-      makeProps([{ name, wdt, buried: rooms ?? 'all' }], read, folder)
+      makeProps([{ name, wdt, buried: rooms ?? 'all', rooms: pieces }], read, folder)
       makeBuildings([{ name, wdt, dungeon: true, ...(rooms ? { buried: rooms } : {}) }], read, folder, liquid)
       return existsSync(list) && done()
     } catch {
