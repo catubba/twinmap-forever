@@ -1,6 +1,6 @@
 <script lang="ts">
   // The main screen: the top row with the state of the link, the map in its frame, and the Now panel.
-  import { experience, linkStatus, type LinkSnapshot } from '../../shared/link'
+  import { canChooseCapture, experience, linkStatus, type LinkSnapshot } from '../../shared/link'
   import { groupFrom } from '../../shared/group'
   import { deathFrom, type Place as DeathPlace } from '../../shared/death'
   import { feedbackDetails } from '../../shared/feedback'
@@ -455,7 +455,7 @@
 {#if onSetup && setup}
   <div class="whole" out:fade={gone}>
     {#if inApp}
-      <FirstRun {setup} {tiles} link={status} onclose={() => (onSetup = false)} />
+      <FirstRun setup={{ ...setup, capture: link?.capture }} {tiles} link={status} onclose={() => (onSetup = false)} />
     {:else}
       <!-- The game folder, the map and the addon are the computer's to set up: here there is only the wait. -->
       <main class="elsewhere surface">
@@ -468,7 +468,7 @@
 {/if}
 <!-- Settings is a window over what is on screen: the map, Items or the Auction House stay under it. -->
 {#if onSettings && setup && onSetup === false}
-  <Settings {setup} {tiles} onback={() => (onSettings = false)} onfeedback={() => (onFeedback = true)} onfirstrun={() => ((onSettings = false), (onSetup = true))} onnews={() => (newsAll = true)} />
+  <Settings setup={{ ...setup, capture: link?.capture }} {tiles} onback={() => (onSettings = false)} onfeedback={() => (onFeedback = true)} onfirstrun={() => ((onSettings = false), (onSetup = true))} onnews={() => (newsAll = true)} />
 {/if}
 {#if onSetup === false}
 <!-- The workspaces; the sections made once, in the stash until a panel of the open workspace takes them (frame.svelte.ts). -->
@@ -537,8 +537,15 @@
       <p class="map-note with-button" role="status">{t('app.map.addonMissing')} <button class="btn" onclick={() => window.twinmap.openCurseForge()}>{t('app.map.getAddon')}</button></p>
     {:else if paused && mapReady}
       <p class="map-note with-button" role="status" in:fly={drop(8)} out:fade={gone}>{t('app.map.paused')} <button class="btn" onclick={() => setPause(false)}>{t('app.map.resume')}</button></p>
+    {:else if status && (status.kind === 'connect' || link?.capture?.state === 'unsupported') && inApp && mapReady}
+      <p class="map-note with-button" role="status" in:fly={drop(8)} out:fade={gone}>{status.line} <button class="btn" onclick={() => window.twinmap.connectCapture()}>{link?.capture?.state === 'waiting' ? t('app.map.connect') : t('app.map.chooseWindow')}</button></p>
+    {:else if inApp && mapReady && link?.capture?.state === 'running' && link.capture.hint && status?.line}
+      <p class="map-note with-button" role="status" in:fly={drop(8)} out:fade={gone}>{status.line} <button class="btn" onclick={() => window.twinmap.chooseCapture()}>{t('app.map.chooseWindow')}</button></p>
     {:else if status?.line && mapReady}
       {#key status.line}<p class="map-note" role="status" in:fly={drop(8)} out:fade={gone}>{status.line}</p>{/key}
+    {/if}
+    {#if inApp && canChooseCapture(link)}
+      <button class="btn" onclick={() => window.twinmap.chooseCapture()}>{t('app.map.chooseWindow')}</button>
     {/if}
   </div>
 

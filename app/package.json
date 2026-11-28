@@ -8,7 +8,7 @@
   "homepage": "https://twinmap.app",
   "main": "out/main/index.js",
   "scripts": {
-    "predev": "node scripts/mac-build.cjs",
+    "predev": "node scripts/mac-build.cjs && node scripts/linux-build.cjs",
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "check": "svelte-check --tsconfig ./tsconfig.json",
@@ -17,7 +17,10 @@
     "predist:mac": "node scripts/mac-build.cjs",
     "dist:mac": "electron-vite build && electron-builder --mac dir --arm64 --publish never",
     "postdist:mac": "node scripts/mac-build.cjs sign",
-    "probe:mac": "node scripts/mac-build.cjs && electron scripts/capture-mac.cjs"
+    "probe:mac": "node scripts/mac-build.cjs && electron scripts/capture-mac.cjs",
+    "probe:linux": "node scripts/linux-build.cjs && electron scripts/capture-linux.cjs",
+    "predist:linux": "node scripts/linux-build.cjs",
+    "dist:linux": "electron-vite build && electron-builder --linux AppImage --x64 --publish never"
   },
   "build": {
     "appId": "app.twinmap",
@@ -60,6 +63,22 @@
       "provider": "github",
       "owner": "catubba",
       "repo": "twinmap-forever"
+    },
+    "linux": {
+      "target": "AppImage",
+      "category": "Game",
+      "artifactName": "Twinmap-${version}-x86_64.${ext}",
+      "syncDesktopName": true,
+      "icon": "build/icon.png",
+      "extraResources": [
+        {
+          "from": "dist-native/twinmap-capture",
+          "to": "twinmap-capture"
+        }
+      ]
+    },
+    "toolsets": {
+      "appimage": "1.0.3"
     }
   },
   "devDependencies": {
@@ -87,5 +106,6 @@
     "leaflet": "^1.9.4",
     "leaflet-rotate": "^0.6.2",
     "three": "^0.187.0"
-  }
+  },
+  "desktopName": "app.twinmap.desktop"
 }

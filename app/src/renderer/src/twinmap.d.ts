@@ -38,6 +38,8 @@ declare global {
       readLog: () => Promise<string>
       retryTiles: () => Promise<void>
       drawn: () => void
+      chooseCapture: () => Promise<void>
+      connectCapture: () => Promise<void>
       setOnTop: (on: boolean) => Promise<void>
       setZoom: (zoom: number) => Promise<void>
       setWorkspaces: (kept: import('../../shared/workspaces').Workspaces) => Promise<void>

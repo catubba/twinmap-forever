@@ -15,6 +15,7 @@ export const addonsFolder = (gameFolder: string): string => join(gameFolder, ...
 
 /** The player's choices the app keeps between runs. */
 export interface Settings {
+  captureToken?: string
   /** The game folder the player picked by hand, when the app did not find it alone. */
   gameFolder?: string
   /** The first run was gone through once: the app opens on the map. */
@@ -41,12 +42,13 @@ export interface Settings {
   workspaces?: Workspaces
 }
 
+export const isCaptureToken = (s: unknown): s is string => typeof s === 'string' && /^[\x21-\x7e]{1,512}$/.test(s)
 /** The settings as they were saved; nothing where the file is missing or is not ours. */
 export function readSettings(file: string): Settings {
   try {
     const read: unknown = JSON.parse(readFileSync(file, 'utf8'))
     if (typeof read !== 'object' || !read) return {}
-    const { gameFolder, setupDone, onTop, lan, lanCode, participate, zoom, noGpu, lang, langAsked, seenVersion, workspaces } = read as Record<string, unknown>
+    const { gameFolder, setupDone, onTop, lan, lanCode, participate, zoom, noGpu, lang, langAsked, seenVersion, workspaces, captureToken } = read as Record<string, unknown>
     const spaces = workspacesOf(workspaces)
     return {
       ...(typeof gameFolder === 'string' ? { gameFolder } : {}),
@@ -61,6 +63,7 @@ export function readSettings(file: string): Settings {
       ...(typeof lang === 'string' && /^([a-z]{2}[A-Z]{2}|pseudo(-[a-z]{2})?)$/.test(lang) ? { lang } : {}),
       ...(typeof seenVersion === 'string' && /^\d+\.\d+\.\d+$/.test(seenVersion) ? { seenVersion } : {}),
       ...(spaces ? { workspaces: spaces } : {}),
+      ...(isCaptureToken(captureToken) ? { captureToken } : {}),
     }
   } catch {
     return {}

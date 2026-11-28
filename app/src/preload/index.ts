@@ -91,6 +91,8 @@ contextBridge.exposeInMainWorld('twinmap', {
   retryTiles: (): Promise<void> => ipcRenderer.invoke('retry-tiles'),
   // The opening screen is drawn: the window can show itself.
   drawn: (): void => ipcRenderer.send('drawn'),
+  chooseCapture: (): Promise<void> => ipcRenderer.invoke('choose-capture'),
+  connectCapture: (): Promise<void> => ipcRenderer.invoke('connect-capture'),
   setOnTop: (on: boolean): Promise<void> => ipcRenderer.invoke('set-on-top', on),
   setZoom: (zoom: number): Promise<void> => ipcRenderer.invoke('set-zoom', zoom),
   // The workspaces as they are laid out now, and the one open: kept for the next start.

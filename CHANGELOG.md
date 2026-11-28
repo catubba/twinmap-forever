@@ -2,6 +2,12 @@
 
 What changed in each version of Twinmap, newest first. The section of a version is also the text of its release on GitHub and of the addon's file on CurseForge.
 
+## Unreleased
+
+### New
+
+- **Twinmap on Linux.** Download the x86_64 AppImage for Linux with glibc 2.39 or newer and connect to the game through the screen-sharing picker. Updates are manual: download each new AppImage from the releases page.
+
 ## 0.18.0 - 2026-11-26
 
 ### New

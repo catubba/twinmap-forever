@@ -1,10 +1,13 @@
+import type { CaptureView } from '../shared/link'
 // The Windows and Mac readers bind different system libraries. Only load the one for this process.
 export type WindowHandle = number | bigint
 type Reading = { width: number; height: number; rgb: Uint8Array; at: { x: number; y: number } }
 /** The edge of the window the addon draws its strip on: a row along the top or the bottom, a column down the left or the right side. */
 export type Edge = 'top' | 'bottom' | 'left' | 'right'
 
+export type TokenStore = { get(): string | undefined; set(token: string | null): void }
 interface Capture {
+  useTokenStore?(store: TokenStore): void
   findWindow(title: string): WindowHandle | null
   programOf(window: WindowHandle): string | null
   findWindowOf(program: RegExp): WindowHandle | null
@@ -17,6 +20,10 @@ interface Capture {
   captureAllowed?(): boolean
   requestCapture?(): boolean
   stopCapture?(): void
+  chooseCapture?(): void
+  captureState?(paused?: boolean): CaptureView
+  captureSession?(): number | null
+  trustCapture?(session: number): void
 }
 
 let capture: Capture | undefined
@@ -25,6 +32,7 @@ export function loadCapture(): Promise<void> {
   return loading ??= (async () => {
     if (process.platform === 'win32') capture = await import('./capture-win32')
     if (process.platform === 'darwin') capture = await import('./capture-darwin')
+    if (process.platform === 'linux') capture = await import('./capture-linux')
   })()
 }
 
@@ -40,3 +48,8 @@ export const readRow: Capture['readRow'] = (...args) => capture?.readRow(...args
 export const captureAllowed = (): boolean => capture?.captureAllowed?.() ?? true
 export const requestCapture = (): boolean => capture?.requestCapture?.() ?? true
 export const stopCapture = (): void => capture?.stopCapture?.()
+export const useTokenStore = (store: TokenStore): void => capture?.useTokenStore?.(store)
+export const chooseCapture = (): void => capture?.chooseCapture?.()
+export const captureState = (paused = false): CaptureView | null => capture?.captureState?.(paused) ?? null
+export const captureSession = (): number | null => capture?.captureSession?.() ?? null
+export const trustCapture = (session: number): void => capture?.trustCapture?.(session)

@@ -6,9 +6,10 @@ import { decodeRow, readStrip, stretchAfter } from '../shared/strip'
 import { readFileSync } from 'node:fs'
 import { worldOfYards } from '../shared/inside'
 import type { Box } from '../shared/minimap'
-import { captureAllowed, findGameWindow, findWindow, readBox, readRect, readRow, showsOnly, windowState, type Edge, type WindowHandle } from './capture'
+import { captureAllowed, captureState, captureSession, trustCapture, findGameWindow, findWindow, readBox, readRect, readRow, showsOnly, windowState, type Edge, type WindowHandle } from './capture'
 import { look } from './health'
 import { startInside, type Inside, type InsideReport } from './minimap'
+import { selfUpdates } from './update-gate'
 
 // Tuning knobs.
 const READ_EVERY = 15 // ms: a block stays up 50 ms, so it is seen about three times
@@ -60,7 +61,9 @@ export function startLink(
   // Paused, a strip was seen on the game's window: the addon draws again (a /reload, a login) and is to be asked once more.
   drawnWhilePaused: () => void = () => {},
 ): { snapshot: () => LinkSnapshot; inside: () => ReturnType<ReturnType<typeof startInside>['report']>; cut: (x: number, y: number, width: number, height: number) => ReturnType<typeof readRect>; pause: (on: boolean) => void; stop: () => void } {
-  const game = createGame(process.platform === 'win32')
+  const updates = selfUpdates(process.platform, process.env)
+  let game = createGame(updates)
+  let lastSession: number | null = null
   // Inside a dungeon the game tells addons no place: there, and only there, it is found from the minimap on the screen.
   const inside = startInside(tilesFolder)
   let found: (Inside & { at: number }) | null = null
@@ -109,6 +112,18 @@ export function startLink(
       if (stand !== null) lookInside(stand, now)
       return
     }
+    const session = captureSession()
+    if (session !== null && session !== lastSession) {
+      if (lastSession !== null) {
+        game = createGame(updates)
+        found = null
+        drew = undefined
+        stretch = 1
+        edgeSeenAt = 0
+      }
+      resumedAt = now
+      lastSession = session
+    }
     if (hwnd === null) {
       if (now < lookAgainAt) return
       lookAgainAt = now + FIND_EVERY
@@ -145,6 +160,7 @@ export function startLink(
     if (read.drew) drew = read.drew
     if (reading.kind !== 'none') edgeSeenAt = now
     game.feed(reading, now)
+    if (reading.kind === 'block' && session !== null) trustCapture(session)
     stretch = stretchAfter(stretch, row, read.drew)
     lookInside(hwnd, now)
   }, READ_EVERY)
@@ -159,6 +175,7 @@ export function startLink(
       }
       return {
         ...(process.platform === 'darwin' && !allowed ? { screenRecording: false as const } : {}),
+        ...((capture) => capture ? { capture } : {})(captureState(paused)),
         game: status,
         state: withInside(game.state, found),
         inside: ((said) => said && { why: said.why, lostFor: said.lostFor })(inside.report()?.report),

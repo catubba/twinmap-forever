@@ -12,6 +12,7 @@
 //                          (seen on a player's PC, issue 116): told by where the container starts
 //   encoding               content key -> encoded key
 //   root                   file number -> content key
+import { wineInstallPaths } from './wine-prefixes'
 import { execFileSync } from 'node:child_process'
 import { closeSync, existsSync, openSync, readdirSync, readFileSync, readSync } from 'node:fs'
 import { homedir } from 'node:os'
@@ -99,6 +100,7 @@ export function registryInstallPath(): string | null {
 
 /** Common install locations, in the order they are checked for the Forever build. */
 export function gameInstallPaths(): (string | null)[] {
+  if (process.platform === 'linux') return wineInstallPaths()
   if (process.platform !== 'darwin') return [registryInstallPath()]
   return ['/Applications/World of Warcraft', join(homedir(), 'Applications', 'World of Warcraft')].filter((folder) => existsSync(folder))
 }

@@ -16,6 +16,8 @@ An interactive map of World of Warcraft: Forever for your second screen.</p>
   <a href="https://github.com/catubba/twinmap-forever/releases/latest/download/Twinmap-Setup.exe"><img src="https://img.shields.io/badge/2._The_app-Download_for_Windows-1f6feb?style=for-the-badge&amp;logo=data:image/svg%2bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0id2hpdGUiIGQ9Ik0wIDMuNCA5LjggMnY5LjRIMHptMTEgLTEuNkwyNCAwdjExLjRIMTF6TTAgMTIuNmg5LjhWMjJMMCAyMC42em0xMSAwaDEzVjI0bC0xMy0xLjh6Ii8+PC9zdmc+" alt="2. The app: download for Windows" height="44"></a>
   &nbsp;&nbsp;
   <a href="https://github.com/catubba/twinmap-forever/releases/latest/download/Twinmap-mac-arm64.zip"><img src="https://img.shields.io/badge/2._The_app-Download_for_Mac-1f6feb?style=for-the-badge&amp;logo=apple&amp;logoColor=white" alt="2. The app: download for Mac" height="44"></a>
+  &nbsp;&nbsp;
+  <a href="https://github.com/catubba/twinmap-forever/releases/latest/download/Twinmap-x86_64.AppImage"><img src="https://img.shields.io/badge/2._The_app-Download_for_Linux-1f6feb?style=for-the-badge&amp;logo=linux&amp;logoColor=white" alt="2. The app: download for Linux" height="44"></a>
 </p>
 
 <p align="center">You need both. Free, with no account, no ads and no Overwolf.</p>
@@ -33,10 +35,10 @@ An interactive map of World of Warcraft: Forever for your second screen.</p>
 ## Install in three steps
 
 1. **The addon.** Install [Twinmap Forever from CurseForge](https://www.curseforge.com/wow/addons/twinmap-forever) and restart the game.
-2. **The app.** [Download Twinmap for Windows](https://github.com/catubba/twinmap-forever/releases/latest/download/Twinmap-Setup.exe) and open the file. It asks for no administrator rights and starts by itself. On a Mac, [download Twinmap for Mac](https://github.com/catubba/twinmap-forever/releases/latest/download/Twinmap-mac-arm64.zip): see below.
+2. **The app.** [Download Twinmap for Windows](https://github.com/catubba/twinmap-forever/releases/latest/download/Twinmap-Setup.exe) and open the file. It asks for no administrator rights and starts by itself. For Mac or Linux, see below.
 3. **Play.** The app finds your game and builds the map from your own game files, once, in a minute or two. Log in: your arrow appears on its own.
 
-From then on the app updates itself, and the addon is updated from CurseForge.
+On Windows the app updates itself; on Mac and Linux, download each new version. The addon is updated from CurseForge.
 
 <details>
 <summary><b>Windows says "Windows protected your PC"</b></summary>
@@ -70,6 +72,17 @@ Twinmap runs on Apple Silicon Macs (macOS 14 or later), with the macOS client of
 Twinmap looks for the game in `/Applications/World of Warcraft` and `~/Applications/World of Warcraft`. Everything works as on Windows, pins and routes sent to the game included. Not on Mac yet: automatic updates (download each new version here) and HDR.
 
 The Mac app is signed and notarized by markus-barta, who builds it from the source of each release; every release checks that it holds the same code before attaching it.
+
+## Linux
+
+Twinmap targets x86_64 Linux with glibc 2.39 or newer (such as Ubuntu 24.04), PipeWire and xdg-desktop-portal, and WoW: Forever under Wine, Proton, Lutris, Bottles or Steam. Capture has been tested with the real game on Hyprland; GNOME and KDE have not yet been verified.
+
+1. [Download the Linux AppImage](https://github.com/catubba/twinmap-forever/releases/latest/download/Twinmap-x86_64.AppImage), make it executable with `chmod +x Twinmap-x86_64.AppImage`, and open it. AppImages may require FUSE on your distribution.
+2. Start the game, click **Connect** in Twinmap and select the World of Warcraft window in the screen-sharing picker. If you close and restart the game, use **Choose another window** and select the new game window. On Hyprland, you can allow a restore token in the picker to remember the selection while the game stays open.
+
+On Hyprland, use `xwayland:force_zero_scaling` or a scale of 1, and disable rounding for the game window. Use a compositor window rule if you want Twinmap always on top. HDR is not supported on Linux.
+
+Linux updates are manual: download each new AppImage from the releases page and replace the old one. The app does not automatically update the AppImage.
 
 ## What it does
 

@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest'
 import { t } from './i18n'
 import { protocolMismatch, type GameState } from './game'
-import { experience, linkStatus, LOST_AFTER, type LinkSnapshot } from './link'
+import { canChooseCapture, experience, linkStatus, LOST_AFTER, type LinkSnapshot } from './link'
 
 const NOW = 1_000_000
 const link = (game: LinkSnapshot['game'], state: Partial<GameState> = {}, seconds = 600): LinkSnapshot => ({
@@ -15,6 +15,20 @@ const heard = (ago: number, pos = {}): Partial<GameState> => ({ sections: { pos 
 
 test('with a fresh position the link is connected, and says nothing on the map', () => {
   expect(linkStatus(link('open', heard(3000)), NOW)).toEqual({ kind: 'connected', word: 'Connected', tone: 'done' })
+})
+
+test('a running capture can be reselected even when the game appears minimized', () => {
+  expect(canChooseCapture({ ...link('minimized'), capture: { state: 'running' } })).toBe(true)
+  expect(canChooseCapture({ ...link('open'), capture: { state: 'picking' } })).toBe(false)
+  expect(canChooseCapture(null)).toBe(false)
+})
+
+test('Linux capture waits for an explicit window choice', () => {
+  const waiting = { ...link('open', heard(1000)), capture: { state: 'waiting' as const } }
+  expect(linkStatus(waiting, NOW)).toMatchObject({ kind: 'connect', word: t('app.link.noWindow') })
+  expect(linkStatus({ ...waiting, game: 'closed' }, NOW).kind).toBe('closed')
+  expect(linkStatus({ ...waiting, capture: { state: 'picking' } }, NOW).kind).toBe('waiting')
+  expect(linkStatus({ ...waiting, capture: { state: 'unsupported', why: 'portal' } }, NOW).line).toContain('portal')
 })
 
 test('in a fight it says position only', () => {
@@ -90,4 +104,8 @@ test('paused, the link says so before anything else, and back from a pause it is
   expect(linkStatus(back, NOW)).toMatchObject({ kind: 'waiting', word: 'Connecting' })
   expect(linkStatus(back, NOW + LOST_AFTER).kind).toBe('lost')
   expect(linkStatus({ ...link('open', heard(1000)), resumedAt: NOW - 3000 }, NOW).kind).toBe('connected')
+})
+
+test('a capture hint explains a lost signal', () => {
+  expect(linkStatus({ ...link('open'), capture: { state: 'running', hint: 'wrong-window' } }, NOW)).toMatchObject({ kind: 'lost', line: t('app.link.wrongWindowLine') })
 })

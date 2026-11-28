@@ -46,6 +46,10 @@ export default {
   },
 
   link: {
+    noWindow: "未选择窗口",
+    connectLine: "Twinmap 需要查看 World of Warcraft 窗口。点击连接并选择该窗口。",
+    chooseAgainLine: "Twinmap 无法看到游戏窗口。请重新选择。",
+    unsupportedLine: "Twinmap 无法读取此桌面上的窗口：{why}",
     paused: '已暂停',
     closed: '游戏未运行',
     closedLine: '游戏未运行。地图仍可使用，登录游戏后会显示你的位置。',
@@ -59,6 +63,8 @@ export default {
     connecting: '正在连接',
     lost: '连接中断',
     // "its strip is not paused" said as "sending is not paused": the strip has no name the player knows.
+    wrongWindowLine: "此窗口中已有 10 秒没有信号条。如果这不是魔兽世界，请选择其他窗口。",
+    notRememberedLine: "下次 Twinmap 可能会再次要求选择窗口。请在选择器或合成器设置中启用恢复令牌。",
     lostLine: '没有收到游戏的信号。请登录游戏，并确认Twinmap Forever插件已启用、发送没有暂停。',
     screenRecording: 'Twinmap暂时无法读取游戏窗口。请在“系统设置 > 隐私与安全 > 录屏与系统录音”中打开Twinmap（如果列表中没有，请用+按钮添加），然后重新打开Twinmap。',
     combat: '战斗中，仅显示位置',
@@ -71,6 +77,8 @@ export default {
   },
 
   map: {
+    connect: "连接",
+    chooseWindow: "选择其他窗口",
     addonMissing: '你的游戏中没有Twinmap Forever插件，因此无法获取位置。请从CurseForge获取，然后重启游戏。',
     getAddon: '从CurseForge获取',
     paused: 'Twinmap已暂停：地图停留在你原来的位置，不再跟随你的角色。',
@@ -176,6 +184,8 @@ export default {
   },
 
   firstRun: {
+    connect: "连接",
+    chooseWindow: "选择其他窗口",
     steps: '步骤',
     building: '正在生成地图',
     secondsLeft: { other: '大约还需{count}秒' },

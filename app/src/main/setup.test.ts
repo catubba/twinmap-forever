@@ -16,6 +16,16 @@ const CONNECTED: LinkStatus = { kind: 'connected', word: 'Connected', tone: 'don
 const CLOSED: LinkStatus = { kind: 'closed', word: 'Game not running', tone: 'objective' }
 const READY: TilesStatus = { state: 'ready', folder: 'x', version: '1.60.1', tiles: 9302, missing: 0, seconds: 16, converted: true }
 
+test('the play page offers Connect when Linux needs a window', () => {
+  const setup = { ...setupStatus('/game', {}, '0.1.0'), linux: true as const, capture: { state: 'waiting' as const } }
+  const status: LinkStatus = { kind: 'connect', word: t('app.link.noWindow'), tone: 'objective', line: t('app.link.connectLine') }
+  expect(setupPages(setup, READY, status)[4]).toMatchObject({ state: 'problem', action: 'connect', lines: [status.line] })
+  expect(setupPages(setup, READY, { ...status, capture: { state: 'refused' } })[4]?.action).toBe('choose-window')
+  expect(setupPages({ ...setup, capture: { state: 'running' } }, READY, { kind: 'minimized', word: 'Minimized', tone: 'objective', capture: { state: 'running' } })[4]?.reselectCapture).toBe(true)
+  const unsupported: LinkStatus = { kind: 'lost', word: 'Lost', tone: 'objective', line: 'portal missing', capture: { state: 'unsupported', why: 'portal missing' } }
+  expect(setupPages(setup, READY, unsupported)[4]).toMatchObject({ state: 'problem', lines: ['portal missing'] })
+})
+
 test('the addon is found by its .toc, with its version; Questie by the file of its data', () => {
   const game = folder()
   expect(setupStatus(game, {}, '0.1.0')).toEqual({ gameFolder: game, addon: null, questie: false, shortestPath: false, done: false, version: '0.1.0', onTop: false, participate: null })
@@ -148,4 +158,46 @@ test('the language asked is kept between runs', () => {
   expect(readSettings(file)).toEqual({ setupDone: true, langAsked: true, lang: 'frFR' })
   writeSettings(file, { lang: 'pseudo-ko' }) // a pseudo-language of a script, for trials
   expect(readSettings(file)).toEqual({ lang: 'pseudo-ko' })
+})
+
+test('the Linux play page behaves as on Windows when no capture state is given', () => {
+  const setup: SetupStatus = { gameFolder: '/WoW', addon: '0.1.0', questie: false, shortestPath: false, done: false, version: '0.1.0', onTop: false, participate: false }
+  for (const link of [null, CLOSED, CONNECTED, { ...CLOSED, kind: 'lost' } as LinkStatus]) {
+    expect(setupPages({ ...setup, linux: true }, READY, link)[4]).toEqual(setupPages(setup, READY, link)[4])
+  }
+})
+test('on Linux the addon page gives the folder with forward slashes, as on macOS', () => {
+  const setup: SetupStatus = { linux: true, gameFolder: '/WoW', addon: null, questie: false, shortestPath: false, done: false, version: '0.1.0', onTop: false, participate: false }
+  expect(setupPages(setup, READY, null).find((p) => p.id === 'addon')?.lines[1]).toBe(t('app.firstRun.addon.howToMac'))
+})
+
+test('capture tokens persist only when valid', () => {
+  const file = join(folder(), 'settings.json')
+  for (const token of ['a1b2-c3', '4f0c2a8e-6a51-4c43-9b7e-1d2f3a4b5c6d']) {
+    writeSettings(file, { captureToken: token })
+    expect(readSettings(file)).toEqual({ captureToken: token })
+  }
+  for (const token of ['', 'x y', 'é', 'x'.repeat(600), 5]) {
+    writeFileSync(file, JSON.stringify({ captureToken: token }))
+    expect(readSettings(file)).toEqual({})
+  }
+})
+
+test('a rotating token survives interleaved settings writes', () => {
+  const file = join(folder(), 'settings.json')
+  const settings: import('./setup').Settings = { onTop: true }
+  writeSettings(file, settings)
+  settings.captureToken = 'first-token'
+  writeSettings(file, settings)
+  settings.zoom = 1.25
+  writeSettings(file, settings)
+  settings.captureToken = 'second-token'
+  writeSettings(file, settings)
+  expect(readSettings(file)).toEqual({ onTop: true, zoom: 1.25, captureToken: 'second-token' })
+})
+
+test('a capture hint offers another window on the play page', () => {
+  const setup = { ...setupStatus('/game', {}, '0.1.0'), capture: { state: 'running' as const, hint: 'wrong-window' as const } }
+  expect(setupPages(setup, READY, CLOSED)[4]).toMatchObject({ action: 'choose-window' })
+  expect(setupPages(setup, READY, CLOSED)[4]?.reselectCapture).toBeUndefined()
 })

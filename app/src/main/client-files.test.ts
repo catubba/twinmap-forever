@@ -1,11 +1,11 @@
 import { createHash } from 'node:crypto'
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { deflateSync } from 'node:zlib'
 import { expect, test } from 'vitest'
 import { salsa20 } from '../shared/salsa20'
-import { EncryptedFileError, gameFolderFrom, installedBuild, openClientFiles, registryInstallPath } from './client-files'
+import { EncryptedFileError, gameFolderFrom, gameInstallPaths, installedBuild, openClientFiles, registryInstallPath } from './client-files'
 import { sentKeys } from './keys'
 
 const md5 = (b: Buffer): Buffer => createHash('md5').update(b).digest()
@@ -262,4 +262,22 @@ test.skipIf(!sent.has(8283))('the real game opens a locked world file with the k
   const world = openClientFiles(real!, sent).read(6992746)!
   expect(world.toString('latin1', 0, 4)).toBe('REVM')
   expect(world.length).toBe(163908)
+})
+
+test.skipIf(process.platform !== 'linux')('on Linux the install paths are the Wine ones', () => {
+  const client = fakeClient([], 2), home = mkdtempSync(join(tmpdir(), 'twinmap-home-')), prefix = join(home, '.wine')
+  mkdirSync(join(prefix, 'dosdevices'), { recursive: true })
+  symlinkSync('/', join(prefix, 'dosdevices', 'z:'))
+  const win = 'Z:' + client.replaceAll('/', '\\\\') + '\\\\_forever_\\\\'
+  writeFileSync(join(prefix, 'system.reg'), `WINE REGISTRY Version 2\n\n[Software\\\\Wow6432Node\\\\Blizzard Entertainment\\\\World of Warcraft] 1\n"InstallPath"="${win}"\n`)
+  const saved = { HOME: process.env.HOME, WINEPREFIX: process.env.WINEPREFIX }
+  process.env.HOME = home
+  delete process.env.WINEPREFIX
+  try {
+    expect(gameFolderFrom(gameInstallPaths())).toBe(client)
+  } finally {
+    process.env.HOME = saved.HOME
+    if (saved.WINEPREFIX === undefined) delete process.env.WINEPREFIX
+    else process.env.WINEPREFIX = saved.WINEPREFIX
+  }
 })

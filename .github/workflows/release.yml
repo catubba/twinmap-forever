@@ -15,6 +15,7 @@ permissions:
 
 jobs:
   release:
+    needs: linux
     runs-on: windows-latest
     defaults:
       run:
@@ -92,6 +93,15 @@ jobs:
           ' ../addon/TwinmapForever/TwinmapForever.toc "$VERSION" dist/addon/release.json
           cat dist/addon/release.json
 
+      - uses: actions/download-artifact@v4
+        with:
+          name: linux-appimage
+          path: app/dist/linux
+      - name: Prepare the Linux AppImage
+        run: |
+          test -f "dist/linux/Twinmap-$VERSION-x86_64.AppImage"
+          cp "dist/linux/Twinmap-$VERSION-x86_64.AppImage" dist/linux/Twinmap-x86_64.AppImage
+
       # The installer, its blockmap and the file that names the latest version: the app updates itself only with all three.
       - name: Publish the release
         run: |
@@ -101,9 +111,11 @@ jobs:
           # The installer once more under a name with no version in it: the address of the latest one is then always
           # the same (releases/latest/download/Twinmap-Setup.exe), for the site and the README to link the download itself.
           cp "dist/Twinmap-Setup-$VERSION.exe" dist/Twinmap-Setup.exe
-          gh release create "$GITHUB_REF_NAME" --title "Twinmap $VERSION" --notes-file notes.md $PRE \
+          gh release create "$GITHUB_REF_NAME" --draft --title "Twinmap $VERSION" --notes-file notes.md $PRE \
             "dist/Twinmap-Setup-$VERSION.exe" "dist/Twinmap-Setup-$VERSION.exe.blockmap" $UPDATE_FILES dist/Twinmap-Setup.exe \
-            "dist/addon/TwinmapForever-$VERSION.zip" dist/addon/release.json
+            "dist/addon/TwinmapForever-$VERSION.zip" dist/addon/release.json \
+            "dist/linux/Twinmap-$VERSION-x86_64.AppImage" dist/linux/Twinmap-x86_64.AppImage
+          gh release edit "$GITHUB_REF_NAME" --draft=false
 
       # The result goes into the release notes, and into virustotal.json for the badge of the README and of the site.
       # A scan that fails does not take the release back: it is published already.
@@ -151,3 +163,31 @@ jobs:
             exit 0
           fi
           node scripts/curseforge.js "dist/addon/TwinmapForever-$VERSION.zip" ../addon/TwinmapForever/TwinmapForever.toc "$VERSION" notes.md
+  linux:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: sudo apt-get update && sudo apt-get install -y libpipewire-0.3-dev libglib2.0-dev
+      - run: npm ci
+      - name: Build the AppImage
+        run: |
+          echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          npm run dist:linux -- -c.extraMetadata.version="${GITHUB_REF_NAME#v}"
+      - name: Check the AppImage
+        run: |
+          test -f "dist/Twinmap-$VERSION-x86_64.AppImage"
+          node scripts/check-appimage.cjs "dist/Twinmap-$VERSION-x86_64.AppImage" --helper
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-appimage
+          path: app/dist/Twinmap-*-x86_64.AppImage
+          if-no-files-found: error
+          retention-days: 7

@@ -10,6 +10,7 @@ import { app, BrowserWindow } from 'electron'
 import { autoUpdater } from 'electron-updater'
 import { join } from 'node:path'
 import { WINDOW } from '../shared/window'
+import { canReplace, justUpdated, selfUpdates } from './update-gate'
 
 const ANSWER_WITHIN = 4000 // ms the look for a newer version may take before the app opens without it
 const READ_FOR = 1200 // ms the small window says the new version is being put in place, before this app closes
@@ -24,7 +25,7 @@ export type Updating = { version: string; percent: number; installing?: boolean 
  */
 export function updateFirst(open: () => void, say: (line: string) => void): void {
   // Started by the installer after an update: it says so, and there is nothing newer to look for.
-  if (process.platform !== 'win32' || !app.isPackaged || process.argv.includes('--updated')) return open()
+  if (!selfUpdates(process.platform, process.env) || !app.isPackaged || justUpdated(process.argv, process.platform === 'linux' ? process.env : {}) || (process.platform === 'linux' && !canReplace(process.env))) return open()
   let opened = false
   let win: BrowserWindow | null = null
   // Whatever goes wrong, at any point, the app opens as it is: an update is never a reason not to start.

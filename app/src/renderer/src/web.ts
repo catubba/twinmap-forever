@@ -80,6 +80,8 @@ if (!inApp) {
       if (link) window.open(link, '_blank', 'noopener')
       return Promise.resolve()
     },
+    chooseCapture: () => Promise.resolve(),
+    connectCapture: () => Promise.resolve(),
     setOnTop: () => Promise.resolve(),
     setZoom: () => Promise.resolve(),
     setWorkspaces: () => Promise.resolve(), // a phone has the defaults (M20-F13 gives it its own)

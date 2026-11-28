@@ -47,6 +47,10 @@ export default {
   },
 
   link: {
+    noWindow: "창을 선택하지 않음",
+    connectLine: "Twinmap이 World of Warcraft 창을 볼 수 있어야 합니다. 연결을 누르고 창을 선택하세요.",
+    chooseAgainLine: "Twinmap이 게임 창을 볼 수 없습니다. 창을 다시 선택하세요.",
+    unsupportedLine: "이 데스크톱에서 Twinmap이 창을 읽을 수 없습니다: {why}",
     paused: '일시 정지됨',
     closed: '게임 실행 안 됨',
     closedLine: '게임이 실행되지 않았습니다. 지도는 계속 사용할 수 있으며, 접속하면 위치가 표시됩니다.',
@@ -61,6 +65,8 @@ export default {
     connecting: '연결 중',
     lost: '연결 끊김',
     // "the strip is not paused" said as "sending is not paused": the strip has no name the player knows.
+    wrongWindowLine: "이 창에서 10초 동안 신호 줄이 보이지 않습니다. World of Warcraft 창이 아니라면 다른 창을 선택하세요.",
+    notRememberedLine: "다음에 Twinmap이 창을 다시 선택하도록 요청할 수 있습니다. 선택 창이나 컴포지터 설정에서 복원 토큰을 활성화하세요.",
     lostLine: '게임에서 신호가 없습니다. 게임에 접속한 다음, Twinmap Forever 애드온이 켜져 있고 전송이 일시 정지되지 않았는지 확인하십시오.',
     screenRecording: 'Twinmap이 아직 게임 창을 읽을 수 없습니다. "시스템 설정 > 개인정보 보호 및 보안 > 화면 및 시스템 오디오 녹음"에서 Twinmap을 켜십시오(목록에 없으면 + 버튼으로 추가하십시오). 그런 다음 Twinmap을 다시 여십시오.',
     combat: '전투 중, 위치만',
@@ -73,6 +79,8 @@ export default {
   },
 
   map: {
+    connect: "연결",
+    chooseWindow: "다른 창 선택",
     addonMissing: '게임에 Twinmap Forever 애드온이 없어 위치를 받을 수 없습니다. CurseForge에서 받은 다음 게임을 다시 시작하십시오.',
     getAddon: 'CurseForge에서 받기',
     paused: 'Twinmap이 일시 정지되었습니다. 지도는 마지막 위치에 머물고 캐릭터를 따라가지 않습니다.',
@@ -179,6 +187,8 @@ export default {
   },
 
   firstRun: {
+    connect: "연결",
+    chooseWindow: "다른 창 선택",
     steps: '단계',
     building: '지도 만드는 중',
     secondsLeft: { other: '약 {count}초 남음' },

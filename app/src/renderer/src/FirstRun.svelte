@@ -10,6 +10,7 @@
   import Logo from './Logo.svelte'
   import { pageIn, pageOut } from './motion'
   import { t } from '../../shared/i18n'
+  import { inApp } from './web'
 
   let { setup, tiles, link, onclose }: { setup: SetupStatus; tiles: TilesStatus | null; link: LinkStatus | null; onclose: () => void } = $props()
 
@@ -84,6 +85,11 @@
             <button class="btn" onclick={() => window.twinmap.openCurseForge()}>{t('app.firstRun.getAddon')}</button>
           {:else if page.action === 'retry'}
             <button class="btn" onclick={() => window.twinmap.retryTiles()}>{t('app.firstRun.retry')}</button>
+          {:else if inApp && (page.action === 'connect' || page.action === 'choose-window')}
+            <button class="btn" onclick={() => page.action === 'connect' ? window.twinmap.connectCapture() : window.twinmap.chooseCapture()}>{page.action === 'connect' ? t('app.firstRun.connect') : t('app.firstRun.chooseWindow')}</button>
+          {/if}
+          {#if inApp && page.reselectCapture}
+            <button class="btn" onclick={() => window.twinmap.chooseCapture()}>{t('app.firstRun.chooseWindow')}</button>
           {/if}
           {#each page.get ?? [] as addon (addon)}
             <button class="btn" onclick={() => window.twinmap.openCurseForge(addon)}>{t('app.firstRun.getOptional', { name: OPTIONAL[addon].name })}</button>

@@ -2,7 +2,11 @@
 import type { GameState } from './game'
 import { t } from './i18n'
 
+export type CaptureState = 'idle' | 'waiting' | 'picking' | 'running' | 'cancelled' | 'refused' | 'unsupported'
+export type CaptureView = { state: CaptureState; why?: string; hint?: 'wrong-window' | 'not-remembered' }
+
 export interface LinkSnapshot {
+  capture?: CaptureView
   /** Present only on macOS while Screen Recording permission is missing. */
   screenRecording?: false
   /** The game's window: not found, minimized (nothing to read), or on screen. */
@@ -24,14 +28,16 @@ export interface LinkSnapshot {
 
 /** How the link is, for the top row: a word, its colour, and a sentence for the map when the player has something to do. */
 export interface LinkStatus {
-  kind: 'paused' | 'connected' | 'combat' | 'waiting' | 'closed' | 'minimized' | 'lost' | 'update-app' | 'update-addon'
+  kind: 'connect' | 'paused' | 'connected' | 'combat' | 'waiting' | 'closed' | 'minimized' | 'lost' | 'update-app' | 'update-addon'
   word: string
   /** Green: all well. Gold: in a fight. Red: no position is coming. Dim: not known yet. */
   tone: 'done' | 'gold' | 'objective' | 'dim'
   line?: string
+  capture?: CaptureView
 }
 
 // The addon sends the position at least every 10 seconds. Two missed and a margin: the strip has stopped.
+export const canChooseCapture = (link: Pick<LinkSnapshot, 'capture'> | null): boolean => link?.capture?.state === 'running'
 export const LOST_AFTER = 25_000
 
 export function linkStatus(link: LinkSnapshot, now: number): LinkStatus {
@@ -41,18 +47,25 @@ export function linkStatus(link: LinkSnapshot, now: number): LinkStatus {
   if (link.game === 'closed')
     return { kind: 'closed', word: t('app.link.closed'), tone: 'objective', line: t('app.link.closedLine') }
   if (link.game === 'minimized')
-    return { kind: 'minimized', word: t('app.link.minimized'), tone: 'objective', line: t('app.link.minimizedLine') }
+    return { kind: 'minimized', word: t('app.link.minimized'), tone: 'objective', line: t('app.link.minimizedLine'), ...(link.capture && { capture: link.capture }) }
+  const hint = link.capture?.hint
+  const hinted = hint === 'wrong-window' ? t('app.link.wrongWindowLine') : hint === 'not-remembered' ? t('app.link.notRememberedLine') : undefined
+  const capturing = link.capture?.state
+  if (capturing === 'waiting' || capturing === 'cancelled' || capturing === 'refused')
+    return { kind: 'connect', word: t('app.link.noWindow'), tone: 'objective', line: t(capturing === 'waiting' ? 'app.link.connectLine' : 'app.link.chooseAgainLine'), capture: link.capture }
+  if (capturing === 'unsupported') return { kind: 'lost', word: t('app.link.lost'), tone: 'objective', line: t('app.link.unsupportedLine', { why: link.capture?.why ?? '' }), capture: link.capture }
+  if (capturing === 'picking') return { kind: 'waiting', word: t('app.link.connecting'), tone: 'dim' }
   if (link.screenRecording === false)
     return { kind: 'lost', word: t('app.link.lost'), tone: 'objective', line: t('app.link.screenRecording') }
   if (state.protocol)
     return { kind: `update-${state.protocol.update}`, word: state.protocol.update === 'app' ? t('app.link.updateApp') : t('app.link.updateAddon'), tone: 'objective', line: state.protocol.message }
   const heard = Math.max(0, ...Object.values(state.updatedAt))
-  if (!heard && link.seconds * 1000 < LOST_AFTER) return { kind: 'waiting', word: t('app.link.connecting'), tone: 'dim' }
+  if (!heard && link.seconds * 1000 < LOST_AFTER) return { kind: 'waiting', word: t('app.link.connecting'), tone: 'dim', ...(hinted && { line: hinted }) }
   // Back from a pause, the addon reads the news within seconds and draws again: until then the link is not lost.
-  if (link.resumedAt !== undefined && heard < link.resumedAt && now - link.resumedAt < LOST_AFTER) return { kind: 'waiting', word: t('app.link.connecting'), tone: 'dim' }
+  if (link.resumedAt !== undefined && heard < link.resumedAt && now - link.resumedAt < LOST_AFTER) return { kind: 'waiting', word: t('app.link.connecting'), tone: 'dim', ...(hinted && { line: hinted }) }
   if (now - heard > LOST_AFTER)
-    return { kind: 'lost', word: t('app.link.lost'), tone: 'objective', line: t('app.link.lostLine') }
-  const line = insideLine(link.inside)
+    return { kind: 'lost', word: t('app.link.lost'), tone: 'objective', line: hinted ?? t('app.link.lostLine') }
+  const line = insideLine(link.inside) ?? hinted
   if (state.sections.pos?.combat) return { kind: 'combat', word: t('app.link.combat'), tone: 'gold', ...(line && { line }) }
   return { kind: 'connected', word: t('app.link.connected'), tone: 'done', ...(line && { line }) }
 }

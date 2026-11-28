@@ -18,7 +18,7 @@ import { feedbackLink, sendFeedback } from '../shared/feedback'
 import { pageOf, setupComplete, setupPages, type SetupStatus } from '../shared/setup'
 import { tilesLine, type TilesStatus } from '../shared/tiles-status'
 import { placeWindow, WINDOW, ZOOMS, zoomStep } from '../shared/window'
-import { captureAllowed, findGameWindow, loadCapture, programOf, requestCapture, stopCapture } from './capture'
+import { captureAllowed, captureState, chooseCapture, findGameWindow, loadCapture, programOf, requestCapture, stopCapture, useTokenStore } from './capture'
 import { readHdr } from './hdr'
 import { gameFolderFrom, gameInstallPaths, gameLocale, installedBuild } from './client-files'
 import { homeAddress, LAN_PORT, startLan, type Lan, type Served } from './lan'
@@ -32,7 +32,7 @@ import startQuestieWorker from './questie-worker?nodeWorker'
 import { sendSamples, startSamples } from './samples'
 import { langFor, langNow, offerAll, offered, planned, setLang, t } from '../shared/i18n'
 import { workspacesOf } from '../shared/workspaces'
-import { addonHearsFonts, addonsFolder, askLangOf, newsSinceOf, readSettings, setupStatus, writeSettings } from './setup'
+import { addonHearsFonts, addonsFolder, askLangOf, newsSinceOf, isCaptureToken, readSettings, setupStatus, writeSettings } from './setup'
 import { hear, installChannel, removeSlots, send as sendSignal, sendOld, sentParts } from './signal'
 import { MAPS_FILE, servedFile } from './tiles'
 import startTilesWorker from './tiles-worker?nodeWorker'
@@ -337,6 +337,14 @@ function createWindow(): void {
 
   const settingsFile = join(app.getPath('userData'), 'settings.json')
   const settings = readSettings(settingsFile)
+  useTokenStore({
+    get: () => settings.captureToken,
+    set: token => {
+      if (isCaptureToken(token)) settings.captureToken = token
+      else delete settings.captureToken
+      writeSettings(settingsFile, settings)
+    },
+  })
   let gameFolder = findGameFolder(settings.gameFolder)
   // The language: the one chosen in the settings, else the game's, else English. The pages ask for it as they load.
   // TWINMAP_LANGS=all, for trials, offers the languages written but not out yet.
@@ -572,7 +580,7 @@ function createWindow(): void {
   // turns it on in the settings. The same page, the same map files, and what a page may ask for above.
   let lan: Lan | null = null
   let lanWord: SetupStatus['lan'] = null
-  const lookSetup = (): SetupStatus => ({ ...setupStatus(gameFolder, settings, app.getVersion()), ...(process.platform === 'darwin' ? { mac: true, ...(!captureAllowed() ? { screenRecording: false } : {}) } : {}), lan: lanWord, zoom: settings.zoom ?? 1, gpu: { chosen: settings.noGpu !== true, running: GPU }, lang: langNow(), langs: planned(), gameLang: gameLang(), askLang, newsSince: newsSinceOf(settings, app.getVersion()), ...(settings.workspaces ? { workspaces: settings.workspaces } : {}) })
+  const lookSetup = (): SetupStatus => ({ ...setupStatus(gameFolder, settings, app.getVersion()), ...(process.platform === 'darwin' ? { mac: true, ...(!captureAllowed() ? { screenRecording: false } : {}) } : {}), ...(process.platform === 'linux' ? { linux: true as const, ...((capture) => capture ? { capture } : {})(captureState()) } : {}), lan: lanWord, zoom: settings.zoom ?? 1, gpu: { chosen: settings.noGpu !== true, running: GPU }, lang: langNow(), langs: planned(), gameLang: gameLang(), askLang, newsSince: newsSinceOf(settings, app.getVersion()), ...(settings.workspaces ? { workspaces: settings.workspaces } : {}) })
   const lanUrl = async (): Promise<void> => {
     const address = await homeAddress()
     if (lan) lanWord = address ? { url: `http://${address}:${LAN_PORT}/?k=${settings.lanCode}` } : { error: t('app.main.noNetwork') }
@@ -879,6 +887,14 @@ function createWindow(): void {
   })
   win.setAlwaysOnTop(settings.onTop === true)
   // From the settings: the window over the others or not. The choice is kept.
+  ipcMain.handle('choose-capture', () => {
+    if (process.platform === 'linux') chooseCapture()
+  })
+  ipcMain.handle('connect-capture', () => {
+    if (process.platform !== 'linux') return
+    requestCapture()
+    setup = lookSetup()
+  })
   ipcMain.handle('set-on-top', (_event, on: unknown) => {
     settings.onTop = on === true
     writeSettings(settingsFile, settings)
@@ -931,8 +947,8 @@ function createWindow(): void {
   const showZoom = (): void => {
     const zoom = settings.zoom ?? 1
     win.webContents.setZoomFactor(zoom)
-    // The title bar overlay exists only on Windows; on macOS the call throws and stopped the zoom.
-    if (process.platform === 'win32') win.setTitleBarOverlay({ height: Math.round(WINDOW.top * zoom) })
+    // The title bar overlay does not exist on macOS; the call throws there.
+    if (process.platform === 'win32' || process.platform === 'linux') win.setTitleBarOverlay({ height: Math.round(WINDOW.top * zoom) })
     if (process.platform === 'darwin') win.setWindowButtonPosition(macButtonsAt(zoom))
   }
   const zoomTo = (zoom: unknown): void => {
@@ -1095,6 +1111,8 @@ function createWindow(): void {
     ipcMain.removeHandler('choose-game-folder')
     ipcMain.removeHandler('open-curseforge')
     ipcMain.removeHandler('open-feedback')
+    ipcMain.removeHandler('choose-capture')
+    ipcMain.removeHandler('connect-capture')
     ipcMain.removeHandler('set-on-top')
     ipcMain.removeHandler('set-zoom')
     ipcMain.removeHandler('set-gpu')
@@ -1136,7 +1154,7 @@ void Promise.all([captureReady, app.whenReady()]).then(([captureError]) => {
   }
   record.say(`started: Twinmap ${app.getVersion()}${GPU ? '' : ', hardware acceleration off'}`)
   if (captureError) record.say(captureError)
-  if (!captureAllowed()) {
+  if (process.platform === 'darwin' && !captureAllowed()) {
     // Asking makes macOS register Twinmap for the permission and may show its prompt; preflight alone never does.
     requestCapture()
     record.say('Twinmap cannot read the game window yet. Under System Settings > Privacy & Security > Screen & System Audio Recording, turn on Twinmap (add it with + if it is not listed), then reopen Twinmap.')

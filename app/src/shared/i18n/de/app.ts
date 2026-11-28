@@ -47,6 +47,10 @@ export default {
   },
 
   link: {
+    noWindow: "Fenster nicht ausgewählt",
+    connectLine: "Twinmap muss das World of Warcraft Fenster sehen. Klicke auf Verbinden und wähle es aus.",
+    chooseAgainLine: "Twinmap konnte das Spielfenster nicht sehen. Wähle es erneut aus.",
+    unsupportedLine: "Twinmap kann auf diesem Desktop keine Fenster lesen: {why}",
     paused: 'Pausiert',
     closed: 'Spiel geschlossen',
     closedLine: 'Das Spiel läuft nicht. Die Karte funktioniert trotzdem; Eure Position erscheint, sobald Ihr Euch einloggt.',
@@ -60,6 +64,8 @@ export default {
     connecting: 'Verbinde',
     // "Disconnected": short, the line under it says why.
     lost: 'Getrennt',
+    wrongWindowLine: "Seit 10 Sekunden kein Streifen in diesem Fenster. Falls es nicht World of Warcraft ist, wähle ein anderes Fenster.",
+    notRememberedLine: "Twinmap fragt beim nächsten Mal möglicherweise erneut nach dem Fenster. Aktiviere Wiederherstellungstoken in der Auswahl oder den Compositor-Einstellungen.",
     lostLine: 'Kein Signal vom Spiel. Loggt Euch ein und prüft, ob das Twinmap-Forever-Addon aktiv ist und sein Streifen nicht pausiert ist.',
     screenRecording: 'Twinmap kann das Spielfenster noch nicht lesen. Schaltet Twinmap unter "Systemeinstellungen > Datenschutz & Sicherheit > Aufnahme von Bildschirm & Systemaudio" ein (fügt es mit + hinzu, falls es nicht aufgelistet ist) und öffnet Twinmap dann erneut.',
     combat: 'Im Kampf, nur Position',
@@ -71,6 +77,8 @@ export default {
   },
 
   map: {
+    connect: "Verbinden",
+    chooseWindow: "Anderes Fenster auswählen",
     addonMissing: 'Das Twinmap-Forever-Addon ist nicht in Eurem Spiel, daher kann keine Position ankommen. Holt es Euch auf CurseForge und startet dann das Spiel neu.',
     getAddon: 'Auf CurseForge holen',
     paused: 'Twinmap ist pausiert: Die Karte bleibt, wo Ihr wart, und Euer Charakter wird nicht verfolgt.',
@@ -171,6 +179,8 @@ export default {
   },
 
   firstRun: {
+    connect: "Verbinden",
+    chooseWindow: "Anderes Fenster auswählen",
     steps: 'Schritte',
     building: 'Karte wird erstellt',
     secondsLeft: { one: 'noch etwa {count} Sekunde', other: 'noch etwa {count} Sekunden' },

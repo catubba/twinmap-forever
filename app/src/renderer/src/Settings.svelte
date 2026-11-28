@@ -103,7 +103,12 @@
       <!-- The window is the computer's: a phone on the home network has none to set. -->
       {#if inApp}
         <label class="choice">{t('settings.window.textSize')} <select class="field size" value={setup.zoom ?? 1} onchange={(e) => window.twinmap.setZoom(Number(e.currentTarget.value))}>{#each ZOOMS as z (z)}<option value={z}>{num(z, { style: 'percent' })}</option>{/each}</select></label>
-        <label class="choice"><input type="checkbox" class="check" checked={setup.onTop} onchange={(e) => window.twinmap.setOnTop(e.currentTarget.checked)} />{t('settings.window.onTop')}</label>
+        {#if setup.capture && setup.capture.state !== 'idle'}
+          <div class="line"><span>{t('app.map.chooseWindow')}</span><button class="btn" onclick={() => window.twinmap.chooseCapture()}>{t('app.map.chooseWindow')}</button></div>
+        {/if}
+        {#if !setup.linux}
+          <label class="choice"><input type="checkbox" class="check" checked={setup.onTop} onchange={(e) => window.twinmap.setOnTop(e.currentTarget.checked)} />{t('settings.window.onTop')}</label>
+        {/if}
         <div class="setting">
           <label class="choice"><input type="checkbox" class="check" checked={setup.gpu?.chosen ?? true} onchange={(e) => window.twinmap.setGpu(e.currentTarget.checked)} />{t('settings.window.gpu')}</label>
           <p class="hint">{t('settings.window.gpuHint')}</p>

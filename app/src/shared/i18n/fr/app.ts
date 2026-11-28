@@ -46,6 +46,10 @@ export default {
   },
 
   link: {
+    noWindow: "Fenêtre non sélectionnée",
+    connectLine: "Twinmap doit voir la fenêtre de World of Warcraft. Cliquez sur Connecter et sélectionnez-la.",
+    chooseAgainLine: "Twinmap ne voit pas la fenêtre du jeu. Sélectionnez-la à nouveau.",
+    unsupportedLine: "Twinmap ne peut pas lire les fenêtres sur ce bureau : {why}",
     paused: 'En pause',
     closed: 'Jeu fermé',
     closedLine: 'Le jeu n’est pas lancé. La carte fonctionne quand même ; votre position apparaît quand vous vous connectez.',
@@ -59,6 +63,8 @@ export default {
     olderAddon: 'L’addon Twinmap Forever est plus ancien que cette application (protocole {addon}, cette application utilise le {app}). Mettez l’addon à jour depuis CurseForge, puis relancez le jeu.',
     connecting: 'Connexion',
     lost: 'Connexion perdue',
+    wrongWindowLine: "Aucune bande dans cette fenêtre depuis 10 secondes. Si ce n’est pas World of Warcraft, choisissez une autre fenêtre.",
+    notRememberedLine: "Twinmap pourrait redemander la fenêtre la prochaine fois. Activez les jetons de restauration dans le sélecteur ou les paramètres du compositeur.",
     lostLine: 'Aucun signal du jeu. Connectez-vous et vérifiez que l’addon Twinmap Forever est activé et que sa bande n’est pas en pause.',
     screenRecording: 'Twinmap ne peut pas encore lire la fenêtre du jeu. Activez Twinmap dans « Réglages Système > Confidentialité et sécurité > Enregistrement de l’écran et des sons du système » (ajoutez-le avec + s’il ne figure pas dans la liste), puis rouvrez Twinmap.',
     combat: 'En combat, position seule',
@@ -70,6 +76,8 @@ export default {
   },
 
   map: {
+    connect: "Connecter",
+    chooseWindow: "Choisir une autre fenêtre",
     addonMissing: 'L’addon Twinmap Forever n’est pas dans votre jeu, aucune position ne peut donc arriver. Téléchargez-le sur CurseForge, puis relancez le jeu.',
     getAddon: 'Obtenir sur CurseForge',
     paused: 'Twinmap est en pause : la carte reste où vous étiez et votre personnage n’est pas suivi.',
@@ -173,6 +181,8 @@ export default {
   },
 
   firstRun: {
+    connect: "Connecter",
+    chooseWindow: "Choisir une autre fenêtre",
     steps: 'Étapes',
     building: 'Création de la carte',
     secondsLeft: { one: 'environ {count} seconde restante', many: 'environ {count} de secondes restantes', other: 'environ {count} secondes restantes' },

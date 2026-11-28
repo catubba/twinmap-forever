@@ -47,6 +47,10 @@ export default {
   },
 
   link: {
+    noWindow: "Ventana no seleccionada",
+    connectLine: "Twinmap necesita ver la ventana de World of Warcraft. Haz clic en Conectar y selecciónala.",
+    chooseAgainLine: "Twinmap no pudo ver la ventana del juego. Selecciónala de nuevo.",
+    unsupportedLine: "Twinmap no puede leer ventanas en este escritorio: {why}",
     paused: 'En pausa',
     closed: 'Juego cerrado',
     closedLine: 'El juego no está abierto. El mapa sigue funcionando; tu posición aparece cuando entras al juego.',
@@ -60,6 +64,8 @@ export default {
     olderAddon: 'El addon Twinmap Forever es más antiguo que esta aplicación (protocolo {addon}, esta aplicación usa el {app}). Actualiza el addon desde CurseForge y reinicia el juego.',
     connecting: 'Conectando',
     lost: 'Conexión perdida',
+    wrongWindowLine: "No hay ninguna franja en esta ventana desde hace 10 segundos. Si no es World of Warcraft, elige otra ventana.",
+    notRememberedLine: "Twinmap podría volver a pedir la ventana la próxima vez. Activa los tokens de restauración en el selector o en la configuración del compositor.",
     lostLine: 'No llega ninguna señal del juego. Inicia sesión y verifica que el addon Twinmap Forever esté activado y que su franja no esté en pausa.',
     screenRecording: 'Twinmap aún no puede leer la ventana del juego. Activa Twinmap en "Configuración del Sistema > Privacidad y seguridad > Grabación de audio del sistema y pantalla" (agrégalo con + si no aparece en la lista), y luego vuelve a abrir Twinmap.',
     combat: 'En combate, solo posición',
@@ -71,6 +77,8 @@ export default {
   },
 
   map: {
+    connect: "Conectar",
+    chooseWindow: "Elegir otra ventana",
     addonMissing: 'El addon Twinmap Forever no está en tu juego, así que no puede llegar ninguna posición. Descárgalo de CurseForge y reinicia el juego.',
     getAddon: 'Descargar de CurseForge',
     paused: 'Twinmap está en pausa: el mapa se queda donde estabas y no sigue a tu personaje.',
@@ -174,6 +182,8 @@ export default {
   },
 
   firstRun: {
+    connect: "Conectar",
+    chooseWindow: "Elegir otra ventana",
     steps: 'Pasos',
     building: 'Creando el mapa',
     secondsLeft: { one: 'falta alrededor de {count} segundo', many: 'faltan unos {count} segundos', other: 'faltan unos {count} segundos' },

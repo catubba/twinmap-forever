@@ -1,13 +1,16 @@
 // The first run: its pages, one thing each, and what each says.
 import type { Workspaces } from './workspaces'
-import type { LinkStatus } from './link'
+import type { CaptureView, LinkStatus } from './link'
 import { tilesHelp, type TilesStatus } from './tiles-status'
 import { num, t } from './i18n'
 
 /** What the main process tells the window about the game folder and the addons in it. */
 export interface SetupStatus {
+  capture?: CaptureView
   /** The desktop app is on macOS. */
   mac?: true
+  /** The desktop app is on Linux. */
+  linux?: true
   /** Present only on macOS while Screen Recording permission is missing. */
   screenRecording?: false
   /** The folder of World of Warcraft: Forever, or null while none is found. */
@@ -72,7 +75,8 @@ export interface Page {
   lines: string[]
   /** Percent done, while the app is working on it. */
   progress?: number
-  action?: 'choose-folder' | 'curseforge' | 'retry' | 'language'
+  action?: 'choose-folder' | 'curseforge' | 'retry' | 'language' | 'connect' | 'choose-window'
+  reselectCapture?: boolean
   /** The optional addons that are not installed: each gets a button to its page on CurseForge. */
   get?: Optional[]
   /** Said on the page whatever its state: it must be read before the thing it warns of is on. */
@@ -115,7 +119,7 @@ export function setupPages(setup: SetupStatus, tiles: TilesStatus | null, link: 
       ? { state: 'done', lines: [t('app.firstRun.addon.installed'), t('app.firstRun.addon.inFolder', { version: setup.addon })] }
       : {
           state: 'todo',
-          lines: [t('app.firstRun.addon.notYet'), t(setup.mac ? 'app.firstRun.addon.howToMac' : 'app.firstRun.addon.howTo'), t('app.firstRun.addon.notices')],
+          lines: [t('app.firstRun.addon.notYet'), t(setup.mac || setup.linux ? 'app.firstRun.addon.howToMac' : 'app.firstRun.addon.howTo'), t('app.firstRun.addon.notices')],
           action: 'curseforge',
         }),
   }
@@ -138,10 +142,15 @@ export function setupPages(setup: SetupStatus, tiles: TilesStatus | null, link: 
     title: t('app.firstRun.play.title'),
     intro: t('app.firstRun.play.intro'),
     warning: t('app.firstRun.photosensitivity'),
+    ...(setup.capture?.state === 'running' && !setup.capture.hint ? { reselectCapture: true } : {}),
     ...(live
       ? { state: 'done', lines: [t('app.firstRun.play.connected')] }
       : setup.screenRecording === false
         ? { state: 'problem', lines: [t('app.link.screenRecording'), t('app.firstRun.play.tick')] }
+        : link?.kind === 'connect'
+          ? { state: 'problem', lines: [link.line ?? link.word], action: (link.capture ?? setup.capture)?.state === 'waiting' ? 'connect' : 'choose-window' }
+          : link?.capture?.state === 'unsupported' && link.line
+            ? { state: 'problem', lines: [link.line], action: 'connect' }
         : link?.kind === 'update-app' || link?.kind === 'update-addon'
           ? { state: 'problem', lines: [link.line ?? link.word] }
           : {
@@ -156,7 +165,7 @@ export function setupPages(setup: SetupStatus, tiles: TilesStatus | null, link: 
               ],
             }),
   }
-  return [game, map, addon, extras, play]
+  return [game, map, addon, extras, setup.capture?.state === 'running' && setup.capture.hint ? { ...play, action: 'choose-window' } : play]
 }
 
 /** The first page of the first run, before the five: the language, already on the game's when the app speaks it. */

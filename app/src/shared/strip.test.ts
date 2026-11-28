@@ -71,6 +71,13 @@ test('an even row, or one with no strip, is no strip', () => {
   expect(decodeRow(Uint8Array.from({ length: 1920 * 4 }, (_, i) => (i * 37) % 256))).toEqual({ kind: 'none' })
 })
 
+test('a narrow strip decodes on a wide row with a colored background', () => {
+  const row = new Uint8Array(3840 * 4)
+  for (let i = 0; i < row.length; i += 4) row.set([32, 64, 128, 255], i)
+  row.set(pixels(strips.narrow[0]!))
+  expect(decodeRow(row).kind).toBe('block')
+})
+
 test('a section split into several blocks joins back, in whatever order the parts come', () => {
   const zone = 'Città di Roccavento è qui '.repeat(4)
   const readings = strips.narrow.map((s) => decodeRow(pixels(s)))

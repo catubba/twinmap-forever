@@ -79,6 +79,10 @@ export default {
   // The state of the link with the game, in the top row (word: short, beside a coloured dot), and the line
   // it puts at the foot of the map when the player has something to do (shared/link.ts).
   link: {
+    noWindow: "Window not chosen",
+    connectLine: "Twinmap needs to see the World of Warcraft window. Click Connect and choose it.",
+    chooseAgainLine: "Twinmap could not see the game window. Choose it again.",
+    unsupportedLine: "Twinmap cannot read windows on this desktop: {why}",
     paused: 'Paused',
     closed: 'Game not running',
     closedLine: 'Game not running. The map still works; your position appears when you log in.',
@@ -95,6 +99,8 @@ export default {
     olderAddon: 'The Twinmap Forever addon is older than this app (protocol {addon}, this app speaks {app}). Update the addon from CurseForge, then restart the game.',
     connecting: 'Connecting',
     lost: 'Link lost',
+    wrongWindowLine: 'No strip in this window for 10 seconds. If it is not World of Warcraft, choose another window.',
+    notRememberedLine: 'Twinmap may ask for the window again next time. Enable restore tokens in the picker or compositor settings.',
     lostLine: 'No signal from the game. Log in, and check that the Twinmap Forever addon is on and its strip is not paused.',
     // macOS only: shown on the map and in setup while Screen Recording permission is missing; Windows needs no such permission.
     // Use the names of System Settings and its panes as macOS shows them in this language; + is the button under the list.
@@ -110,6 +116,8 @@ export default {
 
   // Lines at the foot of the map (App.svelte), each followed on the same line by a button.
   map: {
+    connect: "Connect",
+    chooseWindow: "Choose another window",
     addonMissing: 'The Twinmap Forever addon is not in your game, so no position can come. Get it on CurseForge, then restart the game.',
     // A button after addonMissing: short.
     getAddon: 'Get it on CurseForge',
@@ -245,6 +253,8 @@ export default {
 
   // The first run (FirstRun.svelte, shared/setup.ts): five pages, one thing each, with a row of their titles on top.
   firstRun: {
+    connect: "Connect",
+    chooseWindow: "Choose another window",
     // The row of the titles of the pages, read aloud only.
     steps: 'Steps',
     // The progress bar of the map, read aloud only.

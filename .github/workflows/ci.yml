@@ -74,6 +74,33 @@ jobs:
           test -f "$helper"
           test "$(lipo -archs "$helper")" = arm64
 
+  app-linux:
+    needs: changes
+    if: needs.changes.outputs.app == 'true'
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: sudo apt-get update && sudo apt-get install -y libpipewire-0.3-dev libglib2.0-dev
+      - run: npm ci
+      - run: npm run check
+      - run: npm test
+      - run: npm run build
+      - run: npm run dist:linux
+      - run: node scripts/check-appimage.cjs dist/Twinmap-0.0.0-x86_64.AppImage --helper
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Twinmap-linux
+          path: app/dist/*.AppImage
+          retention-days: 7
+
   server:
     runs-on: ubuntu-latest
     steps:
