@@ -8,10 +8,16 @@
 local _, ns = ...
 
 local LEGS = 12 -- legs told at most: a journey across the world has fewer
-local TEXT = 60 -- letters of a leg's text, and of the goal's name
+local TEXT = 60 -- bytes of a leg's text, and of the goal's name
 
 local function Num(v) if type(v) == "number" and not (issecretvalue and issecretvalue(v)) then return v end end
-local function Str(v) if type(v) == "string" and not (issecretvalue and issecretvalue(v)) then return v:sub(1, TEXT) end end
+-- Cut at TEXT bytes, but never inside a letter: a letter cut in half makes the whole block unreadable to the app.
+local function Str(v)
+  if type(v) ~= "string" or (issecretvalue and issecretvalue(v)) then return end
+  local stop = TEXT
+  while stop > 0 and stop < #v and v:byte(stop + 1) >= 0x80 and v:byte(stop + 1) < 0xC0 do stop = stop - 1 end
+  return v:sub(1, stop)
+end
 
 -- What the app is told: the journey, { loading = true } while its plan is searched, or that there
 -- is none. Told from the first journey on, also when there is none: the app must hear it end.
