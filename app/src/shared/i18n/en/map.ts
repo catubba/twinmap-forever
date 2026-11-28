@@ -104,6 +104,11 @@ export default {
     // Tooltips on those buttons: the last shows every room; {level} is the number on the button.
     everyRoom: 'Every room',
     roomsUpTo: 'Rooms up to level {level}',
+    // Inside a dungeon or a raid: a button beside its name that shows the usual way through it, the bosses numbered in order. Short.
+    route: 'Route',
+    // Its tooltip; the second for the dungeons World of Warcraft: Forever added, whose routes come from guides and videos.
+    routeTip: 'The usual way through, the bosses in order',
+    routeRoughTip: 'The usual way through, the bosses in order: approximate, from guides',
     // Buttons with a plus and a minus, read aloud only; then their tooltips, with the keys that do it too.
     zoomIn: 'Zoom in',
     zoomInTip: 'Zoom in (+)',
