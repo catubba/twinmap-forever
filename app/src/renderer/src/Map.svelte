@@ -1071,7 +1071,7 @@
       if (underOf) inside3d.set([], [])
       underOf = folder
       void fetch(`${TILES}/${folder}/under.json`)
-        .then((answer) => (answer.status === 200 ? (answer.json() as Promise<UnderRoom[]>) : []))
+        .then((answer) => (answer.status === 200 ? (answer.json() as Promise<{ rooms: UnderRoom[] }>).then((made) => made.rooms ?? []) : []))
         .catch(() => [])
         .then((under) => {
           if (underOf === folder && under.length) inside3d!.set(pieces, under, true)

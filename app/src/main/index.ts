@@ -461,9 +461,10 @@ function createWindow(): void {
     // The ground's own textures of the 3D view are made the same way, the first time the view asks (ground.ts).
     const ground = groundAsked(path)
     if (ground !== null && file && !bytes) bytes = (await tiles.item('ground', ground)) ? await readFile(file).catch(() => null) : null
-    // So are the buildings and objects of a dungeon, the first time it is opened in 3D (dungeons.ts).
+    // So are the buildings and objects of a dungeon, the first time it is opened in 3D (dungeons.ts); and its lists are
+    // always asked of the one making, which knows those made before in a way since changed and makes them again
     const dungeon = dungeonAsked(path)
-    if (dungeon !== null && file && !bytes) bytes = (await tiles.item('dungeon', dungeon)) ? await readFile(file).catch(() => null) : null
+    if (dungeon !== null && file && (!bytes || path.endsWith('.json'))) bytes = (await tiles.item('dungeon', dungeon)) ? await readFile(file).catch(() => null) : bytes // a game not to be read keeps what it had
     if (item && !bytes) return { status: 404 }
     // Where the game has no picture there is no file. That is the sea, not a fault: an empty picture for
     // a tile and an empty answer for a block, so the page logs no error for it.

@@ -16,7 +16,8 @@
 // rooms that lie under the ground are listed, for the view to open the ground over them (inside3d.ts); and the ground
 // round the buildings dug in rock is cut, seen from anywhere (M23-F30; shared/inside.ts, inRock and rockCut), with the
 // objects that stand on it:
-//   i<map>/under.json    of its pieces (interiors.json) those inside the ground: [index, floor, yards of ground over it, 1 in rock]
+//   i<map>/under.json    { rule: ROCK_RULE, rooms }: of its pieces (interiors.json) those inside the ground, [index, floor,
+//                        yards of ground over it, 1 in rock]
 import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { dungeonFolder, type Placed } from '../shared/buildings'
@@ -38,6 +39,8 @@ import { dungeonWorldFile, finishedInteriors, MAP_FILE, placedIn } from './inter
 import { makeProps, PROPS_FILE } from './props'
 
 export const UNDER_FILE = 'under.json'
+/** Which rule told the rooms in rock (shared/inside.ts, inRock): a dungeon made with another is made again. 2: M23-F30 with ROCK_UNDER. */
+export const ROCK_RULE = 2
 
 /**
  * The dungeon a path asks something made here of, by the game's number of its map; null for any other path. Its list
@@ -103,12 +106,12 @@ export function dungeonMaker(files: () => ClientFiles, folder: string, table: (b
       const name = dungeonFolder(map), list = join(folder, name, PLACED_FILE)
       // a list of another format is of buildings made again since, for the continents: its files are gone; and so
       // with its objects, whose list goes when they are made in another format (props.ts)
-      // and one made before its rooms in rock were told (an under.json of rooms of three numbers each), with its ground uncut
+      // and one whose rooms in rock were told by another rule, or not at all (an under.json of rooms only)
       const done = (): boolean => {
         try {
           if ((JSON.parse(readFileSync(list, 'utf8')) as Placed).format !== FORMAT || !existsSync(join(folder, name, PROPS_FILE))) return false
           const under = join(folder, name, UNDER_FILE)
-          if (existsSync(under) && !(JSON.parse(readFileSync(under, 'utf8')) as unknown[]).every((r) => Array.isArray(r) && r.length >= 4)) return false
+          if (existsSync(under) && (JSON.parse(readFileSync(under, 'utf8')) as { rule?: number }).rule !== ROCK_RULE) return false
           made.add(map)
           return true
         } catch {
@@ -152,7 +155,7 @@ export function dungeonMaker(files: () => ClientFiles, folder: string, table: (b
         })
         if (cutRound.length) cut = (u, v) => rockCut(cutRound, u, v)
         const file = join(folder, name, UNDER_FILE)
-        writeFileSync(file + '.part', JSON.stringify(under))
+        writeFileSync(file + '.part', JSON.stringify({ rule: ROCK_RULE, rooms: under }))
         renameSync(file + '.part', file)
       }
       // the objects first: the list of the buildings, written last, is what the view waits for

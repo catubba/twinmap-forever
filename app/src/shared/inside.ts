@@ -216,6 +216,8 @@ export function lidOver(pieces: Piece[], [u1, v1, u2, v2]: Box, level: number): 
 
 /** Yards the ground over a building's rooms is, in the middle, over their ceilings, from which the building is dug in rock. */
 export const ROCK_DEEP = 50
+/** The share of the area of a dungeon's rooms that lies inside the ground (roofOf), at least, for it to be dug in rock. */
+export const ROCK_UNDER = 0.8
 /** Yards a boss stands under the ground over it, at least, to be in the rock and not on the ground. */
 const UNDER_GROUND = 20
 /** The ground round a room in rock is cut this many yards over its floor, as a dungeon's buildings are round the character (buildings3d.ts, DUNGEON_CUT). */
@@ -226,6 +228,9 @@ export const ROCK_SLOPE = 1
 /**
  * The buildings of a dungeon dug in rock (M23-F30; measured in design/dungeons3d/rock.ts): the ground over their rooms
  * lies, in the middle of a point every 4 yards of their pieces, ROCK_DEEP yards or more over their ceilings. None in a
+ * dungeon with less than ROCK_UNDER of its rooms inside the ground: one with rooms in the open is a place one walks,
+ * and its caves under that ground stay covered (Zul'Gurub's temples, the city of Scarlet Enclave, the ruins of
+ * Ahn'Qiraj: 32 to 56%, against 93 to 100% in Deadmines, Blackwing Lair and Karazhan Crypts). None either in a
  * dungeon whose bosses stand on the ground more than under it: there the ground is the place one walks, and a
  * building as deep under it is a cellar (Zul'Farrak, Ruins of Lordaeron over Undercity). The depth alone does not tell
  * (Undercity lies 127 yards under the ruins), nor the objects on the ground (the dead trees over the crypts of
@@ -242,6 +247,8 @@ export function inRock(pieces: Piece[], groundAt: (u: number, v: number) => numb
     else on++
   }
   if (on > under) return new Set()
+  const area = (list: Piece[]): number => list.reduce((n, p) => n + p.width * p.height, 0)
+  if (area(pieces.filter((p) => roofOf(p, p.bottom, groundAt) !== null)) < ROCK_UNDER * area(pieces)) return new Set()
   const depths = new Map<number, number[]>()
   for (const p of pieces)
     for (const [u, v] of over(p, 4)) {
