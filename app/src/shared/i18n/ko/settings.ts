@@ -78,6 +78,9 @@ export default {
     daynightHint: '빛이 게임 속 시간을 따라가고, 밤에는 창문에 불이 켜집니다. 지역 이름 아래의 고리로 해를 옮길 수 있으며, 클릭하면 게임 시간으로 돌아갑니다.',
     dungeons: '3D 던전 (실험적)',
     dungeonsHint: '3D 보기에서 던전과 공격대를 방이 위에서 열린 모습으로 보여 줍니다. 아직 만드는 중이라 틀리거나 느릴 수 있습니다.',
+    memory: '그래픽 카드 메모리: {amount}',
+    amount: '약 {mb}MB',
+    costMb: '+{mb}MB',
     card: '그래픽 카드',
   },
 

@@ -31,6 +31,20 @@ export const graphics = $state({
   daynight: on('daynight', () => true),
 })
 
+/**
+ * How much of the graphics card's memory the 3D view takes, in MB, as measured switch by switch (M23-F20,
+ * design/graphics/vram-trial.js: Windows' count of the card's own memory the app's graphics process holds, the most of
+ * Stormwind, Ironforge and Goldshire): a part that is always there, a part that grows with the pixels of the window, and
+ * what each switch adds. Day and night and the dungeons add nothing.
+ */
+export const COSTS = { base: 150, megapixel: 125, buildings: 90, trees: 15, objects: 50, ground: 15 } as const
+
+/** The memory of the card the view takes with these switches, in a window of so many pixels of the card (rounded to 10 MB). */
+export function cardMemory(g: Pick<typeof graphics, 'buildings' | 'trees' | 'objects' | 'ground'>, pixels: number): number {
+  const mb = COSTS.base + (COSTS.megapixel * pixels) / 1e6 + (g.buildings ? COSTS.buildings : 0) + (g.trees ? COSTS.trees : 0) + (g.objects ? COSTS.objects : 0) + (g.ground ? COSTS.ground : 0)
+  return Math.round(mb / 10) * 10
+}
+
 export function setGraphics(to: Partial<typeof graphics>): void {
   Object.assign(graphics, to)
   for (const key of ['buildings', 'trees', 'objects', 'ground', 'dungeons', 'daynight'] as const) localStorage.setItem(key, graphics[key] ? 'on' : 'off')

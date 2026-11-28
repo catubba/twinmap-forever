@@ -79,6 +79,9 @@ export default {
     daynightHint: '光照跟随游戏中的时间，夜晚窗户会亮起。区域名称下方的圆环可以移动太阳，点击即回到游戏时间。',
     dungeons: '3D地下城（实验性）',
     dungeonsHint: '在3D视图中显示地下城和团队副本，房间从上方敞开。仍在开发中：显示可能有误或较慢。',
+    memory: '显卡内存：{amount}',
+    amount: '约 {mb} MB',
+    costMb: '+{mb} MB',
     card: '显卡',
   },
 

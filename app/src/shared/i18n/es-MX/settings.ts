@@ -78,6 +78,9 @@ export default {
     daynightHint: 'La luz sigue la hora del día en el juego y por la noche se encienden las ventanas. El anillo bajo el nombre de la zona mueve el sol; un clic vuelve a la hora del juego.',
     dungeons: 'Calabozo 3D (experimental)',
     dungeonsHint: 'Calabozos y bandas en la vista 3D, con las salas abiertas desde arriba. Aún en construcción: puede verse mal o ir lenta.',
+    memory: 'Memoria de la tarjeta gráfica: {amount}',
+    amount: 'unos {mb} MB',
+    costMb: '+{mb} MB',
     card: 'Tarjeta gráfica',
   },
 
