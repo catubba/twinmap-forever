@@ -279,9 +279,10 @@ export function propsMade(folder: string, worlds: string[]): boolean {
  * Makes the trees and objects of the continents given, in the folder of the build: each model once, kept as it is made
  * (an interrupted run resumes), the copies of each continent by block, its list last. read: a game file by number, null
  * when there is none or the server has not sent its key. rooms: of a dungeon, the pieces of its 2D map: a lid over
- * them is left out. Gives what was made.
+ * them is left out. cut: of a dungeon dug in rock, how high its ground is cut at a place (dungeons.ts): an object of
+ * the blocks standing over that is left out with it. Gives what was made.
  */
-export function makeProps(worlds: { name: string; wdt: Buffer; buried?: Set<string> | 'all'; rooms?: Piece[] }[], read: (id: number) => Buffer | null, folder: string): { models: number; copies: number } {
+export function makeProps(worlds: { name: string; wdt: Buffer; buried?: Set<string> | 'all'; rooms?: Piece[]; cut?: (u: number, v: number) => number }[], read: (id: number) => Buffer | null, folder: string): { models: number; copies: number } {
   const dir = join(folder, BUILDINGS_FOLDER), m2 = join(dir, M2)
   if (formatOf(folder) !== FORMAT) {
     rmSync(m2, { recursive: true, force: true })
@@ -320,9 +321,10 @@ export function makeProps(worlds: { name: string; wdt: Buffer; buried?: Set<stri
   let copies = 0
   for (const w of worlds) {
     const all = copiesOf(w.wdt, read, w.buried).filter((c) => model(c.file))
-    // giants (Darnassus' trees, wider than 100 yards) are never drawn: from above they are a roof over the city; nor is a lid over a dungeon's rooms
+    // giants (Darnassus' trees, wider than 100 yards) are never drawn: from above they are a roof over the city; nor is a lid over a dungeon's rooms, nor what stands on its ground cut away
     const scale = (c: { m: M }): number => Math.hypot(c.m[0]!, c.m[1]!, c.m[2]!)
-    const shown = all.filter((c) => !(models.get(c.file)!.tree && models.get(c.file)!.radius * scale(c) > 100) && !(w.rooms && isLid(c, models.get(c.file)!, w.rooms)))
+    const cutAway = (c: Copy): boolean => !!(w.cut && c.block && c.m[10]! + models.get(c.file)!.low * scale(c) > w.cut(c.m[9]!, c.m[11]!))
+    const shown = all.filter((c) => !(models.get(c.file)!.tree && models.get(c.file)!.radius * scale(c) > 100) && !(w.rooms && isLid(c, models.get(c.file)!, w.rooms)) && !cutAway(c))
     const trees = shown.filter((c) => models.get(c.file)!.tree)
     const bits = thinned(trees.map((c) => ({ x: c.m[9]!, z: c.m[11]!, crown: 0.6 * models.get(c.file)!.radius * scale(c) })))
     const kept = new Map<Copy, number>(trees.map((c, i) => [c, bits[i]!]))

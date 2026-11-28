@@ -77,11 +77,15 @@ const ROOF_HELD = 1500
 const ROOF_LOOKS = 24
 /** How much of a room shows through a mountain that is not its roof. */
 const ROOF_GHOST = 0.1
+/** The height of the cut where the ground is not cut: over everything. */
+const UNCUT = 1e6
 
 /** What lies inside the ground (inside3d.ts), as the view asks it. */
 export interface Under {
   roofOver(x0: number, z0: number, x1: number, z1: number): ((x: number, z: number) => number) | null
   floorAt(x: number, z: number): { y: number; open: number } | null
+  /** How high the ground is cut at round the rooms of a dungeon dug in rock; Infinity where it is not (M23-F30). */
+  cutAt(x: number, z: number): number
   step(camera: THREE.Vector3, dt: number): boolean
   seenPass(on: boolean): void
   /** Whether its pictures are left out of the view, the buildings being drawn whole (buildings3d.ts): they still open the ground. */
@@ -958,7 +962,8 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
       b = fz - i,
       h = found.grid.heights
     const v = (h[i * N + j]! * (1 - a) + h[i * N + j + 1]! * a) * (1 - b) + (h[(i + 1) * N + j]! * (1 - a) + h[(i + 1) * N + j + 1]! * a) * b
-    return v
+    // round the rooms of a dungeon dug in rock the ground is cut (inside3d.ts, cutAt): what is left there is the cut
+    return this.inside ? Math.min(v, this.inside.cutAt(x, z)) : v
   }
 
   // The finest node that is in, at each place, as one array: groundAt is asked thousands of times a
@@ -1194,6 +1199,12 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
       for (let k = 0; k < N * N; k++) roof[k] = roofed(pos[k * 3]!, pos[k * 3 + 2]!)
       ring.forEach((v, r) => (roof[N * N + r] = roof[v]!))
       ground.setAttribute('roofed', new THREE.BufferAttribute(roof, 1))
+      // and how high it is cut, round the rooms of a dungeon dug in rock (M23-F30): every ground that can open is told,
+      // for its program reads it (one not told would be cut at 0)
+      const cut = new Float32Array(count)
+      for (let k = 0; k < N * N; k++) cut[k] = Math.min(UNCUT, this.inside!.cutAt(pos[k * 3]!, pos[k * 3 + 2]!))
+      ring.forEach((v, r) => (cut[N * N + r] = cut[v]! - skirt)) // the skirt goes with the ground over it
+      ground.setAttribute('cut', new THREE.BufferAttribute(cut, 1))
     }
     // At a block and below the picture is the block's own, and so are the ground's textures.
     const material = texture ? this.groundWith(texture, !!roofed, n.z >= BLOCK_ZOOM ? `${n.x >> (n.z - BLOCK_ZOOM)} ${n.y >> (n.z - BLOCK_ZOOM)}` : null) : this.materials.ground
@@ -1208,6 +1219,7 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
       const hole = new THREE.Mesh<THREE.BufferGeometry, THREE.Material>(dark, this.materials.pit)
       if (roofed) {
         dark.setAttribute('roofed', ground.getAttribute('roofed'))
+        dark.setAttribute('cut', ground.getAttribute('cut'))
         hole.material = this.materials.openPit
         hole.renderOrder = -1
       }
@@ -1216,7 +1228,8 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
 
     // Liquids: a square a liquid, at the levels of its corners, grouped by kind. In a dungeon, none over a room under
     // the ground: the ground opens over it, and the water left there would hide it (the sea over Deadmines).
-    const drained = this.bare && roofed ? (a: number): boolean => [a, a + 1, a + N, a + N + 1].some((c) => roofed(pos[c * 3]!, pos[c * 3 + 2]!) >= 1) : null
+    // Nor over the ground cut round a room in rock: it would be left in the air.
+    const drained = this.bare && roofed ? (a: number): boolean => [a, a + 1, a + N, a + N + 1].some((c) => roofed(pos[c * 3]!, pos[c * 3 + 2]!) >= 1 || g.water[c]! > this.inside!.cutAt(pos[c * 3]!, pos[c * 3 + 2]!)) : null
     const lpos = new Float32Array(N * N * 3),
       byKind: number[][] = [[], [], [], [], []],
       wet = new Uint8Array(N * N) // the points of the squares of water
@@ -1333,12 +1346,15 @@ reflectedLight.directSpecular *= 2.0 * (1.0 - vColor.a);`)
   // room has over it, seen aslant, and a margin. Any other ground in front lets the room through as a ghost.
   private opening(shader: THREE.WebGLProgramParametersWithUniforms): void {
     Object.assign(shader.uniforms, this.roofs)
-    shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nattribute float roofed;\nvarying float vRoofed;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvRoofed = roofed;')
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nattribute float roofed, cut;\nvarying float vRoofed, vCut;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvRoofed = roofed;\nvCut = cut - (modelMatrix * vec4(transformed, 1.0)).y;')
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform sampler2D uSeen, uSeenDepth;\nuniform vec2 uSize;\nuniform float uNear, uFar, uDown;\nvarying float vRoofed;')
+      .replace('#include <common>', '#include <common>\nuniform sampler2D uSeen, uSeenDepth;\nuniform vec2 uSize;\nuniform float uNear, uFar, uDown;\nvarying float vRoofed, vCut;')
       .replace(
         '#include <dithering_fragment>',
         `#include <dithering_fragment>
+        if (vCut < 0.0) discard; // over the cut round a room in rock (M23-F30)
         vec2 at = gl_FragCoord.xy / uSize;
         vec4 behind = texture2D(uSeen, at);
         float gap = uNear * uFar / (uFar - texture2D(uSeenDepth, at).x * (uFar - uNear)) - vViewPosition.z;
