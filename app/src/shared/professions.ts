@@ -23,6 +23,8 @@ export interface Recipe {
 
 /** A heading of the window and its known recipes; an empty name for those under none the addon named. */
 export interface Group {
+  /** The game's number of the heading (0 none): two headings can share a name, as Alchemy's 2450 and 2651 in Chinese. */
+  id: number
   name: string
   recipes: Recipe[]
 }
@@ -93,7 +95,7 @@ export function professionsOf(pieces: Record<string, unknown>, facts: SpellFacts
     const mine = all.filter((a) => known.has(a[0])).map(recipe).sort(hardest)
     const groups: Group[] = []
     for (const id of [...new Set(mine.map((r) => (headings.has(r.heading) ? r.heading : 0)))].sort((a, b) => (headings.get(a)?.[1] ?? Infinity) - (headings.get(b)?.[1] ?? Infinity) || a - b))
-      groups.push({ name: headings.get(id)?.[0] ?? '', recipes: mine.filter((r) => (headings.has(r.heading) ? r.heading : 0) === id) })
+      groups.push({ id, name: headings.get(id)?.[0] ?? '', recipes: mine.filter((r) => (headings.has(r.heading) ? r.heading : 0) === id) })
     out.push({
       line: line!,
       name: fact[0],
