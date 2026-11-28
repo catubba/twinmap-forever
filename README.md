@@ -88,11 +88,13 @@ The AppImage updates itself in place, so your shortcuts to it keep working. Not 
 
 One click turns the flat map into the land itself: mountains, valleys, coasts and rivers in relief, to turn, tilt and zoom, with your arrow, your quests and your route standing on the ground. In 2D and in 3D the map can turn with your character, as Rotate Minimap does in the game, or keep north up. Come close to a cave, a mine or Ironforge and the ground opens over it.
 
+The 3D view draws the game's own buildings, trees and objects, from your game files, and its light follows the hour of the game's day. Settings, Graphics turns each one on or off, or sets them all with Quality.
+
 ![Twinmap goes from the flat map to 3D with one click, down to Ironforge open inside its mountain](https://twinmap.app/media/3d.gif)
 
 ### Even inside dungeons
 
-In dungeons and raids the arrow moves through the rooms, with the bosses marked and your companions beside you, each in the colour of their class. Open a dungeon's map from its door, before you go in.
+In dungeons and raids the arrow moves through the rooms, with the bosses marked and your companions beside you, each in the colour of their class. Open a dungeon's map from its door, before you go in. A Route button draws the usual way through each dungeon and raid, the bosses in order; in 3D, as an experimental option, its rooms open from above.
 
 ![The arrow and four companions run through The Temple of Atal'Hakkar, the bosses killed behind them](https://twinmap.app/media/dungeon.gif)
 
@@ -111,11 +113,12 @@ Bags, bank, gear and statistics of every character you play, with a picture of e
 ### And more
 
 - **Your own layout.** The tabs at the top are workspaces of panels. With Edit layout, put the map, Now, your bags or the auction house side by side, stack them or group them as tabs, and make workspaces of your own.
-- **Your look.** Your arrow in any colour and size, the quest pins with Twinmap's icons, the game's or Questie's, and objectives as icons or as areas.
+- **Your look.** The 2D map as the game's minimap or as its own World map, your arrow in any colour and size, the quest pins with Twinmap's icons, the game's or Questie's, and objectives as icons or as areas.
 - **Shopping list.** Add a recipe or an item, and Twinmap says what is missing, where to get it and what it all costs, and shows the vendors on the map or puts them on your route.
 - **In your language.** English, Français, Deutsch, Español (España), Español (Latinoamérica), Русский, 한국어 and 简体中文, the app and the addon, with the names of your game in its own language.
 - **Auction House.** The prices of your character's auction house, every hour: what your bags, bank and gear are worth, how a price moved over a day or a week, and an alert when it crosses your line.
 - **Your quests.** Where to hand in what is done and where to find what is left, for every quest of your log, with the XP and money each one gives. With Questie installed, the ones to take as well. It tells you which quests will soon give less XP, and can hide the ones that already do.
+- **Zone levels.** Every zone tinted by its levels against your character's, in the game's colours.
 - **Services and resources.** Flight masters, inns, vendors, repair, trainers, banks, ships and zeppelins, ore and herbs, each one a layer you turn on or off. Ore and herbs go by kind too, and can hide what no longer raises your skill.
 - **Caves and mines.** Zoom in on a zone and their galleries show through the ground, before you go in.
 - **When you die.** The map marks your corpse, the graveyard and the way back on foot, or the door of the dungeon you died in.
@@ -173,7 +176,7 @@ Here is what is planned, in no particular order. These are plans, not promises: 
 
 - **Group**: quests you share, pins everyone sees
 - **Travel**: flight paths, your hearthstone
-- **More on the map**: zones colored by level, the places you have explored, rares and treasures
+- **More on the map**: the places you have explored, rares and treasures
 - **Quests**: your whole quest log, chains, item rewards, and a plan for the session
 - **Character**: experience per hour, reputations, a reminder when your trainer has something new
 - **Alerts**: full bags, broken gear, a disconnected game, and why you died
