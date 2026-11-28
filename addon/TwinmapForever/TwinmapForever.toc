@@ -28,6 +28,8 @@ Bosses.lua
 Death.lua
 Inbox.lua
 Log.lua
+FlightMasters.lua
+Distance.lua
 Doors.lua
 Finds.lua
 Pin.lua

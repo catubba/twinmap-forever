@@ -19,6 +19,7 @@
   import { gameName, setGameNames } from '../../shared/game-names'
   import { NEW_DUNGEON_PINS } from '../../shared/new-dungeon-pins'
   import { MORE_BOSS_PINS } from '../../shared/more-boss-pins'
+  import { DUNGEON_ROUTES } from '../../shared/dungeon-routes'
   import { FIRST_ENTRANCE, MORE_DOORS } from '../../shared/dungeon-doors'
   import type { Position } from '../../shared/game'
   import { coloursFor, type Companion } from '../../shared/group'
@@ -684,7 +685,7 @@
     const size = rare ? 26 : 22
     return L.divIcon({ className: gone ? 'door' : 'door boss', iconSize: [size, size], html: pin(rare ? (gone ? 'rareSlain' : 'rareBoss') : gone ? 'slain' : 'boss') })
   }
-  let bosses = $state.raw<{ name: string; rare: boolean; marker: L.Marker; gone?: boolean }[]>([])
+  let bosses = $state.raw<{ name: string; rare: boolean; marker: L.Marker; u: number; v: number; gone?: boolean }[]>([])
   const dead = $derived(killedIn(kills, inside?.id))
   $effect(() => {
     for (const boss of bosses) {
@@ -752,7 +753,7 @@
     for (const [name, u, v] of all) {
       // A rare boss is not there in every run: a silver ring, and said in its name.
       const rare = RARE_BOSSES.has(nameOfBoss(name)), shown = gameName(name)
-      bossMarks.push({ name, rare, gone: false, marker: L.marker(atYards({ u, v }), { keyboard: false, icon: bossIcon(false, rare) }).bindTooltip(rare ? t('map.pins.rareBoss', { name: shown }) : shown, { permanent: true, direction: 'bottom', offset: [0, rare ? 11 : 9], className: 'boss-name' }).addTo(pins) })
+      bossMarks.push({ name, rare, u, v, gone: false, marker: L.marker(atYards({ u, v }), { keyboard: false, icon: bossIcon(false, rare) }).bindTooltip(rare ? t('map.pins.rareBoss', { name: shown }) : shown, { permanent: true, direction: 'bottom', offset: [0, rare ? 11 : 9], className: 'boss-name' }).addTo(pins) })
     }
     // The entrances: each wing's, and the other doors of the map where the app knows where they put the player in
     // (Uldaman's back door). Where there are several, each is named as its door on the world map is.
@@ -1961,6 +1962,46 @@
     else routeLayer.remove()
   })
 
+  // The usual way through the dungeon or raid on show (shared/dungeon-routes.ts), as the Route is drawn: a white line,
+  // dashed on the side ways, and the bosses numbered in the order of the route, the number on the skull's shoulder.
+  // A stop with no skull of ours near (a rare, not there every run) has a disc of the Route instead, a boss killed a
+  // dull number. With its rooms: of a level not shown, nothing. The button beside the dungeon's name turns it on and
+  // off, and the choice stays.
+  const NEAR_SKULL = 150 // yards: a skull of the same name farther than this is another boss of that name
+  let dungeonRoute = $state(localStorage.getItem('dungeonRoute') === '1')
+  const routesHere = $derived(inside ? DUNGEON_ROUTES.filter((r) => r.map === inside!.id) : [])
+  const dungeonRouteLayer = L.layerGroup()
+  $effect(() => {
+    dungeonRouteLayer.clearLayers()
+    if (!map || !dungeonRoute) return void dungeonRouteLayer.remove()
+    for (const r of routesHere) {
+      for (const side of [true, false]) {
+        const lines = r.lines.filter((l) => !!l.side === side && l.level <= upTo).map((l) => Array.from({ length: l.at.length / 2 }, (_, i) => atYards({ u: l.at[2 * i]!, v: l.at[2 * i + 1]! })))
+        for (const [color, weight] of [[COLOURS.edge, side ? 4.5 : 5.5], [COLOURS.route, side ? 2 : 3]] as const) L.polyline(lines, { color, weight, interactive: false, lineJoin: 'round', ...(side && { dashArray: '6 7' }) }).addTo(dungeonRouteLayer)
+      }
+      let n = 0
+      for (const [kind, name, u, v, level] of r.stops) {
+        const number = kind === 'rare' ? null : ++n
+        if (level > upTo) continue
+        const done = dead.has(nameOfBoss(name)), at = atYards({ u, v })
+        // Our skull of the same name, if near enough to be the same boss: the number goes on it.
+        const skull = bosses.find((b) => nameOfBoss(b.name) === nameOfBoss(name) && Math.hypot(b.u - u, b.v - v) <= NEAR_SKULL)
+        if (skull && number) L.marker(skull.marker.getLatLng(), { keyboard: false, interactive: false, zIndexOffset: 700, icon: L.divIcon({ className: `route-number${done ? ' done' : ''}`, iconSize: [17, 17], iconAnchor: [-2, 22], html: String(number) }) }).addTo(dungeonRouteLayer)
+        else if (!skull) {
+          const shown = gameName(name)
+          L.marker(at, { keyboard: false, zIndexOffset: 600, icon: L.divIcon({ className: `stop${done || !number ? ' done' : ''}`, iconSize: [16, 16], html: `<i></i>${done || !number ? '' : `<b>${number}</b>`}` }) })
+            .bindTooltip(Object.assign(document.createElement('span'), { textContent: number ? `${number}. ${shown}` : t('map.pins.rareBoss', { name: shown }) }), { direction: 'top', offset: [0, -8], className: 'tip' })
+            .addTo(dungeonRouteLayer)
+        }
+      }
+    }
+    dungeonRouteLayer.addTo(map)
+  })
+  function setDungeonRoute(on: boolean): void {
+    dungeonRoute = on
+    localStorage.setItem('dungeonRoute', on ? '1' : '0')
+  }
+
   // The choices are saved as they are made, and the map follows them.
   $effect(() => {
     localStorage.setItem('layers', JSON.stringify(layers))
@@ -2079,6 +2120,9 @@
     {/if}
     {#if inside}
       <span class="tag">{inside.name}</span>
+      {#if routesHere.length}
+        <button class="btn" aria-pressed={dungeonRoute} title={t(routesHere.some((r) => r.rough) ? 'map.corner.routeRoughTip' : 'map.corner.routeTip')} onclick={() => setDungeonRoute(!dungeonRoute)}>{t('map.corner.route')}</button>
+      {/if}
     {/if}
     {#each [1, 0] as const as which (which)}
       <button class="btn" aria-pressed={!inside && continent === which} onclick={() => choose(which)}>{NAMES[which]}</button>
@@ -2510,6 +2554,19 @@
   }
   .map :global(.stop.done i) {
     border-color: var(--text-dim);
+    background: var(--text-dim);
+  }
+  /* The number of a boss in the order of the dungeon's route, on its skull's shoulder: gold, as the Route's rings. */
+  .map :global(.route-number) {
+    box-sizing: border-box;
+    border-radius: 50%;
+    background: var(--gold);
+    box-shadow: 0 0 0 1.5px #000;
+    font: 700 12px/17px var(--font);
+    color: #000;
+    text-align: center;
+  }
+  .map :global(.route-number.done) {
     background: var(--text-dim);
   }
   .map :global(.stop b) {
